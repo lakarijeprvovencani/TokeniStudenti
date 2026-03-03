@@ -130,6 +130,7 @@ const processedStripeEvents = new Set();
 const STRIPE_EVENT_TTL = 60 * 60 * 1000;
 
 app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  console.log('Stripe webhook received:', { hasBody: !!req.body, bodyLen: req.body?.length, hasSig: !!req.headers['stripe-signature'] });
   const Stripe = (await import('stripe')).default;
   const sig = req.headers['stripe-signature'];
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -143,6 +144,7 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
     const stripe = new Stripe(stripeKey);
     event = stripe.webhooks.constructEvent(req.body, sig, secret);
   } catch (err) {
+    console.error('Stripe webhook signature error:', err.message);
     return res.status(400).send('Webhook signature verification failed');
   }
   if (event.type !== 'checkout.session.completed') {
@@ -577,7 +579,7 @@ app.post('/create-checkout', authLimiter, requireStudentAuth, async (req, res) =
     params.append('line_items[0][quantity]', '1');
     params.append('metadata[key_id]', req.studentKeyId);
     params.append('success_url', baseUrl + '/dashboard?paid=1');
-    params.append('cancel_url', baseUrl + '/dashboard');
+    params.append('cancel_url', baseUrl + '/dashboard?cancelled=1');
 
     const resp = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
