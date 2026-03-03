@@ -578,8 +578,8 @@ app.post('/create-checkout', authLimiter, requireStudentAuth, async (req, res) =
     params.append('line_items[0][price_data][unit_amount]', String(Math.round(amountUsd * 100)));
     params.append('line_items[0][quantity]', '1');
     params.append('metadata[key_id]', req.studentKeyId);
-    params.append('success_url', baseUrl + '/dashboard?paid=1');
-    params.append('cancel_url', baseUrl + '/dashboard?cancelled=1');
+    params.append('success_url', baseUrl + '/payment-status?status=success&amount=' + amountUsd);
+    params.append('cancel_url', baseUrl + '/payment-status?status=cancelled');
 
     const resp = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
@@ -708,6 +708,9 @@ app.get('/health', (_req, res) => {
 // ---- Static pages ----
 app.get('/dashboard', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html'));
+});
+app.get('/payment-status', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'payment-status.html'));
 });
 app.get('/setup', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'setup.html'));

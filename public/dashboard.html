@@ -295,8 +295,8 @@ function render(d){
 function closeBanner(id){$(id).style.display='none';history.replaceState(null,'','/dashboard')}
 (function(){
   const p=new URLSearchParams(location.search);
-  if(p.get('paid')==='1')$('payOk').style.display='flex';
-  if(p.get('cancelled')==='1')$('payFail').style.display='flex';
+  if(p.get('status')==='success'||p.get('paid')==='1')$('payOk').style.display='flex';
+  if(p.get('status')==='cancelled'||p.get('cancelled')==='1')$('payFail').style.display='flex';
 })();
 
 function topup(amount){

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VajbAgent – Status plaćanja</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0a;--surface:#161616;--border:#222;--text:#f5f5f5;--text2:#999;--text3:#666;--orange:#f97316;--orange2:#fb923c;--radius:12px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;-webkit-font-smoothing:antialiased;position:relative}
+body::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:600px;height:600px;border-radius:50%;pointer-events:none}
+body.ok::before{background:radial-gradient(circle,rgba(249,115,22,.06),transparent 65%)}
+body.fail::before{background:radial-gradient(circle,rgba(255,255,255,.02),transparent 65%)}
+
+.card{width:440px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:48px;text-align:center;position:relative;z-index:1}
+.icon{font-size:3.5rem;margin-bottom:16px;line-height:1}
+.ok .icon{color:var(--orange)}
+.fail .icon{color:var(--text3)}
+.title{font-size:1.4rem;font-weight:900;letter-spacing:-.03em;margin-bottom:8px}
+.desc{font-size:.9rem;color:var(--text2);line-height:1.6;margin-bottom:24px}
+.amount{display:inline-block;padding:8px 20px;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.2);border-radius:10px;font-size:1.5rem;font-weight:900;color:var(--orange);letter-spacing:-.02em;margin-bottom:24px}
+.note{font-size:.78rem;color:var(--text3);margin-bottom:24px;line-height:1.5}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(249,115,22,.2);border-top-color:var(--orange);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.btn{display:inline-block;padding:13px 32px;background:var(--orange);color:#000;border:none;border-radius:10px;font-weight:700;font-size:.9rem;font-family:inherit;cursor:pointer;text-decoration:none;transition:opacity .15s}
+.btn:hover{opacity:.88}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
+.btn-ghost:hover{color:var(--text);border-color:var(--text3)}
+.btns{display:flex;gap:10px;justify-content:center}
+.countdown{font-size:.72rem;color:var(--text3);margin-top:18px}
+</style>
+</head>
+<body>
+
+<div class="card" id="card">
+  <div class="icon" id="icon"></div>
+  <div class="title" id="title"></div>
+  <div class="desc" id="desc"></div>
+  <div class="amount" id="amount" style="display:none"></div>
+  <div class="note" id="note"></div>
+  <div class="btns" id="btns"></div>
+  <div class="countdown" id="countdown"></div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const status = params.get('status');
+const amount = params.get('amount');
+
+const card = document.getElementById('card');
+const icon = document.getElementById('icon');
+const title = document.getElementById('title');
+const desc = document.getElementById('desc');
+const amountEl = document.getElementById('amount');
+const note = document.getElementById('note');
+const btns = document.getElementById('btns');
+const countdown = document.getElementById('countdown');
+
+if (status === 'success') {
+  document.body.classList.add('ok');
+  icon.textContent = '✓';
+  title.textContent = 'Uplata uspešna!';
+  desc.textContent = 'Tvoji krediti su dodati na nalog. Možeš odmah da nastaviš sa korišćenjem VajbAgent modela u Cursoru.';
+  if (amount) {
+    amountEl.textContent = '+$' + parseFloat(amount).toFixed(2);
+    amountEl.style.display = 'inline-block';
+  }
+  note.innerHTML = '<span class="spinner"></span> Obrađujemo uplatu... Krediti se dodaju automatski u narednih par sekundi.';
+  btns.innerHTML = '<a href="/dashboard" class="btn">Idi na dashboard</a>';
+  countdown.textContent = 'Automatsko preusmeravanje za 8 sekundi...';
+
+  let sec = 8;
+  const iv = setInterval(() => {
+    sec--;
+    countdown.textContent = 'Automatsko preusmeravanje za ' + sec + ' sekund' + (sec === 1 ? 'u' : 'i') + '...';
+    if (sec <= 0) { clearInterval(iv); location.href = '/dashboard'; }
+  }, 1000);
+
+  setTimeout(() => {
+    note.innerHTML = '✓ Krediti su dodati na tvoj nalog.';
+  }, 3000);
+
+} else if (status === 'cancelled') {
+  document.body.classList.add('fail');
+  icon.textContent = '✕';
+  title.textContent = 'Plaćanje otkazano';
+  desc.textContent = 'Nisi naplaćen/a. Plaćanje je prekinuto pre završetka. Možeš pokušati ponovo kad god želiš.';
+  note.textContent = 'Ako je došlo do greške pri plaćanju, kontaktiraj administratora.';
+  btns.innerHTML = '<a href="/dashboard" class="btn">Nazad na dashboard</a>';
+
+} else {
+  document.body.classList.add('fail');
+  icon.textContent = '?';
+  title.textContent = 'Nepoznat status';
+  desc.textContent = 'Nešto nije u redu sa ovom stranicom.';
+  btns.innerHTML = '<a href="/dashboard" class="btn btn-ghost">Idi na dashboard</a>';
+}
+</script>
+</body>
+</html>
