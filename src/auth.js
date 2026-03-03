@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { getActiveKeys, findByKey } from './students.js';
 
 /**
@@ -6,6 +7,15 @@ import { getActiveKeys, findByKey } from './students.js';
 export function keyId(key) {
   if (!key) return 'unknown';
   return key.trim();
+}
+
+function safeMatch(candidate, list) {
+  for (const valid of list) {
+    const a = Buffer.from(String(candidate));
+    const b = Buffer.from(String(valid));
+    if (a.length === b.length && crypto.timingSafeEqual(a, b)) return valid;
+  }
+  return null;
 }
 
 /**
@@ -20,6 +30,11 @@ export function requireStudentAuth(req, res, next) {
     });
   }
   const token = auth.slice(7).trim();
+  if (!token || token.length < 5) {
+    return res.status(401).json({
+      error: { message: 'API ključ je prekratak.' },
+    });
+  }
   const validKeys = getActiveKeys();
   if (!validKeys.length) {
     console.warn('No active students configured.');
@@ -27,14 +42,15 @@ export function requireStudentAuth(req, res, next) {
       error: { message: 'Server nema konfigurisanih studenata. Kontaktiraj administratora.' },
     });
   }
-  if (!validKeys.includes(token)) {
+  const matched = safeMatch(token, validKeys);
+  if (!matched) {
     return res.status(403).json({
       error: { message: 'Nevažeći API ključ.' },
     });
   }
-  const student = findByKey(token);
-  req.studentApiKey = token;
-  req.studentKeyId = keyId(token);
+  const student = findByKey(matched);
+  req.studentApiKey = matched;
+  req.studentKeyId = keyId(matched);
   req.studentName = student?.name || 'Unknown';
   next();
 }

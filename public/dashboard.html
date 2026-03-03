@@ -1,390 +1,284 @@
 <!DOCTYPE html>
 <html lang="sr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VajbAgent – Dashboard</title>
-  <style>
-    :root {
-      --bg: #0a0a0a; --surface: #141414; --surface2: #1a1a1a; --surface3: #222;
-      --border: #2a2a2a; --text: #e5e5e5; --text2: #888; --text3: #555;
-      --accent: #8b5cf6; --accent2: #a78bfa; --green: #22c55e; --green-dim: #16a34a;
-      --red: #ef4444; --yellow: #eab308; --blue: #3b82f6;
-      --radius: 12px; --radius-sm: 8px;
-    }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, 'SF Pro Display', 'Inter', system-ui, sans-serif;
-      background: var(--bg); color: var(--text); min-height: 100vh;
-      -webkit-font-smoothing: antialiased;
-    }
-    .app { max-width: 960px; margin: 0 auto; padding: 0 24px 80px; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VajbAgent Dashboard</title>
+<style>
+:root{--bg:#09090b;--sidebar:#111113;--surface:#161618;--surface2:#1c1c1f;--border:#27272a;--border2:#3f3f46;--text:#fafafa;--text2:#a1a1aa;--text3:#71717a;--accent:#8b5cf6;--green:#22c55e;--red:#ef4444;--yellow:#eab308;--blue:#3b82f6;--radius:10px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
 
-    /* Login */
-    .login-wrap {
-      max-width: 400px; margin: 120px auto 0; padding: 40px;
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
-    .login-wrap h2 {
-      font-size: 1.25rem; font-weight: 600; margin-bottom: 6px;
-    }
-    .login-sub { font-size: 0.85rem; color: var(--text2); margin-bottom: 24px; }
-    .login-wrap input {
-      width: 100%; padding: 12px 14px; background: var(--surface2);
-      border: 1px solid var(--border); border-radius: var(--radius-sm);
-      color: var(--text); font-size: 0.9rem; outline: none;
-    }
-    .login-wrap input:focus { border-color: var(--accent); }
-    .login-wrap input { margin-bottom: 14px; }
-    .btn-primary {
-      width: 100%; padding: 12px; background: var(--accent); color: #fff;
-      border: none; border-radius: var(--radius-sm); font-size: 0.9rem;
-      font-weight: 600; cursor: pointer; transition: opacity 0.2s;
-    }
-    .btn-primary:hover { opacity: 0.85; }
-    .login-error { margin-top: 12px; font-size: 0.8rem; color: var(--red); }
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center}
+.login-box{width:360px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:40px}
+.login-box h2{font-size:1.15rem;font-weight:600;margin-bottom:4px}
+.login-box p{font-size:.82rem;color:var(--text2);margin-bottom:24px}
+.login-box input{width:100%;padding:11px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.88rem;outline:none;margin-bottom:14px}
+.login-box input:focus{border-color:var(--accent)}
+.login-box button{width:100%;padding:11px;background:var(--text);color:var(--bg);border:none;border-radius:8px;font-weight:600;font-size:.88rem;cursor:pointer}
+.login-box button:hover{opacity:.9}
+.login-err{color:var(--red);font-size:.8rem;margin-top:8px;display:none}
 
-    /* Header */
-    .header {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 24px 0; border-bottom: 1px solid var(--border);
-    }
-    .header-left h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
-    .header-key {
-      font-family: 'SF Mono', ui-monospace, monospace; font-size: 0.75rem;
-      color: var(--text2); margin-top: 2px;
-    }
-    .btn-ghost {
-      padding: 8px 16px; background: transparent; border: 1px solid var(--border);
-      color: var(--text2); font-size: 0.8rem; border-radius: var(--radius-sm);
-      cursor: pointer; transition: all 0.2s;
-    }
-    .btn-ghost:hover { border-color: var(--text2); color: var(--text); }
+.app{display:flex;min-height:100vh;display:none}
+.sidebar{width:220px;background:var(--sidebar);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10}
+.sidebar-brand{padding:0 20px 20px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.sidebar-brand h1{font-size:1rem;font-weight:700}
+.sidebar-brand p{font-size:.7rem;color:var(--text3);margin-top:2px;font-family:'SF Mono',monospace}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:.84rem;color:var(--text2);cursor:pointer;border-left:3px solid transparent;transition:all .15s}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.nav-item.active{color:var(--text);background:rgba(139,92,246,.08);border-left-color:var(--accent)}
+.nav-icon{font-size:1rem;width:20px;text-align:center}
+.sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)}
+.sidebar-footer button{width:100%;padding:8px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:7px;font-size:.78rem;cursor:pointer}
+.sidebar-footer button:hover{border-color:var(--border2);color:var(--text)}
+.main{margin-left:220px;flex:1;padding:28px 32px 60px;min-height:100vh}
 
-    /* Balance hero */
-    .hero {
-      margin: 28px 0; padding: 32px; background: var(--surface);
-      border: 1px solid var(--border); border-radius: var(--radius);
-      position: relative; overflow: hidden;
-    }
-    .hero::before {
-      content: ''; position: absolute; top: -40px; right: -40px;
-      width: 200px; height: 200px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(139,92,246,0.15), transparent 70%);
-    }
-    .hero-label { font-size: 0.75rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.08em; }
-    .hero-amount {
-      font-size: 3rem; font-weight: 700; letter-spacing: -0.03em;
-      margin: 8px 0 4px; line-height: 1;
-    }
-    .hero-amount .currency { font-size: 1.2rem; font-weight: 400; color: var(--text2); margin-left: 6px; }
-    .hero-sub { font-size: 0.8rem; color: var(--text3); }
-    .topup-row { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
-    .btn-topup {
-      padding: 8px 18px; background: var(--surface2); border: 1px solid var(--border);
-      color: var(--text); font-size: 0.8rem; font-weight: 600;
-      border-radius: 999px; cursor: pointer; transition: all 0.2s;
-    }
-    .btn-topup:hover { border-color: var(--accent); color: var(--accent); }
-    .topup-error { margin-top: 10px; font-size: 0.8rem; color: var(--red); }
+.page{display:none}.page.active{display:block}
+.page-title{font-size:1.2rem;font-weight:700;margin-bottom:20px}
 
-    /* Stats grid */
-    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
-    @media (max-width: 640px) { .stats { grid-template-columns: 1fr; } }
-    .stat {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 20px 22px;
-    }
-    .stat-label { font-size: 0.7rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
-    .stat-value { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
-    .stat-bar { margin-top: 14px; height: 4px; background: var(--surface3); border-radius: 2px; overflow: hidden; }
-    .stat-bar-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
-    .stat-bar-fill.purple { background: var(--accent); }
-    .stat-bar-fill.green { background: var(--green); }
-    .stat-bar-fill.blue { background: var(--blue); }
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:16px}
+.card-title{font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px;font-weight:600}
 
-    /* Cards */
-    .card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 24px; margin-bottom: 20px;
-    }
-    .card-title {
-      font-size: 0.7rem; color: var(--text2); text-transform: uppercase;
-      letter-spacing: 0.08em; margin-bottom: 18px;
-    }
+/* Hero balance */
+.hero{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;margin-bottom:20px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-50px;right:-50px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(139,92,246,.12),transparent 70%)}
+.hero-label{font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}
+.hero-val{font-size:2.8rem;font-weight:700;letter-spacing:-.03em;margin:6px 0 2px;line-height:1}
+.hero-val .cur{font-size:1.1rem;font-weight:400;color:var(--text2);margin-left:4px}
+.hero-sub{font-size:.78rem;color:var(--text3)}
 
-    /* Token chart */
-    .token-chart { display: flex; gap: 4px; height: 140px; align-items: flex-end; }
-    .token-col {
-      flex: 1; display: flex; flex-direction: column; align-items: center;
-      gap: 3px; justify-content: flex-end;
-    }
-    .token-bar {
-      width: 100%; border-radius: 3px 3px 0 0; min-height: 2px;
-      transition: height 0.6s ease;
-    }
-    .token-bar.input { background: var(--accent); }
-    .token-bar.output { background: var(--green); }
-    .token-chart-legend {
-      display: flex; gap: 20px; margin-top: 14px; font-size: 0.75rem; color: var(--text2);
-    }
-    .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
+.stat-label{font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.stat-val{font-size:1.4rem;font-weight:700}
+.stat-bar{margin-top:10px;height:3px;background:var(--surface2);border-radius:2px;overflow:hidden}
+.stat-fill{height:100%;border-radius:2px;transition:width .5s}
 
-    /* Model calculator */
-    .model-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-    .model-card {
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); padding: 16px; text-align: center;
-      transition: border-color 0.2s;
-    }
-    .model-card:hover { border-color: var(--accent); }
-    .model-name { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
-    .model-tier { font-size: 0.65rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
-    .model-stat { font-size: 1.3rem; font-weight: 700; }
-    .model-stat.cheap { color: var(--green); }
-    .model-stat.mid { color: var(--yellow); }
-    .model-stat.pricey { color: var(--red); }
-    .model-detail { font-size: 0.7rem; color: var(--text3); margin-top: 4px; }
+/* Model cards */
+.model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px}
+.model-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center;transition:border-color .2s}
+.model-card:hover{border-color:var(--accent)}
+.model-name{font-size:.85rem;font-weight:600;margin-bottom:2px}
+.model-tier{font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.model-stat{font-size:1.2rem;font-weight:700}
+.model-detail{font-size:.68rem;color:var(--text3);margin-top:3px}
+.cheap{color:var(--green)}.mid{color:var(--yellow)}.pricey{color:var(--red)}
 
-    /* Details */
-    .detail-row {
-      display: flex; justify-content: space-between; padding: 12px 0;
-      border-bottom: 1px solid var(--border); font-size: 0.85rem;
-    }
-    .detail-row:last-child { border-bottom: none; }
-    .detail-label { color: var(--text2); }
-    .detail-value { font-weight: 600; }
+/* Topup */
+.topup-grid{display:flex;gap:10px;flex-wrap:wrap}
+.btn-topup{padding:12px 24px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:.9rem;font-weight:600;border-radius:8px;cursor:pointer;transition:all .15s}
+.btn-topup:hover{border-color:var(--accent);color:var(--accent)}
+.topup-err{color:var(--red);font-size:.8rem;margin-top:10px;display:none}
 
-    .hidden { display: none; }
-    .fade-in { animation: fadeIn 0.3s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-  </style>
+/* Setup */
+.setup-step{display:flex;gap:14px;margin-bottom:16px}
+.step-num{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:var(--accent)}
+.step-text{font-size:.85rem;color:var(--text2);line-height:1.6;padding-top:3px}
+.step-text strong{color:var(--text)}
+.copy-box{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin:8px 0}
+.copy-box code{flex:1;font-family:'SF Mono',monospace;font-size:.82rem;color:var(--accent);word-break:break-all}
+.copy-box button{flex-shrink:0;padding:5px 12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:6px;font-size:.72rem;cursor:pointer}
+.copy-box button:hover{color:var(--text);border-color:var(--border2)}
+
+/* Detail rows */
+.detail-row{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);font-size:.84rem}
+.detail-row:last-child{border-bottom:none}
+.detail-label{color:var(--text2)}.detail-val{font-weight:600}
+
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:8px;font-size:.82rem;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
+.toast.show{opacity:1}
+
+@media(max-width:768px){
+  .sidebar{position:fixed;width:100%;height:auto;bottom:0;top:auto;flex-direction:row;padding:0;border-right:none;border-top:1px solid var(--border);overflow-x:auto}
+  .sidebar-brand,.sidebar-footer{display:none}
+  .nav-item{flex-direction:column;gap:2px;padding:10px 14px;font-size:.65rem;border-left:none;border-top:2px solid transparent}
+  .nav-item.active{border-top-color:var(--accent);border-left-color:transparent}
+  .main{margin-left:0;padding:20px 16px 80px}
+  .stats{grid-template-columns:1fr}
+}
+</style>
 </head>
 <body>
-<div class="app">
-  <!-- Login -->
-  <div id="login" class="login-wrap">
+
+<div class="login" id="login">
+  <div class="login-box">
     <h2>VajbAgent</h2>
-    <p class="login-sub">Uloguj se sa svojim API ključem</p>
-    <input type="password" id="apikey" placeholder="Unesi API ključ" autocomplete="off">
-    <button type="button" class="btn-primary" id="btnLogin">Prikaži dashboard</button>
-    <p id="loginError" class="login-error hidden"></p>
-  </div>
-
-  <!-- Dashboard -->
-  <div id="dashboard" class="hidden fade-in">
-    <div class="header">
-      <div class="header-left">
-        <h1>VajbAgent</h1>
-        <div class="header-key">Ključ: …<span id="keySuffix"></span></div>
-      </div>
-      <div style="display:flex;gap:8px;">
-        <a href="/setup" class="btn-ghost">Podešavanje</a>
-        <button type="button" class="btn-ghost" id="btnLogout">Odjavi se</button>
-      </div>
-    </div>
-
-    <!-- Balance -->
-    <div class="hero">
-      <div class="hero-label">Raspoloživi kredit</div>
-      <div class="hero-amount"><span id="balanceVal">0.00</span><span class="currency">USD</span></div>
-      <div class="hero-sub">Troši se automatski po zahtevu</div>
-      <div class="topup-row">
-        <button class="btn-topup" data-amount="5">+ $5</button>
-        <button class="btn-topup" data-amount="10">+ $10</button>
-        <button class="btn-topup" data-amount="20">+ $20</button>
-        <button class="btn-topup" data-amount="50">+ $50</button>
-      </div>
-      <p id="dopuniError" class="topup-error hidden"></p>
-    </div>
-
-    <!-- Stats -->
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-label">Zahtevi</div>
-        <div class="stat-value" id="valReqs">0</div>
-        <div class="stat-bar"><div class="stat-bar-fill purple" id="barReqs" style="width:0%"></div></div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Ulazni tokeni</div>
-        <div class="stat-value" id="valIn">0</div>
-        <div class="stat-bar"><div class="stat-bar-fill blue" id="barIn" style="width:0%"></div></div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Izlazni tokeni</div>
-        <div class="stat-value" id="valOut">0</div>
-        <div class="stat-bar"><div class="stat-bar-fill green" id="barOut" style="width:0%"></div></div>
-      </div>
-    </div>
-
-    <!-- Token split chart -->
-    <div class="card">
-      <div class="card-title">Potrošnja tokena</div>
-      <div class="token-chart" id="tokenChart"></div>
-      <div class="token-chart-legend">
-        <span><span class="legend-dot" style="background:var(--accent)"></span>Ulazni</span>
-        <span><span class="legend-dot" style="background:var(--green)"></span>Izlazni</span>
-      </div>
-    </div>
-
-    <!-- Model calculator -->
-    <div class="card">
-      <div class="card-title">Modeli – koliko zahteva možeš sa trenutnim kreditom</div>
-      <div class="model-grid" id="modelGrid"></div>
-    </div>
-
-    <!-- Details -->
-    <div class="card">
-      <div class="card-title">Detalji</div>
-      <div class="detail-row">
-        <span class="detail-label">Poslednja upotreba</span>
-        <span class="detail-value" id="valLast">—</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">Ukupno potrošeno</span>
-        <span class="detail-value" id="valCost">$0.00</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">Ukupno tokena</span>
-        <span class="detail-value" id="valTotal">0</span>
-      </div>
-    </div>
+    <p>Uloguj se sa svojim API ključem</p>
+    <input type="password" id="keyIn" placeholder="Tvoj API ključ" autocomplete="off" autofocus>
+    <button onclick="doLogin()">Pristupi</button>
+    <div class="login-err" id="loginErr">Neispravan ključ</div>
   </div>
 </div>
 
-<script>
-const STORAGE_KEY = 'vajb_apikey';
-const loginEl = document.getElementById('login');
-const dashEl = document.getElementById('dashboard');
-const apikeyInput = document.getElementById('apikey');
-const loginError = document.getElementById('loginError');
+<div class="app" id="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <h1>VajbAgent</h1>
+      <p id="sideKey"></p>
+    </div>
+    <div class="nav-item active" data-page="overview"><span class="nav-icon">&#9635;</span> Pregled</div>
+    <div class="nav-item" data-page="models"><span class="nav-icon">&#9881;</span> Modeli</div>
+    <div class="nav-item" data-page="topup"><span class="nav-icon">&#9733;</span> Dopuna</div>
+    <div class="nav-item" data-page="setup"><span class="nav-icon">&#9881;</span> Podešavanja</div>
+    <div class="sidebar-footer"><button onclick="doLogout()">Odjavi se</button></div>
+  </aside>
 
-const MODELS = [
-  { id: 'vajb-agent-nano',  name: 'Nano',  costPer: 0.003675, tier: 'Budget' },
-  { id: 'vajb-agent-lite',  name: 'Lite',  costPer: 0.018375, tier: 'Daily' },
-  { id: 'vajb-agent-pro',   name: 'Pro',   costPer: 0.060000, tier: 'Standard' },
-  { id: 'vajb-agent-max',   name: 'Max',   costPer: 0.180000, tier: 'Premium' },
-  { id: 'vajb-agent-ultra', name: 'Ultra', costPer: 0.300000, tier: 'Elite' },
+  <main class="main">
+    <!-- PREGLED -->
+    <div class="page active" id="pg-overview">
+      <div class="page-title">Pregled</div>
+      <div class="hero">
+        <div class="hero-label">Raspoloživi kredit</div>
+        <div class="hero-val"><span id="hBal">0.00</span><span class="cur">USD</span></div>
+        <div class="hero-sub">Troši se automatski po zahtevu</div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat-label">Zahtevi</div><div class="stat-val" id="vReqs">0</div><div class="stat-bar"><div class="stat-fill" id="bReqs" style="width:0%;background:var(--accent)"></div></div></div>
+        <div class="stat"><div class="stat-label">Ulazni tokeni</div><div class="stat-val" id="vIn">0</div><div class="stat-bar"><div class="stat-fill" id="bIn" style="width:0%;background:var(--blue)"></div></div></div>
+        <div class="stat"><div class="stat-label">Izlazni tokeni</div><div class="stat-val" id="vOut">0</div><div class="stat-bar"><div class="stat-fill" id="bOut" style="width:0%;background:var(--green)"></div></div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Detalji</div>
+        <div class="detail-row"><span class="detail-label">Poslednja upotreba</span><span class="detail-val" id="vLast">-</span></div>
+        <div class="detail-row"><span class="detail-label">Ukupno potrošeno</span><span class="detail-val" id="vCost">$0.00</span></div>
+        <div class="detail-row"><span class="detail-label">Ukupno tokena</span><span class="detail-val" id="vTotal">0</span></div>
+      </div>
+    </div>
+
+    <!-- MODELI -->
+    <div class="page" id="pg-models">
+      <div class="page-title">Modeli</div>
+      <div class="card">
+        <div class="card-title">Koliko zahteva možeš sa trenutnim kreditom</div>
+        <div class="model-grid" id="modelGrid"></div>
+      </div>
+    </div>
+
+    <!-- DOPUNA -->
+    <div class="page" id="pg-topup">
+      <div class="page-title">Dopuna kredita</div>
+      <div class="card">
+        <div class="card-title">Izaberi iznos</div>
+        <div class="topup-grid">
+          <button class="btn-topup" onclick="topup(5)">+ $5</button>
+          <button class="btn-topup" onclick="topup(10)">+ $10</button>
+          <button class="btn-topup" onclick="topup(20)">+ $20</button>
+          <button class="btn-topup" onclick="topup(50)">+ $50</button>
+        </div>
+        <div class="topup-err" id="topErr"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Trenutno stanje</div>
+        <div style="font-size:2rem;font-weight:700" id="topBal">$0.00</div>
+      </div>
+    </div>
+
+    <!-- PODEŠAVANJA -->
+    <div class="page" id="pg-setup">
+      <div class="page-title">Podešavanja za Cursor</div>
+      <div class="card">
+        <div class="card-title">Korak po korak</div>
+        <div class="setup-step"><div class="step-num">1</div><div class="step-text">Otvori <strong>Cursor</strong> → Settings → <strong>Models</strong></div></div>
+        <div class="setup-step"><div class="step-num">2</div><div class="step-text">Proširi <strong>OpenAI API Key</strong> sekciju i unesi svoj API ključ:</div></div>
+        <div class="copy-box"><code id="setupKey">-</code><button onclick="copyEl('setupKey')">Kopiraj</button></div>
+        <div class="setup-step"><div class="step-num">3</div><div class="step-text">Uključi <strong>Override OpenAI Base URL</strong> i unesi:</div></div>
+        <div class="copy-box"><code id="setupUrl">-</code><button onclick="copyEl('setupUrl')">Kopiraj</button></div>
+        <div class="setup-step"><div class="step-num">4</div><div class="step-text">Klikni <strong>+ Add Custom Model</strong> i dodaj jedan od ovih modela:</div></div>
+        <div style="margin-left:42px">
+          <div class="copy-box"><code>vajb-agent-nano</code><button onclick="copyText('vajb-agent-nano')">Kopiraj</button></div>
+          <div class="copy-box"><code>vajb-agent-lite</code><button onclick="copyText('vajb-agent-lite')">Kopiraj</button></div>
+          <div class="copy-box"><code>vajb-agent-pro</code><button onclick="copyText('vajb-agent-pro')">Kopiraj</button></div>
+          <div class="copy-box"><code>vajb-agent-max</code><button onclick="copyText('vajb-agent-max')">Kopiraj</button></div>
+          <div class="copy-box"><code>vajb-agent-ultra</code><button onclick="copyText('vajb-agent-ultra')">Kopiraj</button></div>
+        </div>
+        <div class="setup-step"><div class="step-num">5</div><div class="step-text">Izaberi model u chatu i pošalji poruku. Ako dobiješ odgovor, sve radi!</div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let apiKey='';
+const MODELS=[
+  {id:'vajb-agent-nano',name:'Nano',costPer:.003675,tier:'Budget'},
+  {id:'vajb-agent-lite',name:'Lite',costPer:.018375,tier:'Daily'},
+  {id:'vajb-agent-pro',name:'Pro',costPer:.06,tier:'Standard'},
+  {id:'vajb-agent-max',name:'Max',costPer:.18,tier:'Premium'},
+  {id:'vajb-agent-ultra',name:'Ultra',costPer:.3,tier:'Elite'},
 ];
 
-function showErr(msg) { loginError.textContent = msg; loginError.classList.remove('hidden'); }
-function hideErr() { loginError.classList.add('hidden'); }
-function baseUrl() { return location.origin; }
-function fmt(n) { return n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : String(n); }
-function fmtDate(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('sr-RS') + ' ' + d.toLocaleTimeString('sr-RS', { hour:'2-digit', minute:'2-digit' });
+function $(id){return document.getElementById(id)}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+function fmt(n){return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':String(n)}
+function fmtD(iso){if(!iso)return'-';const d=new Date(iso);return d.toLocaleDateString('sr-RS')+' '+d.toLocaleTimeString('sr-RS',{hour:'2-digit',minute:'2-digit'})}
+function copyText(t){navigator.clipboard.writeText(t).then(()=>toast('Kopirano!'))}
+function copyEl(id){copyText($(id).textContent)}
+
+function doLogin(){
+  apiKey=$('keyIn').value.trim();
+  if(!apiKey)return;
+  fetch('/me',{headers:{Authorization:'Bearer '+apiKey}})
+    .then(r=>{if(!r.ok)throw new Error();return r.json()})
+    .then(d=>{localStorage.setItem('vajb_key',apiKey);$('login').style.display='none';$('app').style.display='flex';render(d)})
+    .catch(()=>{$('loginErr').style.display='block'});
 }
+$('keyIn').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 
-function load() {
-  const key = localStorage.getItem(STORAGE_KEY);
-  if (key) { apikeyInput.value = key; fetchMe(key); }
-}
+function doLogout(){localStorage.removeItem('vajb_key');apiKey='';$('app').style.display='none';$('login').style.display='flex';$('keyIn').value='';$('loginErr').style.display='none'}
 
-function fetchMe(key) {
-  fetch(baseUrl() + '/me', { headers: { Authorization: 'Bearer ' + key } })
-    .then(r => {
-      if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? 'Neispravan API ključ.' : 'Greška.');
-      return r.json();
-    })
-    .then(data => {
-      hideErr();
-      localStorage.setItem(STORAGE_KEY, key);
-      loginEl.classList.add('hidden');
-      dashEl.classList.remove('hidden');
-      render(data);
-    })
-    .catch(e => showErr(e.message));
-}
+// Auto login
+(function(){const k=localStorage.getItem('vajb_key');if(k){$('keyIn').value=k;doLogin()}})();
 
-function render(d) {
-  document.getElementById('keySuffix').textContent = d.key_id || '—';
-  document.getElementById('balanceVal').textContent = (d.balance_usd ?? 0).toFixed(2);
-  document.getElementById('valReqs').textContent = fmt(d.requests || 0);
-  document.getElementById('valIn').textContent = fmt(d.input_tokens || 0);
-  document.getElementById('valOut').textContent = fmt(d.output_tokens || 0);
-  document.getElementById('valLast').textContent = fmtDate(d.last_used);
-  document.getElementById('valCost').textContent = '$' + (d.estimated_cost_usd ?? 0).toFixed(2);
-  document.getElementById('valTotal').textContent = fmt((d.input_tokens||0) + (d.output_tokens||0));
-
-  const maxT = Math.max(d.input_tokens||1, d.output_tokens||1, 1);
-  document.getElementById('barIn').style.width = Math.min(((d.input_tokens||0)/maxT)*100, 100) + '%';
-  document.getElementById('barOut').style.width = Math.min(((d.output_tokens||0)/maxT)*100, 100) + '%';
-  document.getElementById('barReqs').style.width = Math.min(((d.requests||0)/500)*100, 100) + '%';
-
-  // Token chart - simple visual split
-  const chart = document.getElementById('tokenChart');
-  chart.innerHTML = '';
-  const inT = d.input_tokens || 0, outT = d.output_tokens || 0;
-  const total = inT + outT || 1;
-  const maxH = 120;
-  for (let i = 0; i < 8; i++) {
-    const frac = i < 4 ? 0.8 + Math.random() * 0.4 : 0.3 + Math.random() * 0.7;
-    const inH = Math.max(2, (inT / total) * maxH * frac);
-    const outH = Math.max(2, (outT / total) * maxH * frac * 0.6);
-    const col = document.createElement('div');
-    col.className = 'token-col';
-    col.innerHTML = `<div class="token-bar input" style="height:${inH}px"></div><div class="token-bar output" style="height:${outH}px"></div>`;
-    chart.appendChild(col);
-  }
-
-  // Model calculator
-  const grid = document.getElementById('modelGrid');
-  grid.innerHTML = '';
-  const bal = d.balance_usd || 0;
-  MODELS.forEach(m => {
-    const reqs = bal > 0 ? Math.floor(bal / m.costPer) : 0;
-    const hrs = (reqs * 2.5 / 60).toFixed(1);
-    const cls = m.costPer < 0.02 ? 'cheap' : m.costPer < 0.1 ? 'mid' : 'pricey';
-    const card = document.createElement('div');
-    card.className = 'model-card';
-    card.innerHTML = `
-      <div class="model-name">${m.name}</div>
-      <div class="model-tier">${m.tier}</div>
-      <div class="model-stat ${cls}">${fmt(reqs)}</div>
-      <div class="model-detail">zahteva · ~${hrs}h</div>
-    `;
-    grid.appendChild(card);
-  });
-}
-
-document.getElementById('btnLogin').onclick = () => {
-  const key = apikeyInput.value.trim();
-  if (!key) return showErr('Unesi API ključ.');
-  fetchMe(key);
-};
-
-document.getElementById('btnLogout').onclick = () => {
-  localStorage.removeItem(STORAGE_KEY);
-  apikeyInput.value = '';
-  dashEl.classList.add('hidden');
-  loginEl.classList.remove('hidden');
-  hideErr();
-};
-
-apikeyInput.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('btnLogin').click(); });
-
-document.querySelectorAll('.btn-topup').forEach(btn => {
-  btn.onclick = function() {
-    const amount = Number(this.dataset.amount);
-    const key = localStorage.getItem(STORAGE_KEY);
-    if (!key) return;
-    const errEl = document.getElementById('dopuniError');
-    errEl.classList.add('hidden');
-    fetch(baseUrl() + '/create-checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
-      body: JSON.stringify({ amount_usd: amount }),
-    }).then(r => r.json()).then(data => {
-      if (data.url) location.href = data.url;
-      else { errEl.textContent = data.error || 'Greška'; errEl.classList.remove('hidden'); }
-    }).catch(() => { errEl.textContent = 'Greška pri povezivanju.'; errEl.classList.remove('hidden'); });
+// Nav
+document.querySelectorAll('.nav-item').forEach(el=>{
+  el.onclick=()=>{
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    $('pg-'+el.dataset.page).classList.add('active');
   };
 });
 
-load();
+function render(d){
+  $('sideKey').textContent=d.key_id||'-';
+  $('hBal').textContent=(d.balance_usd??0).toFixed(2);
+  $('vReqs').textContent=fmt(d.requests||0);
+  $('vIn').textContent=fmt(d.input_tokens||0);
+  $('vOut').textContent=fmt(d.output_tokens||0);
+  $('vLast').textContent=fmtD(d.last_used);
+  $('vCost').textContent='$'+(d.estimated_cost_usd??0).toFixed(2);
+  $('vTotal').textContent=fmt((d.input_tokens||0)+(d.output_tokens||0));
+  $('topBal').textContent='$'+(d.balance_usd??0).toFixed(2);
+  $('setupKey').textContent=apiKey;
+  $('setupUrl').textContent=location.origin;
+
+  const mx=Math.max(d.input_tokens||1,d.output_tokens||1,1);
+  $('bReqs').style.width=Math.min(((d.requests||0)/500)*100,100)+'%';
+  $('bIn').style.width=Math.min(((d.input_tokens||0)/mx)*100,100)+'%';
+  $('bOut').style.width=Math.min(((d.output_tokens||0)/mx)*100,100)+'%';
+
+  const grid=$('modelGrid');grid.innerHTML='';
+  const bal=d.balance_usd||0;
+  MODELS.forEach(m=>{
+    const reqs=bal>0?Math.floor(bal/m.costPer):0;
+    const hrs=(reqs*2.5/60).toFixed(1);
+    const cls=m.costPer<.02?'cheap':m.costPer<.1?'mid':'pricey';
+    grid.innerHTML+=`<div class="model-card"><div class="model-name">${m.name}</div><div class="model-tier">${m.tier}</div><div class="model-stat ${cls}">${fmt(reqs)}</div><div class="model-detail">zahteva · ~${hrs}h</div></div>`;
+  });
+}
+
+function topup(amount){
+  if(!apiKey)return;
+  const err=$('topErr');err.style.display='none';
+  fetch('/create-checkout',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+apiKey},body:JSON.stringify({amount_usd:amount})})
+    .then(r=>r.json()).then(d=>{
+      if(d.url)location.href=d.url;
+      else{err.textContent=d.error||'Greška';err.style.display='block'}
+    }).catch(()=>{err.textContent='Greška pri povezivanju';err.style.display='block'});
+}
 </script>
 </body>
 </html>

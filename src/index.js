@@ -1,8 +1,11 @@
 import 'dotenv/config';
+import crypto from 'crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import cors from 'cors';
 import express from 'express';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { requireStudentAuth } from './auth.js';
 import {
   openAIToAnthropicMessages,
@@ -27,6 +30,14 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 // ---- Model registry: 5 tiers, dual backend (OpenAI + Anthropic) ----
+const MAX_OUTPUT = {
+  'gpt-5-nano': 32768,
+  'gpt-5-mini': 65536,
+  'claude-haiku-4-5': 32768,
+  'claude-sonnet-4-6': 64000,
+  'claude-opus-4-6': 64000,
+};
+
 const VAJB_MODELS = [
   { id: 'vajb-agent-nano',  name: 'VajbAgent Nano',  backend: 'openai',    backendModel: 'gpt-5-nano',       desc: 'Najjeftiniji, za svakodnevna pitanja' },
   { id: 'vajb-agent-lite',  name: 'VajbAgent Lite',  backend: 'openai',    backendModel: 'gpt-5-mini',       desc: 'Daily coding, odličan za cenu' },
@@ -52,10 +63,58 @@ if (!process.env.OPENAI_API_KEY) {
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || 'dummy' });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || 'dummy' });
 
+async function withRetry(fn, { retries = 2, delayMs = 1500 } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const status = err.status || err.statusCode || 0;
+      const retryable = status === 429 || status === 529 || status === 503;
+      if (!retryable || attempt >= retries) throw err;
+      const wait = delayMs * (attempt + 1);
+      console.log(`Retrying after ${status} (attempt ${attempt + 1}/${retries}, wait ${wait}ms)`);
+      await new Promise(r => setTimeout(r, wait));
+    }
+  }
+}
+
+function safeEqual(a, b) {
+  if (!a || !b) return false;
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+app.set('trust proxy', 1);
+
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
+
 app.use(cors());
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { trustProxy: false },
+  handler: (_req, res) => res.status(429).json({ error: { message: 'Previše zahteva. Pokušaj ponovo za 15 minuta.', code: 'rate_limit' } }),
+});
+
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  validate: { trustProxy: false },
+  handler: (_req, res) => res.status(429).json({ error: { message: 'Previše admin zahteva. Sačekaj.', code: 'rate_limit' } }),
+});
+
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`);
+  let logPath = req.path;
+  if (req.query.secret) logPath = req.path + '?secret=***';
+  console.log(`${req.method} ${logPath}`);
   next();
 });
 
@@ -80,34 +139,31 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
     return res.status(200).send();
   }
   const session = event.data.object;
+  if (session.payment_status !== 'paid') {
+    console.warn('Stripe webhook: session not paid', { status: session.payment_status });
+    return res.status(200).send();
+  }
   const keyId = session.metadata?.key_id;
   const amountCents = session.amount_total;
-  if (!keyId || amountCents == null || amountCents < 0) {
-    console.warn('Stripe webhook: missing key_id or amount_total', { key_id: keyId, amount_total: amountCents });
+  if (!keyId || typeof keyId !== 'string' || keyId.length < 3) {
+    console.warn('Stripe webhook: invalid key_id', { key_id: keyId });
+    return res.status(200).send();
+  }
+  if (!amountCents || amountCents <= 0 || amountCents > 100000) {
+    console.warn('Stripe webhook: invalid amount', { amount_total: amountCents });
     return res.status(200).send();
   }
   const amountUsd = Math.round((amountCents / 100) * 100) / 100;
   addBalance(keyId.trim(), amountUsd);
-  console.log('Credits added', { key_id: keyId, amount_usd: amountUsd });
+  console.log('Credits added via Stripe', { key_id: keyId.slice(0, 8) + '...', amount_usd: amountUsd });
   res.status(200).send();
 });
 
 app.use(express.json({ limit: '50mb' }));
 
-// ---- Root ----
+// ---- Root: landing page ----
 app.get('/', (_req, res) => {
-  res.json({
-    service: 'vajb-agent',
-    ok: true,
-    models: VAJB_MODELS.map((m) => m.id),
-    endpoints: {
-      models: 'GET /v1/models',
-      chat: 'POST /v1/chat/completions',
-      dashboard: 'GET /dashboard',
-      setup: 'GET /setup',
-      health: 'GET /health',
-    },
-  });
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 app.head('/', (_req, res) => res.status(200).end());
 
@@ -125,9 +181,9 @@ app.get('/v1/models', (_req, res) => res.json(modelsResponse()));
 app.get('/models', (_req, res) => res.json(modelsResponse()));
 
 // ---- Admin: model info (only for you) ----
-app.get('/admin/models', (req, res) => {
+app.get('/admin/models', adminLimiter, (req, res) => {
   const secret = req.headers['x-admin-secret'] || req.query.secret;
-  if (secret !== process.env.ADMIN_SECRET) {
+  if (!safeEqual(secret, process.env.ADMIN_SECRET)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   res.json(VAJB_MODELS.map((m) => ({
@@ -141,6 +197,7 @@ app.get('/admin/models', (req, res) => {
 
 // ---- Chat completions handler ----
 const chatCompletionsHandler = [
+  authLimiter,
   requireStudentAuth,
   async (req, res) => {
     const body = req.body || {};
@@ -185,13 +242,27 @@ const chatCompletionsHandler = [
         await handleAnthropic(req, res, keyId, resolved, messages, openAITools, stream, max_tokens);
       }
     } catch (err) {
-      console.error(`${resolved.backend} error:`, err.message);
+      console.error(`${resolved.backend} error [${err.status || '?'}]:`, err.message);
+      if (res.headersSent) return;
+
       const status = err.status || 502;
+      const msg = err.message || 'Upstream error';
+      let userMsg = msg;
+      let code = 'api_error';
+
+      if (status === 429) {
+        userMsg = 'API rate limit dostignut. Sačekaj par sekundi i pokušaj ponovo.';
+        code = 'rate_limit';
+      } else if (status === 529 || msg.includes('overloaded')) {
+        userMsg = 'Backend model je trenutno preopterećen. Pokušaj ponovo za minut ili probaj jeftiniji model.';
+        code = 'overloaded';
+      } else if (msg.includes('context') || msg.includes('token') || msg.includes('too long') || msg.includes('maximum')) {
+        userMsg = 'Kontekst je prevelik čak i posle trimovanja. Pokušaj sa kraćim promptom ili zatvori nepotrebne fajlove u Cursor-u.';
+        code = 'context_too_large';
+      }
+
       res.status(status).json({
-        error: {
-          message: err.message || 'Upstream error',
-          type: 'api_error',
-        },
+        error: { message: userMsg, type: code, detail: msg },
       });
     }
   },
@@ -200,16 +271,22 @@ app.post('/v1/chat/completions', chatCompletionsHandler);
 app.post('/chat/completions', chatCompletionsHandler);
 
 // ---- OpenAI backend (Nano, Lite) ----
-// OpenAI API is already in OpenAI format, so we pass through with minimal changes.
 async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, stream, max_tokens) {
-  const maxTokens = Math.min(Math.max(Number(max_tokens) || 4096, 1), 16384);
+  const modelMax = MAX_OUTPUT[resolved.backendModel] || 16384;
+  const requested = Number(max_tokens) || 4096;
+  const maxTokens = Math.min(Math.max(requested, 256), modelMax);
   const trimmedMessages = trimOpenAIMessages(messages, resolved.backendModel);
+
+  const isReasoning = resolved.backendModel.startsWith('gpt-5');
+  const effort = isReasoning && maxTokens <= 2048 ? 'low' : isReasoning ? 'medium' : undefined;
 
   const payload = {
     model: resolved.backendModel,
     messages: trimmedMessages,
     max_completion_tokens: maxTokens,
     stream,
+    ...(stream && { stream_options: { include_usage: true } }),
+    ...(effort && { reasoning_effort: effort }),
     ...(Array.isArray(openAITools) && openAITools.length > 0 && { tools: openAITools }),
   };
 
@@ -223,7 +300,7 @@ async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, st
 }
 
 async function handleOpenAINonStream(res, keyId, resolved, payload) {
-  const response = await openai.chat.completions.create(payload);
+  const response = await withRetry(() => openai.chat.completions.create(payload));
 
   const usage = {
     input_tokens: response.usage?.prompt_tokens ?? 0,
@@ -243,15 +320,17 @@ async function handleOpenAIStream(res, keyId, resolved, payload) {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders?.();
 
-  const stream = await openai.chat.completions.create(payload);
+  const stream = await withRetry(() => openai.chat.completions.create(payload));
 
   let usage = { input_tokens: 0, output_tokens: 0 };
+  let chunkCount = 0;
 
   for await (const chunk of stream) {
     if (chunk.usage) {
       usage.input_tokens = chunk.usage.prompt_tokens ?? usage.input_tokens;
       usage.output_tokens = chunk.usage.completion_tokens ?? usage.output_tokens;
     }
+    chunkCount++;
     chunk.model = resolved.id;
     res.write('data: ' + JSON.stringify(chunk) + '\n\n');
     if (res.flush) res.flush();
@@ -261,7 +340,10 @@ async function handleOpenAIStream(res, keyId, resolved, payload) {
   res.end();
 
   if (usage.input_tokens === 0 && usage.output_tokens === 0) {
-    usage = { input_tokens: 500, output_tokens: 200 };
+    const estIn = Math.max(chunkCount * 50, 1000);
+    const estOut = Math.max(chunkCount * 15, 200);
+    usage = { input_tokens: estIn, output_tokens: estOut };
+    console.log(`OpenAI stream: no usage reported, estimating ~${estIn} in / ~${estOut} out from ${chunkCount} chunks`);
   }
   const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
   deductBalance(keyId, usd);
@@ -292,7 +374,8 @@ async function handleAnthropic(req, res, keyId, resolved, messages, openAITools,
   const mergedSystem = [CURSOR_EDIT_HINT, system].filter(Boolean).join('\n\n');
 
   const anthropicTools = openAIToolsToAnthropic(openAITools);
-  const maxTokens = Math.min(Math.max(Number(max_tokens) || 4096, 1), 16384);
+  const modelMax = MAX_OUTPUT[resolved.backendModel] || 16384;
+  const maxTokens = Math.min(Math.max(Number(max_tokens) || 4096, 1), modelMax);
 
   const payload = {
     model: resolved.backendModel,
@@ -310,7 +393,7 @@ async function handleAnthropic(req, res, keyId, resolved, messages, openAITools,
 }
 
 async function handleAnthropicNonStream(res, keyId, resolved, payload) {
-  const response = await anthropic.messages.create({ ...payload, stream: false });
+  const response = await withRetry(() => anthropic.messages.create({ ...payload, stream: false }));
 
   const usage = {
     input_tokens: response.usage?.input_tokens ?? 0,
@@ -337,7 +420,7 @@ async function handleAnthropicStream(res, keyId, resolved, payload) {
   const toolCalls = [];
   let currentToolIndex = -1;
 
-  const stream = await anthropic.messages.create({ ...payload, stream: true });
+  const stream = await withRetry(() => anthropic.messages.create({ ...payload, stream: true }));
 
   for await (const event of stream) {
     if (event.type === 'message_start' && event.message?.usage) {
@@ -386,7 +469,7 @@ async function handleAnthropicStream(res, keyId, resolved, payload) {
 }
 
 // ---- Usage + balance for current key (dashboard) ----
-app.get('/me', requireStudentAuth, (req, res) => {
+app.get('/me', authLimiter, requireStudentAuth, (req, res) => {
   const keyId = req.studentKeyId;
   const balanceUsd = getBalance(keyId);
   const data = getUsageForKey(keyId);
@@ -408,7 +491,7 @@ app.get('/me', requireStudentAuth, (req, res) => {
 });
 
 // ---- Stripe checkout ----
-app.post('/create-checkout', requireStudentAuth, async (req, res) => {
+app.post('/create-checkout', authLimiter, requireStudentAuth, async (req, res) => {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) {
     return res.status(503).json({ error: 'Plaćanje nije konfigurisano.' });
@@ -418,36 +501,44 @@ app.post('/create-checkout', requireStudentAuth, async (req, res) => {
     return res.status(400).json({ error: 'amount_usd mora biti između 1 i 1000.' });
   }
   const baseUrl = process.env.BASE_URL || (req.protocol + '://' + req.get('host'));
-  const Stripe = (await import('stripe')).default;
-  const stripe = new Stripe(stripeKey);
-  const session = await stripe.checkout.sessions.create({
-    mode: 'payment',
-    payment_method_types: ['card'],
-    line_items: [{
-      price_data: {
-        currency: 'usd',
-        product_data: { name: 'VajbAgent kredit', description: amountUsd + ' USD kredita za potrošnju' },
-        unit_amount: Math.round(amountUsd * 100),
-      },
-      quantity: 1,
-    }],
-    metadata: { key_id: req.studentKeyId },
-    success_url: baseUrl + '/dashboard?paid=1',
-    cancel_url: baseUrl + '/dashboard',
-  });
-  res.json({ url: session.url });
+  try {
+    const Stripe = (await import('stripe')).default;
+    const stripe = new Stripe(stripeKey);
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: { name: 'VajbAgent kredit', description: amountUsd + ' USD kredita za potrošnju' },
+          unit_amount: Math.round(amountUsd * 100),
+        },
+        quantity: 1,
+      }],
+      metadata: { key_id: req.studentKeyId },
+      success_url: baseUrl + '/dashboard?paid=1',
+      cancel_url: baseUrl + '/dashboard',
+    });
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('Stripe checkout error:', err.message);
+    res.status(502).json({ error: 'Greška pri kreiranju sesije plaćanja. Pokušaj ponovo.' });
+  }
 });
 
 // ---- Admin: add credits ----
-app.post('/admin/add-credits', (req, res) => {
+app.post('/admin/add-credits', adminLimiter, (req, res) => {
   const secret = req.headers['x-admin-secret'] || req.body?.admin_secret;
-  if (secret !== process.env.ADMIN_SECRET) {
+  if (!safeEqual(secret, process.env.ADMIN_SECRET)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   const { key_id, amount_usd } = req.body || {};
   const amount = Number(amount_usd);
-  if (!key_id || typeof key_id !== 'string' || !Number.isFinite(amount) || amount <= 0) {
+  if (!key_id || typeof key_id !== 'string' || !Number.isFinite(amount) || amount === 0) {
     return res.status(400).json({ error: 'Body: { "key_id": "...", "amount_usd": 5 }' });
+  }
+  if (Math.abs(amount) > 10000) {
+    return res.status(400).json({ error: 'Iznos ne može biti veći od $10,000.' });
   }
   const newBalance = addBalance(key_id.trim(), amount);
   res.json({ key_id: key_id.trim(), added_usd: amount, balance_usd: newBalance });
@@ -456,13 +547,13 @@ app.post('/admin/add-credits', (req, res) => {
 // ---- Admin: student management ----
 function requireAdmin(req, res, next) {
   const secret = req.headers['x-admin-secret'] || req.query.secret || req.body?.admin_secret;
-  if (secret !== process.env.ADMIN_SECRET) {
+  if (!safeEqual(secret, process.env.ADMIN_SECRET)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   next();
 }
 
-app.get('/admin/students', requireAdmin, (_req, res) => {
+app.get('/admin/students', adminLimiter, requireAdmin, (_req, res) => {
   const students = getAllStudents().map(s => ({
     ...s,
     balance_usd: getBalance(s.key),
@@ -470,7 +561,7 @@ app.get('/admin/students', requireAdmin, (_req, res) => {
   res.json(students);
 });
 
-app.post('/admin/students', requireAdmin, (req, res) => {
+app.post('/admin/students', adminLimiter, requireAdmin, (req, res) => {
   const { name, initial_balance } = req.body || {};
   const result = addStudent(name);
   if (result.error) return res.status(400).json({ error: result.error });
@@ -484,13 +575,13 @@ app.post('/admin/students', requireAdmin, (req, res) => {
   });
 });
 
-app.delete('/admin/students/:key', requireAdmin, (req, res) => {
+app.delete('/admin/students/:key', adminLimiter, requireAdmin, (req, res) => {
   const result = removeStudent(req.params.key);
   if (result.error) return res.status(404).json({ error: result.error });
   res.json(result);
 });
 
-app.patch('/admin/students/:key', requireAdmin, (req, res) => {
+app.patch('/admin/students/:key', adminLimiter, requireAdmin, (req, res) => {
   const { active } = req.body || {};
   if (typeof active !== 'boolean') {
     return res.status(400).json({ error: 'Body: { "active": true/false }' });
@@ -501,14 +592,14 @@ app.patch('/admin/students/:key', requireAdmin, (req, res) => {
 });
 
 // ---- Admin usage ----
-app.get('/usage', requireStudentAuth, (_req, res) => {
+app.get('/usage', adminLimiter, requireAdmin, (_req, res) => {
   res.json(getUsageSummary());
 });
 
 // ---- Admin: full overview (all users, models, earnings) ----
-app.get('/admin/api/overview', (req, res) => {
+app.get('/admin/api/overview', adminLimiter, (req, res) => {
   const secret = req.headers['x-admin-secret'] || req.query.secret;
-  if (secret !== process.env.ADMIN_SECRET) {
+  if (!safeEqual(secret, process.env.ADMIN_SECRET)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   const allUsage = getUsageSummary();
@@ -538,13 +629,7 @@ app.get('/setup', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'setup.html'));
 });
 app.get('/admin', (_req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'admin-add-credits.html'));
-});
-app.get('/admin/info', (_req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'admin-info.html'));
-});
-app.get('/admin/students-panel', (_req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'admin-students.html'));
+  res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));
 });
 
 // ---- 404 ----

@@ -1,135 +1,351 @@
 <!DOCTYPE html>
 <html lang="sr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Vajb Agent Pro</title>
-  <style>
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VajbAgent – AI kodiranje za studente</title>
+<style>
+:root{--bg:#09090b;--surface:#111113;--surface2:#161618;--surface3:#1c1c1f;--border:#27272a;--border2:#3f3f46;--text:#fafafa;--text2:#a1a1aa;--text3:#71717a;--accent:#8b5cf6;--accent2:#a78bfa;--green:#22c55e;--red:#ef4444;--yellow:#eab308;--blue:#3b82f6;--radius:12px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'SF Pro Display','Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
 
-    body {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      color: #fff;
-      overflow: hidden;
-    }
+/* Nav */
+nav{position:fixed;top:0;left:0;right:0;z-index:50;background:rgba(9,9,11,.85);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+.nav-inner{max-width:1100px;margin:0 auto;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between}
+.nav-brand{font-weight:700;font-size:1rem;display:flex;align-items:center;gap:6px}
+.nav-brand span{color:var(--accent)}
+.nav-links{display:flex;gap:6px}
+.nav-links a{padding:7px 16px;font-size:.82rem;color:var(--text2);border-radius:8px;transition:all .15s}
+.nav-links a:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.nav-links .btn-nav{background:var(--text);color:var(--bg);font-weight:600}
+.nav-links .btn-nav:hover{opacity:.9;color:var(--bg)}
+.nav-links .btn-admin{background:transparent;border:1px solid var(--border);color:var(--text3)}
+.nav-links .btn-admin:hover{border-color:var(--border2);color:var(--text2)}
 
-    .glow-circle {
-      position: fixed;
-      border-radius: 50%;
-      filter: blur(120px);
-      opacity: 0.25;
-      pointer-events: none;
-    }
+/* Hero */
+.hero{padding:140px 24px 80px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(139,92,246,.08),transparent 70%);pointer-events:none}
+.hero-tag{display:inline-block;padding:5px 14px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.08);border-radius:20px;font-size:.72rem;color:var(--accent2);font-weight:600;letter-spacing:.03em;margin-bottom:20px}
+.hero h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;letter-spacing:-.03em;line-height:1.15;max-width:700px;margin:0 auto 16px}
+.hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--accent),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{font-size:1.05rem;color:var(--text2);max-width:520px;margin:0 auto 32px;line-height:1.65}
+.hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn-hero{padding:13px 28px;border-radius:10px;font-size:.92rem;font-weight:600;border:none;cursor:pointer;transition:all .2s}
+.btn-primary{background:var(--text);color:var(--bg)}.btn-primary:hover{opacity:.88}
+.btn-secondary{background:transparent;color:var(--text);border:1px solid var(--border2)}.btn-secondary:hover{border-color:var(--text3)}
 
-    .glow-circle.one {
-      width: 600px;
-      height: 600px;
-      background: #7c3aed;
-      top: -200px;
-      left: -200px;
-    }
+/* Section */
+section{max-width:1100px;margin:0 auto;padding:80px 24px}
+.section-tag{font-size:.62rem;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);font-weight:700;margin-bottom:10px}
+.section-title{font-size:1.8rem;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+.section-sub{font-size:.95rem;color:var(--text2);margin-bottom:40px;max-width:550px;line-height:1.6}
 
-    .glow-circle.two {
-      width: 500px;
-      height: 500px;
-      background: #2563eb;
-      bottom: -150px;
-      right: -150px;
-    }
+/* Benefits */
+.benefits{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.benefit{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;transition:border-color .2s}
+.benefit:hover{border-color:var(--border2)}
+.b-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin-bottom:14px}
+.b-purple{background:rgba(139,92,246,.12);color:var(--accent)}
+.b-green{background:rgba(34,197,94,.12);color:var(--green)}
+.b-blue{background:rgba(59,130,246,.12);color:var(--blue)}
+.b-yellow{background:rgba(234,179,8,.12);color:var(--yellow)}
+.b-red{background:rgba(239,68,68,.12);color:var(--red)}
+.b-white{background:rgba(255,255,255,.08);color:var(--text)}
+.benefit h3{font-size:.92rem;font-weight:600;margin-bottom:6px}
+.benefit p{font-size:.82rem;color:var(--text2);line-height:1.55}
 
-    .card {
-      position: relative;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      border-radius: 24px;
-      padding: 64px 56px;
-      max-width: 680px;
-      width: 90%;
-      text-align: center;
-      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
-    }
+/* Comparison */
+.compare-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.compare-head{display:grid;grid-template-columns:1.8fr 1fr 1fr;border-bottom:1px solid var(--border)}
+.compare-head div{padding:18px 22px;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);font-weight:600}
+.compare-head div:nth-child(2){text-align:center;background:rgba(139,92,246,.04);border-left:1px solid var(--border);border-right:1px solid var(--border)}
+.compare-head div:nth-child(3){text-align:center}
+.compare-head .col-va{color:var(--accent)}
+.compare-row{display:grid;grid-template-columns:1.8fr 1fr 1fr;border-bottom:1px solid var(--border)}
+.compare-row:last-child{border-bottom:none}
+.compare-row div{padding:14px 22px;font-size:.84rem;display:flex;align-items:center}
+.compare-row div:first-child{color:var(--text2);font-weight:500}
+.compare-row div:nth-child(2){justify-content:center;background:rgba(139,92,246,.02);border-left:1px solid var(--border);border-right:1px solid var(--border);font-weight:600}
+.compare-row div:nth-child(3){justify-content:center;color:var(--text3)}
+.check{color:var(--green);font-weight:700;font-size:1rem}.cross{color:var(--text3);font-size:.85rem}
+.win{color:var(--green);font-weight:600}.tie{color:var(--text2)}.lose{color:var(--text3)}
 
-    .badge {
-      display: inline-block;
-      background: linear-gradient(90deg, #7c3aed, #2563eb);
-      border-radius: 999px;
-      padding: 6px 20px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      margin-bottom: 32px;
-    }
+/* Models */
+.model-tiers{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.tier{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 16px;text-align:center;transition:all .2s;position:relative}
+.tier:hover{border-color:var(--accent);transform:translateY(-2px)}
+.tier.popular{border-color:rgba(139,92,246,.4)}
+.tier.popular::before{content:'POPULARAN';position:absolute;top:-10px;left:50%;transform:translateX(-50%);padding:3px 10px;background:var(--accent);color:#fff;font-size:.58rem;font-weight:700;letter-spacing:.06em;border-radius:6px}
+.tier-name{font-size:1rem;font-weight:700;margin-bottom:2px}
+.tier-desc{font-size:.68rem;color:var(--text3);margin-bottom:14px}
+.tier-stat{font-size:1.6rem;font-weight:800;letter-spacing:-.02em;margin-bottom:2px}
+.tier-stat-sub{font-size:.68rem;color:var(--text3);margin-bottom:12px}
+.tier-price{font-size:.82rem;color:var(--text2)}
+.tier-price b{color:var(--text);font-size:1rem}
+.t-green{color:var(--green)}.t-blue{color:var(--blue)}.t-purple{color:var(--accent)}.t-yellow{color:var(--yellow)}.t-red{color:var(--red)}
 
-    h1 {
-      font-size: clamp(2rem, 5vw, 3rem);
-      font-weight: 800;
-      line-height: 1.15;
-      margin-bottom: 24px;
-      background: linear-gradient(135deg, #fff 40%, #a78bfa);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
+/* Stats */
+.stat-bar-section{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:30px}
+.stat-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px}
+.stat-block h4{font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:16px;font-weight:600}
+.bar-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.bar-label{width:100px;font-size:.78rem;color:var(--text2);text-align:right;flex-shrink:0}
+.bar-track{flex:1;height:24px;background:var(--surface3);border-radius:6px;overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding:0 10px;font-size:.65rem;font-weight:700;color:rgba(0,0,0,.8);transition:width .8s ease}
+.bar-va{background:linear-gradient(90deg,var(--accent),var(--blue))}
+.bar-cu{background:rgba(255,255,255,.15)}
+.bar-num{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.68rem;color:var(--text3)}
 
-    p {
-      font-size: 1.125rem;
-      color: rgba(255, 255, 255, 0.7);
-      line-height: 1.7;
-      margin-bottom: 40px;
-    }
+/* CTA */
+.cta{text-align:center;padding:80px 24px 100px}
+.cta h2{font-size:1.8rem;font-weight:700;letter-spacing:-.02em;margin-bottom:10px}
+.cta p{color:var(--text2);margin-bottom:28px;font-size:.95rem}
+.cta-cards{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;max-width:700px;margin:0 auto}
+.cta-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:220px;text-align:center;transition:border-color .2s}
+.cta-card:hover{border-color:var(--accent)}
+.cta-card h3{font-size:.88rem;font-weight:600;margin-bottom:4px}
+.cta-card p{font-size:.75rem;color:var(--text3);margin-bottom:14px}
+.cta-card a{display:block;padding:9px;background:var(--text);color:var(--bg);border-radius:8px;font-size:.82rem;font-weight:600;transition:opacity .15s}
+.cta-card a:hover{opacity:.85}
 
-    p strong {
-      color: #a78bfa;
-      font-weight: 600;
-    }
+/* Footer */
+footer{text-align:center;padding:30px 24px;border-top:1px solid var(--border);font-size:.72rem;color:var(--text3)}
 
-    .divider {
-      width: 60px;
-      height: 3px;
-      background: linear-gradient(90deg, #7c3aed, #2563eb);
-      border-radius: 999px;
-      margin: 0 auto 32px;
-    }
-
-    .signature {
-      font-size: 0.875rem;
-      color: rgba(255, 255, 255, 0.4);
-      letter-spacing: 0.04em;
-    }
-
-    .signature span {
-      color: rgba(255, 255, 255, 0.65);
-      font-weight: 600;
-    }
-  </style>
+@media(max-width:900px){
+  .benefits{grid-template-columns:1fr 1fr}
+  .model-tiers{grid-template-columns:repeat(3,1fr)}
+  .stat-bar-section{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  .benefits{grid-template-columns:1fr}
+  .model-tiers{grid-template-columns:1fr 1fr}
+  .compare-head,.compare-row{grid-template-columns:1.4fr 1fr 1fr}
+  .compare-row div{padding:10px 12px;font-size:.76rem}
+  .hero h1{font-size:1.8rem}
+}
+</style>
 </head>
 <body>
-  <div class="glow-circle one"></div>
-  <div class="glow-circle two"></div>
 
-  <div class="card">
-    <div class="badge">AI Asistent</div>
-    <h1>Pomažem ti da praviš<br />odlične stvari u Cursoru</h1>
-    <div class="divider"></div>
-    <p>
-      Stvoren sam da budem tvoj partner u razvoju softvera —<br />
-      brz, precizan i uvek spreman da pomogne.<br />
-      <strong>Napravio me je Nemanja Lakić</strong> kako bih ti pomogao<br />
-      da praviš jako dobre stvari u Cursoru.
-    </p>
-    <div class="signature">Kreirao &mdash; <span>Nemanja Lakić</span></div>
+<nav>
+  <div class="nav-inner">
+    <div class="nav-brand">VajbAgent <span>&middot;</span> AI</div>
+    <div class="nav-links">
+      <a href="#compare">Poređenje</a>
+      <a href="#models">Modeli</a>
+      <a href="/admin" class="btn-admin">Admin</a>
+      <a href="/dashboard" class="btn-nav">Uloguj se</a>
+    </div>
   </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-tag">AI asistent za studente &middot; Pay-as-you-go</div>
+  <h1>Kodiranje sa AI-jem.<br><em>Bez mesečne pretplate.</em></h1>
+  <p>Premium AI modeli u Cursor IDE-u, plaćaj samo koliko koristiš. Do 14x više zahteva za istu cenu u odnosu na tradicionalnu pretplatu.</p>
+  <div class="hero-btns">
+    <a href="/dashboard" class="btn-hero btn-primary">Počni odmah</a>
+    <a href="#compare" class="btn-hero btn-secondary">Vidi poređenje</a>
+  </div>
+</div>
+
+<!-- BENEFITS -->
+<section>
+  <div class="section-tag">Zašto VajbAgent</div>
+  <div class="section-title">Napravljen za studente</div>
+  <div class="section-sub">Sve što ti treba za kodiranje sa AI-jem, bez nepotrebnih troškova.</div>
+  <div class="benefits">
+    <div class="benefit">
+      <div class="b-icon b-green">$</div>
+      <h3>Pay-as-you-go</h3>
+      <p>Bez mesečne pretplate. Uplati $5, $10 ili $20 kada ti zatreba. Nema auto-renew-a, nema iznenađenja na kartici.</p>
+    </div>
+    <div class="benefit">
+      <div class="b-icon b-purple">5</div>
+      <h3>5 nivoa modela</h3>
+      <p>Od ultra-jeftinog Nano za svakodnevna pitanja do Ultra za najkompleksnije agentske zadatke. Ti biraš.</p>
+    </div>
+    <div class="benefit">
+      <div class="b-icon b-blue">⚡</div>
+      <h3>Uvek brz</h3>
+      <p>Nema sporog reda čekanja. Dok imaš kredit, svaki zahtev se obrađuje odmah, bez prioritetnog queue-a.</p>
+    </div>
+    <div class="benefit">
+      <div class="b-icon b-yellow">⚙</div>
+      <h3>Cursor integracija</h3>
+      <p>Radi direktno u Cursor IDE-u. Isti workflow, ista brzina, samo jeftiniji modeli na raspolaganju.</p>
+    </div>
+    <div class="benefit">
+      <div class="b-icon b-red">♦</div>
+      <h3>Premium pristup</h3>
+      <p>Pristup najjačim AI modelima koji bi inače zahtevali skuplju pretplatu. Svi modeli dostupni svakome.</p>
+    </div>
+    <div class="benefit">
+      <div class="b-icon b-white">📊</div>
+      <h3>Transparentno</h3>
+      <p>Realno praćenje potrošnje u dashboardu. Vidiš svaki zahtev, svaki token, tačno znaš gde ti odlazi kredit.</p>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section id="compare">
+  <div class="section-tag">Poređenje</div>
+  <div class="section-title">VajbAgent vs Tradicionalna pretplata</div>
+  <div class="section-sub">Ista cena, više mogućnosti. Pogledaj šta dobijaš za $20.</div>
+  
+  <div class="stat-bar-section">
+    <div class="stat-block">
+      <h4>Zahtevi za $20 – jeftini modeli</h4>
+      <div class="bar-row"><div class="bar-label">VA Nano</div><div class="bar-track"><div class="bar-fill bar-va" style="width:100%">5,442</div></div></div>
+      <div class="bar-row"><div class="bar-label">VA Lite</div><div class="bar-track"><div class="bar-fill bar-va" style="width:20%">1,088</div></div></div>
+      <div class="bar-row"><div class="bar-label">Pretplata</div><div class="bar-track"><div class="bar-fill bar-cu" style="width:12%">~650</div></div></div>
+    </div>
+    <div class="stat-block">
+      <h4>Zahtevi za $20 – premium modeli</h4>
+      <div class="bar-row"><div class="bar-label">VA Pro</div><div class="bar-track"><div class="bar-fill bar-va" style="width:100%">333</div></div></div>
+      <div class="bar-row"><div class="bar-label">Pretplata</div><div class="bar-track"><div class="bar-fill bar-cu" style="width:68%">~225</div></div></div>
+      <div class="bar-row"><div class="bar-label">VA Max</div><div class="bar-track"><div class="bar-fill bar-va" style="width:33%">111</div></div></div>
+      <div class="bar-row"><div class="bar-label">VA Ultra</div><div class="bar-track"><div class="bar-fill bar-va" style="width:20%">66</div><span class="bar-num">~slično pretplati</span></div></div>
+    </div>
+  </div>
+
+  <div class="compare-wrap">
+    <div class="compare-head">
+      <div></div>
+      <div class="col-va">VajbAgent</div>
+      <div>Cursor Pro</div>
+    </div>
+    <div class="compare-row"><div>Cena</div><div class="win">Od $5, pay-as-you-go</div><div>$20/mes fiksno</div></div>
+    <div class="compare-row"><div>Jeftini modeli (daily use)</div><div class="win">1,000 – 5,400+ zahteva</div><div>~650 zahteva</div></div>
+    <div class="compare-row"><div>Premium modeli</div><div class="tie">66 – 333 zahteva</div><div>~225 zahteva</div></div>
+    <div class="compare-row"><div>Najviši tier (Opus klasa)</div><div class="tie">~66 zahteva</div><div>~50-80 zahteva</div></div>
+    <div class="compare-row"><div>Slow queue kad potrošiš</div><div><span class="check">✕</span> Nema – uvek brz</div><div>Da, prelazak na spor red</div></div>
+    <div class="compare-row"><div>Izbor modela</div><div class="win">5 nivoa, sam biraš</div><div>Auto režim bira za tebe</div></div>
+    <div class="compare-row"><div>Pretplata / obaveza</div><div class="win">Nema – uplati kad hoćeš</div><div>Mesečna obaveza</div></div>
+    <div class="compare-row"><div>IDE autocomplete</div><div><span class="cross">–</span> Koristi Cursor free</div><div><span class="check">✓</span></div></div>
+    <div class="compare-row"><div>Cloud agenti</div><div><span class="cross">–</span></div><div><span class="check">✓</span></div></div>
+    <div class="compare-row"><div>Dashboard sa praćenjem</div><div><span class="check">✓</span> Detaljno</div><div><span class="check">✓</span> Osnovno</div></div>
+  </div>
+</section>
+
+<!-- MODELS -->
+<section id="models">
+  <div class="section-tag">Modeli</div>
+  <div class="section-title">Izaberi nivo koji ti odgovara</div>
+  <div class="section-sub">5 nivoa performansi. Od ultra-jeftinog za svakodnevni rad do premium za najteže zadatke.</div>
+  <div class="model-tiers">
+    <div class="tier">
+      <div class="tier-name">Nano</div>
+      <div class="tier-desc">Svakodnevna pitanja</div>
+      <div class="tier-stat t-green">5,442</div>
+      <div class="tier-stat-sub">zahteva za $20</div>
+      <div class="tier-price"><b>$0.004</b> /zahtev</div>
+    </div>
+    <div class="tier">
+      <div class="tier-name">Lite</div>
+      <div class="tier-desc">Daily coding</div>
+      <div class="tier-stat t-blue">1,088</div>
+      <div class="tier-stat-sub">zahteva za $20</div>
+      <div class="tier-price"><b>$0.018</b> /zahtev</div>
+    </div>
+    <div class="tier popular">
+      <div class="tier-name">Pro</div>
+      <div class="tier-desc">Projekti i kod</div>
+      <div class="tier-stat t-purple">333</div>
+      <div class="tier-stat-sub">zahteva za $20</div>
+      <div class="tier-price"><b>$0.06</b> /zahtev</div>
+    </div>
+    <div class="tier">
+      <div class="tier-name">Max</div>
+      <div class="tier-desc">Kompleksni zadaci</div>
+      <div class="tier-stat t-yellow">111</div>
+      <div class="tier-stat-sub">zahteva za $20</div>
+      <div class="tier-price"><b>$0.18</b> /zahtev</div>
+    </div>
+    <div class="tier">
+      <div class="tier-name">Ultra</div>
+      <div class="tier-desc">Elite agent</div>
+      <div class="tier-stat t-red">66</div>
+      <div class="tier-stat-sub">zahteva za $20</div>
+      <div class="tier-price"><b>$0.30</b> /zahtev</div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section>
+  <div class="section-tag">Kako radi</div>
+  <div class="section-title">3 koraka do AI kodiranja</div>
+  <div class="section-sub">Podesi jednom, koristi zauvek.</div>
+  <div class="benefits" style="grid-template-columns:repeat(3,1fr)">
+    <div class="benefit" style="text-align:center">
+      <div style="font-size:2rem;font-weight:800;color:var(--accent);margin-bottom:10px">1</div>
+      <h3>Dobij API ključ</h3>
+      <p>Tvoj mentor ti kreira nalog i šalje personalizovani API ključ.</p>
+    </div>
+    <div class="benefit" style="text-align:center">
+      <div style="font-size:2rem;font-weight:800;color:var(--accent);margin-bottom:10px">2</div>
+      <h3>Podesi Cursor</h3>
+      <p>Unesi ključ u Cursor Settings, dodaj model i počni da kodiš.</p>
+    </div>
+    <div class="benefit" style="text-align:center">
+      <div style="font-size:2rem;font-weight:800;color:var(--accent);margin-bottom:10px">3</div>
+      <h3>Uplati kad treba</h3>
+      <p>Dopuni kredit sa $5, $10 ili $20. Prati potrošnju u dashboardu.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SUMMARY -->
+<section style="padding-bottom:0">
+  <div class="section-tag">Rezime</div>
+  <div class="section-title">Kome je VajbAgent za?</div>
+  <div class="section-sub"></div>
+  <div class="benefits" style="grid-template-columns:1fr 1fr">
+    <div class="benefit">
+      <h3 style="color:var(--green)">Idealno za tebe ako:</h3>
+      <p style="line-height:2">
+        ✓ Hoćeš AI asistenta bez mesečne pretplate<br>
+        ✓ Koristiš AI svakodnevno za kodiranje<br>
+        ✓ Želiš kontrolu nad troškovima<br>
+        ✓ Trebaš jeftine modele za domace i vežbe<br>
+        ✓ Hoćeš pristup premium modelima po potrebi
+      </p>
+    </div>
+    <div class="benefit">
+      <h3 style="color:var(--text2)">Cursor Pro je bolji ako:</h3>
+      <p style="line-height:2">
+        ● Imaš .edu email (besplatan Pro 1 god)<br>
+        ● Trebaš autocomplete i cloud agente<br>
+        ● Koristiš isključivo najskuplji model<br>
+        ● Preferiraš fiksnu mesečnu cenu
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta">
+  <h2>Spreman za početak?</h2>
+  <p>Uloguj se sa svojim ključem ili kontaktiraj mentora za novi nalog.</p>
+  <div class="cta-cards">
+    <div class="cta-card">
+      <h3>Student</h3>
+      <p>Dashboard, potrošnja, dopuna kredita</p>
+      <a href="/dashboard">Uloguj se</a>
+    </div>
+    <div class="cta-card">
+      <h3>Podešavanja</h3>
+      <p>Korak-po-korak za Cursor IDE</p>
+      <a href="/setup">Setup guide</a>
+    </div>
+  </div>
+</div>
+
+<footer>VajbAgent &middot; AI kodiranje za studente &middot; 2026</footer>
+
 </body>
 </html>

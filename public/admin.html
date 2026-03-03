@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VajbAgent Admin</title>
+<style>
+:root{--bg:#09090b;--sidebar:#111113;--surface:#161618;--surface2:#1c1c1f;--border:#27272a;--border2:#3f3f46;--text:#fafafa;--text2:#a1a1aa;--text3:#71717a;--accent:#8b5cf6;--green:#22c55e;--red:#ef4444;--yellow:#eab308;--blue:#3b82f6;--radius:10px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+
+/* Login */
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center}
+.login-box{width:360px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:40px}
+.login-box h2{font-size:1.15rem;font-weight:600;margin-bottom:4px}
+.login-box p{font-size:.82rem;color:var(--text2);margin-bottom:24px}
+.login-box input{width:100%;padding:11px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.88rem;outline:none;margin-bottom:14px}
+.login-box input:focus{border-color:var(--accent)}
+.login-box button{width:100%;padding:11px;background:var(--text);color:var(--bg);border:none;border-radius:8px;font-weight:600;font-size:.88rem;cursor:pointer}
+.login-box button:hover{opacity:.9}
+.login-err{color:var(--red);font-size:.8rem;margin-top:8px;display:none}
+
+/* Layout */
+.app{display:flex;min-height:100vh;display:none}
+.sidebar{width:220px;background:var(--sidebar);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10}
+.sidebar-brand{padding:0 20px 20px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.sidebar-brand h1{font-size:1rem;font-weight:700}
+.sidebar-brand span{color:var(--red)}
+.sidebar-brand p{font-size:.7rem;color:var(--text3);margin-top:2px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:.84rem;color:var(--text2);cursor:pointer;border-left:3px solid transparent;transition:all .15s}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.nav-item.active{color:var(--text);background:rgba(139,92,246,.08);border-left-color:var(--accent)}
+.nav-icon{font-size:1rem;width:20px;text-align:center}
+.sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)}
+.sidebar-footer a{font-size:.75rem;color:var(--text3);text-decoration:none}
+.sidebar-footer a:hover{color:var(--text2)}
+.main{margin-left:220px;flex:1;padding:28px 32px 60px;min-height:100vh;overflow-y:auto}
+
+/* Page sections */
+.page{display:none}
+.page.active{display:block}
+.page-title{font-size:1.2rem;font-weight:700;margin-bottom:20px}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:16px}
+.card-title{font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px;font-weight:600}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
+.sum-label{font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.sum-val{font-size:1.5rem;font-weight:700;letter-spacing:-.02em}
+.sum-sub{font-size:.68rem;color:var(--text3);margin-top:3px}
+.green{color:var(--green)}.red{color:var(--red)}.accent{color:var(--accent)}.yellow{color:var(--yellow)}
+
+/* Tables */
+table{width:100%;border-collapse:collapse}
+th,td{padding:9px 10px;text-align:left;font-size:.8rem;border-bottom:1px solid var(--border)}
+th{color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:.65rem}
+.mono{font-family:'SF Mono',ui-monospace,monospace;font-size:.75rem}
+.tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.65rem;font-weight:600}
+.tag-green{background:rgba(34,197,94,.12);color:var(--green)}
+.tag-red{background:rgba(239,68,68,.12);color:var(--red)}
+.tag-openai{background:rgba(16,163,127,.12);color:#34d399}
+.tag-anthropic{background:rgba(217,119,6,.12);color:#fbbf24}
+
+/* Buttons */
+.btn{padding:7px 14px;border:none;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;transition:all .15s}
+.btn-w{background:var(--text);color:var(--bg)}.btn-w:hover{opacity:.85}
+.btn-g{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.25)}.btn-g:hover{background:rgba(34,197,94,.25)}
+.btn-r{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.2)}.btn-r:hover{background:rgba(239,68,68,.22)}
+.btn-y{background:rgba(234,179,8,.12);color:var(--yellow);border:1px solid rgba(234,179,8,.2)}.btn-y:hover{background:rgba(234,179,8,.22)}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text);border-color:var(--border2)}
+.btn-sm{padding:5px 10px;font-size:.72rem}
+
+/* Forms */
+.form-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.form-input{padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:.84rem;outline:none}
+.form-input:focus{border-color:var(--accent)}
+
+/* Add student result */
+.new-result{margin-top:14px;padding:16px;border-radius:8px;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.2);display:none}
+.new-result .lbl{font-size:.72rem;color:var(--text3)}
+.new-result code{color:var(--green);font-family:'SF Mono',monospace;font-size:.85rem}
+
+/* Credit modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50}
+.modal-bg.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:360px}
+.modal h3{font-size:1rem;font-weight:600;margin-bottom:16px}
+
+/* Earnings grid */
+.earn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.earn-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px}
+.earn-card .etop{font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.03em}
+.earn-card .eval{font-size:1.15rem;font-weight:700;margin:3px 0}
+.earn-card .esub{font-size:.68rem;color:var(--text3)}
+
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:8px;font-size:.82rem;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
+.toast.show{opacity:1}
+
+@media(max-width:768px){
+  .sidebar{position:fixed;width:100%;height:auto;bottom:0;top:auto;flex-direction:row;padding:0;border-right:none;border-top:1px solid var(--border);overflow-x:auto}
+  .sidebar-brand,.sidebar-footer{display:none}
+  .nav-item{flex-direction:column;gap:2px;padding:10px 14px;font-size:.65rem;border-left:none;border-top:2px solid transparent}
+  .nav-item.active{border-top-color:var(--accent);border-left-color:transparent}
+  .main{margin-left:0;margin-bottom:60px;padding:20px 16px 80px}
+  .summary{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div class="login" id="login">
+  <div class="login-box">
+    <h2>VajbAgent Admin</h2>
+    <p>Unesi admin tajnu za pristup</p>
+    <input type="password" id="secretIn" placeholder="Admin secret" autofocus>
+    <button onclick="doLogin()">Pristupi</button>
+    <div class="login-err" id="loginErr">Pogresna tajna</div>
+  </div>
+</div>
+
+<!-- App -->
+<div class="app" id="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <h1>VajbAgent <span>Admin</span></h1>
+      <p>Upravljanje platformom</p>
+    </div>
+    <div class="nav-item active" data-page="overview"><span class="nav-icon">&#9635;</span> Pregled</div>
+    <div class="nav-item" data-page="students"><span class="nav-icon">&#9823;</span> Studenti</div>
+    <div class="nav-item" data-page="models"><span class="nav-icon">&#9881;</span> Modeli</div>
+    <div class="nav-item" data-page="earnings"><span class="nav-icon">&#9733;</span> Zarada</div>
+    <div class="sidebar-footer">
+      <a href="/dashboard" target="_blank">Student Dashboard</a> &middot;
+      <a href="/setup" target="_blank">Setup</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- PREGLED -->
+    <div class="page active" id="pg-overview">
+      <div class="page-title">Pregled</div>
+      <div class="summary">
+        <div class="sum-card"><div class="sum-label">Studenti</div><div class="sum-val accent" id="sUsers">0</div></div>
+        <div class="sum-card"><div class="sum-label">Ukupni zahtevi</div><div class="sum-val" id="sReqs">0</div></div>
+        <div class="sum-card"><div class="sum-label">Provider trošak</div><div class="sum-val red" id="sCost">$0</div><div class="sum-sub" id="sCostD"></div></div>
+        <div class="sum-card"><div class="sum-label">Tvoja zarada</div><div class="sum-val green" id="sProfit">$0</div><div class="sum-sub" id="sProfitD"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Svi korisnici - pregled</div>
+        <table><thead><tr><th>Ime</th><th>Ključ</th><th>Stanje</th><th>Zahtevi</th><th>Tokeni (in/out)</th><th>Poslednje</th></tr></thead>
+        <tbody id="ovUsersBody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- STUDENTI -->
+    <div class="page" id="pg-students">
+      <div class="page-title">Studenti</div>
+      <div class="card">
+        <div class="card-title">Dodaj novog studenta</div>
+        <div class="form-row">
+          <input class="form-input" id="addName" placeholder="Ime i prezime" style="width:200px">
+          <input class="form-input" id="addBal" type="number" placeholder="Pocetni $" value="10" min="0" style="width:90px">
+          <button class="btn btn-w" onclick="addStudent()">Dodaj</button>
+        </div>
+        <div class="new-result" id="newRes">
+          <div class="lbl">Ime</div><div id="nrName" style="font-weight:600;margin-bottom:6px"></div>
+          <div class="lbl">API ključ (pošalji studentu)</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><code id="nrKey"></code><button class="btn btn-sm btn-g" onclick="copyText(lastKey)">Kopiraj</button></div>
+          <div class="lbl">Balans</div><div id="nrBal" class="green" style="font-weight:600"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Svi studenti</div>
+        <table><thead><tr><th>Ime</th><th>API ključ</th><th>Balans</th><th>Status</th><th>Kreiran</th><th>Akcije</th></tr></thead>
+        <tbody id="stuBody"></tbody></table>
+        <div id="stuEmpty" style="display:none;text-align:center;padding:28px;color:var(--text3);font-size:.85rem">Nema studenata. Dodaj prvog iznad.</div>
+      </div>
+    </div>
+
+    <!-- MODELI -->
+    <div class="page" id="pg-models">
+      <div class="page-title">Modeli</div>
+      <div class="card">
+        <div class="card-title">Mapiranje - VajbAgent &rarr; Backend</div>
+        <table><thead><tr><th>VajbAgent ID</th><th>Ime</th><th>Backend</th><th>Model</th><th>Input $/MTok</th><th>Output $/MTok</th><th>~$/zahtev</th></tr></thead>
+        <tbody id="modBody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- ZARADA -->
+    <div class="page" id="pg-earnings">
+      <div class="page-title">Kalkulator zarade</div>
+      <div class="card">
+        <div class="card-title">Koliko zaradjujes po budžetu studenta</div>
+        <div id="earnWrap"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Credit modal -->
+<div class="modal-bg" id="creditModal">
+  <div class="modal">
+    <h3>Izmeni kredite</h3>
+    <div style="margin-bottom:12px"><span class="lbl">Student:</span> <strong id="cmName"></strong></div>
+    <div style="margin-bottom:12px"><span class="lbl">Trenutno:</span> <strong id="cmBal" class="yellow"></strong></div>
+    <div class="form-row" style="margin-bottom:14px">
+      <input class="form-input" id="cmAmount" type="number" placeholder="Iznos USD" step="1" style="width:120px">
+      <button class="btn btn-g" onclick="creditAction(1)">+ Dodaj</button>
+      <button class="btn btn-r" onclick="creditAction(-1)">- Oduzmi</button>
+    </div>
+    <div id="cmRes" style="font-size:.82rem;margin-bottom:10px"></div>
+    <button class="btn btn-ghost" onclick="closeCredit()" style="width:100%">Zatvori</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let secret='';
+let DATA={models:[],users:[],markup:1,students:[]};
+let lastKey='';
+const PRICES={'gpt-5-nano':{in:.05,out:.4},'gpt-5-mini':{in:.25,out:2},'claude-haiku-4-5':{in:1,out:5},'claude-sonnet-4-6':{in:3,out:15},'claude-opus-4-6':{in:5,out:25}};
+const AVG_IN=25000,AVG_OUT=3000;
+
+function $(id){return document.getElementById(id)}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+function fmt(n){return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':String(n)}
+function fmtD(iso){if(!iso)return'-';const d=new Date(iso);return d.toLocaleDateString('sr-RS')+' '+d.toLocaleTimeString('sr-RS',{hour:'2-digit',minute:'2-digit'})}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
+function copyText(t){navigator.clipboard.writeText(t).then(()=>toast('Kopirano!'))}
+
+function api(method,path,body){
+  const o={method,headers:{'Content-Type':'application/json','X-Admin-Secret':secret}};
+  if(body)o.body=JSON.stringify(body);
+  return fetch(path,o).then(r=>r.json());
+}
+
+// Login
+function doLogin(){
+  secret=$('secretIn').value.trim();
+  if(!secret)return;
+  api('GET','/admin/api/overview?secret='+encodeURIComponent(secret))
+    .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;return api('GET','/admin/students?secret='+encodeURIComponent(secret))})
+    .then(s=>{if(s.error)throw s;DATA.students=s;$('login').style.display='none';$('app').style.display='flex';renderAll()})
+    .catch(()=>{$('loginErr').style.display='block'});
+}
+$('secretIn').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+
+// Navigation
+document.querySelectorAll('.nav-item').forEach(el=>{
+  el.onclick=()=>{
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    $('pg-'+el.dataset.page).classList.add('active');
+  };
+});
+
+// Render all
+function renderAll(){renderOverview();renderStudents();renderModels();renderEarnings()}
+
+function refresh(){
+  Promise.all([
+    api('GET','/admin/api/overview?secret='+encodeURIComponent(secret)),
+    api('GET','/admin/students?secret='+encodeURIComponent(secret))
+  ]).then(([ov,st])=>{
+    if(!ov.error){DATA.models=ov.models;DATA.users=ov.users;DATA.markup=ov.markup}
+    if(!st.error)DATA.students=st;
+    renderAll();
+  });
+}
+
+// OVERVIEW
+function renderOverview(){
+  const sts=DATA.students;
+  let totalReqs=0,totalIn=0,totalOut=0;
+  DATA.users.forEach(u=>{totalReqs+=u.requests||0;totalIn+=u.input_tokens||0;totalOut+=u.output_tokens||0});
+  const provCost=(totalIn/1e6)*3+(totalOut/1e6)*15;
+  const paid=provCost*DATA.markup;
+  const profit=paid-provCost;
+
+  $('sUsers').textContent=sts.length;
+  $('sReqs').textContent=fmt(totalReqs);
+  $('sCost').textContent='$'+provCost.toFixed(2);
+  $('sCostD').textContent=fmt(totalIn)+' in + '+fmt(totalOut)+' out';
+  $('sProfit').textContent='$'+profit.toFixed(2);
+  $('sProfitD').textContent='Markup '+DATA.markup+'x';
+
+  const tb=$('ovUsersBody');tb.innerHTML='';
+  sts.forEach(s=>{
+    const u=DATA.users.find(x=>x.key_id===s.key)||{};
+    tb.innerHTML+=`<tr>
+      <td style="font-weight:600">${esc(s.name)}</td>
+      <td class="mono" style="cursor:pointer;color:var(--accent)" onclick="copyText('${esc(s.key)}')">${esc(s.key)}</td>
+      <td class="yellow">$${(s.balance_usd||0).toFixed(2)}</td>
+      <td>${fmt(u.requests||0)}</td>
+      <td>${fmt(u.input_tokens||0)} / ${fmt(u.output_tokens||0)}</td>
+      <td style="color:var(--text3)">${fmtD(u.last_used)}</td>
+    </tr>`;
+  });
+}
+
+// STUDENTS
+function renderStudents(){
+  const sts=DATA.students;
+  const tb=$('stuBody');tb.innerHTML='';
+  $('stuEmpty').style.display=sts.length?'none':'block';
+  sts.forEach(s=>{
+    tb.innerHTML+=`<tr>
+      <td style="font-weight:600">${esc(s.name)}</td>
+      <td class="mono" style="cursor:pointer;color:var(--accent)" onclick="copyText('${esc(s.key)}')" title="Klikni za kopiranje">${esc(s.key)}</td>
+      <td class="yellow">$${(s.balance_usd||0).toFixed(2)}</td>
+      <td>${s.active?'<span class="tag tag-green">Aktivan</span>':'<span class="tag tag-red">Neaktivan</span>'}</td>
+      <td style="color:var(--text3)">${fmtD(s.created)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm btn-y" onclick="openCredit('${esc(s.key)}','${esc(s.name)}',${s.balance_usd||0})">Krediti</button>
+        <button class="btn btn-sm ${s.active?'btn-ghost':'btn-g'}" onclick="toggleStu('${esc(s.key)}',${!s.active})">${s.active?'Deaktiviraj':'Aktiviraj'}</button>
+        <button class="btn btn-sm btn-r" onclick="delStu('${esc(s.key)}','${esc(s.name)}')">Obriši</button>
+      </td>
+    </tr>`;
+  });
+}
+
+function addStudent(){
+  const name=$('addName').value.trim();
+  const bal=parseFloat($('addBal').value)||0;
+  if(!name){toast('Unesi ime.');return}
+  api('POST','/admin/students',{name,initial_balance:bal}).then(d=>{
+    if(d.error){toast(d.error);return}
+    lastKey=d.key;
+    $('nrName').textContent=d.name;
+    $('nrKey').textContent=d.key;
+    $('nrBal').textContent='$'+(d.balance_usd||0).toFixed(2);
+    $('newRes').style.display='block';
+    $('addName').value='';
+    toast('Student dodat!');
+    refresh();
+  });
+}
+$('addName').addEventListener('keydown',e=>{if(e.key==='Enter')addStudent()});
+
+function toggleStu(key,active){
+  api('PATCH','/admin/students/'+encodeURIComponent(key),{active}).then(d=>{
+    if(d.error){toast(d.error);return}
+    toast(active?'Aktiviran':'Deaktiviran');refresh();
+  });
+}
+
+function delStu(key,name){
+  if(!confirm('Obrisati studenta "'+name+'"?'))return;
+  api('DELETE','/admin/students/'+encodeURIComponent(key)).then(d=>{
+    if(d.error){toast(d.error);return}
+    toast('Obrisan');refresh();
+  });
+}
+
+// Credit modal
+let cmKey='';
+function openCredit(key,name,bal){
+  cmKey=key;$('cmName').textContent=name;$('cmBal').textContent='$'+bal.toFixed(2);
+  $('cmAmount').value='';$('cmRes').textContent='';
+  $('creditModal').classList.add('show');
+}
+function closeCredit(){$('creditModal').classList.remove('show')}
+
+function creditAction(sign){
+  const amt=Math.abs(parseFloat($('cmAmount').value)||0);
+  if(!amt){toast('Unesi iznos.');return}
+  const realAmt=sign>0?amt:-amt;
+  api('POST','/admin/add-credits',{key_id:cmKey,amount_usd:realAmt}).then(d=>{
+    if(d.error){$('cmRes').innerHTML='<span style="color:var(--red)">'+d.error+'</span>';return}
+    $('cmRes').innerHTML='<span style="color:var(--green)">Novo stanje: $'+d.balance_usd.toFixed(2)+'</span>';
+    $('cmBal').textContent='$'+d.balance_usd.toFixed(2);
+    refresh();
+  });
+}
+
+// MODELS
+function renderModels(){
+  const tb=$('modBody');tb.innerHTML='';
+  DATA.models.forEach(m=>{
+    const p=PRICES[m.backendModel]||{in:0,out:0};
+    const cost=(AVG_IN/1e6)*p.in+(AVG_OUT/1e6)*p.out;
+    const tag=m.backend==='openai'?'tag-openai':'tag-anthropic';
+    tb.innerHTML+=`<tr>
+      <td class="mono">${m.id}</td><td>${m.name}</td>
+      <td><span class="tag ${tag}">${m.backend}</span></td>
+      <td class="mono">${m.backendModel}</td>
+      <td>$${p.in.toFixed(2)}</td><td>$${p.out.toFixed(2)}</td>
+      <td>$${cost.toFixed(4)}</td>
+    </tr>`;
+  });
+}
+
+// EARNINGS
+function renderEarnings(){
+  const w=$('earnWrap');w.innerHTML='';
+  [10,20,50].forEach(budget=>{
+    const real=budget/DATA.markup;
+    const earn=budget-real;
+    let html=`<div style="margin-bottom:20px"><div style="font-size:.85rem;font-weight:600;margin-bottom:8px">Student plaća $${budget} &rarr; zarada $${earn.toFixed(2)}</div><div class="earn-grid">`;
+    DATA.models.forEach(m=>{
+      const p=PRICES[m.backendModel]||{in:3,out:15};
+      const cost=(AVG_IN/1e6)*p.in+(AVG_OUT/1e6)*p.out;
+      const reqs=Math.floor(real/cost);
+      const hrs=(reqs*2.5/60).toFixed(0);
+      html+=`<div class="earn-card"><div class="etop">${m.name}</div><div class="eval">${fmt(reqs)} <span style="font-size:.7rem;font-weight:400;color:var(--text3)">zahteva</span></div><div class="esub">~${hrs}h kodiranja</div></div>`;
+    });
+    html+='</div></div>';
+    w.innerHTML+=html;
+  });
+}
+</script>
+</body>
+</html>
