@@ -8,11 +8,11 @@ function getValidKeys() {
 }
 
 /**
- * Returns a short identifier for logging (e.g. last 8 chars of key).
+ * Returns the key itself as the identifier (keys are short enough to use directly).
  */
 export function keyId(key) {
-  if (!key || key.length < 8) return 'unknown';
-  return key.slice(-8);
+  if (!key) return 'unknown';
+  return key.trim();
 }
 
 /**
