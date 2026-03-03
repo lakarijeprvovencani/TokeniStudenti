@@ -31,11 +31,13 @@ Proxy koji prima zahteve u **OpenAI Chat Completions** formatu (kao Cursor IDE),
    ```
    Zameni `POSLEDNJIH_8` sa **poslednjih 8 karaktera** tvog test ključa (na dashboardu, kad se uloguješ, piše "Ključ: …xxxxx" – to je key_id).
 
-2. **Cursor:** Settings → Models → proširi OpenAI API → **Override Base URL**: `http://localhost:3000` → **API Key**: tvoj test ključ (ceo iz `STUDENT_API_KEYS`).
+2. **Cursor:** Settings → Models → proširi OpenAI API → **Override Base URL**: `http://localhost:3000` (bez `/` na kraju) → **API Key**: tvoj test ključ (ceo iz `STUDENT_API_KEYS`).
 
-3. Izaberi model **VajbAgent Pro** ili **VajbAgent Max** i pošalji poruku. Ako dobiješ odgovor, **Korak 2 je gotov**.
+3. Model: Cursor može da ne učita listu automatski; ako je lista prazna, **+ Add Custom Model** → Model ID: `vajb-agent-pro` (ili `vajb-agent-max`). Chat zahtevi idu na `POST /chat/completions`, proxy je usklađen sa Anthropic (200K kontekst) i OpenAI formatom.
 
-4. Opciono: otvori **http://localhost:3000/dashboard**, uloguj se istim ključem i proveri potrošnju i kredit.
+4. Izaberi model **VajbAgent Pro** ili **VajbAgent Max** i pošalji poruku. Ako dobiješ odgovor, **Korak 2 je gotov**.
+
+5. Opciono: otvori **http://localhost:3000/dashboard**, uloguj se istim ključem i proveri potrošnju i kredit.
 
 *(Sledeće: deploy za druge, Stripe za automatski kredit.)*
 
@@ -165,7 +167,7 @@ Proxy proverava `Authorization: Bearer <student-api-key>` i loguje usage po tom 
 
 ### Prepaid kredit (koliko potroše toliko plate)
 
-- Za svaki API ključ postoji **stanje u USD** u `data/balances.json`. Svaki uspešan zahtev **oduzima** trošak od tog stanja. Kad stanje padne na 0 ili manje, sledeći zahtev dobija **402** i poruku da dopune nalog.
+- Za svaki API ključ postoji **stanje u USD** u `data/balances.json`. Svaki uspešan zahtev **oduzima** trošak od tog stanja (cena = Anthropic × **STUDENT_MARKUP**; ako nije setovan, 1 = bez marže). Kad stanje padne na 0 ili manje, sledeći zahtev dobija **402** i poruku da dopune nalog. **Zarada:** ako je npr. `STUDENT_MARKUP=1.5`, sa studenta skidaš 1.5× više nego što plaćaš Anthropic-u – razlika ostaje tebi.
 - **Pravilo: 1 USD uplate = 1 USD kredita.** Nema posebnih paketa – iznos koji student plati (npr. 5 USD) direktno se dodaje na stanje.
 - **Kalkulacija troška:** automatski po modelu iz `ANTHROPIC_MODEL` (Anthropic 2026): Sonnet 4 / 4.5 / 4.6 = 3 USD/1M ulaz, 15 USD/1M izlaz; Opus 4.5 / 4.6 = 5 / 25; Haiku 4.5 = 1 / 5.
 - **Automatsko dodavanje kredita (Stripe):**  
@@ -201,7 +203,7 @@ Proxy proverava `Authorization: Bearer <student-api-key>` i loguje usage po tom 
      -d '{"key_id":"ent-key-1","amount_usd":5}'
    ```
 
-**Napomena:** Na free tieru servis se gasi posle 15 min neaktivnosti; sledeći zahtev ga budi (~1 min). Usage i balances u `data/` se gube pri redeploy-u (ephemeral disk).
+**Napomena:** Na free tieru servis se gasi posle 15 min neaktivnosti; sledeći zahtev ga budi (~1 min). Na free tieru su `data/` (balance, usage) efemerni – gube se pri restartu. Da bi preživeli: u Render Dashboard dodaj **Persistent Disk** (mount path `/data`), u Environment postavi `DATA_DIR=/data`; tada se balance i usage čuvaju trajno. (Disk može zahtevati paid plan.)
 
 ---
 

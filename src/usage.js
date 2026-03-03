@@ -3,7 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const USAGE_FILE = path.join(__dirname, '..', 'data', 'usage.json');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
+const USAGE_FILE = path.join(DATA_DIR, 'usage.json');
 
 function ensureDataDir() {
   const dir = path.dirname(USAGE_FILE);

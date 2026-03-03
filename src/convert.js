@@ -14,8 +14,9 @@ function getOpenAITextContent(content) {
     .join('\n');
 }
 
-// Približno max ulaznih tokena (ostavljamo prostor za odgovor). ~4 karaktera po tokenu.
-const MAX_INPUT_CHARS = 600000; // ~150k tokena
+// Anthropic: 200K context window (input+output). Ostavljamo prostor za max_tokens odgovora (~25k).
+// https://docs.anthropic.com/en/docs/build-with-claude/context-windows
+const MAX_INPUT_CHARS = 700000; // ~175k tokena ulaza
 
 /**
  * Ogranici system + messages na ukupno max karaktera (da ne pređemo Anthropic limit).

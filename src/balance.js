@@ -3,7 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const BALANCES_FILE = path.join(__dirname, '..', 'data', 'balances.json');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
+const BALANCES_FILE = path.join(DATA_DIR, 'balances.json');
 
 function ensureDataDir() {
   const dir = path.dirname(BALANCES_FILE);
@@ -69,8 +70,26 @@ function getPriceFromModel(model) {
   return PRICES.sonnet;
 }
 
-/** Trošak u USD za dati broj tokena. Koristi ANTHROPIC_MODEL ili prosleđeni model. */
-export function costUsd(inputTokens, outputTokens, model) {
+/**
+ * Stvarni trošak kod Anthropic-a (USD) za dati broj tokena.
+ */
+export function anthropicCostUsd(inputTokens, outputTokens, model) {
   const price = getPriceFromModel(model);
   return (inputTokens / 1e6) * price.in + (outputTokens / 1e6) * price.out;
+}
+
+/**
+ * Koliko da skines sa studentovog računa (USD).
+ * Ako je STUDENT_MARKUP npr. 1.5, skidamo 1.5× više nego Anthropic – razlika je tvoja zarada.
+ * Markup 1 = bez marže (1 USD kredita = 1 USD troška kod Anthropic).
+ */
+function getStudentMarkup() {
+  const v = parseFloat(process.env.STUDENT_MARKUP);
+  return Number.isFinite(v) && v >= 1 ? v : 1;
+}
+
+/** Trošak u USD koji se skida sa studentovog balansa (Anthropic cena × markup). */
+export function costUsd(inputTokens, outputTokens, model) {
+  const anthropic = anthropicCostUsd(inputTokens, outputTokens, model);
+  return Math.round(anthropic * getStudentMarkup() * 100) / 100;
 }

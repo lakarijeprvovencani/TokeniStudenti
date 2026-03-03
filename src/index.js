@@ -19,7 +19,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-// Tvoja imena agenata u Cursoru → koji Claude model koristimo (ti znaš, korisnik ne vidi)
+// Tvoja imena agenata u Cursoru → koji Claude model koristimo (Anthropic Messages API)
+// Context: 200K tokena standard (Sonnet 4.6 / Opus 4.6); 1M sa beta header za tier 4
 const VAJB_MODELS = [
   { id: 'vajb-agent-pro', name: 'VajbAgent Pro', anthropic: 'claude-sonnet-4-6' },   // Sonnet 4.6
   { id: 'vajb-agent-max', name: 'VajbAgent Max', anthropic: 'claude-opus-4-6' },     // Opus 4.6
@@ -126,8 +127,9 @@ const chatCompletionsHandler = [
     if (balance <= 0) {
       return res.status(402).json({
         error: {
-          message: 'Nedovoljno kredita. Dopuni nalog na dashboardu ili kontaktiraj administratora.',
+          message: `Nedovoljno kredita (stanje: ${balance.toFixed(2)} USD). Dopuni nalog na dashboardu ili kontaktiraj administratora.`,
           code: 'insufficient_credits',
+          balance_usd: balance,
         },
       });
     }
@@ -151,11 +153,22 @@ const chatCompletionsHandler = [
       });
     }
 
+    // Hint za Claude: da odgovori tako da Cursor ponudi "Apply" / primenu izmene, a ne "evo pa kopiraj"
+    const CURSOR_EDIT_HINT = [
+      'Korisnik radi u Cursor IDE. Kad predlažeš izmene koda:',
+      '- Daj konkretan kod u markdown code block-u (npr. ```js ili ```html) sa jasno označenim fajlom ako je poznat.',
+      '- Nemoj reći "evo ti pa kopiraj" – formuliši tako da IDE može da ponudi primenu (Apply).',
+      '- Ako menjaš postojeći fajl, navedi koji fajl i daj ceo izmenjeni blok ili jasno "zameni linije X–Y sa: ...".',
+    ].join(' ');
+    const mergedSystem = [CURSOR_EDIT_HINT, system].filter(Boolean).join('\n\n');
+
+    // Anthropic: max_tokens do 64k za neke modele; 16k dovoljno za Cursor, ostavlja prostor u 200k kontekstu
+    const maxTokens = Math.min(Math.max(Number(max_tokens) || 4096, 1), 16384);
     const payload = {
       model: anthropicModelId,
-      max_tokens: Math.min(Number(max_tokens) || 4096, 8192),
+      max_tokens: maxTokens,
       messages: anthropicMessages,
-      ...(system && { system }),
+      ...(mergedSystem && { system: mergedSystem }),
     };
 
     try {

@@ -26,7 +26,7 @@ Sve brojke su za **najnovije** modele (Sonnet 4.5/4.6 i Opus 4.5/4.6). U proxyju
 
 - **Sonnet 4.5 / Sonnet 4.6** – isti cene (3 USD/1M ulaz, 15 USD/1M izlaz). Ako u proxyju koristiš neki od njih (npr. `ANTHROPIC_MODEL=claude-sonnet-4-20250514`), gledaj kolone „Tvoj trošak (Sonnet 4.5/4.6)” i „Naplati studentu”. Marža na ovim naplatama je ~50–95%.
 - **Opus 4.5 / Opus 4.6** – isti cene (5 USD/1M ulaz, 25 USD/1M izlaz). Ako koristiš Opus, gledaj kolone za Opus 4.5/4.6; naplate su veće jer je tvoj trošak veći (~35–65% marža).
-- **Prepaid u aplikaciji:** 1 USD uplate = 1 USD kredita. Student kupuje npr. „Dopuni 12 USD” i dobija 12 USD kredita; potrošnja se oduzima po cenama iz tabele gore.
+- **Prepaid u aplikaciji:** Student uplati npr. 5 USD i dobija 5 USD kredita. Sa tog kredita se oduzima **tvoja cena** (ne direktno Anthropic). Ako u proxyju postaviš **STUDENT_MARKUP** (npr. 1.5), sa računa se skida 1.5× više nego što košta kod Anthropic-a → **razlika je tvoja zarada**. Primer: markup 1.5, student potroši za 0.10 USD (tvoja cena); kod Anthropic-a to je 0.067 USD. Ti zadržavaš 0.033 USD. Bez markup-a (1) nema zarade: 1 USD kredita = 1 USD troška.
 
 ---
 

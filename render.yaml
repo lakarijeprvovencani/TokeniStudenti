@@ -6,10 +6,16 @@ services:
     runtime: node
     buildCommand: npm install
     startCommand: npm start
+    # Trajni disk: balance i usage prežive restart (inače se gube na free tieru)
+    disk:
+      name: vajb-data
+      mountPath: /data
     envVars:
       - key: NODE_VERSION
         value: 20
-      # Dodaj u Render Dashboard → Environment:
-      # ANTHROPIC_API_KEY (Secret)
-      # STUDENT_API_KEYS (Secret)
-      # ADMIN_SECRET (Secret)
+      - key: DATA_DIR
+        value: /data
+      # Dodaj u Render Dashboard → Environment (Secret):
+      # ANTHROPIC_API_KEY
+      # STUDENT_API_KEYS
+      # ADMIN_SECRET
