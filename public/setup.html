@@ -187,12 +187,12 @@
 
       <div class="step">
         <div class="step-num">5</div>
-        <div class="step-text">Klikni <strong>"+ Add Model"</strong> i dodaj jedan od modela iz tabele ispod (npr. <code>vajb-agent-pro</code>).</div>
+        <div class="step-text">U chatu izaberi model iz tabele ispod (npr. <code>gpt-4o-mini</code> za Nano tier). <strong>NE TREBA</strong> da dodaješ custom modele &ndash; svi ovi modeli su već u Cursoru.</div>
       </div>
 
       <div class="step">
         <div class="step-num">6</div>
-        <div class="step-text">U chatu izaberi dodani model i pošalji poruku. Ako dobiješ odgovor, sve radi!</div>
+        <div class="step-text">Pošalji poruku. Cursor šalje zahtev na tvoj VajbAgent server koji automatski rutira na pravi AI model.</div>
       </div>
 
       <div class="note">
@@ -204,7 +204,7 @@
       <h2>Dostupni modeli</h2>
       <table class="models-table">
         <thead>
-          <tr><th>Model ID (upiši ovo)</th><th>Ime</th><th>Bazirano na</th><th>Tip</th></tr>
+          <tr><th>Izaberi u Cursoru</th><th>VajbAgent Tier</th><th>Bazirano na</th><th>Tip</th></tr>
         </thead>
         <tbody id="models-body">
         </tbody>
@@ -231,26 +231,21 @@
     const baseUrl = window.location.origin;
     document.getElementById('base-url').textContent = baseUrl;
 
-    const modelInfo = {
-      'vajb-agent-nano':  { name: 'VajbAgent Nano',  engine: 'AI Model', badge: 'pro', desc: 'Najjeftiniji, daily use' },
-      'vajb-agent-lite':  { name: 'VajbAgent Lite',  engine: 'AI Model', badge: 'pro', desc: 'Dobar za svakodnevno kodiranje' },
-      'vajb-agent-pro':   { name: 'VajbAgent Pro',   engine: 'AI Model', badge: 'pro', desc: 'Brz i pouzdan' },
-      'vajb-agent-max':   { name: 'VajbAgent Max',   engine: 'AI Model', badge: 'max', desc: 'Kompleksni projekti' },
-      'vajb-agent-ultra': { name: 'VajbAgent Ultra', engine: 'AI Model', badge: 'max', desc: 'Premium, najjači' },
-    };
+    const cursorModels = [
+      { cursor: 'gpt-4o-mini',  tier: 'Nano',  badge: 'pro', desc: 'Najjeftiniji, daily use' },
+      { cursor: 'gpt-4-turbo',  tier: 'Lite',  badge: 'pro', desc: 'Dobar za svakodnevno kodiranje' },
+      { cursor: 'gpt-4o',       tier: 'Pro',   badge: 'pro', desc: 'Brz i pouzdan' },
+      { cursor: 'gpt-4',        tier: 'Max',   badge: 'max', desc: 'Kompleksni projekti' },
+      { cursor: 'gpt-4-32k',    tier: 'Ultra', badge: 'max', desc: 'Premium, najjači' },
+    ];
 
-    fetch('/v1/models')
-      .then(r => r.json())
-      .then(data => {
-        const tbody = document.getElementById('models-body');
-        (data.data || []).forEach(m => {
-          const info = modelInfo[m.id] || { name: m.id, engine: '?', badge: 'pro', desc: '' };
-          const tr = document.createElement('tr');
-          tr.innerHTML = `<td>${m.id}</td><td>${info.name}</td><td>${info.engine}</td>` +
-            `<td><span class="badge badge-${info.badge}">${info.desc}</span></td>`;
-          tbody.appendChild(tr);
-        });
-      });
+    const tbody = document.getElementById('models-body');
+    cursorModels.forEach(m => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${m.cursor}</td><td>VajbAgent ${m.tier}</td><td>AI Model</td>` +
+        `<td><span class="badge badge-${m.badge}">${m.desc}</span></td>`;
+      tbody.appendChild(tr);
+    });
 
     function copyUrl() {
       navigator.clipboard.writeText(baseUrl).then(() => {

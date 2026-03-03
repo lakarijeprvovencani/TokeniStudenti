@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vajb Agent Pro</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    .glow-circle {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.25;
+      pointer-events: none;
+    }
+
+    .glow-circle.one {
+      width: 600px;
+      height: 600px;
+      background: #7c3aed;
+      top: -200px;
+      left: -200px;
+    }
+
+    .glow-circle.two {
+      width: 500px;
+      height: 500px;
+      background: #2563eb;
+      bottom: -150px;
+      right: -150px;
+    }
+
+    .card {
+      position: relative;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-radius: 24px;
+      padding: 64px 56px;
+      max-width: 680px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+    }
+
+    .badge {
+      display: inline-block;
+      background: linear-gradient(90deg, #7c3aed, #2563eb);
+      border-radius: 999px;
+      padding: 6px 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 24px;
+      background: linear-gradient(135deg, #fff 40%, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    p {
+      font-size: 1.125rem;
+      color: rgba(255, 255, 255, 0.7);
+      line-height: 1.7;
+      margin-bottom: 40px;
+    }
+
+    p strong {
+      color: #a78bfa;
+      font-weight: 600;
+    }
+
+    .divider {
+      width: 60px;
+      height: 3px;
+      background: linear-gradient(90deg, #7c3aed, #2563eb);
+      border-radius: 999px;
+      margin: 0 auto 32px;
+    }
+
+    .signature {
+      font-size: 0.875rem;
+      color: rgba(255, 255, 255, 0.4);
+      letter-spacing: 0.04em;
+    }
+
+    .signature span {
+      color: rgba(255, 255, 255, 0.65);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-circle one"></div>
+  <div class="glow-circle two"></div>
+
+  <div class="card">
+    <div class="badge">AI Asistent</div>
+    <h1>Pomažem ti da praviš<br />odlične stvari u Cursoru</h1>
+    <div class="divider"></div>
+    <p>
+      Stvoren sam da budem tvoj partner u razvoju softvera —<br />
+      brz, precizan i uvek spreman da pomogne.<br />
+      <strong>Napravio me je Nemanja Lakić</strong> kako bih ti pomogao<br />
+      da praviš jako dobre stvari u Cursoru.
+    </p>
+    <div class="signature">Kreirao &mdash; <span>Nemanja Lakić</span></div>
+  </div>
+</body>
+</html>

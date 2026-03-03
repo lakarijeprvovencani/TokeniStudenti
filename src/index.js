@@ -23,7 +23,6 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 // ---- Model registry: 5 tiers, dual backend (OpenAI + Anthropic) ----
-// backend: 'openai' | 'anthropic'
 const VAJB_MODELS = [
   { id: 'vajb-agent-nano',  name: 'VajbAgent Nano',  backend: 'openai',    backendModel: 'gpt-5-nano',       desc: 'Najjeftiniji, za svakodnevna pitanja' },
   { id: 'vajb-agent-lite',  name: 'VajbAgent Lite',  backend: 'openai',    backendModel: 'gpt-5-mini',       desc: 'Daily coding, odličan za cenu' },
@@ -33,9 +32,27 @@ const VAJB_MODELS = [
 ];
 const DEFAULT_VAJB_MODEL = VAJB_MODELS[0].id;
 
+// Cursor validates model names locally and blocks unknown IDs before sending.
+// Map well-known model names that Cursor allows to our VajbAgent tiers.
+const CURSOR_ALIASES = {
+  'gpt-4o-mini':            'vajb-agent-nano',
+  'gpt-4-turbo':            'vajb-agent-lite',
+  'gpt-4o':                 'vajb-agent-pro',
+  'gpt-4':                  'vajb-agent-max',
+  'gpt-4-32k':              'vajb-agent-ultra',
+  'o3-mini':                'vajb-agent-nano',
+  'gpt-3.5-turbo':          'vajb-agent-nano',
+  'vajb-agent-pro':         'vajb-agent-pro',
+  'vajb-agent-max':         'vajb-agent-max',
+  'vajb-agent-nano':        'vajb-agent-nano',
+  'vajb-agent-lite':        'vajb-agent-lite',
+  'vajb-agent-ultra':       'vajb-agent-ultra',
+};
+
 function resolveModel(requestedModel) {
-  const id = (requestedModel || '').trim() || DEFAULT_VAJB_MODEL;
-  return VAJB_MODELS.find((m) => m.id === id) || null;
+  const raw = (requestedModel || '').trim() || DEFAULT_VAJB_MODEL;
+  const mapped = CURSOR_ALIASES[raw] || raw;
+  return VAJB_MODELS.find((m) => m.id === mapped) || null;
 }
 
 // ---- Clients ----
@@ -109,15 +126,20 @@ app.get('/', (_req, res) => {
 app.head('/', (_req, res) => res.status(200).end());
 
 // ---- Models list ----
-const modelsResponse = () => ({
-  object: 'list',
-  data: VAJB_MODELS.map((m) => ({
-    id: m.id,
-    object: 'model',
-    created: Math.floor(Date.now() / 1000),
-    owned_by: 'vajb-agent',
-  })),
-});
+// Return both VajbAgent IDs and Cursor-friendly aliases so that
+// Cursor's model dropdown recognizes them without manual entry.
+const modelsResponse = () => {
+  const ts = Math.floor(Date.now() / 1000);
+  const entries = [];
+  for (const m of VAJB_MODELS) {
+    entries.push({ id: m.id, object: 'model', created: ts, owned_by: 'vajb-agent' });
+  }
+  for (const [alias, vajbId] of Object.entries(CURSOR_ALIASES)) {
+    if (VAJB_MODELS.some((m) => m.id === alias)) continue;
+    entries.push({ id: alias, object: 'model', created: ts, owned_by: 'vajb-agent' });
+  }
+  return { object: 'list', data: entries };
+};
 app.get('/v1/models', (_req, res) => res.json(modelsResponse()));
 app.get('/models', (_req, res) => res.json(modelsResponse()));
 
@@ -146,13 +168,14 @@ const chatCompletionsHandler = [
     // First: check model is valid (before balance, so user sees the right error)
     const resolved = resolveModel(model);
     if (!resolved) {
-      const available = VAJB_MODELS.map((m) => m.id).join(', ');
-      console.log(`Rejected unknown model: "${model}" (valid: ${available})`);
+      const cursorModels = ['gpt-4o-mini', 'gpt-4-turbo', 'gpt-4o', 'gpt-4', 'gpt-4-32k'];
+      console.log(`Rejected unknown model: "${model}"`);
       return res.status(400).json({
         error: {
-          message: `Model "${model}" nije podržan. Dostupni modeli: ${available}. U Cursoru: Settings → Models → Add Custom Model → upiši jedan od ovih.`,
+          message: `Model "${model}" nije podržan. U Cursoru izaberi jedan od: ${cursorModels.join(', ')}. Mapiranje: gpt-4o-mini=Nano, gpt-4-turbo=Lite, gpt-4o=Pro, gpt-4=Max, gpt-4-32k=Ultra.`,
           code: 'unknown_model',
-          available_models: VAJB_MODELS.map((m) => ({ id: m.id, name: m.name })),
+          cursor_models: cursorModels,
+          mapping: Object.fromEntries(cursorModels.map((c) => [c, CURSOR_ALIASES[c]])),
         },
       });
     }
