@@ -8,6 +8,7 @@ import {
   openAIToolsToAnthropic,
   toOpenAIChatCompletion,
   toOpenAIStreamChunk,
+  toOpenAIStreamChunkToolCalls,
   streamDone,
 } from './convert.js';
 import path from 'path';
@@ -228,6 +229,8 @@ async function handleStream(req, res, keyId, payload, vajbModelId, anthropicMode
 
   const streamId = 'vajb-' + Date.now();
   let usage = { input_tokens: 0, output_tokens: 0 };
+  const toolCalls = []; // { id, name, inputStr } – akumuliramo iz streama
+  let currentToolIndex = -1;
 
   const stream = await anthropic.messages.create({
     ...payload,
@@ -238,6 +241,11 @@ async function handleStream(req, res, keyId, payload, vajbModelId, anthropicMode
     if (event.type === 'message_start' && event.message?.usage) {
       usage.input_tokens = event.message.usage.input_tokens ?? 0;
     }
+    if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+      const b = event.content_block;
+      toolCalls.push({ id: b.id, name: b.name || 'tool', inputStr: '' });
+      currentToolIndex = toolCalls.length - 1;
+    }
     if (event.type === 'content_block_delta') {
       const delta = event.delta;
       if (delta?.type === 'text_delta' && delta.text) {
@@ -245,6 +253,12 @@ async function handleStream(req, res, keyId, payload, vajbModelId, anthropicMode
         res.write(chunk);
         if (res.flush) res.flush();
       }
+      if (delta?.type === 'input_json_delta' && typeof delta.partial_json === 'string' && currentToolIndex >= 0 && toolCalls[currentToolIndex]) {
+        toolCalls[currentToolIndex].inputStr += delta.partial_json;
+      }
+    }
+    if (event.type === 'content_block_stop') {
+      currentToolIndex = -1;
     }
     if (event.type === 'message_delta' && event.usage) {
       if (event.usage.input_tokens != null) usage.input_tokens = event.usage.input_tokens;
@@ -252,7 +266,20 @@ async function handleStream(req, res, keyId, payload, vajbModelId, anthropicMode
     }
   }
 
-  res.write(toOpenAIStreamChunk('', { id: streamId, model: vajbModelId, finish: true }));
+  if (toolCalls.length > 0) {
+    const openAIToolCalls = toolCalls.map((tc, i) => {
+      let args = tc.inputStr || '{}';
+      try {
+        JSON.parse(args);
+      } catch (_) {
+        args = '{}';
+      }
+      return { index: i, id: tc.id, name: tc.name, arguments: args };
+    });
+    res.write(toOpenAIStreamChunkToolCalls(openAIToolCalls, { id: streamId, model: vajbModelId }));
+  } else {
+    res.write(toOpenAIStreamChunk('', { id: streamId, model: vajbModelId, finish: true }));
+  }
   res.write(streamDone());
   res.end();
 
