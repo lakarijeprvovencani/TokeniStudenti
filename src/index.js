@@ -116,61 +116,67 @@ app.get('/v1/models', (_req, res) => {
 });
 
 // ---- Chat completions: require Bearer token, check balance ----
-app.post('/v1/chat/completions', requireStudentAuth, async (req, res) => {
-  const keyId = req.studentKeyId;
-  const balance = getBalance(keyId);
-  if (balance <= 0) {
-    return res.status(402).json({
-      error: {
-        message: 'Nedovoljno kredita. Dopuni nalog na dashboardu ili kontaktiraj administratora.',
-        code: 'insufficient_credits',
-      },
-    });
-  }
-
-  const body = req.body || {};
-  const { messages, stream = false, max_tokens = 4096, model } = body;
-
-  if (!messages || !Array.isArray(messages) || messages.length === 0) {
-    return res.status(400).json({
-      error: { message: 'Missing or empty "messages" array.' },
-    });
-  }
-
-  const anthropicModelId = getAnthropicModel(model);
-  const vajbModelId = getVajbModelId(model);
-
-  const { system, messages: anthropicMessages } = openAIToAnthropicMessages(messages);
-  if (anthropicMessages.length === 0) {
-    return res.status(400).json({
-      error: { message: 'No valid user/assistant messages after conversion.' },
-    });
-  }
-
-  const payload = {
-    model: anthropicModelId,
-    max_tokens: Math.min(Number(max_tokens) || 4096, 8192),
-    messages: anthropicMessages,
-    ...(system && { system }),
-  };
-
-  try {
-    if (stream) {
-      await handleStream(req, res, keyId, payload, vajbModelId, anthropicModelId);
-    } else {
-      await handleNonStream(req, res, keyId, payload, vajbModelId, anthropicModelId);
+// Cursor šalje na /chat/completions (bez /v1), OpenAI standard je /v1/chat/completions – podržavamo oba
+const chatCompletionsHandler = [
+  requireStudentAuth,
+  async (req, res) => {
+    const keyId = req.studentKeyId;
+    const balance = getBalance(keyId);
+    if (balance <= 0) {
+      return res.status(402).json({
+        error: {
+          message: 'Nedovoljno kredita. Dopuni nalog na dashboardu ili kontaktiraj administratora.',
+          code: 'insufficient_credits',
+        },
+      });
     }
-  } catch (err) {
-    console.error('Anthropic error:', err.message);
-    const status = err.status || 502;
-    res.status(status).json({
-      error: {
-        message: err.message || 'Upstream (Anthropic) error',
-        type: 'api_error',
-      },
-    });
-  }
-});
+
+    const body = req.body || {};
+    const { messages, stream = false, max_tokens = 4096, model } = body;
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({
+        error: { message: 'Missing or empty "messages" array.' },
+      });
+    }
+
+    const anthropicModelId = getAnthropicModel(model);
+    const vajbModelId = getVajbModelId(model);
+
+    const { system, messages: anthropicMessages } = openAIToAnthropicMessages(messages);
+    if (anthropicMessages.length === 0) {
+      return res.status(400).json({
+        error: { message: 'No valid user/assistant messages after conversion.' },
+      });
+    }
+
+    const payload = {
+      model: anthropicModelId,
+      max_tokens: Math.min(Number(max_tokens) || 4096, 8192),
+      messages: anthropicMessages,
+      ...(system && { system }),
+    };
+
+    try {
+      if (stream) {
+        await handleStream(req, res, keyId, payload, vajbModelId, anthropicModelId);
+      } else {
+        await handleNonStream(req, res, keyId, payload, vajbModelId, anthropicModelId);
+      }
+    } catch (err) {
+      console.error('Anthropic error:', err.message);
+      const status = err.status || 502;
+      res.status(status).json({
+        error: {
+          message: err.message || 'Upstream (Anthropic) error',
+          type: 'api_error',
+        },
+      });
+    }
+  },
+];
+app.post('/v1/chat/completions', chatCompletionsHandler);
+app.post('/chat/completions', chatCompletionsHandler);
 
 async function handleNonStream(req, res, keyId, payload, vajbModelId, anthropicModelId) {
   const response = await anthropic.messages.create({
