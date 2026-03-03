@@ -26,14 +26,12 @@ function writeBalances(balances) {
   fs.writeFileSync(BALANCES_FILE, JSON.stringify(balances, null, 2), 'utf8');
 }
 
-/** Get current balance in USD for a key. */
 export function getBalance(keyId) {
   const b = readBalances();
   const v = b[keyId];
   return typeof v === 'number' ? v : 0;
 }
 
-/** Add credits (e.g. after payment). Returns new balance. */
 export function addBalance(keyId, amountUsd) {
   const b = readBalances();
   const current = typeof b[keyId] === 'number' ? b[keyId] : 0;
@@ -43,7 +41,6 @@ export function addBalance(keyId, amountUsd) {
   return next;
 }
 
-/** Deduct cost after a request. Returns new balance (can be negative). */
 export function deductBalance(keyId, amountUsd) {
   const b = readBalances();
   const current = typeof b[keyId] === 'number' ? b[keyId] : 0;
@@ -54,42 +51,54 @@ export function deductBalance(keyId, amountUsd) {
 }
 
 /**
- * Cene po modelu (Anthropic 2026): Sonnet 4.5/4.6, Opus 4.5/4.6, Haiku 4.5.
- * USD po milion tokena (input, output).
+ * All model prices: USD per million tokens (input, output).
+ * Covers both Anthropic and OpenAI backends.
  */
 const PRICES = {
-  sonnet: { in: 3, out: 15 },   // Sonnet 4, 4.5, 4.6
-  opus: { in: 5, out: 25 },     // Opus 4.5, 4.6
-  haiku: { in: 1, out: 5 },    // Haiku 4.5
+  // OpenAI
+  'gpt-5-nano':        { in: 0.05, out: 0.40 },
+  'gpt-5-mini':        { in: 0.25, out: 2.00 },
+  'gpt-4.1-nano':      { in: 0.10, out: 0.40 },
+  'gpt-4.1-mini':      { in: 0.40, out: 1.60 },
+  'gpt-4.1':           { in: 2.00, out: 8.00 },
+  'gpt-5':             { in: 1.25, out: 10.0 },
+  // Anthropic
+  'claude-haiku-4-5':  { in: 1.00, out: 5.00 },
+  'claude-sonnet-4-6': { in: 3.00, out: 15.0 },
+  'claude-opus-4-6':   { in: 5.00, out: 25.0 },
+  'claude-sonnet-4-5': { in: 3.00, out: 15.0 },
+  'claude-opus-4-5':   { in: 5.00, out: 25.0 },
 };
 
-function getPriceFromModel(model) {
-  const m = (model || process.env.ANTHROPIC_MODEL || '').toLowerCase();
-  if (m.includes('opus')) return PRICES.opus;
-  if (m.includes('haiku')) return PRICES.haiku;
-  return PRICES.sonnet;
+const DEFAULT_PRICE = { in: 3, out: 15 };
+
+function getPrice(model) {
+  if (model && PRICES[model]) return PRICES[model];
+  const m = (model || '').toLowerCase();
+  if (m.includes('opus'))   return PRICES['claude-opus-4-6'];
+  if (m.includes('haiku'))  return PRICES['claude-haiku-4-5'];
+  if (m.includes('sonnet')) return PRICES['claude-sonnet-4-6'];
+  if (m.includes('gpt-5-nano') || m.includes('4.1-nano')) return PRICES['gpt-5-nano'];
+  if (m.includes('gpt-5-mini') || m.includes('4.1-mini')) return PRICES['gpt-5-mini'];
+  return DEFAULT_PRICE;
 }
 
-/**
- * Stvarni trošak kod Anthropic-a (USD) za dati broj tokena.
- */
-export function anthropicCostUsd(inputTokens, outputTokens, model) {
-  const price = getPriceFromModel(model);
+/** Raw provider cost. */
+export function providerCostUsd(inputTokens, outputTokens, model) {
+  const price = getPrice(model);
   return (inputTokens / 1e6) * price.in + (outputTokens / 1e6) * price.out;
 }
 
-/**
- * Koliko da skines sa studentovog računa (USD).
- * Ako je STUDENT_MARKUP npr. 1.5, skidamo 1.5× više nego Anthropic – razlika je tvoja zarada.
- * Markup 1 = bez marže (1 USD kredita = 1 USD troška kod Anthropic).
- */
+// Keep old name as alias for backward compatibility
+export const anthropicCostUsd = providerCostUsd;
+
 function getStudentMarkup() {
   const v = parseFloat(process.env.STUDENT_MARKUP);
   return Number.isFinite(v) && v >= 1 ? v : 1;
 }
 
-/** Trošak u USD koji se skida sa studentovog balansa (Anthropic cena × markup). */
+/** Cost deducted from student balance (provider cost x markup). */
 export function costUsd(inputTokens, outputTokens, model) {
-  const anthropic = anthropicCostUsd(inputTokens, outputTokens, model);
-  return Math.round(anthropic * getStudentMarkup() * 100) / 100;
+  const raw = providerCostUsd(inputTokens, outputTokens, model);
+  return Math.round(raw * getStudentMarkup() * 1e6) / 1e6;
 }

@@ -34,8 +34,13 @@ export function openAIToolsToAnthropic(openAITools) {
     });
 }
 
-// Anthropic: 200K context (input+output). Cursor šalje puno u follow-up (istorija + fajlovi) – drastičnije skraćujemo.
-const MAX_INPUT_CHARS = 450000; // ~112k tokena – sigurno ispod 200k sa odgovorom
+// Anthropic context limits: 200K tokens standard. We reserve space for output
+// and keep a safe margin. ~4 chars per token on average.
+const MAX_INPUT_TOKENS_ESTIMATE = 140000;
+const MAX_INPUT_CHARS = MAX_INPUT_TOKENS_ESTIMATE * 4; // ~560K chars ≈ 140K tokens
+const MAX_TOOL_RESULT_CHARS = 12000; // cap individual tool results (file reads, terminal output)
+const MAX_SINGLE_MESSAGE_CHARS = 40000; // cap any single user/assistant message
+const SYSTEM_BUDGET_CHARS = 8000; // always reserve this for system prompt
 
 function contentLength(content) {
   if (typeof content === 'string') return content.length;
@@ -43,49 +48,167 @@ function contentLength(content) {
   let n = 0;
   for (const b of content) {
     if (b && b.type === 'text' && b.text) n += b.text.length;
-    else if (b && (b.type === 'tool_use' || b.type === 'tool_result')) n += 500 + JSON.stringify(b).length;
+    else if (b && (b.type === 'tool_use' || b.type === 'tool_result')) n += JSON.stringify(b).length;
   }
   return n;
 }
 
 /**
- * Ogranici system + messages na ukupno max karaktera (da ne pređemo Anthropic limit).
- * Skraćuje od početka (stariji kontekst), zadnje poruke ostaju što više cela.
+ * Truncate a tool_result content string, keeping the start and end so the
+ * model sees the structure but not every line of a huge file.
+ */
+function truncateToolResult(text, max) {
+  if (!text || text.length <= max) return text;
+  const keep = Math.floor((max - 80) / 2);
+  return text.slice(0, keep)
+    + '\n\n[... skraćeno ' + (text.length - keep * 2) + ' karaktera ...]\n\n'
+    + text.slice(-keep);
+}
+
+/**
+ * Shrink a single message's content to fit within a char budget.
+ * Handles both string content and array content (tool_use / tool_result blocks).
+ */
+function shrinkMessage(msg, maxChars) {
+  const content = msg.content;
+
+  if (typeof content === 'string') {
+    if (content.length <= maxChars) return msg;
+    const keep = Math.floor((maxChars - 60) / 2);
+    return {
+      ...msg,
+      content: content.slice(0, keep) + '\n[... skraćeno ...]\n' + content.slice(-keep),
+    };
+  }
+
+  if (!Array.isArray(content)) return msg;
+
+  let budget = maxChars;
+  const shrunk = [];
+  for (const block of content) {
+    if (block.type === 'tool_result') {
+      const raw = typeof block.content === 'string' ? block.content : JSON.stringify(block.content || '');
+      const capped = truncateToolResult(raw, Math.min(MAX_TOOL_RESULT_CHARS, budget));
+      shrunk.push({ ...block, content: capped });
+      budget -= capped.length;
+    } else if (block.type === 'tool_use') {
+      const serialized = JSON.stringify(block.input || {});
+      const cappedInput = serialized.length > MAX_TOOL_RESULT_CHARS
+        ? JSON.parse('{}')
+        : block.input;
+      const entry = { ...block, input: cappedInput };
+      const len = JSON.stringify(entry).length;
+      shrunk.push(entry);
+      budget -= len;
+    } else if (block.type === 'text' && block.text) {
+      const maxText = Math.max(budget, 200);
+      const text = block.text.length <= maxText
+        ? block.text
+        : block.text.slice(0, Math.floor(maxText / 2)) + '\n[... skraćeno ...]\n' + block.text.slice(-Math.floor(maxText / 2));
+      shrunk.push({ ...block, text });
+      budget -= text.length;
+    } else {
+      shrunk.push(block);
+    }
+    if (budget <= 0) break;
+  }
+  return { ...msg, content: shrunk };
+}
+
+/**
+ * Smart context manager: keeps recent messages, summarizes/trims older ones,
+ * always preserves system prompt and the last user message fully.
+ *
+ * Strategy (like Cursor does internally):
+ * 1. System prompt is always kept (up to SYSTEM_BUDGET_CHARS).
+ * 2. Last 2 messages (current user prompt + preceding context) kept in full.
+ * 3. Older messages: tool_results are aggressively truncated, text is summarized.
+ * 4. If still over budget, drop oldest messages first.
  */
 function applyInputLimit(system, messages) {
-  let total = (system || '').length;
-  for (const m of messages) total += contentLength(m.content);
-  if (total <= MAX_INPUT_CHARS) return { system, messages };
+  let systemOut = system || null;
+  if (systemOut && systemOut.length > SYSTEM_BUDGET_CHARS) {
+    systemOut = systemOut.slice(0, SYSTEM_BUDGET_CHARS) + '\n[... system skraćen ...]';
+  }
 
-  const NOTE = '[Kontekst skraćen zbog ograničenja...]\n\n';
-  let budget = MAX_INPUT_CHARS;
+  const systemCost = (systemOut || '').length;
+  const messageBudget = MAX_INPUT_CHARS - systemCost;
 
-  const outMessages = [];
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    const content = m.content;
-    const len = contentLength(content);
-    if (budget >= len) {
-      outMessages.unshift(m);
+  if (messages.length === 0) return { system: systemOut, messages };
+
+  // Phase 1: shrink every individual message (cap tool results, long texts)
+  const shrunkMessages = messages.map((m, i) => {
+    const isRecent = i >= messages.length - 2;
+    const perMsgMax = isRecent ? MAX_SINGLE_MESSAGE_CHARS * 3 : MAX_SINGLE_MESSAGE_CHARS;
+    return shrinkMessage(m, perMsgMax);
+  });
+
+  // Phase 2: check total - if under budget, done
+  let total = 0;
+  for (const m of shrunkMessages) total += contentLength(m.content);
+  if (total <= messageBudget) return { system: systemOut, messages: shrunkMessages };
+
+  // Phase 3: keep messages from the end until budget runs out
+  const NOTE_MSG = { role: 'user', content: '[Stariji kontekst je izostavljen zbog ograničenja veličine. Nastavlja se od ovde.]' };
+  const NOTE_LEN = contentLength(NOTE_MSG.content);
+  let budget = messageBudget - NOTE_LEN;
+  const kept = [];
+
+  for (let i = shrunkMessages.length - 1; i >= 0; i--) {
+    const m = shrunkMessages[i];
+    const len = contentLength(m.content);
+    if (len <= budget) {
+      kept.unshift(m);
       budget -= len;
-    } else if (budget > NOTE.length + 100 && typeof content === 'string') {
-      const maxContent = budget - NOTE.length;
-      outMessages.unshift({
-        role: m.role,
-        content: NOTE + content.slice(-maxContent),
-      });
+    } else if (budget > 500 && i > 0) {
+      kept.unshift(shrinkMessage(m, budget));
       budget = 0;
       break;
     } else {
       break;
     }
   }
-  let outSystem = null;
-  if (system && budget > NOTE.length + 100) {
-    const sys = system;
-    outSystem = sys.length <= budget ? sys : NOTE + sys.slice(-(budget - NOTE.length));
+
+  if (kept.length < shrunkMessages.length) {
+    // Ensure first message is 'user' (Anthropic requires it)
+    if (kept.length === 0 || kept[0].role !== 'user') {
+      kept.unshift(NOTE_MSG);
+    } else {
+      kept.unshift(NOTE_MSG);
+    }
   }
-  return { system: outSystem, messages: outMessages };
+
+  // Anthropic requires alternating user/assistant - fix any violations
+  const fixed = fixAlternation(kept);
+
+  return { system: systemOut, messages: fixed };
+}
+
+/**
+ * Ensure messages alternate user/assistant as Anthropic requires.
+ * Merge consecutive same-role messages and ensure starts with user.
+ */
+function fixAlternation(messages) {
+  if (messages.length === 0) return messages;
+  const out = [];
+  for (const m of messages) {
+    if (out.length > 0 && out[out.length - 1].role === m.role) {
+      const prev = out[out.length - 1];
+      if (typeof prev.content === 'string' && typeof m.content === 'string') {
+        prev.content += '\n' + m.content;
+      } else {
+        const prevArr = Array.isArray(prev.content) ? prev.content : [{ type: 'text', text: prev.content || '' }];
+        const currArr = Array.isArray(m.content) ? m.content : [{ type: 'text', text: m.content || '' }];
+        prev.content = [...prevArr, ...currArr];
+      }
+    } else {
+      out.push({ ...m });
+    }
+  }
+  if (out.length > 0 && out[0].role !== 'user') {
+    out.unshift({ role: 'user', content: '[Početak konverzacije]' });
+  }
+  return out;
 }
 
 /**

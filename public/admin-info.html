@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VajbAgent – Admin Panel</title>
+  <style>
+    :root {
+      --bg: #0a0a0a; --surface: #141414; --surface2: #1a1a1a; --surface3: #222;
+      --border: #2a2a2a; --text: #e5e5e5; --text2: #888; --text3: #555;
+      --accent: #8b5cf6; --accent2: #a78bfa; --green: #22c55e; --green-dim: rgba(34,197,94,0.15);
+      --red: #ef4444; --red-dim: rgba(239,68,68,0.15);
+      --yellow: #eab308; --blue: #3b82f6;
+      --radius: 12px; --radius-sm: 8px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'SF Pro Display', system-ui, sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    .app { max-width: 1100px; margin: 0 auto; padding: 0 24px 80px; }
+
+    /* Login */
+    .login-wrap {
+      max-width: 400px; margin: 120px auto 0; padding: 40px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    }
+    .login-wrap h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: 6px; }
+    .login-sub { font-size: 0.85rem; color: var(--text2); margin-bottom: 24px; }
+    .login-wrap input {
+      width: 100%; padding: 12px 14px; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      color: var(--text); font-size: 0.9rem; outline: none; margin-bottom: 14px;
+    }
+    .login-wrap input:focus { border-color: var(--red); }
+    .btn-admin {
+      width: 100%; padding: 12px; background: var(--red); color: #fff;
+      border: none; border-radius: var(--radius-sm); font-size: 0.9rem;
+      font-weight: 600; cursor: pointer;
+    }
+    .btn-admin:hover { opacity: 0.85; }
+    .login-error { margin-top: 12px; font-size: 0.8rem; color: var(--red); }
+
+    /* Header */
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 24px 0; border-bottom: 1px solid var(--border);
+    }
+    .header h1 { font-size: 1.1rem; font-weight: 700; }
+    .header h1 span { color: var(--red); }
+    .header-links { display: flex; gap: 8px; }
+    .btn-ghost {
+      padding: 8px 16px; background: transparent; border: 1px solid var(--border);
+      color: var(--text2); font-size: 0.8rem; border-radius: var(--radius-sm);
+      cursor: pointer; text-decoration: none; transition: all 0.2s;
+    }
+    .btn-ghost:hover { border-color: var(--text2); color: var(--text); }
+
+    /* Summary cards */
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 28px 0; }
+    @media (max-width: 700px) { .summary { grid-template-columns: repeat(2, 1fr); } }
+    .sum-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+    }
+    .sum-label { font-size: 0.65rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+    .sum-value { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+    .sum-value.green { color: var(--green); }
+    .sum-value.red { color: var(--red); }
+    .sum-value.accent { color: var(--accent); }
+    .sum-sub { font-size: 0.7rem; color: var(--text3); margin-top: 4px; }
+
+    /* Card */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px; margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 0.7rem; color: var(--text2); text-transform: uppercase;
+      letter-spacing: 0.08em; margin-bottom: 18px;
+    }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 12px; text-align: left; font-size: 0.8rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.65rem; }
+    td { color: var(--text); }
+    .mono { font-family: 'SF Mono', ui-monospace, monospace; font-size: 0.75rem; }
+    .tag {
+      display: inline-block; padding: 2px 8px; border-radius: 6px;
+      font-size: 0.65rem; font-weight: 600;
+    }
+    .tag-openai { background: rgba(16,163,127,0.15); color: #34d399; }
+    .tag-anthropic { background: rgba(217,119,6,0.15); color: #fbbf24; }
+    .tag-green { background: var(--green-dim); color: var(--green); }
+    .tag-red { background: var(--red-dim); color: var(--red); }
+
+    /* Add credits form */
+    .add-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .add-form input {
+      padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text); font-size: 0.85rem; outline: none;
+    }
+    .add-form input:focus { border-color: var(--accent); }
+    .btn-add {
+      padding: 8px 18px; background: var(--green); color: #000; border: none;
+      border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: 600; cursor: pointer;
+    }
+    .add-result { font-size: 0.8rem; color: var(--green); margin-top: 10px; }
+
+    .hidden { display: none; }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <!-- Login -->
+  <div id="login" class="login-wrap">
+    <h2>Admin Panel</h2>
+    <p class="login-sub">Unesi admin secret</p>
+    <input type="password" id="secretInput" placeholder="Admin secret" autocomplete="off">
+    <button class="btn-admin" id="btnLogin">Prikaži admin panel</button>
+    <p id="loginError" class="login-error hidden"></p>
+  </div>
+
+  <!-- Admin dashboard -->
+  <div id="admin" class="hidden fade-in">
+    <div class="header">
+      <h1>VajbAgent <span>Admin</span></h1>
+      <div class="header-links">
+        <a href="/dashboard" class="btn-ghost">Dashboard</a>
+        <a href="/setup" class="btn-ghost">Setup</a>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary">
+      <div class="sum-card">
+        <div class="sum-label">Ukupni korisnici</div>
+        <div class="sum-value accent" id="sumUsers">0</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Ukupni zahtevi</div>
+        <div class="sum-value" id="sumReqs">0</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Tvoj trošak (provider)</div>
+        <div class="sum-value red" id="sumCost">$0</div>
+        <div class="sum-sub" id="sumCostDetail"></div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Tvoja zarada</div>
+        <div class="sum-value green" id="sumProfit">$0</div>
+        <div class="sum-sub" id="sumProfitDetail"></div>
+      </div>
+    </div>
+
+    <!-- Models -->
+    <div class="card">
+      <div class="card-title">Modeli – mapiranje i cene (samo za tebe)</div>
+      <table>
+        <thead>
+          <tr><th>VajbAgent ID</th><th>Ime</th><th>Backend</th><th>Stvarni model</th><th>Input $/MTok</th><th>Output $/MTok</th><th>~$/zahtev</th></tr>
+        </thead>
+        <tbody id="modelsBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Users -->
+    <div class="card">
+      <div class="card-title">Korisnici</div>
+      <table>
+        <thead>
+          <tr><th>Key ID</th><th>Stanje</th><th>Zahtevi</th><th>Input tokeni</th><th>Output tokeni</th><th>Poslednja upotreba</th><th>Status</th></tr>
+        </thead>
+        <tbody id="usersBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Add credits -->
+    <div class="card">
+      <div class="card-title">Dodaj kredit korisniku</div>
+      <div class="add-form">
+        <input type="text" id="addKeyId" placeholder="Key ID (poslednjih 8 char)">
+        <input type="number" id="addAmount" placeholder="USD" min="1" step="1" style="width:80px;">
+        <button class="btn-add" id="btnAdd">Dodaj kredit</button>
+      </div>
+      <p id="addResult" class="add-result hidden"></p>
+    </div>
+
+    <!-- Earnings calculator -->
+    <div class="card">
+      <div class="card-title">Kalkulacija zarade</div>
+      <div id="earningsCalc"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'vajb_admin_secret';
+const loginEl = document.getElementById('login');
+const adminEl = document.getElementById('admin');
+const secretInput = document.getElementById('secretInput');
+const loginError = document.getElementById('loginError');
+
+const PRICES = {
+  'gpt-5-nano':        { in: 0.05, out: 0.40 },
+  'gpt-5-mini':        { in: 0.25, out: 2.00 },
+  'claude-haiku-4-5':  { in: 1.00, out: 5.00 },
+  'claude-sonnet-4-6': { in: 3.00, out: 15.0 },
+  'claude-opus-4-6':   { in: 5.00, out: 25.0 },
+};
+
+function showErr(msg) { loginError.textContent = msg; loginError.classList.remove('hidden'); }
+function fmt(n) { return n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : String(n); }
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('sr-RS') + ' ' + d.toLocaleTimeString('sr-RS', { hour:'2-digit', minute:'2-digit' });
+}
+
+function load() {
+  const s = localStorage.getItem(STORAGE_KEY);
+  if (s) { secretInput.value = s; fetchAdmin(s); }
+}
+
+function fetchAdmin(secret) {
+  fetch(location.origin + '/admin/api/overview?secret=' + encodeURIComponent(secret))
+    .then(r => { if (!r.ok) throw new Error('Pogrešan secret.'); return r.json(); })
+    .then(data => {
+      loginError.classList.add('hidden');
+      localStorage.setItem(STORAGE_KEY, secret);
+      loginEl.classList.add('hidden');
+      adminEl.classList.remove('hidden');
+      renderAdmin(data, secret);
+    })
+    .catch(e => showErr(e.message));
+}
+
+function renderAdmin(data, secret) {
+  const { models, users, markup } = data;
+  const AVG_IN = 25000, AVG_OUT = 3000;
+
+  // Models table
+  const mb = document.getElementById('modelsBody');
+  mb.innerHTML = '';
+  models.forEach(m => {
+    const p = PRICES[m.backendModel] || { in: 0, out: 0 };
+    const costReq = (AVG_IN/1e6)*p.in + (AVG_OUT/1e6)*p.out;
+    const tagCls = m.backend === 'openai' ? 'tag-openai' : 'tag-anthropic';
+    mb.innerHTML += `<tr>
+      <td class="mono">${m.id}</td><td>${m.name}</td>
+      <td><span class="tag ${tagCls}">${m.backend}</span></td>
+      <td class="mono">${m.backendModel}</td>
+      <td>$${p.in.toFixed(2)}</td><td>$${p.out.toFixed(2)}</td>
+      <td>$${costReq.toFixed(4)}</td>
+    </tr>`;
+  });
+
+  // Users table + totals
+  const ub = document.getElementById('usersBody');
+  ub.innerHTML = '';
+  let totalReqs = 0, totalIn = 0, totalOut = 0, totalBal = 0;
+  users.forEach(u => {
+    totalReqs += u.requests || 0;
+    totalIn += u.input_tokens || 0;
+    totalOut += u.output_tokens || 0;
+    totalBal += u.balance_usd || 0;
+    const status = u.balance_usd > 0
+      ? '<span class="tag tag-green">Aktivan</span>'
+      : '<span class="tag tag-red">Bez kredita</span>';
+    ub.innerHTML += `<tr>
+      <td class="mono">${u.key_id}</td>
+      <td>$${(u.balance_usd||0).toFixed(2)}</td>
+      <td>${fmt(u.requests||0)}</td>
+      <td>${fmt(u.input_tokens||0)}</td>
+      <td>${fmt(u.output_tokens||0)}</td>
+      <td>${fmtDate(u.last_used)}</td>
+      <td>${status}</td>
+    </tr>`;
+  });
+
+  // Estimate provider cost using default Sonnet pricing as approximation
+  const providerCost = (totalIn/1e6)*3 + (totalOut/1e6)*15;
+  const studentPaid = providerCost * markup;
+  const profit = studentPaid - providerCost;
+
+  document.getElementById('sumUsers').textContent = users.length;
+  document.getElementById('sumReqs').textContent = fmt(totalReqs);
+  document.getElementById('sumCost').textContent = '$' + providerCost.toFixed(2);
+  document.getElementById('sumCostDetail').textContent = fmt(totalIn) + ' in + ' + fmt(totalOut) + ' out tokena';
+  document.getElementById('sumProfit').textContent = '$' + profit.toFixed(2);
+  document.getElementById('sumProfitDetail').textContent = 'Markup ' + markup + 'x · Ukupno naplaćeno ~$' + studentPaid.toFixed(2);
+
+  // Earnings calculator
+  const ec = document.getElementById('earningsCalc');
+  ec.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">';
+  [10, 20, 50].forEach(budget => {
+    const real = budget / markup;
+    const earn = budget - real;
+    models.forEach(m => {
+      const p = PRICES[m.backendModel] || { in: 3, out: 15 };
+      const costReq = (AVG_IN/1e6)*p.in + (AVG_OUT/1e6)*p.out;
+      const reqs = Math.floor(real / costReq);
+      const hrs = (reqs * 2.5 / 60).toFixed(0);
+      ec.innerHTML += `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;">
+        <div style="font-size:0.65rem;color:var(--text3);text-transform:uppercase;">${m.name} · $${budget}</div>
+        <div style="font-size:1.2rem;font-weight:700;margin:4px 0;">${fmt(reqs)} zahteva</div>
+        <div style="font-size:0.7rem;color:var(--text3);">~${hrs}h · zarada $${earn.toFixed(2)}</div>
+      </div>`;
+    });
+  });
+  ec.innerHTML += '</div>';
+
+  // Add credits
+  document.getElementById('btnAdd').onclick = () => {
+    const keyId = document.getElementById('addKeyId').value.trim();
+    const amount = Number(document.getElementById('addAmount').value);
+    const resEl = document.getElementById('addResult');
+    if (!keyId || !amount) { resEl.textContent = 'Popuni oba polja.'; resEl.style.color = 'var(--red)'; resEl.classList.remove('hidden'); return; }
+    fetch(location.origin + '/admin/add-credits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': secret },
+      body: JSON.stringify({ key_id: keyId, amount_usd: amount }),
+    }).then(r => r.json()).then(d => {
+      if (d.error) { resEl.textContent = d.error; resEl.style.color = 'var(--red)'; }
+      else { resEl.textContent = `Dodato $${d.added_usd} → novo stanje: $${d.balance_usd}`; resEl.style.color = 'var(--green)'; }
+      resEl.classList.remove('hidden');
+      fetchAdmin(secret);
+    });
+  };
+}
+
+document.getElementById('btnLogin').onclick = () => {
+  const s = secretInput.value.trim();
+  if (!s) return showErr('Unesi admin secret.');
+  fetchAdmin(s);
+};
+secretInput.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('btnLogin').click(); });
+
+load();
+</script>
+</body>
+</html>

@@ -5,412 +5,386 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>VajbAgent – Dashboard</title>
   <style>
-    * { box-sizing: border-box; }
+    :root {
+      --bg: #0a0a0a; --surface: #141414; --surface2: #1a1a1a; --surface3: #222;
+      --border: #2a2a2a; --text: #e5e5e5; --text2: #888; --text3: #555;
+      --accent: #8b5cf6; --accent2: #a78bfa; --green: #22c55e; --green-dim: #16a34a;
+      --red: #ef4444; --yellow: #eab308; --blue: #3b82f6;
+      --radius: 12px; --radius-sm: 8px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
-      font-size: 14px;
-      color: #0a0a0a;
-      background: #f5f5f5;
-      line-height: 1.5;
-      min-height: 100vh;
+      font-family: -apple-system, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
     }
-    .app {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 0 24px 48px;
-    }
-    .top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 20px 0 32px;
-      border-bottom: 1px solid #e0e0e0;
-    }
-    .logo {
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: #0a0a0a;
-    }
-    .key-badge {
-      font-family: ui-monospace, monospace;
-      font-size: 11px;
-      color: #666;
-      letter-spacing: 0.02em;
-    }
-    .btn {
-      padding: 8px 16px;
-      border: 1px solid #333;
-      background: transparent;
-      color: #333;
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      text-decoration: none;
-    }
-    .btn:hover { background: #eee; }
+    .app { max-width: 960px; margin: 0 auto; padding: 0 24px 80px; }
 
-    .hero {
-      margin: 40px 0 36px;
-      padding: 32px 28px;
-      background: #0a0a0a;
-      color: #fff;
-    }
-    .hero-label {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #999;
-      margin-bottom: 6px;
-    }
-    .hero-value {
-      font-size: 36px;
-      font-weight: 300;
-      letter-spacing: -0.02em;
-    }
-    .hero-value span { font-weight: 600; }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
-      margin-bottom: 32px;
-    }
-    @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
-    .tile {
-      background: #fff;
-      border: 1px solid #e5e5e5;
-      padding: 20px 22px;
-    }
-    .tile-label {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #888;
-      margin-bottom: 8px;
-    }
-    .tile-value {
-      font-size: 22px;
-      font-weight: 600;
-      color: #0a0a0a;
-    }
-    .tile-bar {
-      margin-top: 12px;
-      height: 4px;
-      background: #eee;
-      overflow: hidden;
-    }
-    .tile-bar-fill {
-      height: 100%;
-      background: #333;
-      transition: width 0.4s ease;
-    }
-
-    .section {
-      background: #fff;
-      border: 1px solid #e5e5e5;
-      margin-bottom: 24px;
-      padding: 24px 28px;
-    }
-    .section-title {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #888;
-      margin-bottom: 20px;
-    }
-    .chart-row {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 16px;
-    }
-    .chart-row:last-child { margin-bottom: 0; }
-    .chart-label {
-      width: 80px;
-      font-size: 12px;
-      color: #555;
-    }
-    .chart-bar-wrap {
-      flex: 1;
-      height: 24px;
-      background: #f0f0f0;
-      display: flex;
-      overflow: hidden;
-    }
-    .chart-bar-in {
-      background: #1a1a1a;
-      transition: width 0.5s ease;
-    }
-    .chart-bar-out {
-      background: #4a4a4a;
-      transition: width 0.5s ease;
-    }
-    .chart-num {
-      width: 72px;
-      text-align: right;
-      font-size: 12px;
-      font-weight: 600;
-      color: #0a0a0a;
-    }
-
-    .meta-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 12px 0;
-      border-top: 1px solid #eee;
-      margin-top: 20px;
-      font-size: 12px;
-      color: #666;
-    }
-    .meta-row strong { color: #0a0a0a; }
-
+    /* Login */
     .login-wrap {
-      max-width: 400px;
-      margin: 80px auto 0;
-      padding: 40px 32px;
-      background: #fff;
-      border: 1px solid #e5e5e5;
+      max-width: 400px; margin: 120px auto 0; padding: 40px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius);
     }
     .login-wrap h2 {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #666;
-      margin: 0 0 20px;
+      font-size: 1.25rem; font-weight: 600; margin-bottom: 6px;
     }
+    .login-sub { font-size: 0.85rem; color: var(--text2); margin-bottom: 24px; }
     .login-wrap input {
-      width: 100%;
-      padding: 12px 14px;
-      border: 1px solid #ddd;
-      font-size: 14px;
-      margin-bottom: 16px;
+      width: 100%; padding: 12px 14px; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      color: var(--text); font-size: 0.9rem; outline: none;
     }
-    .login-wrap input:focus {
-      outline: none;
-      border-color: #333;
+    .login-wrap input:focus { border-color: var(--accent); }
+    .login-wrap input { margin-bottom: 14px; }
+    .btn-primary {
+      width: 100%; padding: 12px; background: var(--accent); color: #fff;
+      border: none; border-radius: var(--radius-sm); font-size: 0.9rem;
+      font-weight: 600; cursor: pointer; transition: opacity 0.2s;
     }
-    .login-wrap .btn {
-      width: 100%;
-      padding: 12px;
-      background: #0a0a0a;
-      color: #fff;
-      border-color: #0a0a0a;
+    .btn-primary:hover { opacity: 0.85; }
+    .login-error { margin-top: 12px; font-size: 0.8rem; color: var(--red); }
+
+    /* Header */
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 24px 0; border-bottom: 1px solid var(--border);
     }
-    .login-wrap .btn:hover { background: #333; border-color: #333; }
-    .login-error {
-      margin-top: 12px;
-      font-size: 12px;
-      color: #666;
-      border-left: 2px solid #999;
-      padding-left: 10px;
+    .header-left h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
+    .header-key {
+      font-family: 'SF Mono', ui-monospace, monospace; font-size: 0.75rem;
+      color: var(--text2); margin-top: 2px;
     }
+    .btn-ghost {
+      padding: 8px 16px; background: transparent; border: 1px solid var(--border);
+      color: var(--text2); font-size: 0.8rem; border-radius: var(--radius-sm);
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-ghost:hover { border-color: var(--text2); color: var(--text); }
+
+    /* Balance hero */
+    .hero {
+      margin: 28px 0; padding: 32px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: ''; position: absolute; top: -40px; right: -40px;
+      width: 200px; height: 200px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(139,92,246,0.15), transparent 70%);
+    }
+    .hero-label { font-size: 0.75rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.08em; }
+    .hero-amount {
+      font-size: 3rem; font-weight: 700; letter-spacing: -0.03em;
+      margin: 8px 0 4px; line-height: 1;
+    }
+    .hero-amount .currency { font-size: 1.2rem; font-weight: 400; color: var(--text2); margin-left: 6px; }
+    .hero-sub { font-size: 0.8rem; color: var(--text3); }
+    .topup-row { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+    .btn-topup {
+      padding: 8px 18px; background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); font-size: 0.8rem; font-weight: 600;
+      border-radius: 999px; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-topup:hover { border-color: var(--accent); color: var(--accent); }
+    .topup-error { margin-top: 10px; font-size: 0.8rem; color: var(--red); }
+
+    /* Stats grid */
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 640px) { .stats { grid-template-columns: 1fr; } }
+    .stat {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 22px;
+    }
+    .stat-label { font-size: 0.7rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+    .stat-value { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+    .stat-bar { margin-top: 14px; height: 4px; background: var(--surface3); border-radius: 2px; overflow: hidden; }
+    .stat-bar-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+    .stat-bar-fill.purple { background: var(--accent); }
+    .stat-bar-fill.green { background: var(--green); }
+    .stat-bar-fill.blue { background: var(--blue); }
+
+    /* Cards */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px; margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 0.7rem; color: var(--text2); text-transform: uppercase;
+      letter-spacing: 0.08em; margin-bottom: 18px;
+    }
+
+    /* Token chart */
+    .token-chart { display: flex; gap: 4px; height: 140px; align-items: flex-end; }
+    .token-col {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      gap: 3px; justify-content: flex-end;
+    }
+    .token-bar {
+      width: 100%; border-radius: 3px 3px 0 0; min-height: 2px;
+      transition: height 0.6s ease;
+    }
+    .token-bar.input { background: var(--accent); }
+    .token-bar.output { background: var(--green); }
+    .token-chart-legend {
+      display: flex; gap: 20px; margin-top: 14px; font-size: 0.75rem; color: var(--text2);
+    }
+    .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+
+    /* Model calculator */
+    .model-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .model-card {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 16px; text-align: center;
+      transition: border-color 0.2s;
+    }
+    .model-card:hover { border-color: var(--accent); }
+    .model-name { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
+    .model-tier { font-size: 0.65rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+    .model-stat { font-size: 1.3rem; font-weight: 700; }
+    .model-stat.cheap { color: var(--green); }
+    .model-stat.mid { color: var(--yellow); }
+    .model-stat.pricey { color: var(--red); }
+    .model-detail { font-size: 0.7rem; color: var(--text3); margin-top: 4px; }
+
+    /* Details */
+    .detail-row {
+      display: flex; justify-content: space-between; padding: 12px 0;
+      border-bottom: 1px solid var(--border); font-size: 0.85rem;
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { color: var(--text2); }
+    .detail-value { font-weight: 600; }
+
     .hidden { display: none; }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body>
-  <div class="app">
-    <div id="login" class="login-wrap">
-      <h2>Prijava</h2>
-      <input type="password" id="apikey" placeholder="API ključ" autocomplete="off">
-      <button type="button" class="btn" id="btnLogin">Prikaži potrošnju</button>
-      <p id="loginError" class="login-error hidden"></p>
+<div class="app">
+  <!-- Login -->
+  <div id="login" class="login-wrap">
+    <h2>VajbAgent</h2>
+    <p class="login-sub">Uloguj se sa svojim API ključem</p>
+    <input type="password" id="apikey" placeholder="Unesi API ključ" autocomplete="off">
+    <button type="button" class="btn-primary" id="btnLogin">Prikaži dashboard</button>
+    <p id="loginError" class="login-error hidden"></p>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="hidden fade-in">
+    <div class="header">
+      <div class="header-left">
+        <h1>VajbAgent</h1>
+        <div class="header-key">Ključ: …<span id="keySuffix"></span></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <a href="/setup" class="btn-ghost">Podešavanje</a>
+        <button type="button" class="btn-ghost" id="btnLogout">Odjavi se</button>
+      </div>
     </div>
 
-    <div id="dashboard" class="hidden">
-      <div class="top">
-        <div>
-          <div class="logo">VajbAgent</div>
-          <div class="key-badge">Ključ …<span id="keySuffix"></span></div>
-        </div>
-        <button type="button" class="btn" id="btnLogout">Odjavi se</button>
+    <!-- Balance -->
+    <div class="hero">
+      <div class="hero-label">Raspoloživi kredit</div>
+      <div class="hero-amount"><span id="balanceVal">0.00</span><span class="currency">USD</span></div>
+      <div class="hero-sub">Troši se automatski po zahtevu</div>
+      <div class="topup-row">
+        <button class="btn-topup" data-amount="5">+ $5</button>
+        <button class="btn-topup" data-amount="10">+ $10</button>
+        <button class="btn-topup" data-amount="20">+ $20</button>
+        <button class="btn-topup" data-amount="50">+ $50</button>
       </div>
+      <p id="dopuniError" class="topup-error hidden"></p>
+    </div>
 
-      <div class="hero">
-        <div class="hero-label">Raspoloživi kredit</div>
-        <div class="hero-value"><span id="balanceVal">0.00</span> USD</div>
-        <div style="margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap;">
-          <button type="button" class="btn btn-dopuni" data-amount="5" style="background: #333; color: #fff; border-color: #333;">Dopuni 5 USD</button>
-          <button type="button" class="btn btn-dopuni" data-amount="12" style="background: #333; color: #fff; border-color: #333;">Dopuni 12 USD</button>
-          <button type="button" class="btn btn-dopuni" data-amount="22" style="background: #333; color: #fff; border-color: #333;">Dopuni 22 USD</button>
-        </div>
-        <p id="dopuniError" class="hidden" style="margin-top: 10px; font-size: 12px; color: #ccc;"></p>
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Zahtevi</div>
+        <div class="stat-value" id="valReqs">0</div>
+        <div class="stat-bar"><div class="stat-bar-fill purple" id="barReqs" style="width:0%"></div></div>
       </div>
-
-      <div class="grid">
-        <div class="tile">
-          <div class="tile-label">Ulazni tokeni</div>
-          <div class="tile-value" id="valInput">0</div>
-          <div class="tile-bar">
-            <div class="tile-bar-fill" id="barInput" style="width: 0%"></div>
-          </div>
-        </div>
-        <div class="tile">
-          <div class="tile-label">Izlazni tokeni</div>
-          <div class="tile-value" id="valOutput">0</div>
-          <div class="tile-bar">
-            <div class="tile-bar-fill" id="barOutput" style="width: 0%"></div>
-          </div>
-        </div>
-        <div class="tile">
-          <div class="tile-label">Zahtevi</div>
-          <div class="tile-value" id="valRequests">0</div>
-          <div class="tile-bar">
-            <div class="tile-bar-fill" id="barRequests" style="width: 0%"></div>
-          </div>
-        </div>
+      <div class="stat">
+        <div class="stat-label">Ulazni tokeni</div>
+        <div class="stat-value" id="valIn">0</div>
+        <div class="stat-bar"><div class="stat-bar-fill blue" id="barIn" style="width:0%"></div></div>
       </div>
-
-      <div class="section">
-        <div class="section-title">Tokeni (ulaz vs izlaz)</div>
-        <div class="chart-row">
-          <span class="chart-label">Ukupno</span>
-          <div class="chart-bar-wrap">
-            <div class="chart-bar-in" id="stackIn" style="width: 0%"></div>
-            <div class="chart-bar-out" id="stackOut" style="width: 0%"></div>
-          </div>
-          <span class="chart-num" id="chartTotalNum">0</span>
-        </div>
-        <div class="meta-row" style="border-top: none; margin-top: 8px;">
-          <span>Ulaz <strong id="chartInNum">0</strong></span>
-          <span>Izlaz <strong id="chartOutNum">0</strong></span>
-        </div>
+      <div class="stat">
+        <div class="stat-label">Izlazni tokeni</div>
+        <div class="stat-value" id="valOut">0</div>
+        <div class="stat-bar"><div class="stat-bar-fill green" id="barOut" style="width:0%"></div></div>
       </div>
+    </div>
 
-      <div class="section">
-        <div class="section-title">Detalji</div>
-        <div class="meta-row">
-          <span>Poslednja upotreba</span>
-          <strong id="valLast">—</strong>
-        </div>
-        <div class="meta-row">
-          <span>Procenjeni trošak (potrošeno)</span>
-          <strong id="valCost">0.00 USD</strong>
-        </div>
+    <!-- Token split chart -->
+    <div class="card">
+      <div class="card-title">Potrošnja tokena</div>
+      <div class="token-chart" id="tokenChart"></div>
+      <div class="token-chart-legend">
+        <span><span class="legend-dot" style="background:var(--accent)"></span>Ulazni</span>
+        <span><span class="legend-dot" style="background:var(--green)"></span>Izlazni</span>
+      </div>
+    </div>
+
+    <!-- Model calculator -->
+    <div class="card">
+      <div class="card-title">Modeli – koliko zahteva možeš sa trenutnim kreditom</div>
+      <div class="model-grid" id="modelGrid"></div>
+    </div>
+
+    <!-- Details -->
+    <div class="card">
+      <div class="card-title">Detalji</div>
+      <div class="detail-row">
+        <span class="detail-label">Poslednja upotreba</span>
+        <span class="detail-value" id="valLast">—</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Ukupno potrošeno</span>
+        <span class="detail-value" id="valCost">$0.00</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Ukupno tokena</span>
+        <span class="detail-value" id="valTotal">0</span>
       </div>
     </div>
   </div>
-  <script>
-    var STORAGE_KEY = 'vajb_apikey';
-    var loginEl = document.getElementById('login');
-    var dashboardEl = document.getElementById('dashboard');
-    var apikeyInput = document.getElementById('apikey');
-    var loginError = document.getElementById('loginError');
-    var btnLogin = document.getElementById('btnLogin');
-    var btnLogout = document.getElementById('btnLogout');
+</div>
 
-    function showError(msg) {
-      loginError.textContent = msg;
-      loginError.classList.remove('hidden');
-    }
-    function hideError() {
-      loginError.classList.add('hidden');
-    }
-    function getBaseUrl() { return window.location.origin; }
+<script>
+const STORAGE_KEY = 'vajb_apikey';
+const loginEl = document.getElementById('login');
+const dashEl = document.getElementById('dashboard');
+const apikeyInput = document.getElementById('apikey');
+const loginError = document.getElementById('loginError');
 
-    function loadFromStorage() {
-      var key = localStorage.getItem(STORAGE_KEY);
-      if (key) {
-        apikeyInput.value = key;
-        fetchMe(key);
-      }
-    }
+const MODELS = [
+  { id: 'vajb-agent-nano',  name: 'Nano',  costPer: 0.003675, tier: 'Budget' },
+  { id: 'vajb-agent-lite',  name: 'Lite',  costPer: 0.018375, tier: 'Daily' },
+  { id: 'vajb-agent-pro',   name: 'Pro',   costPer: 0.060000, tier: 'Standard' },
+  { id: 'vajb-agent-max',   name: 'Max',   costPer: 0.180000, tier: 'Premium' },
+  { id: 'vajb-agent-ultra', name: 'Ultra', costPer: 0.300000, tier: 'Elite' },
+];
 
-    function fetchMe(apiKey) {
-      fetch(getBaseUrl() + '/me', { headers: { 'Authorization': 'Bearer ' + apiKey } })
-        .then(function (r) {
-          if (!r.ok) {
-            if (r.status === 401 || r.status === 403) throw new Error('Neispravan API ključ.');
-            throw new Error('Greška pri učitavanju.');
-          }
-          return r.json();
-        })
-        .then(function (data) {
-          hideError();
-          localStorage.setItem(STORAGE_KEY, apiKey);
-          loginEl.classList.add('hidden');
-          dashboardEl.classList.remove('hidden');
-          render(data);
-        })
-        .catch(function (err) { showError(err.message || 'Greška.'); });
-    }
+function showErr(msg) { loginError.textContent = msg; loginError.classList.remove('hidden'); }
+function hideErr() { loginError.classList.add('hidden'); }
+function baseUrl() { return location.origin; }
+function fmt(n) { return n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : String(n); }
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('sr-RS') + ' ' + d.toLocaleTimeString('sr-RS', { hour:'2-digit', minute:'2-digit' });
+}
 
-    function formatNum(n) {
-      if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
-      if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
-      return String(n);
-    }
-    function formatDate(iso) {
-      try {
-        var d = new Date(iso);
-        return d.toLocaleDateString('sr-RS') + ' ' + d.toLocaleTimeString('sr-RS', { hour: '2-digit', minute: '2-digit' });
-      } catch (e) { return iso; }
-    }
+function load() {
+  const key = localStorage.getItem(STORAGE_KEY);
+  if (key) { apikeyInput.value = key; fetchMe(key); }
+}
 
-    function render(data) {
-      document.getElementById('keySuffix').textContent = data.key_id || '—';
-      document.getElementById('balanceVal').textContent = (data.balance_usd != null ? data.balance_usd : 0).toFixed(2);
-      document.getElementById('valInput').textContent = formatNum(data.input_tokens || 0);
-      document.getElementById('valOutput').textContent = formatNum(data.output_tokens || 0);
-      document.getElementById('valRequests').textContent = formatNum(data.requests || 0);
-      document.getElementById('valLast').textContent = data.last_used ? formatDate(data.last_used) : '—';
-      document.getElementById('valCost').textContent = (data.estimated_cost_usd != null ? data.estimated_cost_usd : 0).toFixed(2) + ' USD';
+function fetchMe(key) {
+  fetch(baseUrl() + '/me', { headers: { Authorization: 'Bearer ' + key } })
+    .then(r => {
+      if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? 'Neispravan API ključ.' : 'Greška.');
+      return r.json();
+    })
+    .then(data => {
+      hideErr();
+      localStorage.setItem(STORAGE_KEY, key);
+      loginEl.classList.add('hidden');
+      dashEl.classList.remove('hidden');
+      render(data);
+    })
+    .catch(e => showErr(e.message));
+}
 
-      var maxT = Math.max(data.input_tokens || 0, data.output_tokens || 0, 1);
-      var pctIn = ((data.input_tokens || 0) / maxT) * 100;
-      var pctOut = ((data.output_tokens || 0) / maxT) * 100;
-      document.getElementById('barInput').style.width = Math.min(pctIn, 100) + '%';
-      document.getElementById('barOutput').style.width = Math.min(pctOut, 100) + '%';
+function render(d) {
+  document.getElementById('keySuffix').textContent = d.key_id || '—';
+  document.getElementById('balanceVal').textContent = (d.balance_usd ?? 0).toFixed(2);
+  document.getElementById('valReqs').textContent = fmt(d.requests || 0);
+  document.getElementById('valIn').textContent = fmt(d.input_tokens || 0);
+  document.getElementById('valOut').textContent = fmt(d.output_tokens || 0);
+  document.getElementById('valLast').textContent = fmtDate(d.last_used);
+  document.getElementById('valCost').textContent = '$' + (d.estimated_cost_usd ?? 0).toFixed(2);
+  document.getElementById('valTotal').textContent = fmt((d.input_tokens||0) + (d.output_tokens||0));
 
-      var maxReq = 500;
-      document.getElementById('barRequests').style.width = Math.min(((data.requests || 0) / maxReq) * 100, 100) + '%';
+  const maxT = Math.max(d.input_tokens||1, d.output_tokens||1, 1);
+  document.getElementById('barIn').style.width = Math.min(((d.input_tokens||0)/maxT)*100, 100) + '%';
+  document.getElementById('barOut').style.width = Math.min(((d.output_tokens||0)/maxT)*100, 100) + '%';
+  document.getElementById('barReqs').style.width = Math.min(((d.requests||0)/500)*100, 100) + '%';
 
-      var total = (data.input_tokens || 0) + (data.output_tokens || 0);
-      var pctInStack = total ? ((data.input_tokens || 0) / total) * 100 : 50;
-      var pctOutStack = total ? ((data.output_tokens || 0) / total) * 100 : 50;
-      document.getElementById('stackIn').style.width = pctInStack + '%';
-      document.getElementById('stackOut').style.width = pctOutStack + '%';
-      document.getElementById('chartTotalNum').textContent = formatNum(total);
-      document.getElementById('chartInNum').textContent = formatNum(data.input_tokens || 0);
-      document.getElementById('chartOutNum').textContent = formatNum(data.output_tokens || 0);
-    }
+  // Token chart - simple visual split
+  const chart = document.getElementById('tokenChart');
+  chart.innerHTML = '';
+  const inT = d.input_tokens || 0, outT = d.output_tokens || 0;
+  const total = inT + outT || 1;
+  const maxH = 120;
+  for (let i = 0; i < 8; i++) {
+    const frac = i < 4 ? 0.8 + Math.random() * 0.4 : 0.3 + Math.random() * 0.7;
+    const inH = Math.max(2, (inT / total) * maxH * frac);
+    const outH = Math.max(2, (outT / total) * maxH * frac * 0.6);
+    const col = document.createElement('div');
+    col.className = 'token-col';
+    col.innerHTML = `<div class="token-bar input" style="height:${inH}px"></div><div class="token-bar output" style="height:${outH}px"></div>`;
+    chart.appendChild(col);
+  }
 
-    btnLogin.addEventListener('click', function () {
-      var key = (apikeyInput.value || '').trim();
-      if (!key) { showError('Unesi API ključ.'); return; }
-      fetchMe(key);
-    });
-    btnLogout.addEventListener('click', function () {
-      localStorage.removeItem(STORAGE_KEY);
-      apikeyInput.value = '';
-      dashboardEl.classList.add('hidden');
-      loginEl.classList.remove('hidden');
-      hideError();
-    });
+  // Model calculator
+  const grid = document.getElementById('modelGrid');
+  grid.innerHTML = '';
+  const bal = d.balance_usd || 0;
+  MODELS.forEach(m => {
+    const reqs = bal > 0 ? Math.floor(bal / m.costPer) : 0;
+    const hrs = (reqs * 2.5 / 60).toFixed(1);
+    const cls = m.costPer < 0.02 ? 'cheap' : m.costPer < 0.1 ? 'mid' : 'pricey';
+    const card = document.createElement('div');
+    card.className = 'model-card';
+    card.innerHTML = `
+      <div class="model-name">${m.name}</div>
+      <div class="model-tier">${m.tier}</div>
+      <div class="model-stat ${cls}">${fmt(reqs)}</div>
+      <div class="model-detail">zahteva · ~${hrs}h</div>
+    `;
+    grid.appendChild(card);
+  });
+}
 
-    document.querySelectorAll('.btn-dopuni').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var amount = Number(this.getAttribute('data-amount'));
-        var key = localStorage.getItem(STORAGE_KEY);
-        if (!key) return;
-        var errEl = document.getElementById('dopuniError');
-        errEl.classList.add('hidden');
-        fetch(getBaseUrl() + '/create-checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-          body: JSON.stringify({ amount_usd: amount })
-        })
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
-            if (data.url) window.location.href = data.url;
-            else { errEl.textContent = data.error || 'Greška'; errEl.classList.remove('hidden'); }
-          })
-          .catch(function () { errEl.textContent = 'Greška pri povezivanju.'; errEl.classList.remove('hidden'); });
-      });
-    });
-    loadFromStorage();
-  </script>
+document.getElementById('btnLogin').onclick = () => {
+  const key = apikeyInput.value.trim();
+  if (!key) return showErr('Unesi API ključ.');
+  fetchMe(key);
+};
+
+document.getElementById('btnLogout').onclick = () => {
+  localStorage.removeItem(STORAGE_KEY);
+  apikeyInput.value = '';
+  dashEl.classList.add('hidden');
+  loginEl.classList.remove('hidden');
+  hideErr();
+};
+
+apikeyInput.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('btnLogin').click(); });
+
+document.querySelectorAll('.btn-topup').forEach(btn => {
+  btn.onclick = function() {
+    const amount = Number(this.dataset.amount);
+    const key = localStorage.getItem(STORAGE_KEY);
+    if (!key) return;
+    const errEl = document.getElementById('dopuniError');
+    errEl.classList.add('hidden');
+    fetch(baseUrl() + '/create-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
+      body: JSON.stringify({ amount_usd: amount }),
+    }).then(r => r.json()).then(data => {
+      if (data.url) location.href = data.url;
+      else { errEl.textContent = data.error || 'Greška'; errEl.classList.remove('hidden'); }
+    }).catch(() => { errEl.textContent = 'Greška pri povezivanju.'; errEl.classList.remove('hidden'); });
+  };
+});
+
+load();
+</script>
 </body>
 </html>
