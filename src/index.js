@@ -11,6 +11,7 @@ import {
   toOpenAIStreamChunk,
   toOpenAIStreamChunkToolCalls,
   streamDone,
+  trimOpenAIMessages,
 } from './convert.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -88,7 +89,7 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
   res.status(200).send();
 });
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // ---- Root ----
 app.get('/', (_req, res) => {
@@ -199,16 +200,17 @@ app.post('/chat/completions', chatCompletionsHandler);
 // OpenAI API is already in OpenAI format, so we pass through with minimal changes.
 async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, stream, max_tokens) {
   const maxTokens = Math.min(Math.max(Number(max_tokens) || 4096, 1), 16384);
+  const trimmedMessages = trimOpenAIMessages(messages, resolved.backendModel);
 
   const payload = {
     model: resolved.backendModel,
-    messages,
+    messages: trimmedMessages,
     max_completion_tokens: maxTokens,
     stream,
     ...(Array.isArray(openAITools) && openAITools.length > 0 && { tools: openAITools }),
   };
 
-  console.log(`OpenAI request: model=${resolved.backendModel}, msgs=${messages.length}, stream=${stream}`);
+  console.log(`OpenAI request: model=${resolved.backendModel}, msgs=${messages.length}→${trimmedMessages.length}, stream=${stream}`);
 
   if (stream) {
     await handleOpenAIStream(res, keyId, resolved, payload);
@@ -266,7 +268,7 @@ async function handleOpenAIStream(res, keyId, resolved, payload) {
 // ---- Anthropic backend (Pro, Max, Ultra) ----
 async function handleAnthropic(req, res, keyId, resolved, messages, openAITools, stream, max_tokens) {
   const originalMsgCount = messages.length;
-  const { system, messages: anthropicMessages } = openAIToAnthropicMessages(messages);
+  const { system, messages: anthropicMessages } = openAIToAnthropicMessages(messages, resolved.backendModel);
 
   if (anthropicMessages.length === 0) {
     return res.status(400).json({

@@ -34,13 +34,25 @@ export function openAIToolsToAnthropic(openAITools) {
     });
 }
 
-// Anthropic context limits: 200K tokens standard. We reserve space for output
-// and keep a safe margin. ~4 chars per token on average.
-const MAX_INPUT_TOKENS_ESTIMATE = 140000;
-const MAX_INPUT_CHARS = MAX_INPUT_TOKENS_ESTIMATE * 4; // ~560K chars ≈ 140K tokens
-const MAX_TOOL_RESULT_CHARS = 12000; // cap individual tool results (file reads, terminal output)
-const MAX_SINGLE_MESSAGE_CHARS = 40000; // cap any single user/assistant message
-const SYSTEM_BUDGET_CHARS = 8000; // always reserve this for system prompt
+// Per-model input token limits (leave room for output).
+// ~4 chars per token on average.
+const MODEL_INPUT_LIMITS = {
+  'gpt-5-nano':        { tokens: 200000, chars: 800000 },
+  'gpt-5-mini':        { tokens: 250000, chars: 1000000 },
+  'claude-haiku-4-5':  { tokens: 160000, chars: 640000 },
+  'claude-sonnet-4-6': { tokens: 160000, chars: 640000 },
+  'claude-opus-4-6':   { tokens: 160000, chars: 640000 },
+};
+const DEFAULT_LIMIT = { tokens: 120000, chars: 480000 };
+
+function getModelLimit(backendModel) {
+  return MODEL_INPUT_LIMITS[backendModel] || DEFAULT_LIMIT;
+}
+
+const MAX_TOOL_RESULT_CHARS = 10000;
+const MAX_SINGLE_MESSAGE_CHARS = 30000;
+const MAX_RECENT_MESSAGE_CHARS = 80000;
+const SYSTEM_BUDGET_CHARS = 8000;
 
 function contentLength(content) {
   if (typeof content === 'string') return content.length;
@@ -125,7 +137,10 @@ function shrinkMessage(msg, maxChars) {
  * 3. Older messages: tool_results are aggressively truncated, text is summarized.
  * 4. If still over budget, drop oldest messages first.
  */
-function applyInputLimit(system, messages) {
+function applyInputLimit(system, messages, backendModel) {
+  const limit = getModelLimit(backendModel);
+  const MAX_INPUT_CHARS = limit.chars;
+
   let systemOut = system || null;
   if (systemOut && systemOut.length > SYSTEM_BUDGET_CHARS) {
     systemOut = systemOut.slice(0, SYSTEM_BUDGET_CHARS) + '\n[... system skraćen ...]';
@@ -212,12 +227,153 @@ function fixAlternation(messages) {
 }
 
 /**
+ * Estimate char length of an OpenAI-format message (string content, array content, tool_calls).
+ */
+function openAIMsgLength(msg) {
+  if (!msg) return 0;
+  const c = msg.content;
+  let n = 0;
+  if (typeof c === 'string') n += c.length;
+  else if (Array.isArray(c)) {
+    for (const p of c) {
+      if (p.text) n += p.text.length;
+      else if (p.input_text) n += p.input_text.length;
+      else n += JSON.stringify(p).length;
+    }
+  }
+  if (Array.isArray(msg.tool_calls)) n += JSON.stringify(msg.tool_calls).length;
+  return n;
+}
+
+/**
+ * Truncate a string keeping start+end with a note in the middle.
+ */
+function truncateStr(str, max) {
+  if (!str || str.length <= max) return str;
+  const keep = Math.floor((max - 60) / 2);
+  return str.slice(0, keep) + '\n[... skraćeno ' + (str.length - keep * 2) + ' chars ...]\n' + str.slice(-keep);
+}
+
+/**
+ * Shrink an OpenAI-format message to fit within maxChars.
+ */
+function shrinkOpenAIMsg(msg, maxChars) {
+  let content = msg.content;
+
+  if (typeof content === 'string' && content.length > maxChars) {
+    return { ...msg, content: truncateStr(content, maxChars) };
+  }
+
+  if (Array.isArray(content)) {
+    let budget = maxChars;
+    const parts = [];
+    for (const p of content) {
+      if (p.type === 'text' && p.text && p.text.length > budget) {
+        parts.push({ ...p, text: truncateStr(p.text, Math.max(budget, 200)) });
+        budget = 0;
+      } else {
+        parts.push(p);
+        budget -= (p.text || p.input_text || JSON.stringify(p)).length;
+      }
+      if (budget <= 0) break;
+    }
+    return { ...msg, content: parts };
+  }
+
+  return msg;
+}
+
+/**
+ * Trim OpenAI-format messages to fit within a backend model's input limit.
+ * Used for the OpenAI backend (Nano/Lite) where messages go through as-is.
+ *
+ * Strategy:
+ * 1. System messages stay (trimmed if huge)
+ * 2. Last 2 messages are preserved fully
+ * 3. Older tool messages and large content are aggressively trimmed
+ * 4. If still over limit, drop oldest non-system messages
+ */
+export function trimOpenAIMessages(messages, backendModel) {
+  const limit = getModelLimit(backendModel);
+  const maxChars = limit.chars;
+
+  if (!messages || messages.length === 0) return messages;
+
+  let total = 0;
+  for (const m of messages) total += openAIMsgLength(m);
+  if (total <= maxChars) return messages;
+
+  console.log(`trimOpenAIMessages: ${messages.length} msgs, ~${Math.round(total/4000)}K tokens, limit ~${Math.round(maxChars/4000)}K tokens. Trimming...`);
+
+  // Phase 1: shrink individual messages
+  const shrunk = messages.map((m, i) => {
+    const isRecent = i >= messages.length - 2;
+    const role = (m.role || '').toLowerCase();
+    const isSystem = role === 'system';
+    const isTool = role === 'tool';
+
+    if (isSystem) {
+      return shrinkOpenAIMsg(m, SYSTEM_BUDGET_CHARS);
+    }
+    if (isTool) {
+      return shrinkOpenAIMsg(m, MAX_TOOL_RESULT_CHARS);
+    }
+    if (isRecent) {
+      return shrinkOpenAIMsg(m, MAX_RECENT_MESSAGE_CHARS);
+    }
+    return shrinkOpenAIMsg(m, MAX_SINGLE_MESSAGE_CHARS);
+  });
+
+  total = 0;
+  for (const m of shrunk) total += openAIMsgLength(m);
+  if (total <= maxChars) {
+    console.log(`trimOpenAIMessages: after shrink → ~${Math.round(total/4000)}K tokens. OK.`);
+    return shrunk;
+  }
+
+  // Phase 2: keep system messages + messages from the end until budget fills
+  const systemMsgs = shrunk.filter(m => (m.role || '').toLowerCase() === 'system');
+  const nonSystem = shrunk.filter(m => (m.role || '').toLowerCase() !== 'system');
+
+  let budget = maxChars;
+  for (const s of systemMsgs) budget -= openAIMsgLength(s);
+
+  const kept = [];
+  for (let i = nonSystem.length - 1; i >= 0; i--) {
+    const len = openAIMsgLength(nonSystem[i]);
+    if (len <= budget) {
+      kept.unshift(nonSystem[i]);
+      budget -= len;
+    } else if (budget > 500) {
+      kept.unshift(shrinkOpenAIMsg(nonSystem[i], budget));
+      budget = 0;
+      break;
+    } else {
+      break;
+    }
+  }
+
+  const dropped = nonSystem.length - kept.length;
+  const result = [...systemMsgs];
+  if (dropped > 0) {
+    result.push({ role: 'user', content: `[${dropped} starijih poruka izostavljeno zbog ograničenja konteksta]` });
+  }
+  result.push(...kept);
+
+  total = 0;
+  for (const m of result) total += openAIMsgLength(m);
+  console.log(`trimOpenAIMessages: after drop → ${result.length} msgs, ~${Math.round(total/4000)}K tokens.`);
+
+  return result;
+}
+
+/**
  * OpenAI messages → Anthropic messages + system.
  * - system role → top-level system
  * - user/assistant/tool → messages; assistant tool_calls → tool_use, tool → tool_result
  * - ograničava ukupni ulaz da ne pređe Anthropic limit (Cursor šalje puno konteksta)
  */
-export function openAIToAnthropicMessages(openAIMessages) {
+export function openAIToAnthropicMessages(openAIMessages, backendModel) {
   let system = null;
   const messages = [];
   const raw = openAIMessages || [];
@@ -287,7 +443,7 @@ export function openAIToAnthropicMessages(openAIMessages) {
     if (text) messages.push({ role: 'user', content: text });
   }
 
-  return applyInputLimit(system, messages);
+  return applyInputLimit(system, messages, backendModel);
 }
 
 /**
