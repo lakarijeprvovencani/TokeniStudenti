@@ -1,5 +1,6 @@
 /**
  * Convert OpenAI Chat Completions request/response to/from Anthropic Messages API.
+ * Podrška za tool calling tako da Cursor može da prikaže Apply i izvrši izmene.
  */
 
 /**
@@ -14,9 +15,39 @@ function getOpenAITextContent(content) {
     .join('\n');
 }
 
+/**
+ * OpenAI tools (function declarations) → Anthropic tools.
+ */
+export function openAIToolsToAnthropic(openAITools) {
+  if (!Array.isArray(openAITools) || openAITools.length === 0) return [];
+  return openAITools
+    .filter((t) => t && t.type === 'function' && t.function)
+    .map((t) => {
+      const fn = t.function;
+      const params = fn.parameters || { type: 'object', properties: {} };
+      if (params.type !== 'object') params.type = 'object';
+      return {
+        name: String(fn.name || '').slice(0, 64).replace(/[^a-zA-Z0-9_-]/g, '_') || 'tool',
+        description: String(fn.description || 'No description'),
+        input_schema: params,
+      };
+    });
+}
+
 // Anthropic: 200K context window (input+output). Ostavljamo prostor za max_tokens odgovora (~25k).
 // https://docs.anthropic.com/en/docs/build-with-claude/context-windows
 const MAX_INPUT_CHARS = 700000; // ~175k tokena ulaza
+
+function contentLength(content) {
+  if (typeof content === 'string') return content.length;
+  if (!Array.isArray(content)) return 0;
+  let n = 0;
+  for (const b of content) {
+    if (b && b.type === 'text' && b.text) n += b.text.length;
+    else if (b && (b.type === 'tool_use' || b.type === 'tool_result')) n += 500 + JSON.stringify(b).length;
+  }
+  return n;
+}
 
 /**
  * Ogranici system + messages na ukupno max karaktera (da ne pređemo Anthropic limit).
@@ -24,7 +55,7 @@ const MAX_INPUT_CHARS = 700000; // ~175k tokena ulaza
  */
 function applyInputLimit(system, messages) {
   let total = (system || '').length;
-  for (const m of messages) total += (m.content || '').length;
+  for (const m of messages) total += contentLength(m.content);
   if (total <= MAX_INPUT_CHARS) return { system, messages };
 
   const NOTE = '[Kontekst skraćen zbog ograničenja...]\n\n';
@@ -33,12 +64,12 @@ function applyInputLimit(system, messages) {
   const outMessages = [];
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
-    const content = m.content || '';
-    const len = content.length;
+    const content = m.content;
+    const len = contentLength(content);
     if (budget >= len) {
       outMessages.unshift(m);
       budget -= len;
-    } else if (budget > NOTE.length + 100) {
+    } else if (budget > NOTE.length + 100 && typeof content === 'string') {
       const maxContent = budget - NOTE.length;
       outMessages.unshift({
         role: m.role,
@@ -61,32 +92,77 @@ function applyInputLimit(system, messages) {
 /**
  * OpenAI messages → Anthropic messages + system.
  * - system role → top-level system
- * - user/assistant → messages (only user/assistant; drop other roles or merge into user)
+ * - user/assistant/tool → messages; assistant tool_calls → tool_use, tool → tool_result
  * - ograničava ukupni ulaz da ne pređe Anthropic limit (Cursor šalje puno konteksta)
  */
 export function openAIToAnthropicMessages(openAIMessages) {
   let system = null;
   const messages = [];
+  const raw = openAIMessages || [];
 
-  for (const msg of openAIMessages || []) {
+  for (let i = 0; i < raw.length; i++) {
+    const msg = raw[i];
     const role = (msg.role || '').toLowerCase();
-    const text = getOpenAITextContent(msg.content);
-    if (!text && role !== 'system') continue;
 
     if (role === 'system') {
-      system = system ? system + '\n' + text : text;
+      const text = getOpenAITextContent(msg.content);
+      if (text) system = system ? system + '\n' + text : text;
       continue;
     }
+
     if (role === 'user') {
-      messages.push({ role: 'user', content: text });
+      const text = getOpenAITextContent(msg.content);
+      messages.push({ role: 'user', content: text || '' });
       continue;
     }
+
     if (role === 'assistant') {
-      messages.push({ role: 'assistant', content: text });
+      const toolCalls = msg.tool_calls;
+      if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+        const blocks = [];
+        const text = getOpenAITextContent(msg.content);
+        if (text) blocks.push({ type: 'text', text });
+        for (const tc of toolCalls) {
+          let input = {};
+          try {
+            input = typeof tc.function?.arguments === 'string' ? JSON.parse(tc.function.arguments) : tc.function?.arguments || {};
+          } catch (_) {}
+          blocks.push({
+            type: 'tool_use',
+            id: tc.id || 'tc_' + i + '_' + blocks.length,
+            name: tc.function?.name || 'tool',
+            input,
+          });
+        }
+        messages.push({ role: 'assistant', content: blocks });
+      } else {
+        const text = getOpenAITextContent(msg.content);
+        if (text) messages.push({ role: 'assistant', content: text });
+      }
       continue;
     }
-    // 'developer' or other: treat as user turn for compatibility
-    messages.push({ role: 'user', content: text });
+
+    if (role === 'tool') {
+      const toolResults = [];
+      let j = i;
+      while (j < raw.length && (raw[j].role || '').toLowerCase() === 'tool') {
+        const t = raw[j];
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: t.tool_call_id || t.tool_call_ids?.[0],
+          content: typeof t.content === 'string' ? t.content : JSON.stringify(t.content || ''),
+        });
+        j++;
+      }
+      if (toolResults.length > 0) {
+        messages.push({ role: 'user', content: toolResults });
+        i = j - 1;
+      }
+      continue;
+    }
+
+    const text = getOpenAITextContent(msg.content);
+    if (text) messages.push({ role: 'user', content: text });
   }
 
   return applyInputLimit(system, messages);
@@ -94,21 +170,33 @@ export function openAIToAnthropicMessages(openAIMessages) {
 
 /**
  * Build OpenAI-style non-streaming choice from Anthropic message.
+ * Ako Claude vrati tool_use, vraćamo tool_calls da Cursor prikaže Apply i izvrši.
  */
 export function anthropicToOpenAIChoice(anthropicMessage, model = 'vajb-agent') {
-  const content = Array.isArray(anthropicMessage.content)
-    ? anthropicMessage.content
-        .filter((b) => b.type === 'text')
-        .map((b) => b.text)
-        .join('')
-    : anthropicMessage.content || '';
+  const blocks = Array.isArray(anthropicMessage.content) ? anthropicMessage.content : [];
+  const textParts = blocks.filter((b) => b && b.type === 'text').map((b) => b.text);
+  const content = textParts.join('') || null;
+  const toolUseBlocks = blocks.filter((b) => b && b.type === 'tool_use');
+  const toolCalls = toolUseBlocks.map((b) => ({
+    id: b.id,
+    type: 'function',
+    function: {
+      name: b.name,
+      arguments: typeof b.input === 'string' ? b.input : JSON.stringify(b.input || {}),
+    },
+  }));
+
+  const message = {
+    role: 'assistant',
+    content,
+    ...(toolCalls.length > 0 && { tool_calls: toolCalls }),
+  };
+  const finish_reason = toolCalls.length > 0 ? 'tool_calls' : 'stop';
+
   return {
     index: 0,
-    message: {
-      role: 'assistant',
-      content: content || null,
-    },
-    finish_reason: 'stop',
+    message,
+    finish_reason,
   };
 }
 

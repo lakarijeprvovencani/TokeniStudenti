@@ -5,6 +5,7 @@ import express from 'express';
 import { requireStudentAuth } from './auth.js';
 import {
   openAIToAnthropicMessages,
+  openAIToolsToAnthropic,
   toOpenAIChatCompletion,
   toOpenAIStreamChunk,
   streamDone,
@@ -135,7 +136,7 @@ const chatCompletionsHandler = [
     }
 
     const body = req.body || {};
-    const { messages, stream = false, max_tokens = 4096, model } = body;
+    const { messages, stream = false, max_tokens = 4096, model, tools: openAITools } = body;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({
@@ -162,6 +163,9 @@ const chatCompletionsHandler = [
     ].join(' ');
     const mergedSystem = [CURSOR_EDIT_HINT, system].filter(Boolean).join('\n\n');
 
+    // Cursor šalje tools (edit_file, run_terminal_cmd, itd.) – prosleđujemo Claude-u da vraća tool_calls i Cursor prikaže Apply
+    const anthropicTools = openAIToolsToAnthropic(openAITools);
+
     // Anthropic: max_tokens do 64k za neke modele; 16k dovoljno za Cursor, ostavlja prostor u 200k kontekstu
     const maxTokens = Math.min(Math.max(Number(max_tokens) || 4096, 1), 16384);
     const payload = {
@@ -169,6 +173,7 @@ const chatCompletionsHandler = [
       max_tokens: maxTokens,
       messages: anthropicMessages,
       ...(mergedSystem && { system: mergedSystem }),
+      ...(anthropicTools.length > 0 && { tools: anthropicTools }),
     };
 
     try {
@@ -317,9 +322,9 @@ app.post('/create-checkout', requireStudentAuth, async (req, res) => {
   res.json({ url: session.url });
 });
 
-// Admin: add credits to a key (e.g. after student pays 5 USD)
+// Admin: add credits to a key (secret iz headera ili body za formu)
 app.post('/admin/add-credits', (req, res) => {
-  const secret = req.headers['x-admin-secret'];
+  const secret = req.headers['x-admin-secret'] || req.body?.admin_secret;
   if (secret !== process.env.ADMIN_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -344,6 +349,11 @@ app.get('/health', (_req, res) => {
 // Dashboard (static page)
 app.get('/dashboard', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html'));
+});
+
+// Admin: forma za dopunu kredita
+app.get('/admin', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'admin-add-credits.html'));
 });
 
 // 404 – unknown path (so we see in logs what Cursor actually requested)
