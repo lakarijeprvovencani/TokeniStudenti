@@ -34,22 +34,15 @@ let usageCache = null;
 let usageCacheTime = 0;
 const CACHE_TTL = 2000;
 
-function parseObj(data) {
-  if (!data) return null;
-  if (typeof data === 'object' && !Array.isArray(data)) return data;
-  if (typeof data === 'string') { try { const p = JSON.parse(data); return (p && typeof p === 'object' && !Array.isArray(p)) ? p : null; } catch { return null; } }
-  return null;
-}
-
 async function readUsage() {
   if (usageCache && (Date.now() - usageCacheTime < CACHE_TTL)) return usageCache;
   const r = getRedis();
   if (r) {
     try {
-      const data = await r.get(REDIS_KEY);
-      const parsed = parseObj(data);
-      if (parsed && Object.keys(parsed).length > 0) {
-        usageCache = parsed;
+      let data = await r.get(REDIS_KEY);
+      if (typeof data === 'string') { try { data = JSON.parse(data); } catch {} }
+      if (data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length > 0) {
+        usageCache = data;
         usageCacheTime = Date.now();
         return usageCache;
       }
@@ -69,7 +62,7 @@ async function writeUsage(usage) {
   const r = getRedis();
   if (r) {
     try {
-      await r.set(REDIS_KEY, JSON.stringify(usage));
+      await r.set(REDIS_KEY, usage);
     } catch (err) {
       console.error('Redis write usage error:', err.message);
     }
