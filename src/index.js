@@ -17,6 +17,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { logUsage, getUsageSummary, getUsageForKey } from './usage.js';
 import { getBalance, deductBalance, costUsd, addBalance } from './balance.js';
+import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent } from './students.js';
+
+seedFromEnv();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -450,6 +453,53 @@ app.post('/admin/add-credits', (req, res) => {
   res.json({ key_id: key_id.trim(), added_usd: amount, balance_usd: newBalance });
 });
 
+// ---- Admin: student management ----
+function requireAdmin(req, res, next) {
+  const secret = req.headers['x-admin-secret'] || req.query.secret || req.body?.admin_secret;
+  if (secret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+app.get('/admin/students', requireAdmin, (_req, res) => {
+  const students = getAllStudents().map(s => ({
+    ...s,
+    balance_usd: getBalance(s.key),
+  }));
+  res.json(students);
+});
+
+app.post('/admin/students', requireAdmin, (req, res) => {
+  const { name, initial_balance } = req.body || {};
+  const result = addStudent(name);
+  if (result.error) return res.status(400).json({ error: result.error });
+  const bal = Number(initial_balance);
+  if (Number.isFinite(bal) && bal > 0) {
+    addBalance(result.student.key, bal);
+  }
+  res.json({
+    ...result.student,
+    balance_usd: getBalance(result.student.key),
+  });
+});
+
+app.delete('/admin/students/:key', requireAdmin, (req, res) => {
+  const result = removeStudent(req.params.key);
+  if (result.error) return res.status(404).json({ error: result.error });
+  res.json(result);
+});
+
+app.patch('/admin/students/:key', requireAdmin, (req, res) => {
+  const { active } = req.body || {};
+  if (typeof active !== 'boolean') {
+    return res.status(400).json({ error: 'Body: { "active": true/false }' });
+  }
+  const result = toggleStudent(req.params.key, active);
+  if (result.error) return res.status(404).json({ error: result.error });
+  res.json(result.student);
+});
+
 // ---- Admin usage ----
 app.get('/usage', requireStudentAuth, (_req, res) => {
   res.json(getUsageSummary());
@@ -492,6 +542,9 @@ app.get('/admin', (_req, res) => {
 });
 app.get('/admin/info', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'admin-info.html'));
+});
+app.get('/admin/students-panel', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'admin-students.html'));
 });
 
 // ---- 404 ----

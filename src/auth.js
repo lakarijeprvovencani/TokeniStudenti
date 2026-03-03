@@ -1,14 +1,7 @@
-/**
- * Valid student API keys from env (comma-separated).
- * In production you might use a DB or external service.
- */
-function getValidKeys() {
-  const raw = process.env.STUDENT_API_KEYS || '';
-  return raw.split(',').map((k) => k.trim()).filter(Boolean);
-}
+import { getActiveKeys, findByKey } from './students.js';
 
 /**
- * Returns the key itself as the identifier (keys are short enough to use directly).
+ * Returns the key itself as the student identifier.
  */
 export function keyId(key) {
   if (!key) return 'unknown';
@@ -17,31 +10,31 @@ export function keyId(key) {
 
 /**
  * Express middleware: require Authorization: Bearer <student-api-key>.
- * Sets req.studentApiKey and req.studentKeyId for downstream use.
+ * Sets req.studentApiKey, req.studentKeyId, and req.studentName for downstream use.
  */
 export function requireStudentAuth(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
-    console.log('Auth: 401 – missing or invalid Authorization header');
     return res.status(401).json({
       error: { message: 'Missing or invalid Authorization header. Use Bearer <your-api-key>.' },
     });
   }
   const token = auth.slice(7).trim();
-  const validKeys = getValidKeys();
+  const validKeys = getActiveKeys();
   if (!validKeys.length) {
-    console.warn('No STUDENT_API_KEYS configured; rejecting all requests.');
+    console.warn('No active students configured.');
     return res.status(503).json({
-      error: { message: 'Server not configured with valid API keys.' },
+      error: { message: 'Server nema konfigurisanih studenata. Kontaktiraj administratora.' },
     });
   }
   if (!validKeys.includes(token)) {
-    console.log('Auth: 403 – invalid API key');
     return res.status(403).json({
-      error: { message: 'Invalid API key.' },
+      error: { message: 'Nevažeći API ključ.' },
     });
   }
+  const student = findByKey(token);
   req.studentApiKey = token;
   req.studentKeyId = keyId(token);
+  req.studentName = student?.name || 'Unknown';
   next();
 }
