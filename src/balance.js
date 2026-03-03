@@ -60,8 +60,7 @@ async function writeBalances(balances) {
   const r = getRedis();
   if (r) {
     try {
-      const res = await r.set(REDIS_KEY, balances);
-      console.log('Redis write balances result:', res);
+      await r.set(REDIS_KEY, balances);
     } catch (err) {
       console.error('Redis write balances error:', err.message);
     }
@@ -93,7 +92,6 @@ export async function deductBalance(keyId, amountUsd) {
   const current = typeof b[keyId] === 'number' ? b[keyId] : 0;
   const next = Math.round((current - amountUsd) * 100) / 100;
   b[keyId] = next;
-  console.log(`deductBalance: ${keyId} ${current} - ${amountUsd} = ${next}`);
   await writeBalances(b);
   return next;
 }
