@@ -34,9 +34,8 @@ export function openAIToolsToAnthropic(openAITools) {
     });
 }
 
-// Anthropic: 200K context window (input+output). Ostavljamo prostor za max_tokens odgovora (~25k).
-// https://docs.anthropic.com/en/docs/build-with-claude/context-windows
-const MAX_INPUT_CHARS = 700000; // ~175k tokena ulaza
+// Anthropic: 200K context (input+output). Cursor šalje puno u follow-up (istorija + fajlovi) – drastičnije skraćujemo.
+const MAX_INPUT_CHARS = 450000; // ~112k tokena – sigurno ispod 200k sa odgovorom
 
 function contentLength(content) {
   if (typeof content === 'string') return content.length;
