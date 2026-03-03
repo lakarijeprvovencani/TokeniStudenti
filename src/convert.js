@@ -14,10 +14,54 @@ function getOpenAITextContent(content) {
     .join('\n');
 }
 
+// Približno max ulaznih tokena (ostavljamo prostor za odgovor). ~4 karaktera po tokenu.
+const MAX_INPUT_CHARS = 600000; // ~150k tokena
+
+/**
+ * Ogranici system + messages na ukupno max karaktera (da ne pređemo Anthropic limit).
+ * Skraćuje od početka (stariji kontekst), zadnje poruke ostaju što više cela.
+ */
+function applyInputLimit(system, messages) {
+  let total = (system || '').length;
+  for (const m of messages) total += (m.content || '').length;
+  if (total <= MAX_INPUT_CHARS) return { system, messages };
+
+  const NOTE = '[Kontekst skraćen zbog ograničenja...]\n\n';
+  let budget = MAX_INPUT_CHARS;
+
+  const outMessages = [];
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    const content = m.content || '';
+    const len = content.length;
+    if (budget >= len) {
+      outMessages.unshift(m);
+      budget -= len;
+    } else if (budget > NOTE.length + 100) {
+      const maxContent = budget - NOTE.length;
+      outMessages.unshift({
+        role: m.role,
+        content: NOTE + content.slice(-maxContent),
+      });
+      budget = 0;
+      break;
+    } else {
+      break;
+    }
+  }
+  let outSystem = null;
+  if (system && budget > NOTE.length + 100) {
+    const sys = system;
+    outSystem = sys.length <= budget ? sys : NOTE + sys.slice(-(budget - NOTE.length));
+  }
+  return { system: outSystem, messages: outMessages };
+}
+
 /**
  * OpenAI messages → Anthropic messages + system.
  * - system role → top-level system
  * - user/assistant → messages (only user/assistant; drop other roles or merge into user)
+ * - ograničava ukupni ulaz da ne pređe Anthropic limit (Cursor šalje puno konteksta)
  */
 export function openAIToAnthropicMessages(openAIMessages) {
   let system = null;
@@ -44,7 +88,7 @@ export function openAIToAnthropicMessages(openAIMessages) {
     messages.push({ role: 'user', content: text });
   }
 
-  return { system, messages };
+  return applyInputLimit(system, messages);
 }
 
 /**
