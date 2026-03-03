@@ -46,6 +46,12 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || 'dumm
 
 app.use(cors());
 
+// Log every request (method + path) so we can see what Cursor calls in Render logs
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  next();
+});
+
 // Stripe webhook mora dobiti raw body (pre express.json())
 app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
   const Stripe = (await import('stripe')).default;
@@ -303,6 +309,14 @@ app.get('/health', (_req, res) => {
 // Dashboard (static page)
 app.get('/dashboard', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html'));
+});
+
+// 404 – unknown path (so we see in logs what Cursor actually requested)
+app.use((req, res) => {
+  console.log(`404 Not Found: ${req.method} ${req.path}`);
+  res.status(404).json({
+    error: { message: 'Not found', path: req.path, method: req.method },
+  });
 });
 
 app.listen(PORT, () => {

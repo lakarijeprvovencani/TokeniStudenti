@@ -22,6 +22,7 @@ export function keyId(key) {
 export function requireStudentAuth(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
+    console.log('Auth: 401 – missing or invalid Authorization header');
     return res.status(401).json({
       error: { message: 'Missing or invalid Authorization header. Use Bearer <your-api-key>.' },
     });
@@ -35,6 +36,7 @@ export function requireStudentAuth(req, res, next) {
     });
   }
   if (!validKeys.includes(token)) {
+    console.log('Auth: 403 – invalid API key');
     return res.status(403).json({
       error: { message: 'Invalid API key.' },
     });
