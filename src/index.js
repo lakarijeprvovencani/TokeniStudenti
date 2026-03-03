@@ -726,8 +726,33 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: { message: 'Internal server error' } });
 });
 
+app.get('/debug/redis', adminLimiter, async (req, res) => {
+  const secret = req.headers['x-admin-secret'] || req.query.secret;
+  if (!safeEqual(secret, process.env.ADMIN_SECRET)) return res.status(401).json({ error: 'Unauthorized' });
+  const { getRedis, isRedisConfigured } = await import('./redis.js');
+  const configured = isRedisConfigured();
+  let ping = null;
+  let keys = {};
+  if (configured) {
+    const r = getRedis();
+    try {
+      ping = await r.ping();
+      const bal = await r.get('vajb:balances');
+      const usg = await r.get('vajb:usage');
+      const stu = await r.get('vajb:students');
+      keys = {
+        balances: { type: typeof bal, isObj: bal && typeof bal === 'object', keys: bal ? Object.keys(bal).length : 0 },
+        usage: { type: typeof usg, isObj: usg && typeof usg === 'object', keys: usg ? Object.keys(usg).length : 0 },
+        students: { type: typeof stu, isArr: Array.isArray(stu), count: Array.isArray(stu) ? stu.length : 0 },
+      };
+    } catch (err) { ping = 'error: ' + err.message; }
+  }
+  res.json({ configured, ping, keys });
+});
+
 app.listen(PORT, () => {
   console.log(`VajbAgent proxy listening on http://localhost:${PORT}`);
+  console.log(`  Redis: ${process.env.UPSTASH_REDIS_REST_URL ? 'configured' : 'NOT configured (file fallback)'}`);
   console.log(`  Models: ${VAJB_MODELS.map(m => m.id).join(', ')}`);
   console.log(`  GET  /v1/models`);
   console.log(`  POST /v1/chat/completions (Bearer token required)`);

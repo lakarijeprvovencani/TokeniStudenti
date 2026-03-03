@@ -57,16 +57,17 @@ async function readBalances() {
 }
 
 async function writeBalances(balances) {
-  balanceCache = balances;
-  cacheTime = Date.now();
   const r = getRedis();
   if (r) {
     try {
-      await r.set(REDIS_KEY, balances);
+      const res = await r.set(REDIS_KEY, balances);
+      console.log('Redis write balances result:', res);
     } catch (err) {
       console.error('Redis write balances error:', err.message);
     }
   }
+  balanceCache = { ...balances };
+  cacheTime = Date.now();
   try { writeBalancesFile(balances); } catch {}
 }
 

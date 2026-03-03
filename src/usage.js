@@ -57,16 +57,17 @@ async function readUsage() {
 }
 
 async function writeUsage(usage) {
-  usageCache = usage;
-  usageCacheTime = Date.now();
   const r = getRedis();
   if (r) {
     try {
-      await r.set(REDIS_KEY, usage);
+      const res = await r.set(REDIS_KEY, usage);
+      console.log('Redis write usage result:', res);
     } catch (err) {
       console.error('Redis write usage error:', err.message);
     }
   }
+  usageCache = { ...usage };
+  usageCacheTime = Date.now();
   try { writeUsageFile(usage); } catch {}
 }
 
