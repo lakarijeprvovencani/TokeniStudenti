@@ -2,16 +2,19 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { getRedis, isRedisConfigured } from './redis.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const STUDENTS_FILE = path.join(DATA_DIR, 'students.json');
+const REDIS_KEY = 'vajb:students';
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-function readStudents() {
+// ---- File fallback ----
+function readStudentsFile() {
   ensureDataDir();
   if (!fs.existsSync(STUDENTS_FILE)) return [];
   try {
@@ -22,9 +25,47 @@ function readStudents() {
   }
 }
 
-function writeStudents(students) {
+function writeStudentsFile(students) {
   ensureDataDir();
   fs.writeFileSync(STUDENTS_FILE, JSON.stringify(students, null, 2), 'utf8');
+}
+
+// ---- Redis + file layer ----
+let studentsCache = null;
+let studentsCacheTime = 0;
+const CACHE_TTL = 2000;
+
+async function readStudents() {
+  if (studentsCache && (Date.now() - studentsCacheTime < CACHE_TTL)) return studentsCache;
+  const r = getRedis();
+  if (r) {
+    try {
+      const data = await r.get(REDIS_KEY);
+      studentsCache = (Array.isArray(data)) ? data : [];
+      studentsCacheTime = Date.now();
+      if (studentsCache.length > 0) return studentsCache;
+    } catch (err) {
+      console.error('Redis read students error:', err.message);
+    }
+  }
+  const fb = readStudentsFile();
+  studentsCache = fb;
+  studentsCacheTime = Date.now();
+  return fb;
+}
+
+async function writeStudents(students) {
+  studentsCache = students;
+  studentsCacheTime = Date.now();
+  const r = getRedis();
+  if (r) {
+    try {
+      await r.set(REDIS_KEY, students);
+    } catch (err) {
+      console.error('Redis write students error:', err.message);
+    }
+  }
+  try { writeStudentsFile(students); } catch {}
 }
 
 function generateKey(name) {
@@ -37,12 +78,8 @@ function generateKey(name) {
   return `va-${slug}-${rand}`;
 }
 
-/**
- * Seed students from STUDENT_API_KEYS env var (backward compatibility).
- * Only runs if students.json is empty/missing.
- */
-export function seedFromEnv() {
-  const existing = readStudents();
+export async function seedFromEnv() {
+  const existing = await readStudents();
   if (existing.length > 0) return;
 
   const raw = process.env.STUDENT_API_KEYS || '';
@@ -55,30 +92,32 @@ export function seedFromEnv() {
     created: new Date().toISOString(),
     active: true,
   }));
-  writeStudents(seeded);
+  await writeStudents(seeded);
   console.log(`Seeded ${seeded.length} students from STUDENT_API_KEYS env.`);
 }
 
-export function getAllStudents() {
+export async function getAllStudents() {
   return readStudents();
 }
 
-export function getActiveKeys() {
-  return readStudents().filter(s => s.active).map(s => s.key);
+export async function getActiveKeys() {
+  const students = await readStudents();
+  return students.filter(s => s.active).map(s => s.key);
 }
 
-export function findByKey(key) {
-  return readStudents().find(s => s.key === key) || null;
+export async function findByKey(key) {
+  const students = await readStudents();
+  return students.find(s => s.key === key) || null;
 }
 
-export function addStudent(name) {
+export async function addStudent(name) {
   if (!name || typeof name !== 'string' || name.trim().length < 2) {
     return { error: 'Ime mora imati najmanje 2 karaktera.' };
   }
   if (name.length > 100) {
     return { error: 'Ime ne može biti duže od 100 karaktera.' };
   }
-  const students = readStudents();
+  const students = await readStudents();
   const trimmed = name.trim().replace(/[<>"'&;]/g, '');
 
   if (students.length >= 500) {
@@ -96,24 +135,24 @@ export function addStudent(name) {
     active: true,
   };
   students.push(student);
-  writeStudents(students);
+  await writeStudents(students);
   return { student };
 }
 
-export function removeStudent(key) {
-  const students = readStudents();
+export async function removeStudent(key) {
+  const students = await readStudents();
   const idx = students.findIndex(s => s.key === key);
   if (idx === -1) return { error: 'Student sa tim ključem ne postoji.' };
   const removed = students.splice(idx, 1)[0];
-  writeStudents(students);
+  await writeStudents(students);
   return { removed };
 }
 
-export function toggleStudent(key, active) {
-  const students = readStudents();
+export async function toggleStudent(key, active) {
+  const students = await readStudents();
   const student = students.find(s => s.key === key);
   if (!student) return { error: 'Student sa tim ključem ne postoji.' };
   student.active = active;
-  writeStudents(students);
+  await writeStudents(students);
   return { student };
 }

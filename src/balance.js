@@ -1,10 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getRedis, isRedisConfigured } from './redis.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const BALANCES_FILE = path.join(DATA_DIR, 'balances.json');
+const REDIS_KEY = 'vajb:balances';
 
 function ensureDataDir() {
   const dir = path.dirname(BALANCES_FILE);
@@ -15,64 +17,91 @@ let balanceCache = null;
 let cacheTime = 0;
 const CACHE_TTL = 2000;
 
-function readBalances() {
+// ---- File-based fallback ----
+function readBalancesFile() {
   ensureDataDir();
-  if (balanceCache && (Date.now() - cacheTime < CACHE_TTL)) return balanceCache;
   if (!fs.existsSync(BALANCES_FILE)) return {};
   try {
-    balanceCache = JSON.parse(fs.readFileSync(BALANCES_FILE, 'utf8'));
-    cacheTime = Date.now();
-    return balanceCache;
+    return JSON.parse(fs.readFileSync(BALANCES_FILE, 'utf8'));
   } catch {
     return {};
   }
 }
 
-function writeBalances(balances) {
+function writeBalancesFile(balances) {
   ensureDataDir();
   fs.writeFileSync(BALANCES_FILE, JSON.stringify(balances, null, 2), 'utf8');
-  balanceCache = balances;
-  cacheTime = Date.now();
 }
 
-export function getBalance(keyId) {
-  const b = readBalances();
+// ---- Redis + cache layer ----
+async function readBalances() {
+  if (balanceCache && (Date.now() - cacheTime < CACHE_TTL)) return balanceCache;
+  const r = getRedis();
+  if (r) {
+    try {
+      const data = await r.get(REDIS_KEY);
+      balanceCache = (data && typeof data === 'object') ? data : {};
+      cacheTime = Date.now();
+      return balanceCache;
+    } catch (err) {
+      console.error('Redis read balances error:', err.message);
+    }
+  }
+  const fb = readBalancesFile();
+  balanceCache = fb;
+  cacheTime = Date.now();
+  return fb;
+}
+
+async function writeBalances(balances) {
+  balanceCache = balances;
+  cacheTime = Date.now();
+  const r = getRedis();
+  if (r) {
+    try {
+      await r.set(REDIS_KEY, balances);
+    } catch (err) {
+      console.error('Redis write balances error:', err.message);
+    }
+  }
+  try { writeBalancesFile(balances); } catch {}
+}
+
+export async function getBalance(keyId) {
+  const b = await readBalances();
   const v = b[keyId];
   return typeof v === 'number' ? v : 0;
 }
 
-export function addBalance(keyId, amountUsd) {
+export async function addBalance(keyId, amountUsd) {
   balanceCache = null;
-  const b = readBalances();
+  const b = await readBalances();
   const current = typeof b[keyId] === 'number' ? b[keyId] : 0;
   const next = Math.round((current + amountUsd) * 100) / 100;
   b[keyId] = next;
-  writeBalances(b);
+  await writeBalances(b);
   return next;
 }
 
-export function deductBalance(keyId, amountUsd) {
+export async function deductBalance(keyId, amountUsd) {
   balanceCache = null;
-  const b = readBalances();
+  const b = await readBalances();
   const current = typeof b[keyId] === 'number' ? b[keyId] : 0;
   const next = Math.round((current - amountUsd) * 100) / 100;
   b[keyId] = next;
-  writeBalances(b);
+  await writeBalances(b);
   return next;
 }
 
 /**
  * All model prices: USD per million tokens (input, output).
- * Covers both Anthropic and OpenAI backends.
  */
 const PRICES = {
-  // OpenAI
   'gpt-4o-mini':       { in: 0.15, out: 0.60 },
   'gpt-4o':            { in: 2.50, out: 10.0 },
   'gpt-4.1-nano':      { in: 0.10, out: 0.40 },
   'gpt-4.1-mini':      { in: 0.40, out: 1.60 },
   'gpt-4.1':           { in: 2.00, out: 8.00 },
-  // Anthropic
   'claude-haiku-4-5':  { in: 1.00, out: 5.00 },
   'claude-sonnet-4-6': { in: 3.00, out: 15.0 },
   'claude-opus-4-6':   { in: 5.00, out: 25.0 },
@@ -93,13 +122,11 @@ function getPrice(model) {
   return DEFAULT_PRICE;
 }
 
-/** Raw provider cost. */
 export function providerCostUsd(inputTokens, outputTokens, model) {
   const price = getPrice(model);
   return (inputTokens / 1e6) * price.in + (outputTokens / 1e6) * price.out;
 }
 
-// Keep old name as alias for backward compatibility
 export const anthropicCostUsd = providerCostUsd;
 
 function getStudentMarkup() {
@@ -107,7 +134,6 @@ function getStudentMarkup() {
   return Number.isFinite(v) && v >= 1 ? v : 1;
 }
 
-/** Cost deducted from student balance (provider cost x markup). */
 export function costUsd(inputTokens, outputTokens, model) {
   const raw = providerCostUsd(inputTokens, outputTokens, model);
   return Math.round(raw * getStudentMarkup() * 1e6) / 1e6;

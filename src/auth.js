@@ -1,9 +1,6 @@
 import crypto from 'crypto';
 import { getActiveKeys, findByKey } from './students.js';
 
-/**
- * Returns the key itself as the student identifier.
- */
 export function keyId(key) {
   if (!key) return 'unknown';
   return key.trim();
@@ -21,11 +18,7 @@ function safeMatch(candidate, list) {
   return matched;
 }
 
-/**
- * Express middleware: require Authorization: Bearer <student-api-key>.
- * Sets req.studentApiKey, req.studentKeyId, and req.studentName for downstream use.
- */
-export function requireStudentAuth(req, res, next) {
+export async function requireStudentAuth(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
     return res.status(401).json({
@@ -38,22 +31,27 @@ export function requireStudentAuth(req, res, next) {
       error: { message: 'API ključ je prekratak.' },
     });
   }
-  const validKeys = getActiveKeys();
-  if (!validKeys.length) {
-    console.warn('No active students configured.');
-    return res.status(503).json({
-      error: { message: 'Server nema konfigurisanih studenata. Kontaktiraj administratora.' },
-    });
+  try {
+    const validKeys = await getActiveKeys();
+    if (!validKeys.length) {
+      console.warn('No active students configured.');
+      return res.status(503).json({
+        error: { message: 'Server nema konfigurisanih studenata. Kontaktiraj administratora.' },
+      });
+    }
+    const matched = safeMatch(token, validKeys);
+    if (!matched) {
+      return res.status(403).json({
+        error: { message: 'Nevažeći API ključ.' },
+      });
+    }
+    const student = await findByKey(matched);
+    req.studentApiKey = matched;
+    req.studentKeyId = keyId(matched);
+    req.studentName = student?.name || 'Unknown';
+    next();
+  } catch (err) {
+    console.error('Auth error:', err.message);
+    return res.status(500).json({ error: { message: 'Greška pri autentifikaciji.' } });
   }
-  const matched = safeMatch(token, validKeys);
-  if (!matched) {
-    return res.status(403).json({
-      error: { message: 'Nevažeći API ključ.' },
-    });
-  }
-  const student = findByKey(matched);
-  req.studentApiKey = matched;
-  req.studentKeyId = keyId(matched);
-  req.studentName = student?.name || 'Unknown';
-  next();
 }

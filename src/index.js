@@ -22,7 +22,7 @@ import { logUsage, getUsageSummary, getUsageForKey, getModelStats } from './usag
 import { getBalance, deductBalance, costUsd, addBalance } from './balance.js';
 import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, findByKey } from './students.js';
 
-seedFromEnv();
+await seedFromEnv();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -171,7 +171,7 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
     return res.status(200).send();
   }
   const amountUsd = Math.round((amountCents / 100) * 100) / 100;
-  addBalance(keyId.trim(), amountUsd);
+  await addBalance(keyId.trim(), amountUsd);
   console.log('Credits added via Stripe', { key_id: keyId.slice(0, 8) + '...', amount_usd: amountUsd });
   res.status(200).send();
 });
@@ -260,7 +260,7 @@ const chatCompletionsHandler = [
     }
 
     const keyId = req.studentKeyId;
-    const balance = getBalance(keyId);
+    const balance = await getBalance(keyId);
     if (balance <= 0) {
       return res.status(402).json({
         error: {
@@ -345,8 +345,8 @@ async function handleOpenAINonStream(res, keyId, resolved, payload) {
     model: resolved.backendModel,
   };
   const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
-  deductBalance(keyId, usd);
-  logUsage(keyId, usage);
+  await deductBalance(keyId, usd);
+  await logUsage(keyId, usage);
 
   response.model = resolved.id;
   res.json(response);
@@ -396,8 +396,8 @@ async function handleOpenAIStream(res, keyId, resolved, payload) {
   }
   usage.model = resolved.backendModel;
   const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
-  deductBalance(keyId, usd);
-  logUsage(keyId, usage);
+  await deductBalance(keyId, usd);
+  await logUsage(keyId, usage);
 }
 
 // ---- Anthropic backend (Pro, Max, Ultra) ----
@@ -451,8 +451,8 @@ async function handleAnthropicNonStream(res, keyId, resolved, payload) {
     model: resolved.backendModel,
   };
   const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
-  deductBalance(keyId, usd);
-  logUsage(keyId, usage);
+  await deductBalance(keyId, usd);
+  await logUsage(keyId, usage);
 
   const openAIResponse = toOpenAIChatCompletion(
     response, response.usage, resolved.id, response.id || 'vajb-' + Date.now()
@@ -528,16 +528,16 @@ async function handleAnthropicStream(res, keyId, resolved, payload) {
 
   usage.model = resolved.backendModel;
   const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
-  deductBalance(keyId, usd);
-  logUsage(keyId, usage);
+  await deductBalance(keyId, usd);
+  await logUsage(keyId, usage);
 }
 
 // ---- Usage + balance for current key (dashboard) ----
-app.get('/me', authLimiter, requireStudentAuth, (req, res) => {
+app.get('/me', authLimiter, requireStudentAuth, async (req, res) => {
   const keyId = req.studentKeyId;
   const name = req.studentName || 'Unknown';
-  const balanceUsd = getBalance(keyId);
-  const data = getUsageForKey(keyId);
+  const balanceUsd = await getBalance(keyId);
+  const data = await getUsageForKey(keyId);
   if (!data) {
     return res.json({
       key_id: keyId, name, balance_usd: balanceUsd,
@@ -600,7 +600,7 @@ app.post('/create-checkout', authLimiter, requireStudentAuth, async (req, res) =
 });
 
 // ---- Admin: add credits ----
-app.post('/admin/add-credits', adminLimiter, (req, res) => {
+app.post('/admin/add-credits', adminLimiter, async (req, res) => {
   const secret = req.headers['x-admin-secret'] || req.body?.admin_secret;
   if (!safeEqual(secret, process.env.ADMIN_SECRET)) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -613,7 +613,7 @@ app.post('/admin/add-credits', adminLimiter, (req, res) => {
   if (Math.abs(amount) > 10000) {
     return res.status(400).json({ error: 'Iznos ne može biti veći od $10,000.' });
   }
-  const newBalance = addBalance(key_id.trim(), amount);
+  const newBalance = await addBalance(key_id.trim(), amount);
   res.json({ key_id: key_id.trim(), added_usd: amount, balance_usd: newBalance });
 });
 
@@ -626,63 +626,65 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-app.get('/admin/students', adminLimiter, requireAdmin, (_req, res) => {
-  const students = getAllStudents().map(s => ({
-    ...s,
-    balance_usd: getBalance(s.key),
-  }));
+app.get('/admin/students', adminLimiter, requireAdmin, async (_req, res) => {
+  const allStudents = await getAllStudents();
+  const students = [];
+  for (const s of allStudents) {
+    students.push({ ...s, balance_usd: await getBalance(s.key) });
+  }
   res.json(students);
 });
 
-app.post('/admin/students', adminLimiter, requireAdmin, (req, res) => {
+app.post('/admin/students', adminLimiter, requireAdmin, async (req, res) => {
   const { name, initial_balance } = req.body || {};
-  const result = addStudent(name);
+  const result = await addStudent(name);
   if (result.error) return res.status(400).json({ error: result.error });
   const bal = Number(initial_balance);
   if (Number.isFinite(bal) && bal > 0) {
-    addBalance(result.student.key, bal);
+    await addBalance(result.student.key, bal);
   }
   res.json({
     ...result.student,
-    balance_usd: getBalance(result.student.key),
+    balance_usd: await getBalance(result.student.key),
   });
 });
 
-app.delete('/admin/students/:key', adminLimiter, requireAdmin, (req, res) => {
-  const result = removeStudent(req.params.key);
+app.delete('/admin/students/:key', adminLimiter, requireAdmin, async (req, res) => {
+  const result = await removeStudent(req.params.key);
   if (result.error) return res.status(404).json({ error: result.error });
   res.json(result);
 });
 
-app.patch('/admin/students/:key', adminLimiter, requireAdmin, (req, res) => {
+app.patch('/admin/students/:key', adminLimiter, requireAdmin, async (req, res) => {
   const { active } = req.body || {};
   if (typeof active !== 'boolean') {
     return res.status(400).json({ error: 'Body: { "active": true/false }' });
   }
-  const result = toggleStudent(req.params.key, active);
+  const result = await toggleStudent(req.params.key, active);
   if (result.error) return res.status(404).json({ error: result.error });
   res.json(result.student);
 });
 
 // ---- Admin usage ----
-app.get('/usage', adminLimiter, requireAdmin, (_req, res) => {
-  res.json(getUsageSummary());
+app.get('/usage', adminLimiter, requireAdmin, async (_req, res) => {
+  res.json(await getUsageSummary());
 });
 
 // ---- Admin: full overview (all users, models, earnings) ----
-app.get('/admin/api/overview', adminLimiter, (req, res) => {
+app.get('/admin/api/overview', adminLimiter, async (req, res) => {
   const secret = req.headers['x-admin-secret'] || req.query.secret;
   if (!safeEqual(secret, process.env.ADMIN_SECRET)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  const allUsage = getUsageSummary();
+  const allUsage = await getUsageSummary();
   const markup = parseFloat(process.env.STUDENT_MARKUP) || 1;
-  const users = Object.entries(allUsage).map(([keyId, data]) => {
-    const bal = getBalance(keyId);
-    const student = findByKey(keyId);
-    return { key_id: keyId, name: student?.name || keyId, balance_usd: bal, ...data };
-  });
-  const modelStats = getModelStats();
+  const users = [];
+  for (const [keyId, data] of Object.entries(allUsage)) {
+    const bal = await getBalance(keyId);
+    const student = await findByKey(keyId);
+    users.push({ key_id: keyId, name: student?.name || keyId, balance_usd: bal, ...data });
+  }
+  const modelStats = await getModelStats();
   const firstUse = Object.values(allUsage)
     .map(u => u.last_used).filter(Boolean).sort()[0] || null;
 
