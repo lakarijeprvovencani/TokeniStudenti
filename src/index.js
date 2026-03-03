@@ -87,6 +87,21 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
 
 app.use(express.json());
 
+// Root – Render i Cursor ponekad proveravaju / ; bez ovoga dobijaju 404 i "resource not found"
+app.get('/', (_req, res) => {
+  res.json({
+    service: 'vajb-agent',
+    ok: true,
+    endpoints: {
+      models: 'GET /v1/models',
+      chat: 'POST /v1/chat/completions',
+      dashboard: 'GET /dashboard',
+      health: 'GET /health',
+    },
+  });
+});
+app.head('/', (_req, res) => res.status(200).end());
+
 // ---- Public (no auth): models list for Cursor dropdown ----
 app.get('/v1/models', (_req, res) => {
   res.json({
