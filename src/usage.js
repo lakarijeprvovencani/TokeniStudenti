@@ -85,6 +85,7 @@ export async function logUsage(apiKeyId, { input_tokens, output_tokens, model })
     usage[key].by_model[model].output_tokens += output_tokens;
     usage[key].by_model[model].requests += 1;
   }
+  console.log(`logUsage: ${key} reqs=${usage[key].requests} model=${model} in=${input_tokens} out=${output_tokens}`);
   await writeUsage(usage);
 }
 

@@ -92,6 +92,7 @@ export async function deductBalance(keyId, amountUsd) {
   const current = typeof b[keyId] === 'number' ? b[keyId] : 0;
   const next = Math.round((current - amountUsd) * 100) / 100;
   b[keyId] = next;
+  console.log(`deductBalance: ${keyId} ${current} - ${amountUsd} = ${next}`);
   await writeBalances(b);
   return next;
 }
