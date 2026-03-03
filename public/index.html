@@ -4,324 +4,372 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>VajbAgent – AI kodiranje za studente</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#09090b;--surface:#111113;--surface2:#161618;--surface3:#1c1c1f;--border:#27272a;--border2:#3f3f46;--text:#fafafa;--text2:#a1a1aa;--text3:#71717a;--accent:#8b5cf6;--accent2:#a78bfa;--green:#22c55e;--red:#ef4444;--yellow:#eab308;--blue:#3b82f6;--radius:12px}
+:root{--bg:#0a0a0a;--bg2:#111;--surface:#181818;--surface2:#1e1e1e;--surface3:#252525;--border:#2a2a2a;--border2:#333;--text:#f5f5f5;--text2:#999;--text3:#666;--orange:#f97316;--orange2:#fb923c;--orange-glow:rgba(249,115,22,.15);--green:#22c55e;--red:#ef4444;--blue:#3b82f6;--radius:14px}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,'SF Pro Display','Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
 
+/* Ticker */
+.ticker{background:var(--orange);color:#000;padding:10px 0;overflow:hidden;white-space:nowrap;font-size:.82rem;font-weight:600}
+.ticker-inner{display:inline-block;animation:scroll 30s linear infinite}
+.ticker-inner span{margin:0 40px}
+@keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
 /* Nav */
-nav{position:fixed;top:0;left:0;right:0;z-index:50;background:rgba(9,9,11,.85);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
-.nav-inner{max-width:1100px;margin:0 auto;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between}
-.nav-brand{font-weight:700;font-size:1rem;display:flex;align-items:center;gap:6px}
-.nav-brand span{color:var(--accent)}
-.nav-links{display:flex;gap:6px}
-.nav-links a{padding:7px 16px;font-size:.82rem;color:var(--text2);border-radius:8px;transition:all .15s}
-.nav-links a:hover{color:var(--text);background:rgba(255,255,255,.05)}
-.nav-links .btn-nav{background:var(--text);color:var(--bg);font-weight:600}
-.nav-links .btn-nav:hover{opacity:.9;color:var(--bg)}
-.nav-links .btn-admin{background:transparent;border:1px solid var(--border);color:var(--text3)}
-.nav-links .btn-admin:hover{border-color:var(--border2);color:var(--text2)}
+nav{background:rgba(10,10,10,.9);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
+.nav-inner{max-width:1100px;margin:0 auto;padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between}
+.nav-brand{font-weight:800;font-size:1.05rem;letter-spacing:-.02em}
+.nav-brand span{color:var(--orange)}
+.nav-links{display:flex;gap:6px;align-items:center}
+.nav-links a{padding:8px 16px;font-size:.82rem;font-weight:500;color:var(--text2);border-radius:8px;transition:all .15s}
+.nav-links a:hover{color:var(--text)}
+.btn-login{background:var(--orange)!important;color:#000!important;font-weight:700!important;padding:9px 20px!important;border-radius:8px!important}
+.btn-login:hover{opacity:.9}
+.btn-admin-nav{border:1px solid var(--border)!important;color:var(--text3)!important}
+.btn-admin-nav:hover{border-color:var(--border2)!important;color:var(--text2)!important}
 
 /* Hero */
-.hero{padding:140px 24px 80px;text-align:center;position:relative;overflow:hidden}
-.hero::before{content:'';position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(139,92,246,.08),transparent 70%);pointer-events:none}
-.hero-tag{display:inline-block;padding:5px 14px;border:1px solid rgba(139,92,246,.3);background:rgba(139,92,246,.08);border-radius:20px;font-size:.72rem;color:var(--accent2);font-weight:600;letter-spacing:.03em;margin-bottom:20px}
-.hero h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;letter-spacing:-.03em;line-height:1.15;max-width:700px;margin:0 auto 16px}
-.hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--accent),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.hero p{font-size:1.05rem;color:var(--text2);max-width:520px;margin:0 auto 32px;line-height:1.65}
+.hero{padding:100px 24px 80px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:800px;height:800px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,.06),transparent 65%);pointer-events:none}
+.hero-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border:1px solid rgba(249,115,22,.3);background:rgba(249,115,22,.08);border-radius:50px;font-size:.78rem;color:var(--orange2);font-weight:600;margin-bottom:28px}
+.hero-pill::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--orange);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.hero h1{font-size:clamp(2.2rem,5.5vw,3.8rem);font-weight:900;letter-spacing:-.04em;line-height:1.1;max-width:800px;margin:0 auto 20px}
+.hero h1 em{font-style:italic;color:var(--orange)}
+.hero p{font-size:1.05rem;color:var(--text2);max-width:540px;margin:0 auto 36px;line-height:1.7}
 .hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-.btn-hero{padding:13px 28px;border-radius:10px;font-size:.92rem;font-weight:600;border:none;cursor:pointer;transition:all .2s}
-.btn-primary{background:var(--text);color:var(--bg)}.btn-primary:hover{opacity:.88}
+.btn-hero{padding:14px 32px;border-radius:10px;font-size:.95rem;font-weight:700;border:none;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:8px}
+.btn-primary{background:var(--orange);color:#000}.btn-primary:hover{opacity:.88;transform:translateY(-1px)}
 .btn-secondary{background:transparent;color:var(--text);border:1px solid var(--border2)}.btn-secondary:hover{border-color:var(--text3)}
 
-/* Section */
+/* Sections */
 section{max-width:1100px;margin:0 auto;padding:80px 24px}
-.section-tag{font-size:.62rem;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);font-weight:700;margin-bottom:10px}
-.section-title{font-size:1.8rem;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
-.section-sub{font-size:.95rem;color:var(--text2);margin-bottom:40px;max-width:550px;line-height:1.6}
+.stag{font-size:.7rem;text-transform:uppercase;letter-spacing:.15em;color:var(--orange);font-weight:700;margin-bottom:12px}
+.stitle{font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;letter-spacing:-.03em;margin-bottom:8px;line-height:1.15}
+.stitle em{font-style:italic;color:var(--orange)}
+.ssub{font-size:.95rem;color:var(--text2);margin-bottom:44px;max-width:500px;line-height:1.65}
 
 /* Benefits */
 .benefits{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.benefit{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;transition:border-color .2s}
-.benefit:hover{border-color:var(--border2)}
-.b-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin-bottom:14px}
-.b-purple{background:rgba(139,92,246,.12);color:var(--accent)}
-.b-green{background:rgba(34,197,94,.12);color:var(--green)}
-.b-blue{background:rgba(59,130,246,.12);color:var(--blue)}
-.b-yellow{background:rgba(234,179,8,.12);color:var(--yellow)}
-.b-red{background:rgba(239,68,68,.12);color:var(--red)}
-.b-white{background:rgba(255,255,255,.08);color:var(--text)}
-.benefit h3{font-size:.92rem;font-weight:600;margin-bottom:6px}
-.benefit p{font-size:.82rem;color:var(--text2);line-height:1.55}
+.bcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;transition:border-color .2s}
+.bcard:hover{border-color:var(--border2)}
+.bcard-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.15rem;margin-bottom:16px;font-weight:700}
+.bi-orange{background:rgba(249,115,22,.1);color:var(--orange)}
+.bi-green{background:rgba(34,197,94,.1);color:var(--green)}
+.bi-blue{background:rgba(59,130,246,.1);color:var(--blue)}
+.bcard h3{font-size:.95rem;font-weight:700;margin-bottom:6px}
+.bcard p{font-size:.84rem;color:var(--text2);line-height:1.6}
 
-/* Comparison */
-.compare-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
-.compare-head{display:grid;grid-template-columns:1.8fr 1fr 1fr;border-bottom:1px solid var(--border)}
-.compare-head div{padding:18px 22px;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);font-weight:600}
-.compare-head div:nth-child(2){text-align:center;background:rgba(139,92,246,.04);border-left:1px solid var(--border);border-right:1px solid var(--border)}
-.compare-head div:nth-child(3){text-align:center}
-.compare-head .col-va{color:var(--accent)}
-.compare-row{display:grid;grid-template-columns:1.8fr 1fr 1fr;border-bottom:1px solid var(--border)}
-.compare-row:last-child{border-bottom:none}
-.compare-row div{padding:14px 22px;font-size:.84rem;display:flex;align-items:center}
-.compare-row div:first-child{color:var(--text2);font-weight:500}
-.compare-row div:nth-child(2){justify-content:center;background:rgba(139,92,246,.02);border-left:1px solid var(--border);border-right:1px solid var(--border);font-weight:600}
-.compare-row div:nth-child(3){justify-content:center;color:var(--text3)}
-.check{color:var(--green);font-weight:700;font-size:1rem}.cross{color:var(--text3);font-size:.85rem}
-.win{color:var(--green);font-weight:600}.tie{color:var(--text2)}.lose{color:var(--text3)}
+/* Model tiers */
+.tiers{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.tier{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:26px 16px;text-align:center;transition:all .25s;position:relative}
+.tier:hover{border-color:var(--orange);transform:translateY(-3px)}
+.tier.pop{border-color:rgba(249,115,22,.4)}
+.tier.pop::before{content:'POPULARAN';position:absolute;top:-10px;left:50%;transform:translateX(-50%);padding:4px 12px;background:var(--orange);color:#000;font-size:.58rem;font-weight:800;letter-spacing:.06em;border-radius:6px}
+.t-name{font-size:1.05rem;font-weight:800;margin-bottom:2px}
+.t-desc{font-size:.68rem;color:var(--text3);margin-bottom:16px}
+.t-val{font-size:1.8rem;font-weight:900;letter-spacing:-.03em;margin-bottom:2px}
+.t-val-sub{font-size:.68rem;color:var(--text3);margin-bottom:14px}
+.t-price{font-size:.82rem;color:var(--text2)}.t-price b{color:var(--text);font-size:1rem}
+.t-o{color:var(--orange)}.t-g{color:var(--green)}.t-b{color:var(--blue)}.t-y{color:#eab308}.t-r{color:var(--red)}
 
-/* Models */
-.model-tiers{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
-.tier{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px 16px;text-align:center;transition:all .2s;position:relative}
-.tier:hover{border-color:var(--accent);transform:translateY(-2px)}
-.tier.popular{border-color:rgba(139,92,246,.4)}
-.tier.popular::before{content:'POPULARAN';position:absolute;top:-10px;left:50%;transform:translateX(-50%);padding:3px 10px;background:var(--accent);color:#fff;font-size:.58rem;font-weight:700;letter-spacing:.06em;border-radius:6px}
-.tier-name{font-size:1rem;font-weight:700;margin-bottom:2px}
-.tier-desc{font-size:.68rem;color:var(--text3);margin-bottom:14px}
-.tier-stat{font-size:1.6rem;font-weight:800;letter-spacing:-.02em;margin-bottom:2px}
-.tier-stat-sub{font-size:.68rem;color:var(--text3);margin-bottom:12px}
-.tier-price{font-size:.82rem;color:var(--text2)}
-.tier-price b{color:var(--text);font-size:1rem}
-.t-green{color:var(--green)}.t-blue{color:var(--blue)}.t-purple{color:var(--accent)}.t-yellow{color:var(--yellow)}.t-red{color:var(--red)}
+/* Compare */
+.cmp{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.cmp-head{display:grid;grid-template-columns:1.8fr 1fr 1fr;border-bottom:1px solid var(--border)}
+.cmp-head div{padding:18px 22px;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);font-weight:700}
+.cmp-head .col-va{color:var(--orange);text-align:center;background:rgba(249,115,22,.03);border-left:1px solid var(--border);border-right:1px solid var(--border)}
+.cmp-head .col-cp{text-align:center}
+.cmp-row{display:grid;grid-template-columns:1.8fr 1fr 1fr;border-bottom:1px solid var(--border)}
+.cmp-row:last-child{border-bottom:none}
+.cmp-row div{padding:14px 22px;font-size:.84rem;display:flex;align-items:center}
+.cmp-row div:first-child{color:var(--text2);font-weight:500}
+.cmp-row div:nth-child(2){justify-content:center;background:rgba(249,115,22,.02);border-left:1px solid var(--border);border-right:1px solid var(--border);font-weight:600}
+.cmp-row div:nth-child(3){justify-content:center;color:var(--text3)}
+.win{color:var(--green);font-weight:600}
+.chk{color:var(--green);font-weight:700;font-size:1rem}
+.crx{color:var(--text3);font-size:.85rem}
 
-/* Stats */
-.stat-bar-section{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:30px}
-.stat-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px}
-.stat-block h4{font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:16px;font-weight:600}
+/* Bars */
+.bars{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px}
+.bar-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px}
+.bar-block h4{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:18px;font-weight:700}
 .bar-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
-.bar-label{width:100px;font-size:.78rem;color:var(--text2);text-align:right;flex-shrink:0}
-.bar-track{flex:1;height:24px;background:var(--surface3);border-radius:6px;overflow:hidden;position:relative}
-.bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding:0 10px;font-size:.65rem;font-weight:700;color:rgba(0,0,0,.8);transition:width .8s ease}
-.bar-va{background:linear-gradient(90deg,var(--accent),var(--blue))}
-.bar-cu{background:rgba(255,255,255,.15)}
-.bar-num{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.68rem;color:var(--text3)}
+.bar-lbl{width:90px;font-size:.78rem;color:var(--text2);text-align:right;flex-shrink:0}
+.bar-trk{flex:1;height:26px;background:var(--surface3);border-radius:7px;overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:7px;display:flex;align-items:center;padding:0 12px;font-size:.68rem;font-weight:700;color:#000;transition:width .8s}
+.bar-va{background:linear-gradient(90deg,var(--orange),var(--orange2))}
+.bar-cu{background:rgba(255,255,255,.12);color:var(--text2)!important}
+.bar-num{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.65rem;color:var(--text3)}
+
+/* Steps */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.step-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;text-align:center}
+.step-num{font-size:2.2rem;font-weight:900;color:var(--orange);margin-bottom:10px;line-height:1}
+.step-card h3{font-size:.95rem;font-weight:700;margin-bottom:6px}
+.step-card p{font-size:.82rem;color:var(--text2);line-height:1.6}
+
+/* Summary */
+.sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px}
+.sum-card h3{font-size:1rem;font-weight:700;margin-bottom:12px}
+.sum-card p{font-size:.84rem;color:var(--text2);line-height:2}
+.sum-card .win-line::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:8px}
+.sum-green .win-line::before{background:var(--green)}
+.sum-muted .win-line::before{background:var(--text3)}
 
 /* CTA */
-.cta{text-align:center;padding:80px 24px 100px}
-.cta h2{font-size:1.8rem;font-weight:700;letter-spacing:-.02em;margin-bottom:10px}
-.cta p{color:var(--text2);margin-bottom:28px;font-size:.95rem}
-.cta-cards{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;max-width:700px;margin:0 auto}
-.cta-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:220px;text-align:center;transition:border-color .2s}
-.cta-card:hover{border-color:var(--accent)}
-.cta-card h3{font-size:.88rem;font-weight:600;margin-bottom:4px}
-.cta-card p{font-size:.75rem;color:var(--text3);margin-bottom:14px}
-.cta-card a{display:block;padding:9px;background:var(--text);color:var(--bg);border-radius:8px;font-size:.82rem;font-weight:600;transition:opacity .15s}
+.cta{text-align:center;padding:80px 24px 100px;position:relative}
+.cta::before{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,.05),transparent 65%);pointer-events:none}
+.cta h2{font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;letter-spacing:-.03em;margin-bottom:10px}
+.cta p{color:var(--text2);margin-bottom:32px;font-size:.95rem}
+.cta-cards{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;max-width:720px;margin:0 auto}
+.cta-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:230px;text-align:center;transition:border-color .2s}
+.cta-card:hover{border-color:var(--orange)}
+.cta-card h3{font-size:.92rem;font-weight:700;margin-bottom:4px}
+.cta-card p{font-size:.75rem;color:var(--text3);margin-bottom:16px}
+.cta-card a{display:block;padding:10px;background:var(--orange);color:#000;border-radius:8px;font-size:.84rem;font-weight:700;transition:opacity .15s}
 .cta-card a:hover{opacity:.85}
+.cta-card a.ghost{background:transparent;border:1px solid var(--border);color:var(--text2)}
+.cta-card a.ghost:hover{border-color:var(--border2);color:var(--text)}
+
+/* Powered */
+.powered{text-align:center;padding:20px 24px 12px;font-size:.78rem;color:var(--text3)}
+.powered a{color:var(--orange);font-weight:600;border-bottom:1px solid rgba(249,115,22,.3)}
+.powered a:hover{border-color:var(--orange)}
 
 /* Footer */
-footer{text-align:center;padding:30px 24px;border-top:1px solid var(--border);font-size:.72rem;color:var(--text3)}
+footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-size:.72rem;color:var(--text3)}
 
 @media(max-width:900px){
-  .benefits{grid-template-columns:1fr 1fr}
-  .model-tiers{grid-template-columns:repeat(3,1fr)}
-  .stat-bar-section{grid-template-columns:1fr}
+  .benefits,.steps{grid-template-columns:1fr 1fr}
+  .tiers{grid-template-columns:repeat(3,1fr)}
+  .bars,.sum-grid{grid-template-columns:1fr}
 }
 @media(max-width:600px){
-  .benefits{grid-template-columns:1fr}
-  .model-tiers{grid-template-columns:1fr 1fr}
-  .compare-head,.compare-row{grid-template-columns:1.4fr 1fr 1fr}
-  .compare-row div{padding:10px 12px;font-size:.76rem}
-  .hero h1{font-size:1.8rem}
+  .benefits,.steps{grid-template-columns:1fr}
+  .tiers{grid-template-columns:1fr 1fr}
+  .cmp-head,.cmp-row{grid-template-columns:1.4fr 1fr 1fr}
+  .cmp-row div{padding:10px 12px;font-size:.76rem}
+  .hero h1{font-size:2rem}
+  .nav-links a:not(.btn-login):not(.btn-admin-nav){display:none}
 }
 </style>
 </head>
 <body>
 
+<!-- Ticker -->
+<div class="ticker">
+  <div class="ticker-inner">
+    <span>AI kodiranje za studente</span>
+    <span>Pay-as-you-go bez pretplate</span>
+    <span>5 nivoa AI modela</span>
+    <span>Powered by Vajb Kodiranje Mentorstvo</span>
+    <span>Do 14x vise zahteva za istu cenu</span>
+    <span>AI kodiranje za studente</span>
+    <span>Pay-as-you-go bez pretplate</span>
+    <span>5 nivoa AI modela</span>
+    <span>Powered by Vajb Kodiranje Mentorstvo</span>
+    <span>Do 14x vise zahteva za istu cenu</span>
+  </div>
+</div>
+
+<!-- Nav -->
 <nav>
   <div class="nav-inner">
-    <div class="nav-brand">VajbAgent <span>&middot;</span> AI</div>
+    <div class="nav-brand">Vajb<span>Agent</span></div>
     <div class="nav-links">
-      <a href="#compare">Poređenje</a>
+      <a href="#benefits">Benefiti</a>
+      <a href="#compare">Uporedi</a>
       <a href="#models">Modeli</a>
-      <a href="/admin" class="btn-admin">Admin</a>
-      <a href="/dashboard" class="btn-nav">Uloguj se</a>
+      <a href="/admin" class="btn-admin-nav">Admin</a>
+      <a href="/dashboard" class="btn-login">Uloguj se</a>
     </div>
   </div>
 </nav>
 
-<!-- HERO -->
+<!-- Hero -->
 <div class="hero">
-  <div class="hero-tag">AI asistent za studente &middot; Pay-as-you-go</div>
-  <h1>Kodiranje sa AI-jem.<br><em>Bez mesečne pretplate.</em></h1>
-  <p>Premium AI modeli u Cursor IDE-u, plaćaj samo koliko koristiš. Do 14x više zahteva za istu cenu u odnosu na tradicionalnu pretplatu.</p>
+  <div class="hero-pill">Od $5 do premium AI kodiranja</div>
+  <h1>Ne treba ti pretplata<br><em>da bi kodirao sa AI-jem</em></h1>
+  <p>Premium AI modeli u Cursor IDE-u, plati samo koliko koristis. Do 14x vise zahteva u odnosu na tradicionalnu mesecnu pretplatu.</p>
   <div class="hero-btns">
-    <a href="/dashboard" class="btn-hero btn-primary">Počni odmah</a>
-    <a href="#compare" class="btn-hero btn-secondary">Vidi poređenje</a>
+    <a href="/dashboard" class="btn-hero btn-primary">Pocni odmah</a>
+    <a href="#compare" class="btn-hero btn-secondary">Uporedi sa Cursor Pro</a>
   </div>
 </div>
 
-<!-- BENEFITS -->
-<section>
-  <div class="section-tag">Zašto VajbAgent</div>
-  <div class="section-title">Napravljen za studente</div>
-  <div class="section-sub">Sve što ti treba za kodiranje sa AI-jem, bez nepotrebnih troškova.</div>
+<!-- Benefits -->
+<section id="benefits">
+  <div class="stag">Zasto VajbAgent</div>
+  <div class="stitle">Napravljen za <em>studente</em></div>
+  <div class="ssub">Sve sto ti treba za AI kodiranje, bez nepotrebnih troskova i obaveza.</div>
   <div class="benefits">
-    <div class="benefit">
-      <div class="b-icon b-green">$</div>
+    <div class="bcard">
+      <div class="bcard-icon bi-orange">$</div>
       <h3>Pay-as-you-go</h3>
-      <p>Bez mesečne pretplate. Uplati $5, $10 ili $20 kada ti zatreba. Nema auto-renew-a, nema iznenađenja na kartici.</p>
+      <p>Bez mesecne pretplate. Uplati $5, $10 ili $20 kada ti zatreba. Nema auto-renew-a, nema iznenadenja.</p>
     </div>
-    <div class="benefit">
-      <div class="b-icon b-purple">5</div>
+    <div class="bcard">
+      <div class="bcard-icon bi-orange">5</div>
       <h3>5 nivoa modela</h3>
-      <p>Od ultra-jeftinog Nano za svakodnevna pitanja do Ultra za najkompleksnije agentske zadatke. Ti biraš.</p>
+      <p>Od ultra-jeftinog Nano za svakodnevna pitanja do Ultra za najkompleksnije zadatke. Ti biras.</p>
     </div>
-    <div class="benefit">
-      <div class="b-icon b-blue">⚡</div>
+    <div class="bcard">
+      <div class="bcard-icon bi-green">&#9889;</div>
       <h3>Uvek brz</h3>
-      <p>Nema sporog reda čekanja. Dok imaš kredit, svaki zahtev se obrađuje odmah, bez prioritetnog queue-a.</p>
+      <p>Nema sporog reda cekanja. Dok imas kredit, svaki zahtev se obraduje odmah.</p>
     </div>
-    <div class="benefit">
-      <div class="b-icon b-yellow">⚙</div>
+    <div class="bcard">
+      <div class="bcard-icon bi-blue">&#9881;</div>
       <h3>Cursor integracija</h3>
-      <p>Radi direktno u Cursor IDE-u. Isti workflow, ista brzina, samo jeftiniji modeli na raspolaganju.</p>
+      <p>Radi direktno u Cursor IDE-u. Isti workflow, ista brzina, jeftiniji modeli.</p>
     </div>
-    <div class="benefit">
-      <div class="b-icon b-red">♦</div>
+    <div class="bcard">
+      <div class="bcard-icon bi-orange">&#9830;</div>
       <h3>Premium pristup</h3>
-      <p>Pristup najjačim AI modelima koji bi inače zahtevali skuplju pretplatu. Svi modeli dostupni svakome.</p>
+      <p>Pristup najjacim AI modelima koji bi inace zahtevali skuplju pretplatu.</p>
     </div>
-    <div class="benefit">
-      <div class="b-icon b-white">📊</div>
+    <div class="bcard">
+      <div class="bcard-icon bi-green">&#9635;</div>
       <h3>Transparentno</h3>
-      <p>Realno praćenje potrošnje u dashboardu. Vidiš svaki zahtev, svaki token, tačno znaš gde ti odlazi kredit.</p>
+      <p>Realno pracenje potrosnje u dashboardu. Vidis svaki zahtev i svaki token.</p>
     </div>
   </div>
 </section>
 
-<!-- COMPARISON -->
+<!-- Compare -->
 <section id="compare">
-  <div class="section-tag">Poređenje</div>
-  <div class="section-title">VajbAgent vs Tradicionalna pretplata</div>
-  <div class="section-sub">Ista cena, više mogućnosti. Pogledaj šta dobijaš za $20.</div>
-  
-  <div class="stat-bar-section">
-    <div class="stat-block">
-      <h4>Zahtevi za $20 – jeftini modeli</h4>
-      <div class="bar-row"><div class="bar-label">VA Nano</div><div class="bar-track"><div class="bar-fill bar-va" style="width:100%">5,442</div></div></div>
-      <div class="bar-row"><div class="bar-label">VA Lite</div><div class="bar-track"><div class="bar-fill bar-va" style="width:20%">1,088</div></div></div>
-      <div class="bar-row"><div class="bar-label">Pretplata</div><div class="bar-track"><div class="bar-fill bar-cu" style="width:12%">~650</div></div></div>
+  <div class="stag">Poredjenje</div>
+  <div class="stitle">VajbAgent vs <em>Cursor Pro</em></div>
+  <div class="ssub">Ista cena, vise mogucnosti. Pogledaj sta dobijas za $20.</div>
+
+  <div class="bars">
+    <div class="bar-block">
+      <h4>Zahtevi za $20 - jeftini modeli</h4>
+      <div class="bar-row"><div class="bar-lbl">VA Nano</div><div class="bar-trk"><div class="bar-fill bar-va" style="width:100%">2,402</div></div></div>
+      <div class="bar-row"><div class="bar-lbl">Pretplata</div><div class="bar-trk"><div class="bar-fill bar-cu" style="width:27%">~650</div></div></div>
+      <div class="bar-row"><div class="bar-lbl">VA Lite</div><div class="bar-trk"><div class="bar-fill bar-va" style="width:6%">144</div></div></div>
     </div>
-    <div class="stat-block">
-      <h4>Zahtevi za $20 – premium modeli</h4>
-      <div class="bar-row"><div class="bar-label">VA Pro</div><div class="bar-track"><div class="bar-fill bar-va" style="width:100%">333</div></div></div>
-      <div class="bar-row"><div class="bar-label">Pretplata</div><div class="bar-track"><div class="bar-fill bar-cu" style="width:68%">~225</div></div></div>
-      <div class="bar-row"><div class="bar-label">VA Max</div><div class="bar-track"><div class="bar-fill bar-va" style="width:33%">111</div></div></div>
-      <div class="bar-row"><div class="bar-label">VA Ultra</div><div class="bar-track"><div class="bar-fill bar-va" style="width:20%">66</div><span class="bar-num">~slično pretplati</span></div></div>
+    <div class="bar-block">
+      <h4>Zahtevi za $20 - premium modeli</h4>
+      <div class="bar-row"><div class="bar-lbl">VA Pro</div><div class="bar-trk"><div class="bar-fill bar-va" style="width:100%">333</div></div></div>
+      <div class="bar-row"><div class="bar-lbl">Pretplata</div><div class="bar-trk"><div class="bar-fill bar-cu" style="width:68%">~225</div></div></div>
+      <div class="bar-row"><div class="bar-lbl">VA Max</div><div class="bar-trk"><div class="bar-fill bar-va" style="width:33%">111</div></div></div>
+      <div class="bar-row"><div class="bar-lbl">VA Ultra</div><div class="bar-trk"><div class="bar-fill bar-va" style="width:20%">67</div></div></div>
     </div>
   </div>
 
-  <div class="compare-wrap">
-    <div class="compare-head">
+  <div class="cmp">
+    <div class="cmp-head">
       <div></div>
       <div class="col-va">VajbAgent</div>
-      <div>Cursor Pro</div>
+      <div class="col-cp">Cursor Pro</div>
     </div>
-    <div class="compare-row"><div>Cena</div><div class="win">Od $5, pay-as-you-go</div><div>$20/mes fiksno</div></div>
-    <div class="compare-row"><div>Jeftini modeli (daily use)</div><div class="win">1,000 – 5,400+ zahteva</div><div>~650 zahteva</div></div>
-    <div class="compare-row"><div>Premium modeli</div><div class="tie">66 – 333 zahteva</div><div>~225 zahteva</div></div>
-    <div class="compare-row"><div>Najviši tier (Opus klasa)</div><div class="tie">~66 zahteva</div><div>~50-80 zahteva</div></div>
-    <div class="compare-row"><div>Slow queue kad potrošiš</div><div><span class="check">✕</span> Nema – uvek brz</div><div>Da, prelazak na spor red</div></div>
-    <div class="compare-row"><div>Izbor modela</div><div class="win">5 nivoa, sam biraš</div><div>Auto režim bira za tebe</div></div>
-    <div class="compare-row"><div>Pretplata / obaveza</div><div class="win">Nema – uplati kad hoćeš</div><div>Mesečna obaveza</div></div>
-    <div class="compare-row"><div>IDE autocomplete</div><div><span class="cross">–</span> Koristi Cursor free</div><div><span class="check">✓</span></div></div>
-    <div class="compare-row"><div>Cloud agenti</div><div><span class="cross">–</span></div><div><span class="check">✓</span></div></div>
-    <div class="compare-row"><div>Dashboard sa praćenjem</div><div><span class="check">✓</span> Detaljno</div><div><span class="check">✓</span> Osnovno</div></div>
+    <div class="cmp-row"><div>Cena</div><div class="win">Od $5, pay-as-you-go</div><div>$20/mes fiksno</div></div>
+    <div class="cmp-row"><div>Jeftini modeli (daily)</div><div class="win">2,400+ zahteva (Nano)</div><div>~650 zahteva</div></div>
+    <div class="cmp-row"><div>Premium modeli</div><div class="win">67 - 333 zahteva</div><div>~225 zahteva</div></div>
+    <div class="cmp-row"><div>Slow queue</div><div><span class="chk">&#10005;</span> Nema - uvek brz</div><div>Da, spor red</div></div>
+    <div class="cmp-row"><div>Izbor modela</div><div class="win">5 nivoa, sam biras</div><div>Auto rezim</div></div>
+    <div class="cmp-row"><div>Pretplata / obaveza</div><div class="win">Nema - uplati kad hoces</div><div>Mesecna obaveza</div></div>
+    <div class="cmp-row"><div>IDE autocomplete</div><div><span class="crx">-</span> Koristi Cursor free</div><div><span class="chk">&#10003;</span></div></div>
+    <div class="cmp-row"><div>Dashboard pracenje</div><div><span class="chk">&#10003;</span> Detaljno</div><div><span class="chk">&#10003;</span> Osnovno</div></div>
   </div>
 </section>
 
-<!-- MODELS -->
+<!-- Models -->
 <section id="models">
-  <div class="section-tag">Modeli</div>
-  <div class="section-title">Izaberi nivo koji ti odgovara</div>
-  <div class="section-sub">5 nivoa performansi. Od ultra-jeftinog za svakodnevni rad do premium za najteže zadatke.</div>
-  <div class="model-tiers">
+  <div class="stag">Modeli</div>
+  <div class="stitle">Izaberi nivo koji ti <em>odgovara</em></div>
+  <div class="ssub">5 nivoa performansi. Od ultra-jeftinog za svakodnevni rad do premium za najkompleksnije zadatke.</div>
+  <div class="tiers">
     <div class="tier">
-      <div class="tier-name">Nano</div>
-      <div class="tier-desc">Svakodnevna pitanja</div>
-      <div class="tier-stat t-green">5,442</div>
-      <div class="tier-stat-sub">zahteva za $20</div>
-      <div class="tier-price"><b>$0.004</b> /zahtev</div>
+      <div class="t-name">Nano</div>
+      <div class="t-desc">Svakodnevna pitanja</div>
+      <div class="t-val t-g">2,402</div>
+      <div class="t-val-sub">zahteva za $20</div>
+      <div class="t-price"><b>$0.008</b> /zahtev</div>
     </div>
     <div class="tier">
-      <div class="tier-name">Lite</div>
-      <div class="tier-desc">Daily coding</div>
-      <div class="tier-stat t-blue">1,088</div>
-      <div class="tier-stat-sub">zahteva za $20</div>
-      <div class="tier-price"><b>$0.018</b> /zahtev</div>
+      <div class="t-name">Lite</div>
+      <div class="t-desc">Daily coding</div>
+      <div class="t-val t-b">144</div>
+      <div class="t-val-sub">zahteva za $20</div>
+      <div class="t-price"><b>$0.14</b> /zahtev</div>
     </div>
-    <div class="tier popular">
-      <div class="tier-name">Pro</div>
-      <div class="tier-desc">Projekti i kod</div>
-      <div class="tier-stat t-purple">333</div>
-      <div class="tier-stat-sub">zahteva za $20</div>
-      <div class="tier-price"><b>$0.06</b> /zahtev</div>
-    </div>
-    <div class="tier">
-      <div class="tier-name">Max</div>
-      <div class="tier-desc">Kompleksni zadaci</div>
-      <div class="tier-stat t-yellow">111</div>
-      <div class="tier-stat-sub">zahteva za $20</div>
-      <div class="tier-price"><b>$0.18</b> /zahtev</div>
+    <div class="tier pop">
+      <div class="t-name">Pro</div>
+      <div class="t-desc">Projekti i kod</div>
+      <div class="t-val t-o">333</div>
+      <div class="t-val-sub">zahteva za $20</div>
+      <div class="t-price"><b>$0.06</b> /zahtev</div>
     </div>
     <div class="tier">
-      <div class="tier-name">Ultra</div>
-      <div class="tier-desc">Elite agent</div>
-      <div class="tier-stat t-red">66</div>
-      <div class="tier-stat-sub">zahteva za $20</div>
-      <div class="tier-price"><b>$0.30</b> /zahtev</div>
+      <div class="t-name">Max</div>
+      <div class="t-desc">Kompleksni zadaci</div>
+      <div class="t-val t-y">111</div>
+      <div class="t-val-sub">zahteva za $20</div>
+      <div class="t-price"><b>$0.18</b> /zahtev</div>
+    </div>
+    <div class="tier">
+      <div class="t-name">Ultra</div>
+      <div class="t-desc">Elite agent</div>
+      <div class="t-val t-r">67</div>
+      <div class="t-val-sub">zahteva za $20</div>
+      <div class="t-price"><b>$0.30</b> /zahtev</div>
     </div>
   </div>
 </section>
 
-<!-- HOW IT WORKS -->
+<!-- How it works -->
 <section>
-  <div class="section-tag">Kako radi</div>
-  <div class="section-title">3 koraka do AI kodiranja</div>
-  <div class="section-sub">Podesi jednom, koristi zauvek.</div>
-  <div class="benefits" style="grid-template-columns:repeat(3,1fr)">
-    <div class="benefit" style="text-align:center">
-      <div style="font-size:2rem;font-weight:800;color:var(--accent);margin-bottom:10px">1</div>
-      <h3>Dobij API ključ</h3>
-      <p>Tvoj mentor ti kreira nalog i šalje personalizovani API ključ.</p>
+  <div class="stag">Kako radi</div>
+  <div class="stitle">3 koraka do <em>AI kodiranja</em></div>
+  <div class="ssub">Podesi jednom, koristi zauvek.</div>
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-num">1</div>
+      <h3>Dobij API kljuc</h3>
+      <p>Tvoj mentor ti kreira nalog i salje personalizovani API kljuc.</p>
     </div>
-    <div class="benefit" style="text-align:center">
-      <div style="font-size:2rem;font-weight:800;color:var(--accent);margin-bottom:10px">2</div>
+    <div class="step-card">
+      <div class="step-num">2</div>
       <h3>Podesi Cursor</h3>
-      <p>Unesi ključ u Cursor Settings, dodaj model i počni da kodiš.</p>
+      <p>Unesi kljuc u Cursor Settings, dodaj model i pocni da kodiras.</p>
     </div>
-    <div class="benefit" style="text-align:center">
-      <div style="font-size:2rem;font-weight:800;color:var(--accent);margin-bottom:10px">3</div>
+    <div class="step-card">
+      <div class="step-num">3</div>
       <h3>Uplati kad treba</h3>
-      <p>Dopuni kredit sa $5, $10 ili $20. Prati potrošnju u dashboardu.</p>
+      <p>Dopuni kredit sa $5, $10 ili $20. Prati potrosnju u dashboardu.</p>
     </div>
   </div>
 </section>
 
-<!-- SUMMARY -->
-<section style="padding-bottom:0">
-  <div class="section-tag">Rezime</div>
-  <div class="section-title">Kome je VajbAgent za?</div>
-  <div class="section-sub"></div>
-  <div class="benefits" style="grid-template-columns:1fr 1fr">
-    <div class="benefit">
+<!-- Summary -->
+<section>
+  <div class="stag">Rezime</div>
+  <div class="stitle">Kome je <em>VajbAgent</em> za?</div>
+  <div class="ssub"></div>
+  <div class="sum-grid">
+    <div class="sum-card sum-green">
       <h3 style="color:var(--green)">Idealno za tebe ako:</h3>
-      <p style="line-height:2">
-        ✓ Hoćeš AI asistenta bez mesečne pretplate<br>
-        ✓ Koristiš AI svakodnevno za kodiranje<br>
-        ✓ Želiš kontrolu nad troškovima<br>
-        ✓ Trebaš jeftine modele za domace i vežbe<br>
-        ✓ Hoćeš pristup premium modelima po potrebi
+      <p>
+        <span class="win-line">Hoces AI asistenta bez mesecne pretplate</span><br>
+        <span class="win-line">Koristis AI svakodnevno za kodiranje</span><br>
+        <span class="win-line">Zelis kontrolu nad troskovima</span><br>
+        <span class="win-line">Trebas jeftine modele za domace i vezbe</span><br>
+        <span class="win-line">Hoces pristup premium modelima po potrebi</span>
       </p>
     </div>
-    <div class="benefit">
+    <div class="sum-card sum-muted">
       <h3 style="color:var(--text2)">Cursor Pro je bolji ako:</h3>
-      <p style="line-height:2">
-        ● Imaš .edu email (besplatan Pro 1 god)<br>
-        ● Trebaš autocomplete i cloud agente<br>
-        ● Koristiš isključivo najskuplji model<br>
-        ● Preferiraš fiksnu mesečnu cenu
+      <p>
+        <span class="win-line">Imas .edu email (besplatan Pro 1 god)</span><br>
+        <span class="win-line">Trebas autocomplete i cloud agente</span><br>
+        <span class="win-line">Koristis iskljucivo najskuplji model</span><br>
+        <span class="win-line">Preferiras fiksnu mesecnu cenu</span>
       </p>
     </div>
   </div>
@@ -329,21 +377,23 @@ footer{text-align:center;padding:30px 24px;border-top:1px solid var(--border);fo
 
 <!-- CTA -->
 <div class="cta">
-  <h2>Spreman za početak?</h2>
-  <p>Uloguj se sa svojim ključem ili kontaktiraj mentora za novi nalog.</p>
+  <h2>Spreman za pocetak?</h2>
+  <p>Uloguj se sa svojim kljucem ili kontaktiraj mentora za novi nalog.</p>
   <div class="cta-cards">
     <div class="cta-card">
       <h3>Student</h3>
-      <p>Dashboard, potrošnja, dopuna kredita</p>
+      <p>Dashboard, potrosnja, dopuna</p>
       <a href="/dashboard">Uloguj se</a>
     </div>
     <div class="cta-card">
-      <h3>Podešavanja</h3>
-      <p>Korak-po-korak za Cursor IDE</p>
-      <a href="/setup">Setup guide</a>
+      <h3>Podesavanja</h3>
+      <p>Korak-po-korak za Cursor</p>
+      <a href="/setup" class="ghost">Setup guide</a>
     </div>
   </div>
 </div>
+
+<div class="powered">Powered by <a href="https://vajbkodiranje.com" target="_blank">Vajb Kodiranje Mentorstvo</a></div>
 
 <footer>VajbAgent &middot; AI kodiranje za studente &middot; 2026</footer>
 

@@ -1,264 +1,125 @@
 <!DOCTYPE html>
 <html lang="sr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VajbAgent – Podešavanje u Cursoru</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      color: #fff;
-      padding: 40px 20px;
-    }
-    .container {
-      max-width: 720px;
-      margin: 0 auto;
-    }
-    h1 {
-      font-size: 2rem;
-      font-weight: 800;
-      margin-bottom: 8px;
-      background: linear-gradient(135deg, #fff 40%, #a78bfa);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .subtitle {
-      color: rgba(255,255,255,0.5);
-      margin-bottom: 36px;
-      font-size: 0.95rem;
-    }
-    .card {
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 16px;
-      padding: 32px;
-      margin-bottom: 24px;
-      backdrop-filter: blur(16px);
-    }
-    .card h2 {
-      font-size: 1.15rem;
-      margin-bottom: 16px;
-      color: #a78bfa;
-    }
-    .step {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 18px;
-    }
-    .step-num {
-      flex-shrink: 0;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #7c3aed, #2563eb);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 0.85rem;
-    }
-    .step-text {
-      padding-top: 4px;
-      line-height: 1.6;
-      color: rgba(255,255,255,0.85);
-      font-size: 0.95rem;
-    }
-    .copy-box {
-      display: flex;
-      align-items: center;
-      background: rgba(0,0,0,0.4);
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 10px;
-      padding: 12px 16px;
-      margin: 12px 0;
-      gap: 12px;
-    }
-    .copy-box code {
-      flex: 1;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.9rem;
-      color: #c4b5fd;
-      word-break: break-all;
-    }
-    .copy-btn {
-      flex-shrink: 0;
-      background: rgba(124,58,237,0.3);
-      border: 1px solid rgba(124,58,237,0.5);
-      color: #c4b5fd;
-      padding: 6px 14px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 0.8rem;
-      font-weight: 600;
-      transition: all 0.2s;
-    }
-    .copy-btn:hover { background: rgba(124,58,237,0.5); }
-    .models-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 12px;
-    }
-    .models-table th, .models-table td {
-      padding: 10px 14px;
-      text-align: left;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-      font-size: 0.9rem;
-    }
-    .models-table th {
-      color: rgba(255,255,255,0.5);
-      font-weight: 600;
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .models-table td:first-child { font-family: 'SF Mono', monospace; color: #c4b5fd; }
-    .badge {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 600;
-    }
-    .badge-pro { background: rgba(37,99,235,0.3); color: #93c5fd; }
-    .badge-max { background: rgba(124,58,237,0.3); color: #c4b5fd; }
-    .note {
-      background: rgba(234,179,8,0.1);
-      border-left: 3px solid #eab308;
-      padding: 14px 18px;
-      border-radius: 0 10px 10px 0;
-      margin-top: 16px;
-      font-size: 0.9rem;
-      color: rgba(255,255,255,0.75);
-      line-height: 1.6;
-    }
-    .footer {
-      text-align: center;
-      margin-top: 40px;
-      color: rgba(255,255,255,0.3);
-      font-size: 0.8rem;
-    }
-    .footer a {
-      color: rgba(255,255,255,0.5);
-      text-decoration: none;
-    }
-    .footer a:hover { color: #a78bfa; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VajbAgent – Podesavanje u Cursoru</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0a;--surface:#161616;--surface2:#1c1c1c;--border:#222;--border2:#333;--text:#f5f5f5;--text2:#999;--text3:#666;--orange:#f97316;--orange2:#fb923c;--radius:12px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;padding:40px 20px}
+.container{max-width:720px;margin:0 auto}
+
+.brand{font-size:1.4rem;font-weight:900;letter-spacing:-.03em;margin-bottom:4px}
+.brand span{color:var(--orange)}
+.subtitle{color:var(--text2);margin-bottom:36px;font-size:.92rem}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;margin-bottom:20px}
+.card h2{font-size:1.05rem;font-weight:800;margin-bottom:16px;color:var(--orange)}
+
+.step{display:flex;gap:16px;margin-bottom:18px}
+.step-num{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.82rem;color:var(--orange)}
+.step-text{padding-top:4px;line-height:1.65;color:var(--text2);font-size:.92rem}
+.step-text strong{color:var(--text)}
+
+.copy-box{display:flex;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin:10px 0;gap:12px}
+.copy-box code{flex:1;font-family:'SF Mono','Fira Code',ui-monospace,monospace;font-size:.88rem;color:var(--orange);word-break:break-all}
+.copy-btn{flex-shrink:0;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);color:var(--orange);padding:7px 16px;border-radius:8px;cursor:pointer;font-size:.78rem;font-weight:700;font-family:inherit;transition:all .2s}
+.copy-btn:hover{background:rgba(249,115,22,.2)}
+
+table{width:100%;border-collapse:collapse;margin-top:12px}
+th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--border);font-size:.88rem}
+th{color:var(--text3);font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em}
+td:first-child{font-family:'SF Mono',monospace;color:var(--orange)}
+.badge{display:inline-block;padding:3px 10px;border-radius:50px;font-size:.72rem;font-weight:700}
+.badge-pro{background:rgba(249,115,22,.1);color:var(--orange2)}
+.badge-max{background:rgba(249,115,22,.15);color:var(--orange)}
+
+.note{background:rgba(249,115,22,.04);border-left:3px solid var(--orange);padding:16px 20px;border-radius:0 10px 10px 0;margin-top:18px;font-size:.88rem;color:var(--text2);line-height:1.65}
+.note strong{color:var(--text)}
+
+.footer{text-align:center;margin-top:40px;color:var(--text3);font-size:.78rem}
+.footer a{color:var(--orange);text-decoration:none;font-weight:600}
+.footer a:hover{opacity:.8}
+</style>
 </head>
 <body>
-  <div class="container">
-    <h1>Podešavanje u Cursoru</h1>
-    <p class="subtitle">Sve informacije za povezivanje VajbAgent-a sa tvojim Cursorom.</p>
+<div class="container">
+  <div class="brand">Vajb<span>Agent</span></div>
+  <p class="subtitle">Sve informacije za povezivanje sa tvojim Cursorom.</p>
 
-    <div class="card">
-      <h2>Override Base URL</h2>
-      <p style="color:rgba(255,255,255,0.6); font-size:0.9rem; margin-bottom:8px;">Ovo je URL koji unosiš u Cursor podešavanja. Sačuvaj ga ili se vrati na ovu stranicu kad god ti treba.</p>
-      <div class="copy-box">
-        <code id="base-url">Učitavam...</code>
-        <button class="copy-btn" onclick="copyUrl()">Kopiraj</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Korak po korak</h2>
-
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-text">Otvori <strong>Cursor</strong> → ikona zupčanika (Settings) dole levo → <strong>Cursor Settings</strong>.</div>
-      </div>
-
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-text">Idi na <strong>Models</strong> → proširi sekciju <strong>OpenAI API Key</strong>.</div>
-      </div>
-
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-text">U polje <strong>API Key</strong> unesi tvoj VajbAgent ključ (ne Anthropic ključ, nego tvoj lični ključ koji si dobio).</div>
-      </div>
-
-      <div class="step">
-        <div class="step-num">4</div>
-        <div class="step-text">Uključi <strong>Override OpenAI Base URL</strong> i unesi URL iznad.</div>
-      </div>
-
-      <div class="step">
-        <div class="step-num">5</div>
-        <div class="step-text">Klikni <strong>"+ Add Model"</strong> i dodaj jedan od modela iz tabele ispod (npr. <code>vajb-agent-pro</code>).</div>
-      </div>
-
-      <div class="step">
-        <div class="step-num">6</div>
-        <div class="step-text">U chatu izaberi dodani model i pošalji poruku. Ako dobiješ odgovor, sve radi!</div>
-      </div>
-
-      <div class="note">
-        <strong>Važno:</strong> Dok je Override uključen, Cursor će koristiti tvoj VajbAgent API za izabrani model. Kad hoćeš da koristiš Cursor-ove ugrađene modele, isključi Override toggle. URL ostaje sačuvan za kad ponovo uključiš.
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>Dostupni modeli</h2>
-      <table class="models-table">
-        <thead>
-          <tr><th>Model ID (upiši ovo)</th><th>Ime</th><th>Bazirano na</th><th>Tip</th></tr>
-        </thead>
-        <tbody id="models-body">
-        </tbody>
-      </table>
-    </div>
-
-    <div class="card">
-      <h2>Brzi linkovi</h2>
-      <div class="step">
-        <div class="step-text">
-          <a href="/dashboard" style="color:#a78bfa;">Dashboard</a> – pogledaj potrošnju i stanje kredita<br/>
-          <a href="/health" style="color:#a78bfa;">Health Check</a> – proveri da li server radi<br/>
-          <a href="/v1/models" style="color:#a78bfa;">API Models</a> – lista modela (JSON)
-        </div>
-      </div>
-    </div>
-
-    <div class="footer">
-      VajbAgent &mdash; <a href="/">Početna</a>
+  <div class="card">
+    <h2>Override Base URL</h2>
+    <p style="color:var(--text2);font-size:.88rem;margin-bottom:10px">Ovo je URL koji unosis u Cursor podesavanja. Sacuvaj ga.</p>
+    <div class="copy-box">
+      <code id="base-url">Ucitavam...</code>
+      <button class="copy-btn" onclick="copyUrl()">Kopiraj</button>
     </div>
   </div>
 
-  <script>
-    const baseUrl = window.location.origin;
-    document.getElementById('base-url').textContent = baseUrl;
+  <div class="card">
+    <h2>Korak po korak</h2>
+    <div class="step"><div class="step-num">1</div><div class="step-text">Otvori <strong>Cursor</strong> → ikona zupcanika (Settings) → <strong>Cursor Settings</strong></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text">Idi na <strong>Models</strong> → prosiri sekciju <strong>OpenAI API Key</strong></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text">U polje <strong>API Key</strong> unesi tvoj VajbAgent kljuc (ne Anthropic kljuc, nego tvoj licni kljuc koji si dobio)</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text">Ukljuci <strong>Override OpenAI Base URL</strong> i unesi URL iznad</div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-text">Klikni <strong>"+ Add Model"</strong> i dodaj model iz tabele ispod (npr. <code style="color:var(--orange)">vajb-agent-pro</code>)</div></div>
+    <div class="step"><div class="step-num">6</div><div class="step-text">U chatu izaberi dodani model i posalji poruku. Ako dobijes odgovor, sve radi!</div></div>
+    <div class="note"><strong>Vazno:</strong> Dok je Override ukljucen, Cursor koristi tvoj VajbAgent API. Kad hoces ugradene modele, iskljuci Override toggle. URL ostaje sacuvan.</div>
+  </div>
 
-    const modelInfo = {
-      'vajb-agent-nano':  { name: 'VajbAgent Nano',  engine: 'AI Model', badge: 'pro', desc: 'Najjeftiniji, daily use' },
-      'vajb-agent-lite':  { name: 'VajbAgent Lite',  engine: 'AI Model', badge: 'pro', desc: 'Dobar za svakodnevno kodiranje' },
-      'vajb-agent-pro':   { name: 'VajbAgent Pro',   engine: 'AI Model', badge: 'pro', desc: 'Brz i pouzdan' },
-      'vajb-agent-max':   { name: 'VajbAgent Max',   engine: 'AI Model', badge: 'max', desc: 'Kompleksni projekti' },
-      'vajb-agent-ultra': { name: 'VajbAgent Ultra', engine: 'AI Model', badge: 'max', desc: 'Premium, najjači' },
-    };
+  <div class="card">
+    <h2>Dostupni modeli</h2>
+    <table>
+      <thead><tr><th>Model ID (upisi ovo)</th><th>Ime</th><th>Tip</th></tr></thead>
+      <tbody id="models-body"></tbody>
+    </table>
+  </div>
 
-    fetch('/v1/models')
-      .then(r => r.json())
-      .then(data => {
-        const tbody = document.getElementById('models-body');
-        (data.data || []).forEach(m => {
-          const info = modelInfo[m.id] || { name: m.id, engine: '?', badge: 'pro', desc: '' };
-          const tr = document.createElement('tr');
-          tr.innerHTML = `<td>${m.id}</td><td>${info.name}</td><td>${info.engine}</td>` +
-            `<td><span class="badge badge-${info.badge}">${info.desc}</span></td>`;
-          tbody.appendChild(tr);
-        });
-      });
+  <div class="card">
+    <h2>Brzi linkovi</h2>
+    <p style="line-height:2.2;font-size:.88rem">
+      <a href="/dashboard" style="color:var(--orange);font-weight:600">Dashboard</a> – potrosnja i stanje kredita<br>
+      <a href="/health" style="color:var(--orange);font-weight:600">Health Check</a> – proveri da li server radi<br>
+      <a href="/v1/models" style="color:var(--orange);font-weight:600">API Models</a> – lista modela (JSON)
+    </p>
+  </div>
 
-    function copyUrl() {
-      navigator.clipboard.writeText(baseUrl).then(() => {
-        const btn = document.querySelector('.copy-btn');
-        btn.textContent = 'Kopirano!';
-        setTimeout(() => btn.textContent = 'Kopiraj', 2000);
-      });
-    }
-  </script>
+  <div class="footer">
+    Vajb<span style="color:var(--orange)">Agent</span> &mdash; <a href="/">Pocetna</a> &middot; <a href="/dashboard">Dashboard</a>
+  </div>
+</div>
+
+<script>
+const baseUrl=window.location.origin;
+document.getElementById('base-url').textContent=baseUrl;
+
+const modelInfo={
+  'vajb-agent-nano':{name:'VajbAgent Nano',desc:'Najjeftiniji, daily use'},
+  'vajb-agent-lite':{name:'VajbAgent Lite',desc:'Svakodnevno kodiranje'},
+  'vajb-agent-pro':{name:'VajbAgent Pro',desc:'Brz i pouzdan'},
+  'vajb-agent-max':{name:'VajbAgent Max',desc:'Kompleksni projekti'},
+  'vajb-agent-ultra':{name:'VajbAgent Ultra',desc:'Premium, najjaci'},
+};
+
+fetch('/v1/models').then(r=>r.json()).then(data=>{
+  const tbody=document.getElementById('models-body');
+  (data.data||[]).forEach(m=>{
+    const info=modelInfo[m.id]||{name:m.id,desc:''};
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${m.id}</td><td>${info.name}</td><td><span class="badge badge-pro">${info.desc}</span></td>`;
+    tbody.appendChild(tr);
+  });
+});
+
+function copyUrl(){
+  navigator.clipboard.writeText(baseUrl).then(()=>{
+    const btn=document.querySelector('.copy-btn');
+    btn.textContent='Kopirano!';setTimeout(()=>btn.textContent='Kopiraj',2000);
+  });
+}
+</script>
 </body>
 </html>

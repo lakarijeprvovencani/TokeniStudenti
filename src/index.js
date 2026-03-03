@@ -18,9 +18,9 @@ import {
 } from './convert.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { logUsage, getUsageSummary, getUsageForKey } from './usage.js';
+import { logUsage, getUsageSummary, getUsageForKey, getModelStats } from './usage.js';
 import { getBalance, deductBalance, costUsd, addBalance } from './balance.js';
-import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent } from './students.js';
+import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, findByKey } from './students.js';
 
 seedFromEnv();
 
@@ -31,16 +31,16 @@ const PORT = Number(process.env.PORT) || 3000;
 
 // ---- Model registry: 5 tiers, dual backend (OpenAI + Anthropic) ----
 const MAX_OUTPUT = {
-  'gpt-5-nano': 32768,
-  'gpt-5-mini': 65536,
-  'claude-haiku-4-5': 32768,
-  'claude-sonnet-4-6': 64000,
-  'claude-opus-4-6': 64000,
+  'gpt-4o-mini': 16384,
+  'gpt-4o':      16384,
+  'claude-haiku-4-5': 65536,
+  'claude-sonnet-4-6': 65536,
+  'claude-opus-4-6': 131072,
 };
 
 const VAJB_MODELS = [
-  { id: 'vajb-agent-nano',  name: 'VajbAgent Nano',  backend: 'openai',    backendModel: 'gpt-5-nano',       desc: 'Najjeftiniji, za svakodnevna pitanja' },
-  { id: 'vajb-agent-lite',  name: 'VajbAgent Lite',  backend: 'openai',    backendModel: 'gpt-5-mini',       desc: 'Daily coding, odličan za cenu' },
+  { id: 'vajb-agent-nano',  name: 'VajbAgent Nano',  backend: 'openai',    backendModel: 'gpt-4o-mini',      desc: 'Najjeftiniji, za svakodnevna pitanja' },
+  { id: 'vajb-agent-lite',  name: 'VajbAgent Lite',  backend: 'openai',    backendModel: 'gpt-4o',           desc: 'Daily coding, odličan za cenu' },
   { id: 'vajb-agent-pro',   name: 'VajbAgent Pro',   backend: 'anthropic', backendModel: 'claude-haiku-4-5',  desc: 'Brz Claude, solidno kodiranje' },
   { id: 'vajb-agent-max',   name: 'VajbAgent Max',   backend: 'anthropic', backendModel: 'claude-sonnet-4-6', desc: 'Ozbiljan rad, kompleksni projekti' },
   { id: 'vajb-agent-ultra', name: 'VajbAgent Ultra', backend: 'anthropic', backendModel: 'claude-opus-4-6',   desc: 'Premium, najjači za agente' },
@@ -48,7 +48,8 @@ const VAJB_MODELS = [
 const DEFAULT_VAJB_MODEL = VAJB_MODELS[0].id;
 
 function resolveModel(requestedModel) {
-  const id = (requestedModel || '').trim() || DEFAULT_VAJB_MODEL;
+  const id = (requestedModel || '').trim();
+  if (!id) return null;
   return VAJB_MODELS.find((m) => m.id === id) || null;
 }
 
@@ -80,10 +81,11 @@ async function withRetry(fn, { retries = 2, delayMs = 1500 } = {}) {
 
 function safeEqual(a, b) {
   if (!a || !b) return false;
-  const bufA = Buffer.from(String(a));
-  const bufB = Buffer.from(String(b));
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
+  const strA = String(a);
+  const strB = String(b);
+  const hashA = crypto.createHash('sha256').update(strA).digest();
+  const hashB = crypto.createHash('sha256').update(strB).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
 }
 
 app.set('trust proxy', 1);
@@ -97,10 +99,15 @@ app.use(cors());
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 60,
+  max: 120,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { trustProxy: false },
+  keyGenerator: (req) => {
+    const auth = req.headers.authorization || '';
+    if (auth.startsWith('Bearer ') && auth.length > 12) return 'key:' + auth.slice(7, 27);
+    return 'ip:' + (req.ip || 'unknown');
+  },
+  validate: false,
   handler: (_req, res) => res.status(429).json({ error: { message: 'Previše zahteva. Pokušaj ponovo za 15 minuta.', code: 'rate_limit' } }),
 });
 
@@ -119,6 +126,9 @@ app.use((req, res, next) => {
 });
 
 // ---- Stripe webhook (raw body before express.json) ----
+const processedStripeEvents = new Set();
+const STRIPE_EVENT_TTL = 60 * 60 * 1000;
+
 app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
   const Stripe = (await import('stripe')).default;
   const sig = req.headers['stripe-signature'];
@@ -138,6 +148,13 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
   if (event.type !== 'checkout.session.completed') {
     return res.status(200).send();
   }
+  if (processedStripeEvents.has(event.id)) {
+    console.log('Stripe webhook: duplicate event ignored', event.id);
+    return res.status(200).send();
+  }
+  processedStripeEvents.add(event.id);
+  setTimeout(() => processedStripeEvents.delete(event.id), STRIPE_EVENT_TTL);
+
   const session = event.data.object;
   if (session.payment_status !== 'paid') {
     console.warn('Stripe webhook: session not paid', { status: session.payment_status });
@@ -159,7 +176,16 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
   res.status(200).send();
 });
 
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use((err, _req, res, next) => {
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: { message: 'Payload prevelik. Max 10MB.', code: 'payload_too_large' } });
+  }
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: { message: 'Neispravan JSON.', code: 'invalid_json' } });
+  }
+  next(err);
+});
 
 // ---- Root: landing page ----
 app.get('/', (_req, res) => {
@@ -222,6 +248,16 @@ const chatCompletionsHandler = [
         error: { message: 'Missing or empty "messages" array.' },
       });
     }
+    if (messages.length > 500) {
+      return res.status(400).json({
+        error: { message: `Too many messages (${messages.length}). Max 500.`, code: 'too_many_messages' },
+      });
+    }
+    if (Array.isArray(openAITools) && openAITools.length > 128) {
+      return res.status(400).json({
+        error: { message: `Too many tools (${openAITools.length}). Max 128.`, code: 'too_many_tools' },
+      });
+    }
 
     const keyId = req.studentKeyId;
     const balance = getBalance(keyId);
@@ -277,16 +313,17 @@ async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, st
   const maxTokens = Math.min(Math.max(requested, 256), modelMax);
   const trimmedMessages = trimOpenAIMessages(messages, resolved.backendModel);
 
-  const isReasoning = resolved.backendModel.startsWith('gpt-5');
-  const effort = isReasoning && maxTokens <= 2048 ? 'low' : isReasoning ? 'medium' : undefined;
+  const isReasoning = resolved.backendModel.startsWith('o') || resolved.backendModel.includes('gpt-5');
 
   const payload = {
     model: resolved.backendModel,
     messages: trimmedMessages,
-    max_completion_tokens: maxTokens,
+    ...(isReasoning
+      ? { max_completion_tokens: maxTokens }
+      : { max_tokens: maxTokens }),
     stream,
     ...(stream && { stream_options: { include_usage: true } }),
-    ...(effort && { reasoning_effort: effort }),
+    ...(isReasoning && { reasoning_effort: maxTokens <= 2048 ? 'low' : 'medium' }),
     ...(Array.isArray(openAITools) && openAITools.length > 0 && { tools: openAITools }),
   };
 
@@ -305,6 +342,7 @@ async function handleOpenAINonStream(res, keyId, resolved, payload) {
   const usage = {
     input_tokens: response.usage?.prompt_tokens ?? 0,
     output_tokens: response.usage?.completion_tokens ?? 0,
+    model: resolved.backendModel,
   };
   const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
   deductBalance(keyId, usd);
@@ -320,12 +358,22 @@ async function handleOpenAIStream(res, keyId, resolved, payload) {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders?.();
 
+  const STREAM_TIMEOUT = 5 * 60 * 1000;
+  let lastChunkTime = Date.now();
+  const timeoutCheck = setInterval(() => {
+    if (Date.now() - lastChunkTime > STREAM_TIMEOUT) {
+      clearInterval(timeoutCheck);
+      if (!res.writableEnded) { res.write('data: [DONE]\n\n'); res.end(); }
+    }
+  }, 30000);
+
   const stream = await withRetry(() => openai.chat.completions.create(payload));
 
   let usage = { input_tokens: 0, output_tokens: 0 };
   let chunkCount = 0;
 
   for await (const chunk of stream) {
+    lastChunkTime = Date.now();
     if (chunk.usage) {
       usage.input_tokens = chunk.usage.prompt_tokens ?? usage.input_tokens;
       usage.output_tokens = chunk.usage.completion_tokens ?? usage.output_tokens;
@@ -336,6 +384,7 @@ async function handleOpenAIStream(res, keyId, resolved, payload) {
     if (res.flush) res.flush();
   }
 
+  clearInterval(timeoutCheck);
   res.write('data: [DONE]\n\n');
   res.end();
 
@@ -345,6 +394,7 @@ async function handleOpenAIStream(res, keyId, resolved, payload) {
     usage = { input_tokens: estIn, output_tokens: estOut };
     console.log(`OpenAI stream: no usage reported, estimating ~${estIn} in / ~${estOut} out from ${chunkCount} chunks`);
   }
+  usage.model = resolved.backendModel;
   const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
   deductBalance(keyId, usd);
   logUsage(keyId, usage);
@@ -398,6 +448,7 @@ async function handleAnthropicNonStream(res, keyId, resolved, payload) {
   const usage = {
     input_tokens: response.usage?.input_tokens ?? 0,
     output_tokens: response.usage?.output_tokens ?? 0,
+    model: resolved.backendModel,
   };
   const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
   deductBalance(keyId, usd);
@@ -420,9 +471,19 @@ async function handleAnthropicStream(res, keyId, resolved, payload) {
   const toolCalls = [];
   let currentToolIndex = -1;
 
+  const STREAM_TIMEOUT = 5 * 60 * 1000;
+  let lastChunkTime = Date.now();
+  const timeoutCheck = setInterval(() => {
+    if (Date.now() - lastChunkTime > STREAM_TIMEOUT) {
+      clearInterval(timeoutCheck);
+      if (!res.writableEnded) { res.end(); }
+    }
+  }, 30000);
+
   const stream = await withRetry(() => anthropic.messages.create({ ...payload, stream: true }));
 
   for await (const event of stream) {
+    lastChunkTime = Date.now();
     if (event.type === 'message_start' && event.message?.usage) {
       usage.input_tokens = event.message.usage.input_tokens ?? 0;
     }
@@ -450,6 +511,8 @@ async function handleAnthropicStream(res, keyId, resolved, payload) {
     }
   }
 
+  clearInterval(timeoutCheck);
+
   if (toolCalls.length > 0) {
     const openAIToolCalls = toolCalls.map((tc, i) => {
       let args = tc.inputStr || '{}';
@@ -463,6 +526,7 @@ async function handleAnthropicStream(res, keyId, resolved, payload) {
   res.write(streamDone());
   res.end();
 
+  usage.model = resolved.backendModel;
   const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
   deductBalance(keyId, usd);
   logUsage(keyId, usage);
@@ -471,11 +535,12 @@ async function handleAnthropicStream(res, keyId, resolved, payload) {
 // ---- Usage + balance for current key (dashboard) ----
 app.get('/me', authLimiter, requireStudentAuth, (req, res) => {
   const keyId = req.studentKeyId;
+  const name = req.studentName || 'Unknown';
   const balanceUsd = getBalance(keyId);
   const data = getUsageForKey(keyId);
   if (!data) {
     return res.json({
-      key_id: keyId, balance_usd: balanceUsd,
+      key_id: keyId, name, balance_usd: balanceUsd,
       input_tokens: 0, output_tokens: 0, requests: 0, last_used: null, estimated_cost_usd: 0,
     });
   }
@@ -483,7 +548,7 @@ app.get('/me', authLimiter, requireStudentAuth, (req, res) => {
   const output = data.output_tokens || 0;
   const estimatedCost = costUsd(input, output);
   res.json({
-    key_id: keyId, balance_usd: balanceUsd,
+    key_id: keyId, name, balance_usd: balanceUsd,
     input_tokens: input, output_tokens: output,
     requests: data.requests || 0, last_used: data.last_used || null,
     estimated_cost_usd: Math.round(estimatedCost * 100) / 100,
@@ -606,14 +671,21 @@ app.get('/admin/api/overview', adminLimiter, (req, res) => {
   const markup = parseFloat(process.env.STUDENT_MARKUP) || 1;
   const users = Object.entries(allUsage).map(([keyId, data]) => {
     const bal = getBalance(keyId);
-    return { key_id: keyId, balance_usd: bal, ...data };
+    const student = findByKey(keyId);
+    return { key_id: keyId, name: student?.name || keyId, balance_usd: bal, ...data };
   });
+  const modelStats = getModelStats();
+  const firstUse = Object.values(allUsage)
+    .map(u => u.last_used).filter(Boolean).sort()[0] || null;
+
   res.json({
     models: VAJB_MODELS.map((m) => ({
       id: m.id, name: m.name, backend: m.backend, backendModel: m.backendModel, desc: m.desc,
     })),
     users,
     markup,
+    model_stats: modelStats,
+    first_use: firstUse,
   });
 });
 
@@ -634,10 +706,14 @@ app.get('/admin', (_req, res) => {
 
 // ---- 404 ----
 app.use((req, res) => {
-  console.log(`404 Not Found: ${req.method} ${req.path}`);
-  res.status(404).json({
-    error: { message: 'Not found', path: req.path, method: req.method },
-  });
+  res.status(404).json({ error: { message: 'Not found' } });
+});
+
+// ---- Global error handler (never leak stack traces) ----
+app.use((err, _req, res, _next) => {
+  console.error('Unhandled error:', err.message);
+  if (res.headersSent) return;
+  res.status(500).json({ error: { message: 'Internal server error' } });
 });
 
 app.listen(PORT, () => {

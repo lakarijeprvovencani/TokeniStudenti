@@ -75,9 +75,15 @@ export function addStudent(name) {
   if (!name || typeof name !== 'string' || name.trim().length < 2) {
     return { error: 'Ime mora imati najmanje 2 karaktera.' };
   }
+  if (name.length > 100) {
+    return { error: 'Ime ne može biti duže od 100 karaktera.' };
+  }
   const students = readStudents();
-  const trimmed = name.trim();
+  const trimmed = name.trim().replace(/[<>"'&;]/g, '');
 
+  if (students.length >= 500) {
+    return { error: 'Maksimalan broj studenata dostignut (500).' };
+  }
   if (students.some(s => s.name.toLowerCase() === trimmed.toLowerCase())) {
     return { error: `Student "${trimmed}" već postoji.` };
   }

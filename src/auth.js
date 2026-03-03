@@ -10,12 +10,15 @@ export function keyId(key) {
 }
 
 function safeMatch(candidate, list) {
+  const candidateHash = crypto.createHash('sha256').update(String(candidate)).digest();
+  let matched = null;
   for (const valid of list) {
-    const a = Buffer.from(String(candidate));
-    const b = Buffer.from(String(valid));
-    if (a.length === b.length && crypto.timingSafeEqual(a, b)) return valid;
+    const validHash = crypto.createHash('sha256').update(String(valid)).digest();
+    if (crypto.timingSafeEqual(candidateHash, validHash)) {
+      matched = valid;
+    }
   }
-  return null;
+  return matched;
 }
 
 /**

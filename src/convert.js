@@ -37,13 +37,13 @@ export function openAIToolsToAnthropic(openAITools) {
 // Per-model input token limits (leave room for output).
 // ~4 chars per token on average.
 const MODEL_INPUT_LIMITS = {
-  'gpt-5-nano':        { tokens: 300000, chars: 1200000 },
-  'gpt-5-mini':        { tokens: 300000, chars: 1200000 },
-  'claude-haiku-4-5':  { tokens: 180000, chars: 720000 },
-  'claude-sonnet-4-6': { tokens: 180000, chars: 720000 },
-  'claude-opus-4-6':   { tokens: 180000, chars: 720000 },
+  'gpt-4o-mini':       { tokens: 100000, chars: 400000 },
+  'gpt-4o':            { tokens: 100000, chars: 400000 },
+  'claude-haiku-4-5':  { tokens: 130000, chars: 520000 },
+  'claude-sonnet-4-6': { tokens: 130000, chars: 520000 },
+  'claude-opus-4-6':   { tokens: 70000,  chars: 280000 },
 };
-const DEFAULT_LIMIT = { tokens: 150000, chars: 600000 };
+const DEFAULT_LIMIT = { tokens: 100000, chars: 400000 };
 
 function getModelLimit(backendModel) {
   return MODEL_INPUT_LIMITS[backendModel] || DEFAULT_LIMIT;

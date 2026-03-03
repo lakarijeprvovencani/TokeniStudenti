@@ -4,96 +4,108 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>VajbAgent Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#09090b;--sidebar:#111113;--surface:#161618;--surface2:#1c1c1f;--border:#27272a;--border2:#3f3f46;--text:#fafafa;--text2:#a1a1aa;--text3:#71717a;--accent:#8b5cf6;--green:#22c55e;--red:#ef4444;--yellow:#eab308;--blue:#3b82f6;--radius:10px}
+:root{--bg:#0a0a0a;--sidebar:#0f0f0f;--surface:#161616;--surface2:#1c1c1c;--border:#222;--border2:#333;--text:#f5f5f5;--text2:#999;--text3:#666;--orange:#f97316;--orange2:#fb923c;--green:#22c55e;--red:#ef4444;--yellow:#eab308;--blue:#3b82f6;--radius:12px}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
 
-.login{min-height:100vh;display:flex;align-items:center;justify-content:center}
-.login-box{width:360px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:40px}
-.login-box h2{font-size:1.15rem;font-weight:600;margin-bottom:4px}
-.login-box p{font-size:.82rem;color:var(--text2);margin-bottom:24px}
-.login-box input{width:100%;padding:11px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.88rem;outline:none;margin-bottom:14px}
-.login-box input:focus{border-color:var(--accent)}
-.login-box button{width:100%;padding:11px;background:var(--text);color:var(--bg);border:none;border-radius:8px;font-weight:600;font-size:.88rem;cursor:pointer}
-.login-box button:hover{opacity:.9}
-.login-err{color:var(--red);font-size:.8rem;margin-top:8px;display:none}
+/* Login */
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);position:relative}
+.login::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,.06),transparent 65%);pointer-events:none}
+.login-box{width:380px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:44px;position:relative;z-index:1}
+.login-brand{font-size:1.3rem;font-weight:900;letter-spacing:-.03em;margin-bottom:4px}
+.login-brand span{color:var(--orange)}
+.login-box p{font-size:.84rem;color:var(--text2);margin-bottom:28px}
+.login-box input{width:100%;padding:13px 16px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.88rem;font-family:inherit;outline:none;margin-bottom:14px;transition:border-color .2s}
+.login-box input:focus{border-color:var(--orange)}
+.login-box button{width:100%;padding:13px;background:var(--orange);color:#000;border:none;border-radius:10px;font-weight:700;font-size:.9rem;font-family:inherit;cursor:pointer;transition:opacity .15s}
+.login-box button:hover{opacity:.88}
+.login-err{color:var(--red);font-size:.8rem;margin-top:10px;display:none}
+.login-footer{text-align:center;margin-top:20px;font-size:.75rem;color:var(--text3)}
+.login-footer a{color:var(--orange);font-weight:600}
 
+/* Layout */
 .app{display:flex;min-height:100vh;display:none}
-.sidebar{width:220px;background:var(--sidebar);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10}
-.sidebar-brand{padding:0 20px 20px;border-bottom:1px solid var(--border);margin-bottom:8px}
-.sidebar-brand h1{font-size:1rem;font-weight:700}
-.sidebar-brand p{font-size:.7rem;color:var(--text3);margin-top:2px;font-family:'SF Mono',monospace}
-.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:.84rem;color:var(--text2);cursor:pointer;border-left:3px solid transparent;transition:all .15s}
-.nav-item:hover{color:var(--text);background:rgba(255,255,255,.03)}
-.nav-item.active{color:var(--text);background:rgba(139,92,246,.08);border-left-color:var(--accent)}
+.sidebar{width:230px;background:var(--sidebar);border-right:1px solid var(--border);padding:24px 0;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10}
+.sidebar-brand{padding:0 22px 22px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.sidebar-brand h1{font-size:1.1rem;font-weight:900;letter-spacing:-.02em}
+.sidebar-brand h1 span{color:var(--orange)}
+.sidebar-brand p{font-size:.68rem;color:var(--text3);margin-top:3px;font-family:'SF Mono',ui-monospace,monospace}
+.nav-item{display:flex;align-items:center;gap:10px;padding:11px 22px;font-size:.84rem;font-weight:500;color:var(--text2);cursor:pointer;border-left:3px solid transparent;transition:all .15s}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,.02)}
+.nav-item.active{color:var(--text);background:rgba(249,115,22,.06);border-left-color:var(--orange);font-weight:600}
 .nav-icon{font-size:1rem;width:20px;text-align:center}
-.sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)}
-.sidebar-footer button{width:100%;padding:8px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:7px;font-size:.78rem;cursor:pointer}
+.sidebar-footer{margin-top:auto;padding:18px 22px;border-top:1px solid var(--border)}
+.sidebar-footer button{width:100%;padding:9px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:8px;font-size:.78rem;font-family:inherit;cursor:pointer;font-weight:500;transition:all .15s}
 .sidebar-footer button:hover{border-color:var(--border2);color:var(--text)}
-.main{margin-left:220px;flex:1;padding:28px 32px 60px;min-height:100vh}
+.main{margin-left:230px;flex:1;padding:30px 36px 60px;min-height:100vh}
 
+/* Pages */
 .page{display:none}.page.active{display:block}
-.page-title{font-size:1.2rem;font-weight:700;margin-bottom:20px}
+.page-title{font-size:1.25rem;font-weight:800;letter-spacing:-.02em;margin-bottom:22px}
 
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:16px}
-.card-title{font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px;font-weight:600}
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:16px}
+.card-title{font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;font-weight:700}
 
 /* Hero balance */
-.hero{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;margin-bottom:20px;position:relative;overflow:hidden}
-.hero::before{content:'';position:absolute;top:-50px;right:-50px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(139,92,246,.12),transparent 70%)}
-.hero-label{font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}
-.hero-val{font-size:2.8rem;font-weight:700;letter-spacing:-.03em;margin:6px 0 2px;line-height:1}
-.hero-val .cur{font-size:1.1rem;font-weight:400;color:var(--text2);margin-left:4px}
+.hero-bal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;margin-bottom:20px;position:relative;overflow:hidden}
+.hero-bal::before{content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,.08),transparent 70%)}
+.hero-label{font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-weight:700}
+.hero-val{font-size:3rem;font-weight:900;letter-spacing:-.04em;margin:8px 0 4px;line-height:1}
+.hero-val .cur{font-size:1.1rem;font-weight:500;color:var(--text2);margin-left:4px}
 .hero-sub{font-size:.78rem;color:var(--text3)}
 
 /* Stats */
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
-.stat-label{font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
-.stat-val{font-size:1.4rem;font-weight:700}
-.stat-bar{margin-top:10px;height:3px;background:var(--surface2);border-radius:2px;overflow:hidden}
-.stat-fill{height:100%;border-radius:2px;transition:width .5s}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.stat-label{font-size:.63rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:700}
+.stat-val{font-size:1.5rem;font-weight:800;letter-spacing:-.02em}
+.stat-bar{margin-top:10px;height:4px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.stat-fill{height:100%;border-radius:3px;transition:width .5s}
 
-/* Model cards */
-.model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px}
-.model-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center;transition:border-color .2s}
-.model-card:hover{border-color:var(--accent)}
-.model-name{font-size:.85rem;font-weight:600;margin-bottom:2px}
-.model-tier{font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
-.model-stat{font-size:1.2rem;font-weight:700}
-.model-detail{font-size:.68rem;color:var(--text3);margin-top:3px}
+/* Models */
+.model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.model-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:18px;text-align:center;transition:border-color .2s}
+.model-card:hover{border-color:var(--orange)}
+.model-name{font-size:.9rem;font-weight:700;margin-bottom:2px}
+.model-tier{font-size:.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;font-weight:600}
+.model-stat{font-size:1.3rem;font-weight:900}
+.model-detail{font-size:.68rem;color:var(--text3);margin-top:4px}
 .cheap{color:var(--green)}.mid{color:var(--yellow)}.pricey{color:var(--red)}
 
 /* Topup */
-.topup-grid{display:flex;gap:10px;flex-wrap:wrap}
-.btn-topup{padding:12px 24px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:.9rem;font-weight:600;border-radius:8px;cursor:pointer;transition:all .15s}
-.btn-topup:hover{border-color:var(--accent);color:var(--accent)}
-.topup-err{color:var(--red);font-size:.8rem;margin-top:10px;display:none}
+.topup-grid{display:flex;gap:12px;flex-wrap:wrap}
+.btn-topup{padding:14px 28px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:.95rem;font-weight:700;font-family:inherit;border-radius:10px;cursor:pointer;transition:all .15s}
+.btn-topup:hover{border-color:var(--orange);color:var(--orange)}
+.topup-err{color:var(--red);font-size:.8rem;margin-top:12px;display:none}
 
 /* Setup */
-.setup-step{display:flex;gap:14px;margin-bottom:16px}
-.step-num{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:var(--accent)}
-.step-text{font-size:.85rem;color:var(--text2);line-height:1.6;padding-top:3px}
+.setup-step{display:flex;gap:14px;margin-bottom:18px}
+.step-num{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;color:var(--orange)}
+.step-text{font-size:.85rem;color:var(--text2);line-height:1.65;padding-top:4px}
 .step-text strong{color:var(--text)}
-.copy-box{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin:8px 0}
-.copy-box code{flex:1;font-family:'SF Mono',monospace;font-size:.82rem;color:var(--accent);word-break:break-all}
-.copy-box button{flex-shrink:0;padding:5px 12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:6px;font-size:.72rem;cursor:pointer}
-.copy-box button:hover{color:var(--text);border-color:var(--border2)}
+.copy-box{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:11px 14px;margin:8px 0}
+.copy-box code{flex:1;font-family:'SF Mono',ui-monospace,monospace;font-size:.82rem;color:var(--orange);word-break:break-all}
+.copy-box button{flex-shrink:0;padding:6px 14px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);color:var(--orange);border-radius:7px;font-size:.72rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s}
+.copy-box button:hover{background:rgba(249,115,22,.2)}
 
 /* Detail rows */
-.detail-row{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);font-size:.84rem}
+.detail-row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);font-size:.84rem}
 .detail-row:last-child{border-bottom:none}
 .detail-label{color:var(--text2)}.detail-val{font-weight:600}
 
-.toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:8px;font-size:.82rem;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:12px 20px;border-radius:10px;font-size:.82rem;font-weight:500;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
 .toast.show{opacity:1}
 
 @media(max-width:768px){
   .sidebar{position:fixed;width:100%;height:auto;bottom:0;top:auto;flex-direction:row;padding:0;border-right:none;border-top:1px solid var(--border);overflow-x:auto}
   .sidebar-brand,.sidebar-footer{display:none}
-  .nav-item{flex-direction:column;gap:2px;padding:10px 14px;font-size:.65rem;border-left:none;border-top:2px solid transparent}
-  .nav-item.active{border-top-color:var(--accent);border-left-color:transparent}
+  .nav-item{flex-direction:column;gap:2px;padding:10px 14px;font-size:.62rem;border-left:none;border-top:2px solid transparent}
+  .nav-item.active{border-top-color:var(--orange);border-left-color:transparent}
   .main{margin-left:0;padding:20px 16px 80px}
   .stats{grid-template-columns:1fr}
 }
@@ -101,26 +113,29 @@ body{font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;background:
 </head>
 <body>
 
+<!-- Login -->
 <div class="login" id="login">
   <div class="login-box">
-    <h2>VajbAgent</h2>
-    <p>Uloguj se sa svojim API ključem</p>
-    <input type="password" id="keyIn" placeholder="Tvoj API ključ" autocomplete="off" autofocus>
+    <div class="login-brand">Vajb<span>Agent</span></div>
+    <p>Uloguj se sa svojim API kljucem</p>
+    <input type="password" id="keyIn" placeholder="Tvoj API kljuc" autocomplete="off" autofocus>
     <button onclick="doLogin()">Pristupi</button>
-    <div class="login-err" id="loginErr">Neispravan ključ</div>
+    <div class="login-err" id="loginErr">Neispravan kljuc</div>
+    <div class="login-footer"><a href="/">← Nazad na pocetnu</a></div>
   </div>
 </div>
 
+<!-- App -->
 <div class="app" id="app">
   <aside class="sidebar">
     <div class="sidebar-brand">
-      <h1>VajbAgent</h1>
+      <h1>Vajb<span>Agent</span></h1>
       <p id="sideKey"></p>
     </div>
     <div class="nav-item active" data-page="overview"><span class="nav-icon">&#9635;</span> Pregled</div>
     <div class="nav-item" data-page="models"><span class="nav-icon">&#9881;</span> Modeli</div>
     <div class="nav-item" data-page="topup"><span class="nav-icon">&#9733;</span> Dopuna</div>
-    <div class="nav-item" data-page="setup"><span class="nav-icon">&#9881;</span> Podešavanja</div>
+    <div class="nav-item" data-page="setup"><span class="nav-icon">&#9881;</span> Podesavanja</div>
     <div class="sidebar-footer"><button onclick="doLogout()">Odjavi se</button></div>
   </aside>
 
@@ -128,20 +143,20 @@ body{font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;background:
     <!-- PREGLED -->
     <div class="page active" id="pg-overview">
       <div class="page-title">Pregled</div>
-      <div class="hero">
-        <div class="hero-label">Raspoloživi kredit</div>
+      <div class="hero-bal">
+        <div class="hero-label">Raspolozivi kredit</div>
         <div class="hero-val"><span id="hBal">0.00</span><span class="cur">USD</span></div>
-        <div class="hero-sub">Troši se automatski po zahtevu</div>
+        <div class="hero-sub">Trosi se automatski po zahtevu</div>
       </div>
       <div class="stats">
-        <div class="stat"><div class="stat-label">Zahtevi</div><div class="stat-val" id="vReqs">0</div><div class="stat-bar"><div class="stat-fill" id="bReqs" style="width:0%;background:var(--accent)"></div></div></div>
+        <div class="stat"><div class="stat-label">Zahtevi</div><div class="stat-val" id="vReqs">0</div><div class="stat-bar"><div class="stat-fill" id="bReqs" style="width:0%;background:var(--orange)"></div></div></div>
         <div class="stat"><div class="stat-label">Ulazni tokeni</div><div class="stat-val" id="vIn">0</div><div class="stat-bar"><div class="stat-fill" id="bIn" style="width:0%;background:var(--blue)"></div></div></div>
         <div class="stat"><div class="stat-label">Izlazni tokeni</div><div class="stat-val" id="vOut">0</div><div class="stat-bar"><div class="stat-fill" id="bOut" style="width:0%;background:var(--green)"></div></div></div>
       </div>
       <div class="card">
         <div class="card-title">Detalji</div>
         <div class="detail-row"><span class="detail-label">Poslednja upotreba</span><span class="detail-val" id="vLast">-</span></div>
-        <div class="detail-row"><span class="detail-label">Ukupno potrošeno</span><span class="detail-val" id="vCost">$0.00</span></div>
+        <div class="detail-row"><span class="detail-label">Ukupno potroseno</span><span class="detail-val" id="vCost">$0.00</span></div>
         <div class="detail-row"><span class="detail-label">Ukupno tokena</span><span class="detail-val" id="vTotal">0</span></div>
       </div>
     </div>
@@ -150,7 +165,7 @@ body{font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;background:
     <div class="page" id="pg-models">
       <div class="page-title">Modeli</div>
       <div class="card">
-        <div class="card-title">Koliko zahteva možeš sa trenutnim kreditom</div>
+        <div class="card-title">Koliko zahteva mozes sa trenutnim kreditom</div>
         <div class="model-grid" id="modelGrid"></div>
       </div>
     </div>
@@ -170,29 +185,29 @@ body{font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;background:
       </div>
       <div class="card">
         <div class="card-title">Trenutno stanje</div>
-        <div style="font-size:2rem;font-weight:700" id="topBal">$0.00</div>
+        <div style="font-size:2.2rem;font-weight:900;letter-spacing:-.03em" id="topBal">$0.00</div>
       </div>
     </div>
 
-    <!-- PODEŠAVANJA -->
+    <!-- PODESAVANJA -->
     <div class="page" id="pg-setup">
-      <div class="page-title">Podešavanja za Cursor</div>
+      <div class="page-title">Podesavanja za Cursor</div>
       <div class="card">
         <div class="card-title">Korak po korak</div>
         <div class="setup-step"><div class="step-num">1</div><div class="step-text">Otvori <strong>Cursor</strong> → Settings → <strong>Models</strong></div></div>
-        <div class="setup-step"><div class="step-num">2</div><div class="step-text">Proširi <strong>OpenAI API Key</strong> sekciju i unesi svoj API ključ:</div></div>
+        <div class="setup-step"><div class="step-num">2</div><div class="step-text">Prosiri <strong>OpenAI API Key</strong> sekciju i unesi svoj API kljuc:</div></div>
         <div class="copy-box"><code id="setupKey">-</code><button onclick="copyEl('setupKey')">Kopiraj</button></div>
-        <div class="setup-step"><div class="step-num">3</div><div class="step-text">Uključi <strong>Override OpenAI Base URL</strong> i unesi:</div></div>
+        <div class="setup-step"><div class="step-num">3</div><div class="step-text">Ukljuci <strong>Override OpenAI Base URL</strong> i unesi:</div></div>
         <div class="copy-box"><code id="setupUrl">-</code><button onclick="copyEl('setupUrl')">Kopiraj</button></div>
-        <div class="setup-step"><div class="step-num">4</div><div class="step-text">Klikni <strong>+ Add Custom Model</strong> i dodaj jedan od ovih modela:</div></div>
-        <div style="margin-left:42px">
+        <div class="setup-step"><div class="step-num">4</div><div class="step-text">Klikni <strong>+ Add Custom Model</strong> i dodaj model:</div></div>
+        <div style="margin-left:44px">
           <div class="copy-box"><code>vajb-agent-nano</code><button onclick="copyText('vajb-agent-nano')">Kopiraj</button></div>
           <div class="copy-box"><code>vajb-agent-lite</code><button onclick="copyText('vajb-agent-lite')">Kopiraj</button></div>
           <div class="copy-box"><code>vajb-agent-pro</code><button onclick="copyText('vajb-agent-pro')">Kopiraj</button></div>
           <div class="copy-box"><code>vajb-agent-max</code><button onclick="copyText('vajb-agent-max')">Kopiraj</button></div>
           <div class="copy-box"><code>vajb-agent-ultra</code><button onclick="copyText('vajb-agent-ultra')">Kopiraj</button></div>
         </div>
-        <div class="setup-step"><div class="step-num">5</div><div class="step-text">Izaberi model u chatu i pošalji poruku. Ako dobiješ odgovor, sve radi!</div></div>
+        <div class="setup-step"><div class="step-num">5</div><div class="step-text">Izaberi model u chatu i posalji poruku. Ako dobijes odgovor, sve radi!</div></div>
       </div>
     </div>
   </main>
@@ -203,8 +218,8 @@ body{font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;background:
 <script>
 let apiKey='';
 const MODELS=[
-  {id:'vajb-agent-nano',name:'Nano',costPer:.003675,tier:'Budget'},
-  {id:'vajb-agent-lite',name:'Lite',costPer:.018375,tier:'Daily'},
+  {id:'vajb-agent-nano',name:'Nano',costPer:.008325,tier:'Budget'},
+  {id:'vajb-agent-lite',name:'Lite',costPer:.13875,tier:'Daily'},
   {id:'vajb-agent-pro',name:'Pro',costPer:.06,tier:'Standard'},
   {id:'vajb-agent-max',name:'Max',costPer:.18,tier:'Premium'},
   {id:'vajb-agent-ultra',name:'Ultra',costPer:.3,tier:'Elite'},
@@ -229,10 +244,8 @@ $('keyIn').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 
 function doLogout(){localStorage.removeItem('vajb_key');apiKey='';$('app').style.display='none';$('login').style.display='flex';$('keyIn').value='';$('loginErr').style.display='none'}
 
-// Auto login
 (function(){const k=localStorage.getItem('vajb_key');if(k){$('keyIn').value=k;doLogin()}})();
 
-// Nav
 document.querySelectorAll('.nav-item').forEach(el=>{
   el.onclick=()=>{
     document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -276,8 +289,8 @@ function topup(amount){
   fetch('/create-checkout',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+apiKey},body:JSON.stringify({amount_usd:amount})})
     .then(r=>r.json()).then(d=>{
       if(d.url)location.href=d.url;
-      else{err.textContent=d.error||'Greška';err.style.display='block'}
-    }).catch(()=>{err.textContent='Greška pri povezivanju';err.style.display='block'});
+      else{err.textContent=d.error||'Greska';err.style.display='block'}
+    }).catch(()=>{err.textContent='Greska pri povezivanju';err.style.display='block'});
 }
 </script>
 </body>

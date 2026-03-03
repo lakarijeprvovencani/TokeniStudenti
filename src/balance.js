@@ -11,11 +11,18 @@ function ensureDataDir() {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
+let balanceCache = null;
+let cacheTime = 0;
+const CACHE_TTL = 2000;
+
 function readBalances() {
   ensureDataDir();
+  if (balanceCache && (Date.now() - cacheTime < CACHE_TTL)) return balanceCache;
   if (!fs.existsSync(BALANCES_FILE)) return {};
   try {
-    return JSON.parse(fs.readFileSync(BALANCES_FILE, 'utf8'));
+    balanceCache = JSON.parse(fs.readFileSync(BALANCES_FILE, 'utf8'));
+    cacheTime = Date.now();
+    return balanceCache;
   } catch {
     return {};
   }
@@ -24,6 +31,8 @@ function readBalances() {
 function writeBalances(balances) {
   ensureDataDir();
   fs.writeFileSync(BALANCES_FILE, JSON.stringify(balances, null, 2), 'utf8');
+  balanceCache = balances;
+  cacheTime = Date.now();
 }
 
 export function getBalance(keyId) {
@@ -33,6 +42,7 @@ export function getBalance(keyId) {
 }
 
 export function addBalance(keyId, amountUsd) {
+  balanceCache = null;
   const b = readBalances();
   const current = typeof b[keyId] === 'number' ? b[keyId] : 0;
   const next = Math.round((current + amountUsd) * 100) / 100;
@@ -42,6 +52,7 @@ export function addBalance(keyId, amountUsd) {
 }
 
 export function deductBalance(keyId, amountUsd) {
+  balanceCache = null;
   const b = readBalances();
   const current = typeof b[keyId] === 'number' ? b[keyId] : 0;
   const next = Math.round((current - amountUsd) * 100) / 100;
@@ -56,12 +67,11 @@ export function deductBalance(keyId, amountUsd) {
  */
 const PRICES = {
   // OpenAI
-  'gpt-5-nano':        { in: 0.05, out: 0.40 },
-  'gpt-5-mini':        { in: 0.25, out: 2.00 },
+  'gpt-4o-mini':       { in: 0.15, out: 0.60 },
+  'gpt-4o':            { in: 2.50, out: 10.0 },
   'gpt-4.1-nano':      { in: 0.10, out: 0.40 },
   'gpt-4.1-mini':      { in: 0.40, out: 1.60 },
   'gpt-4.1':           { in: 2.00, out: 8.00 },
-  'gpt-5':             { in: 1.25, out: 10.0 },
   // Anthropic
   'claude-haiku-4-5':  { in: 1.00, out: 5.00 },
   'claude-sonnet-4-6': { in: 3.00, out: 15.0 },
@@ -78,8 +88,8 @@ function getPrice(model) {
   if (m.includes('opus'))   return PRICES['claude-opus-4-6'];
   if (m.includes('haiku'))  return PRICES['claude-haiku-4-5'];
   if (m.includes('sonnet')) return PRICES['claude-sonnet-4-6'];
-  if (m.includes('gpt-5-nano') || m.includes('4.1-nano')) return PRICES['gpt-5-nano'];
-  if (m.includes('gpt-5-mini') || m.includes('4.1-mini')) return PRICES['gpt-5-mini'];
+  if (m.includes('4o-mini') || m.includes('4.1-nano')) return PRICES['gpt-4o-mini'];
+  if (m.includes('gpt-4o') || m.includes('4.1-mini')) return PRICES['gpt-4o'];
   return DEFAULT_PRICE;
 }
 
