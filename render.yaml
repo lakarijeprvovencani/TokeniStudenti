@@ -1,0 +1,15 @@
+# Render Blueprint – jedan klik deploy
+# https://dashboard.render.com/blueprints
+services:
+  - type: web
+    name: vajb-agent
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      # Dodaj u Render Dashboard → Environment:
+      # ANTHROPIC_API_KEY (Secret)
+      # STUDENT_API_KEYS (Secret)
+      # ADMIN_SECRET (Secret)

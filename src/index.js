@@ -1,0 +1,313 @@
+import 'dotenv/config';
+import Anthropic from '@anthropic-ai/sdk';
+import cors from 'cors';
+import express from 'express';
+import { requireStudentAuth } from './auth.js';
+import {
+  openAIToAnthropicMessages,
+  toOpenAIChatCompletion,
+  toOpenAIStreamChunk,
+  streamDone,
+} from './convert.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { logUsage, getUsageSummary, getUsageForKey } from './usage.js';
+import { getBalance, deductBalance, costUsd, addBalance } from './balance.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const app = express();
+const PORT = Number(process.env.PORT) || 3000;
+
+// Tvoja imena agenata u Cursoru → koji Claude model koristimo (ti znaš, korisnik ne vidi)
+const VAJB_MODELS = [
+  { id: 'vajb-agent-pro', name: 'VajbAgent Pro', anthropic: 'claude-sonnet-4-6' },   // Sonnet 4.6
+  { id: 'vajb-agent-max', name: 'VajbAgent Max', anthropic: 'claude-opus-4-6' },     // Opus 4.6
+];
+const DEFAULT_VAJB_MODEL = VAJB_MODELS[0].id;
+
+function getAnthropicModel(requestedModel) {
+  const id = (requestedModel || '').trim() || DEFAULT_VAJB_MODEL;
+  const found = VAJB_MODELS.find((m) => m.id === id);
+  return found ? found.anthropic : VAJB_MODELS[0].anthropic;
+}
+
+function getVajbModelId(requestedModel) {
+  const id = (requestedModel || '').trim() || DEFAULT_VAJB_MODEL;
+  const found = VAJB_MODELS.find((m) => m.id === id);
+  return found ? found.id : DEFAULT_VAJB_MODEL;
+}
+
+if (!process.env.ANTHROPIC_API_KEY) {
+  console.warn('ANTHROPIC_API_KEY is not set; chat completions will fail.');
+}
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || 'dummy' });
+
+app.use(cors());
+
+// Stripe webhook mora dobiti raw body (pre express.json())
+app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  const Stripe = (await import('stripe')).default;
+  const sig = req.headers['stripe-signature'];
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!secret || !stripeKey) {
+    console.warn('STRIPE_WEBHOOK_SECRET or STRIPE_SECRET_KEY not set');
+    return res.status(500).send('Webhook not configured');
+  }
+  let event;
+  try {
+    const stripe = new Stripe(stripeKey);
+    event = stripe.webhooks.constructEvent(req.body, sig, secret);
+  } catch (err) {
+    return res.status(400).send('Webhook signature verification failed');
+  }
+  if (event.type !== 'checkout.session.completed') {
+    return res.status(200).send();
+  }
+  const session = event.data.object;
+  const keyId = session.metadata?.key_id;
+  const amountCents = session.amount_total;
+  if (!keyId || amountCents == null || amountCents < 0) {
+    console.warn('Stripe webhook: missing key_id or amount_total', { key_id: keyId, amount_total: amountCents });
+    return res.status(200).send();
+  }
+  const amountUsd = Math.round((amountCents / 100) * 100) / 100;
+  addBalance(keyId.trim(), amountUsd);
+  console.log('Credits added', { key_id: keyId, amount_usd: amountUsd });
+  res.status(200).send();
+});
+
+app.use(express.json());
+
+// ---- Public (no auth): models list for Cursor dropdown ----
+app.get('/v1/models', (_req, res) => {
+  res.json({
+    object: 'list',
+    data: VAJB_MODELS.map((m) => ({
+      id: m.id,
+      object: 'model',
+      created: Math.floor(Date.now() / 1000),
+      owned_by: 'vajb-agent',
+    })),
+  });
+});
+
+// ---- Chat completions: require Bearer token, check balance ----
+app.post('/v1/chat/completions', requireStudentAuth, async (req, res) => {
+  const keyId = req.studentKeyId;
+  const balance = getBalance(keyId);
+  if (balance <= 0) {
+    return res.status(402).json({
+      error: {
+        message: 'Nedovoljno kredita. Dopuni nalog na dashboardu ili kontaktiraj administratora.',
+        code: 'insufficient_credits',
+      },
+    });
+  }
+
+  const body = req.body || {};
+  const { messages, stream = false, max_tokens = 4096, model } = body;
+
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({
+      error: { message: 'Missing or empty "messages" array.' },
+    });
+  }
+
+  const anthropicModelId = getAnthropicModel(model);
+  const vajbModelId = getVajbModelId(model);
+
+  const { system, messages: anthropicMessages } = openAIToAnthropicMessages(messages);
+  if (anthropicMessages.length === 0) {
+    return res.status(400).json({
+      error: { message: 'No valid user/assistant messages after conversion.' },
+    });
+  }
+
+  const payload = {
+    model: anthropicModelId,
+    max_tokens: Math.min(Number(max_tokens) || 4096, 8192),
+    messages: anthropicMessages,
+    ...(system && { system }),
+  };
+
+  try {
+    if (stream) {
+      await handleStream(req, res, keyId, payload, vajbModelId, anthropicModelId);
+    } else {
+      await handleNonStream(req, res, keyId, payload, vajbModelId, anthropicModelId);
+    }
+  } catch (err) {
+    console.error('Anthropic error:', err.message);
+    const status = err.status || 502;
+    res.status(status).json({
+      error: {
+        message: err.message || 'Upstream (Anthropic) error',
+        type: 'api_error',
+      },
+    });
+  }
+});
+
+async function handleNonStream(req, res, keyId, payload, vajbModelId, anthropicModelId) {
+  const response = await anthropic.messages.create({
+    ...payload,
+    stream: false,
+  });
+
+  const usage = {
+    input_tokens: response.usage?.input_tokens ?? 0,
+    output_tokens: response.usage?.output_tokens ?? 0,
+  };
+  const usd = costUsd(usage.input_tokens, usage.output_tokens, anthropicModelId);
+  deductBalance(keyId, usd);
+  logUsage(keyId, usage);
+
+  const openAI = toOpenAIChatCompletion(
+    response,
+    response.usage,
+    vajbModelId,
+    response.id || 'vajb-' + Date.now()
+  );
+  res.json(openAI);
+}
+
+async function handleStream(req, res, keyId, payload, vajbModelId, anthropicModelId) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  const streamId = 'vajb-' + Date.now();
+  let usage = { input_tokens: 0, output_tokens: 0 };
+
+  const stream = await anthropic.messages.create({
+    ...payload,
+    stream: true,
+  });
+
+  for await (const event of stream) {
+    if (event.type === 'message_start' && event.message?.usage) {
+      usage.input_tokens = event.message.usage.input_tokens ?? 0;
+    }
+    if (event.type === 'content_block_delta') {
+      const delta = event.delta;
+      if (delta?.type === 'text_delta' && delta.text) {
+        const chunk = toOpenAIStreamChunk(delta.text, { id: streamId, model: vajbModelId });
+        res.write(chunk);
+        if (res.flush) res.flush();
+      }
+    }
+    if (event.type === 'message_delta' && event.usage) {
+      if (event.usage.input_tokens != null) usage.input_tokens = event.usage.input_tokens;
+      if (event.usage.output_tokens != null) usage.output_tokens = event.usage.output_tokens;
+    }
+  }
+
+  res.write(toOpenAIStreamChunk('', { id: streamId, model: vajbModelId, finish: true }));
+  res.write(streamDone());
+  res.end();
+
+  const usd = costUsd(usage.input_tokens, usage.output_tokens, anthropicModelId);
+  deductBalance(keyId, usd);
+  logUsage(keyId, usage);
+}
+
+// Usage + balance for current key (dashboard)
+app.get('/me', requireStudentAuth, (req, res) => {
+  const keyId = req.studentKeyId;
+  const balanceUsd = getBalance(keyId);
+  const data = getUsageForKey(keyId);
+  if (!data) {
+    return res.json({
+      key_id: keyId,
+      balance_usd: balanceUsd,
+      input_tokens: 0,
+      output_tokens: 0,
+      requests: 0,
+      last_used: null,
+      estimated_cost_usd: 0,
+    });
+  }
+  const input = data.input_tokens || 0;
+  const output = data.output_tokens || 0;
+  const estimatedCost = costUsd(input, output);
+  res.json({
+    key_id: keyId,
+    balance_usd: balanceUsd,
+    input_tokens: input,
+    output_tokens: output,
+    requests: data.requests || 0,
+    last_used: data.last_used || null,
+    estimated_cost_usd: Math.round(estimatedCost * 100) / 100,
+  });
+});
+
+// Student: kreira Stripe Checkout za dopunu (1 USD uplate = 1 USD kredita)
+app.post('/create-checkout', requireStudentAuth, async (req, res) => {
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    return res.status(503).json({ error: 'Plaćanje nije konfigurisano.' });
+  }
+  const amountUsd = Number(req.body?.amount_usd);
+  if (!Number.isFinite(amountUsd) || amountUsd < 1 || amountUsd > 1000) {
+    return res.status(400).json({ error: 'amount_usd mora biti između 1 i 1000.' });
+  }
+  const baseUrl = process.env.BASE_URL || (req.protocol + '://' + req.get('host'));
+  const Stripe = (await import('stripe')).default;
+  const stripe = new Stripe(stripeKey);
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    payment_method_types: ['card'],
+    line_items: [{
+      price_data: {
+        currency: 'usd',
+        product_data: { name: 'VajbAgent kredit', description: amountUsd + ' USD kredita za potrošnju' },
+        unit_amount: Math.round(amountUsd * 100),
+      },
+      quantity: 1,
+    }],
+    metadata: { key_id: req.studentKeyId },
+    success_url: baseUrl + '/dashboard?paid=1',
+    cancel_url: baseUrl + '/dashboard',
+  });
+  res.json({ url: session.url });
+});
+
+// Admin: add credits to a key (e.g. after student pays 5 USD)
+app.post('/admin/add-credits', (req, res) => {
+  const secret = req.headers['x-admin-secret'];
+  if (secret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const { key_id, amount_usd } = req.body || {};
+  const amount = Number(amount_usd);
+  if (!key_id || typeof key_id !== 'string' || !Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ error: 'Body: { "key_id": "...", "amount_usd": 5 }' });
+  }
+  const newBalance = addBalance(key_id.trim(), amount);
+  res.json({ key_id: key_id.trim(), added_usd: amount, balance_usd: newBalance });
+});
+
+// All usage (admin)
+app.get('/usage', requireStudentAuth, (_req, res) => {
+  res.json(getUsageSummary());
+});
+
+app.get('/health', (_req, res) => {
+  res.json({ ok: true, service: 'vajb-agent' });
+});
+
+// Dashboard (static page)
+app.get('/dashboard', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html'));
+});
+
+app.listen(PORT, () => {
+  console.log(`VajbAgent proxy listening on http://localhost:${PORT}`);
+  console.log(`  GET  /v1/models`);
+  console.log(`  POST /v1/chat/completions (Bearer token required)`);
+  console.log(`  GET  /dashboard – student dashboard`);
+});
