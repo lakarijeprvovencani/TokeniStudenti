@@ -93,8 +93,8 @@ app.get('/', (_req, res) => {
     service: 'vajb-agent',
     ok: true,
     endpoints: {
-      models: 'GET /v1/models',
-      chat: 'POST /v1/chat/completions',
+      models: 'GET /v1/models or GET /models',
+      chat: 'POST /v1/chat/completions or POST /chat/completions',
       dashboard: 'GET /dashboard',
       health: 'GET /health',
     },
@@ -103,17 +103,18 @@ app.get('/', (_req, res) => {
 app.head('/', (_req, res) => res.status(200).end());
 
 // ---- Public (no auth): models list for Cursor dropdown ----
-app.get('/v1/models', (_req, res) => {
-  res.json({
-    object: 'list',
-    data: VAJB_MODELS.map((m) => ({
-      id: m.id,
-      object: 'model',
-      created: Math.floor(Date.now() / 1000),
-      owned_by: 'vajb-agent',
-    })),
-  });
+// Cursor može da zove /models ili /v1/models – oba vraćaju istu listu da se modeli učitaju sami
+const modelsResponse = () => ({
+  object: 'list',
+  data: VAJB_MODELS.map((m) => ({
+    id: m.id,
+    object: 'model',
+    created: Math.floor(Date.now() / 1000),
+    owned_by: 'vajb-agent',
+  })),
 });
+app.get('/v1/models', (_req, res) => res.json(modelsResponse()));
+app.get('/models', (_req, res) => res.json(modelsResponse()));
 
 // ---- Chat completions: require Bearer token, check balance ----
 // Cursor šalje na /chat/completions (bez /v1), OpenAI standard je /v1/chat/completions – podržavamo oba
