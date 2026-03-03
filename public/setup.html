@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>VajbAgent – Podesavanje u Cursoru</title>
+<title>VajbAgent – Podešavanje u Cursoru</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -52,28 +52,28 @@ td:first-child{font-family:'SF Mono',monospace;color:var(--orange)}
 
   <div class="card">
     <h2>Override Base URL</h2>
-    <p style="color:var(--text2);font-size:.88rem;margin-bottom:10px">Ovo je URL koji unosis u Cursor podesavanja. Sacuvaj ga.</p>
+    <p style="color:var(--text2);font-size:.88rem;margin-bottom:10px">Ovo je URL koji unosiš u Cursor podešavanja. Sačuvaj ga.</p>
     <div class="copy-box">
-      <code id="base-url">Ucitavam...</code>
+      <code id="base-url">Učitavam...</code>
       <button class="copy-btn" onclick="copyUrl()">Kopiraj</button>
     </div>
   </div>
 
   <div class="card">
     <h2>Korak po korak</h2>
-    <div class="step"><div class="step-num">1</div><div class="step-text">Otvori <strong>Cursor</strong> → ikona zupcanika (Settings) → <strong>Cursor Settings</strong></div></div>
-    <div class="step"><div class="step-num">2</div><div class="step-text">Idi na <strong>Models</strong> → prosiri sekciju <strong>OpenAI API Key</strong></div></div>
-    <div class="step"><div class="step-num">3</div><div class="step-text">U polje <strong>API Key</strong> unesi tvoj VajbAgent kljuc (ne Anthropic kljuc, nego tvoj licni kljuc koji si dobio)</div></div>
-    <div class="step"><div class="step-num">4</div><div class="step-text">Ukljuci <strong>Override OpenAI Base URL</strong> i unesi URL iznad</div></div>
+    <div class="step"><div class="step-num">1</div><div class="step-text">Otvori <strong>Cursor</strong> → ikona zupčanika (Settings) → <strong>Cursor Settings</strong></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text">Idi na <strong>Models</strong> → proširi sekciju <strong>OpenAI API Key</strong></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text">U polje <strong>API Key</strong> unesi tvoj VajbAgent ključ (ne Anthropic ključ, nego tvoj lični ključ koji si dobio)</div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-text">Uključi <strong>Override OpenAI Base URL</strong> i unesi URL iznad</div></div>
     <div class="step"><div class="step-num">5</div><div class="step-text">Klikni <strong>"+ Add Model"</strong> i dodaj model iz tabele ispod (npr. <code style="color:var(--orange)">vajb-agent-pro</code>)</div></div>
-    <div class="step"><div class="step-num">6</div><div class="step-text">U chatu izaberi dodani model i posalji poruku. Ako dobijes odgovor, sve radi!</div></div>
-    <div class="note"><strong>Vazno:</strong> Dok je Override ukljucen, Cursor koristi tvoj VajbAgent API. Kad hoces ugradene modele, iskljuci Override toggle. URL ostaje sacuvan.</div>
+    <div class="step"><div class="step-num">6</div><div class="step-text">U chatu izaberi dodani model i pošalji poruku. Ako dobiješ odgovor, sve radi!</div></div>
+    <div class="note"><strong>Važno:</strong> Dok je Override uključen, Cursor koristi tvoj VajbAgent API. Kad hoćeš ugrađene modele, isključi Override toggle. URL ostaje sačuvan.</div>
   </div>
 
   <div class="card">
     <h2>Dostupni modeli</h2>
     <table>
-      <thead><tr><th>Model ID (upisi ovo)</th><th>Ime</th><th>Tip</th></tr></thead>
+      <thead><tr><th>Model ID (upiši ovo)</th><th>Ime</th><th>Tip</th></tr></thead>
       <tbody id="models-body"></tbody>
     </table>
   </div>
@@ -81,14 +81,14 @@ td:first-child{font-family:'SF Mono',monospace;color:var(--orange)}
   <div class="card">
     <h2>Brzi linkovi</h2>
     <p style="line-height:2.2;font-size:.88rem">
-      <a href="/dashboard" style="color:var(--orange);font-weight:600">Dashboard</a> – potrosnja i stanje kredita<br>
+      <a href="/dashboard" style="color:var(--orange);font-weight:600">Dashboard</a> – potrošnja i stanje kredita<br>
       <a href="/health" style="color:var(--orange);font-weight:600">Health Check</a> – proveri da li server radi<br>
       <a href="/v1/models" style="color:var(--orange);font-weight:600">API Models</a> – lista modela (JSON)
     </p>
   </div>
 
   <div class="footer">
-    Vajb<span style="color:var(--orange)">Agent</span> &mdash; <a href="/">Pocetna</a> &middot; <a href="/dashboard">Dashboard</a>
+    Vajb<span style="color:var(--orange)">Agent</span> &mdash; <a href="/">Početna</a> &middot; <a href="/dashboard">Dashboard</a>
   </div>
 </div>
 
@@ -101,7 +101,7 @@ const modelInfo={
   'vajb-agent-lite':{name:'VajbAgent Lite',desc:'Svakodnevno kodiranje'},
   'vajb-agent-pro':{name:'VajbAgent Pro',desc:'Brz i pouzdan'},
   'vajb-agent-max':{name:'VajbAgent Max',desc:'Kompleksni projekti'},
-  'vajb-agent-ultra':{name:'VajbAgent Ultra',desc:'Premium, najjaci'},
+  'vajb-agent-ultra':{name:'VajbAgent Ultra',desc:'Premium, najjači'},
 };
 
 fetch('/v1/models').then(r=>r.json()).then(data=>{

@@ -70,8 +70,8 @@ th,td{padding:10px 12px;text-align:left;font-size:.8rem;border-bottom:1px solid 
 th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:.63rem}
 .mono{font-family:'SF Mono',ui-monospace,monospace;font-size:.73rem}
 .tag{display:inline-block;padding:3px 10px;border-radius:6px;font-size:.63rem;font-weight:700}
-.tag-green{background:rgba(34,197,94,.1);color:var(--green)}
-.tag-red{background:rgba(239,68,68,.1);color:var(--red)}
+.tag-green,.tag-active{background:var(--orange-dim,rgba(249,115,22,.1));color:var(--orange)}
+.tag-red,.tag-inactive{background:rgba(255,255,255,.05);color:var(--text3)}
 .tag-openai{background:rgba(16,163,127,.1);color:#34d399}
 .tag-anthropic{background:rgba(249,115,22,.1);color:var(--orange2)}
 
@@ -131,7 +131,7 @@ th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.0
     <p>Unesi admin tajnu za pristup</p>
     <input type="password" id="secretIn" placeholder="Admin secret" autofocus>
     <button onclick="doLogin()">Pristupi</button>
-    <div class="login-err" id="loginErr">Pogresna tajna</div>
+    <div class="login-err" id="loginErr">Pogrešna tajna</div>
   </div>
 </div>
 
@@ -160,33 +160,33 @@ th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.0
       <div class="summary">
         <div class="sum-card"><div class="sum-label">Aktivni studenti</div><div class="sum-val c-orange" id="sUsers">0</div><div class="sum-sub" id="sUsersD"></div></div>
         <div class="sum-card"><div class="sum-label">Ukupni zahtevi</div><div class="sum-val" id="sReqs">0</div><div class="sum-sub" id="sReqsD"></div></div>
-        <div class="sum-card"><div class="sum-label">Moj trosak (API)</div><div class="sum-val c-red" id="sCost">$0</div><div class="sum-sub" id="sCostD"></div></div>
-        <div class="sum-card"><div class="sum-label">Moja zarada</div><div class="sum-val c-green" id="sProfit">$0</div><div class="sum-sub" id="sProfitD"></div></div>
+        <div class="sum-card"><div class="sum-label">Moj trošak (API)</div><div class="sum-val" id="sCost">$0</div><div class="sum-sub" id="sCostD"></div></div>
+        <div class="sum-card"><div class="sum-label">Moja zarada</div><div class="sum-val c-orange" id="sProfit">$0</div><div class="sum-sub" id="sProfitD"></div></div>
       </div>
 
       <div class="summary" style="grid-template-columns:repeat(3,1fr)">
-        <div class="sum-card"><div class="sum-label">Ukupno tokena (in)</div><div class="sum-val" id="sTokIn">0</div><div class="sum-sub" id="sTokInD"></div></div>
-        <div class="sum-card"><div class="sum-label">Ukupno tokena (out)</div><div class="sum-val" id="sTokOut">0</div><div class="sum-sub" id="sTokOutD"></div></div>
-        <div class="sum-card"><div class="sum-label">Balans studenata</div><div class="sum-val c-yellow" id="sTotBal">$0</div><div class="sum-sub" id="sTotBalD"></div></div>
+        <div class="sum-card"><div class="sum-label">Ukupno tokena (ulaz)</div><div class="sum-val" id="sTokIn">0</div><div class="sum-sub" id="sTokInD"></div></div>
+        <div class="sum-card"><div class="sum-label">Ukupno tokena (izlaz)</div><div class="sum-val" id="sTokOut">0</div><div class="sum-sub" id="sTokOutD"></div></div>
+        <div class="sum-card"><div class="sum-label">Balans studenata</div><div class="sum-val c-orange" id="sTotBal">$0</div><div class="sum-sub" id="sTotBalD"></div></div>
       </div>
 
       <div class="card">
-        <div class="card-title">Potrosnja po modelu (realni API troskovi)</div>
+        <div class="card-title">Potrošnja po modelu (realni API troškovi)</div>
         <div id="modelBreakdown"></div>
       </div>
 
       <div class="card">
-        <div class="card-title">Mesecna projekcija</div>
+        <div class="card-title">Mesečna projekcija</div>
         <div class="summary" style="grid-template-columns:repeat(3,1fr);margin-bottom:0">
-          <div class="sum-card" style="border-color:rgba(239,68,68,.15)"><div class="sum-label">Procenjen mesecni API trosak</div><div class="sum-val c-red" id="projCost">$0</div><div class="sum-sub" id="projCostD"></div></div>
-          <div class="sum-card" style="border-color:rgba(234,179,8,.15)"><div class="sum-label">Procenjen mesecni prihod</div><div class="sum-val c-yellow" id="projRev">$0</div><div class="sum-sub" id="projRevD"></div></div>
-          <div class="sum-card" style="border-color:rgba(34,197,94,.15)"><div class="sum-label">Procenjena mesecna zarada</div><div class="sum-val c-green" id="projProfit">$0</div><div class="sum-sub" id="projProfitD"></div></div>
+          <div class="sum-card"><div class="sum-label">Procenjeni mesečni API trošak</div><div class="sum-val c-orange" id="projCost">$0</div><div class="sum-sub" id="projCostD"></div></div>
+          <div class="sum-card"><div class="sum-label">Procenjeni mesečni prihod</div><div class="sum-val c-orange" id="projRev">$0</div><div class="sum-sub" id="projRevD"></div></div>
+          <div class="sum-card"><div class="sum-label">Procenjena mesečna zarada</div><div class="sum-val c-orange" id="projProfit">$0</div><div class="sum-sub" id="projProfitD"></div></div>
         </div>
       </div>
 
       <div class="card">
         <div class="card-title">Svi korisnici - detalji</div>
-        <table><thead><tr><th>Ime</th><th>Kljuc</th><th>Stanje</th><th>Zahtevi</th><th>Tokeni (in/out)</th><th>~Trosak</th><th>Poslednje</th></tr></thead>
+        <table><thead><tr><th>Ime</th><th>Ključ</th><th>Stanje</th><th>Zahtevi</th><th>Tokeni (ulaz/izlaz)</th><th>~Trošak</th><th>Poslednje</th></tr></thead>
         <tbody id="ovUsersBody"></tbody></table>
       </div>
     </div>
@@ -203,14 +203,14 @@ th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.0
         </div>
         <div class="new-result" id="newRes">
           <div class="lbl">Ime</div><div id="nrName" style="font-weight:700;margin-bottom:8px"></div>
-          <div class="lbl">API kljuc (posalji studentu)</div>
+          <div class="lbl">API ključ (pošalji studentu)</div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><code id="nrKey"></code><button class="btn btn-sm btn-g" onclick="copyText(lastKey)">Kopiraj</button></div>
           <div class="lbl">Balans</div><div id="nrBal" class="c-green" style="font-weight:700"></div>
         </div>
       </div>
       <div class="card">
         <div class="card-title">Svi studenti</div>
-        <table><thead><tr><th>Ime</th><th>API kljuc</th><th>Balans</th><th>Status</th><th>Kreiran</th><th>Akcije</th></tr></thead>
+        <table><thead><tr><th>Ime</th><th>API ključ</th><th>Balans</th><th>Status</th><th>Kreiran</th><th>Akcije</th></tr></thead>
         <tbody id="stuBody"></tbody></table>
         <div id="stuEmpty" style="display:none;text-align:center;padding:28px;color:var(--text3);font-size:.85rem">Nema studenata. Dodaj prvog iznad.</div>
       </div>
@@ -230,7 +230,7 @@ th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.0
     <div class="page" id="pg-earnings">
       <div class="page-title">Kalkulator zarade</div>
       <div class="card">
-        <div class="card-title">Koliko zaradjujes po budzetu studenta</div>
+        <div class="card-title">Koliko zarađuješ po budžetu studenta</div>
         <div id="earnWrap"></div>
       </div>
     </div>
@@ -339,9 +339,9 @@ function renderOverview(){
   const avgOut=totalReqs>0?Math.round((totalOut/totalReqs)/1000):0;
   $('sReqsD').textContent='~'+avgIn+'K in / ~'+avgOut+'K out prosek po zahtevu';
   $('sCost').textContent='$'+provCost.toFixed(2);
-  $('sCostD').textContent='Prosecna cena po zahtevu: $'+((provCost/Math.max(totalReqs,1))).toFixed(4);
+  $('sCostD').textContent='Prosečna cena po zahtevu: $'+((provCost/Math.max(totalReqs,1))).toFixed(4);
   $('sProfit').textContent='$'+profit.toFixed(2);
-  $('sProfitD').textContent='Markup '+DATA.markup+'x = '+((DATA.markup-1)*100).toFixed(0)+'% marza';
+  $('sProfitD').textContent='Markup '+DATA.markup+'x = '+((DATA.markup-1)*100).toFixed(0)+'% marža';
 
   let inCost=0,outCost=0;
   for(const m of DATA.models){
@@ -350,15 +350,15 @@ function renderOverview(){
     inCost+=(st.input_tokens/1e6)*p.in;outCost+=(st.output_tokens/1e6)*p.out;
   }
   $('sTokIn').textContent=fmt(totalIn);
-  $('sTokInD').textContent='~$'+inCost.toFixed(2)+' trosak za input';
+  $('sTokInD').textContent='~$'+inCost.toFixed(2)+' trošak za ulaz';
   $('sTokOut').textContent=fmt(totalOut);
-  $('sTokOutD').textContent='~$'+outCost.toFixed(2)+' trosak za output';
+  $('sTokOutD').textContent='~$'+outCost.toFixed(2)+' trošak za izlaz';
   $('sTotBal').textContent='$'+totalBal.toFixed(2);
-  $('sTotBalD').textContent='Nepotroseni krediti studenata';
+  $('sTotBalD').textContent='Nepotrošeni krediti studenata';
 
   // Model breakdown bars
   const mb=$('modelBreakdown');mb.innerHTML='';
-  const colors=['var(--green)','var(--blue)','var(--orange)','var(--yellow)','var(--red)'];
+  const colors=['var(--orange)','var(--orange2)','var(--orange)','var(--orange2)','var(--orange)'];
   let maxCost=0;
   const modelData=DATA.models.map((m,i)=>{
     const p=PRICES[m.backendModel]||{in:3,out:15};
@@ -377,7 +377,7 @@ function renderOverview(){
     </div>`;
   });
   if(modelData.every(d=>d.reqs===0)){
-    mb.innerHTML+='<div style="text-align:center;padding:20px;color:var(--text3);font-size:.82rem">Nema podataka jos. Statistika se popunjava kako studenti koriste modele.</div>';
+    mb.innerHTML+='<div style="text-align:center;padding:20px;color:var(--text3);font-size:.82rem">Nema podataka još. Statistika se popunjava kako studenti koriste modele.</div>';
   }
 
   // Monthly projection
@@ -396,7 +396,7 @@ function renderOverview(){
   $('projCost').textContent='$'+monthlyCost.toFixed(2);
   $('projCostD').textContent=Math.round(dailyReqs)+' zahteva/dan × 30 dana';
   $('projRev').textContent='$'+monthlyRev.toFixed(2);
-  $('projRevD').textContent='Ono sto studenti placaju';
+  $('projRevD').textContent='Ono što studenti plaćaju';
   $('projProfit').textContent='$'+monthlyProfit.toFixed(2);
   $('projProfitD').textContent=activeSts.length+' aktivnih × '+DATA.markup+'x markup';
 
@@ -420,10 +420,10 @@ function renderOverview(){
     tb.innerHTML+=`<tr>
       <td style="font-weight:700">${esc(s.name)}</td>
       <td class="mono" style="cursor:pointer;color:var(--orange);font-size:.68rem" onclick="copyText('${esc(s.key)}')" title="${esc(s.key)}">${esc(s.key).slice(0,16)}…</td>
-      <td class="c-yellow">$${(s.balance_usd||0).toFixed(2)}</td>
+      <td class="c-orange">$${(s.balance_usd||0).toFixed(2)}</td>
       <td>${fmt(u.requests||0)}</td>
       <td style="font-size:.75rem">${fmt(uIn)} / ${fmt(uOut)}</td>
-      <td class="c-red" style="font-size:.75rem">$${uCost.toFixed(3)}</td>
+      <td style="font-size:.75rem">$${uCost.toFixed(3)}</td>
       <td style="color:var(--text3);font-size:.75rem">${fmtD(u.last_used)}</td>
     </tr>`;
   });
@@ -438,8 +438,8 @@ function renderStudents(){
     tb.innerHTML+=`<tr>
       <td style="font-weight:700">${esc(s.name)}</td>
       <td class="mono" style="cursor:pointer;color:var(--orange)" onclick="copyText('${esc(s.key)}')" title="Klikni za kopiranje">${esc(s.key)}</td>
-      <td class="c-yellow">$${(s.balance_usd||0).toFixed(2)}</td>
-      <td>${s.active?'<span class="tag tag-green">Aktivan</span>':'<span class="tag tag-red">Neaktivan</span>'}</td>
+      <td class="c-orange">$${(s.balance_usd||0).toFixed(2)}</td>
+      <td>${s.active?'<span class="tag tag-active">Aktivan</span>':'<span class="tag tag-inactive">Neaktivan</span>'}</td>
       <td style="color:var(--text3)">${fmtD(s.created)}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-sm btn-y" onclick="openCredit('${esc(s.key)}','${esc(s.name)}',${s.balance_usd||0})">Krediti</button>
