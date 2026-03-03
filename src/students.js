@@ -35,15 +35,24 @@ let studentsCache = null;
 let studentsCacheTime = 0;
 const CACHE_TTL = 2000;
 
+function parseArr(data) {
+  if (Array.isArray(data)) return data;
+  if (typeof data === 'string') { try { const p = JSON.parse(data); return Array.isArray(p) ? p : null; } catch { return null; } }
+  return null;
+}
+
 async function readStudents() {
   if (studentsCache && (Date.now() - studentsCacheTime < CACHE_TTL)) return studentsCache;
   const r = getRedis();
   if (r) {
     try {
       const data = await r.get(REDIS_KEY);
-      studentsCache = (Array.isArray(data)) ? data : [];
-      studentsCacheTime = Date.now();
-      if (studentsCache.length > 0) return studentsCache;
+      const parsed = parseArr(data);
+      if (parsed && parsed.length > 0) {
+        studentsCache = parsed;
+        studentsCacheTime = Date.now();
+        return studentsCache;
+      }
     } catch (err) {
       console.error('Redis read students error:', err.message);
     }
@@ -60,7 +69,7 @@ async function writeStudents(students) {
   const r = getRedis();
   if (r) {
     try {
-      await r.set(REDIS_KEY, students);
+      await r.set(REDIS_KEY, JSON.stringify(students));
     } catch (err) {
       console.error('Redis write students error:', err.message);
     }

@@ -34,15 +34,25 @@ function writeBalancesFile(balances) {
 }
 
 // ---- Redis + cache layer ----
+function parseObj(data) {
+  if (!data) return null;
+  if (typeof data === 'object' && !Array.isArray(data)) return data;
+  if (typeof data === 'string') { try { const p = JSON.parse(data); return (p && typeof p === 'object' && !Array.isArray(p)) ? p : null; } catch { return null; } }
+  return null;
+}
+
 async function readBalances() {
   if (balanceCache && (Date.now() - cacheTime < CACHE_TTL)) return balanceCache;
   const r = getRedis();
   if (r) {
     try {
       const data = await r.get(REDIS_KEY);
-      balanceCache = (data && typeof data === 'object') ? data : {};
-      cacheTime = Date.now();
-      return balanceCache;
+      const parsed = parseObj(data);
+      if (parsed) {
+        balanceCache = parsed;
+        cacheTime = Date.now();
+        return balanceCache;
+      }
     } catch (err) {
       console.error('Redis read balances error:', err.message);
     }
@@ -59,7 +69,7 @@ async function writeBalances(balances) {
   const r = getRedis();
   if (r) {
     try {
-      await r.set(REDIS_KEY, balances);
+      await r.set(REDIS_KEY, JSON.stringify(balances));
     } catch (err) {
       console.error('Redis write balances error:', err.message);
     }
