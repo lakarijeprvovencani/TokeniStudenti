@@ -12,7 +12,7 @@
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
 
 /* Login */
-.login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);position:relative}
+.login{min-height:100vh;display:none;align-items:center;justify-content:center;background:var(--bg);position:relative}
 .login::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,.06),transparent 65%);pointer-events:none}
 .login-box{width:380px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:44px;position:relative;z-index:1}
 .login-brand{font-size:1.3rem;font-weight:900;letter-spacing:-.03em;margin-bottom:4px}
@@ -241,19 +241,39 @@ function fmtD(iso){if(!iso)return'-';const d=new Date(iso);return d.toLocaleDate
 function copyText(t){navigator.clipboard.writeText(t).then(()=>toast('Kopirano!'))}
 function copyEl(id){copyText($(id).textContent)}
 
+function showLogin(){$('login').style.display='flex';$('app').style.display='none'}
+function showApp(){$('login').style.display='none';$('app').style.display='flex'}
+
 function doLogin(){
   apiKey=$('keyIn').value.trim();
   if(!apiKey)return;
   fetch('/me',{headers:{Authorization:'Bearer '+apiKey}})
     .then(r=>{if(!r.ok)throw new Error();return r.json()})
-    .then(d=>{localStorage.setItem('vajb_key',apiKey);$('login').style.display='none';$('app').style.display='flex';render(d)})
-    .catch(()=>{$('loginErr').style.display='block'});
+    .then(d=>{localStorage.setItem('vajb_key',apiKey);showApp();render(d)})
+    .catch(()=>{showLogin();$('loginErr').style.display='block'});
 }
 $('keyIn').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 
-function doLogout(){localStorage.removeItem('vajb_key');apiKey='';$('app').style.display='none';$('login').style.display='flex';$('keyIn').value='';$('loginErr').style.display='none'}
+function doLogout(){localStorage.removeItem('vajb_key');apiKey='';showLogin();$('keyIn').value='';$('loginErr').style.display='none'}
 
-(function(){const k=localStorage.getItem('vajb_key');if(k){$('keyIn').value=k;doLogin()}})();
+function refreshData(){
+  if(!apiKey)return;
+  fetch('/me',{headers:{Authorization:'Bearer '+apiKey}})
+    .then(r=>{if(!r.ok)throw new Error();return r.json()})
+    .then(d=>render(d))
+    .catch(()=>{});
+}
+
+(function(){
+  const k=localStorage.getItem('vajb_key');
+  if(k){apiKey=k;$('keyIn').value=k;
+    fetch('/me',{headers:{Authorization:'Bearer '+apiKey}})
+      .then(r=>{if(!r.ok)throw new Error();return r.json()})
+      .then(d=>{showApp();render(d)})
+      .catch(()=>{showLogin()});
+  } else {showLogin()}
+  setInterval(refreshData,30000);
+})();
 
 document.querySelectorAll('.nav-item').forEach(el=>{
   el.onclick=()=>{

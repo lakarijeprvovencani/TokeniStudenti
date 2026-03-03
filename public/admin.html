@@ -12,7 +12,7 @@
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
 
 /* Login */
-.login{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative}
+.login{min-height:100vh;display:none;align-items:center;justify-content:center;position:relative}
 .login::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,.06),transparent 65%);pointer-events:none}
 .login-box{width:380px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:44px;position:relative;z-index:1}
 .login-brand{font-size:1.3rem;font-weight:900;letter-spacing:-.03em;margin-bottom:2px}
@@ -151,6 +151,7 @@ th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.0
     <div class="sidebar-footer">
       <a href="/dashboard" target="_blank">Student Dashboard</a> &middot;
       <a href="/setup" target="_blank">Setup</a>
+      <div style="margin-top:10px"><button onclick="doAdminLogout()" style="width:100%;padding:8px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:8px;font-size:.72rem;font-family:inherit;cursor:pointer;font-weight:500">Odjavi se</button></div>
     </div>
   </aside>
 
@@ -278,13 +279,16 @@ function api(method,path,body){
   return fetch(path,o).then(r=>r.json());
 }
 
+function showLogin(){$('login').style.display='flex';$('app').style.display='none'}
+function showApp(){$('login').style.display='none';$('app').style.display='flex'}
+
 function doLogin(){
   secret=$('secretIn').value.trim();
   if(!secret)return;
   api('GET','/admin/api/overview?secret='+encodeURIComponent(secret))
     .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;return api('GET','/admin/students?secret='+encodeURIComponent(secret))})
-    .then(s=>{if(s.error)throw s;DATA.students=s;$('login').style.display='none';$('app').style.display='flex';renderAll()})
-    .catch(()=>{$('loginErr').style.display='block'});
+    .then(s=>{if(s.error)throw s;DATA.students=s;localStorage.setItem('vajb_admin',secret);showApp();renderAll()})
+    .catch(()=>{showLogin();$('loginErr').style.display='block'});
 }
 $('secretIn').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 
@@ -540,6 +544,19 @@ function renderEarnings(){
     w.innerHTML+=html;
   });
 }
+
+function doAdminLogout(){localStorage.removeItem('vajb_admin');secret='';showLogin();$('secretIn').value='';$('loginErr').style.display='none'}
+
+(function(){
+  const s=localStorage.getItem('vajb_admin');
+  if(s){secret=s;$('secretIn').value=s;
+    api('GET','/admin/api/overview?secret='+encodeURIComponent(secret))
+      .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;return api('GET','/admin/students?secret='+encodeURIComponent(secret))})
+      .then(s2=>{if(s2.error)throw s2;DATA.students=s2;showApp();renderAll()})
+      .catch(()=>{showLogin()});
+  } else {showLogin()}
+  setInterval(()=>{if(secret)refresh()},30000);
+})();
 </script>
 </body>
 </html>
