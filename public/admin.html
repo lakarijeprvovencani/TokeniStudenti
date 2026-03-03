@@ -90,9 +90,11 @@ th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.0
 .form-input:focus{border-color:var(--orange)}
 
 /* New student result */
-.new-result{margin-top:16px;padding:18px;border-radius:10px;background:rgba(34,197,94,.04);border:1px solid rgba(34,197,94,.15);display:none}
+.new-result{margin-top:16px;padding:18px;border-radius:10px;background:rgba(249,115,22,.05);border:1px solid rgba(249,115,22,.2);display:none;position:relative}
 .new-result .lbl{font-size:.68rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
-.new-result code{color:var(--green);font-family:'SF Mono',monospace;font-size:.85rem}
+.new-result code{color:var(--orange);font-family:'SF Mono',monospace;font-size:.85rem}
+.new-result .close-btn{position:absolute;top:12px;right:14px;background:none;border:none;color:var(--text3);font-size:1.1rem;cursor:pointer;padding:4px 8px;border-radius:6px;transition:all .15s}
+.new-result .close-btn:hover{color:var(--text);background:rgba(255,255,255,.05)}
 
 /* Credit modal */
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(4px)}
@@ -202,10 +204,11 @@ th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.0
           <button class="btn btn-w" onclick="addStudent()">Dodaj</button>
         </div>
         <div class="new-result" id="newRes">
+          <button class="close-btn" onclick="closeNewRes()" title="Zatvori">&times;</button>
           <div class="lbl">Ime</div><div id="nrName" style="font-weight:700;margin-bottom:8px"></div>
           <div class="lbl">API ključ (pošalji studentu)</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><code id="nrKey"></code><button class="btn btn-sm btn-g" onclick="copyText(lastKey)">Kopiraj</button></div>
-          <div class="lbl">Balans</div><div id="nrBal" class="c-green" style="font-weight:700"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><code id="nrKey"></code><button class="btn btn-sm btn-w" onclick="copyText(lastKey)">Kopiraj</button></div>
+          <div class="lbl">Balans</div><div id="nrBal" class="c-orange" style="font-weight:700"></div>
         </div>
       </div>
       <div class="card">
@@ -242,7 +245,7 @@ th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.0
   <div class="modal">
     <h3>Izmeni kredite</h3>
     <div style="margin-bottom:12px"><span style="font-size:.72rem;color:var(--text3)">Student:</span> <strong id="cmName"></strong></div>
-    <div style="margin-bottom:12px"><span style="font-size:.72rem;color:var(--text3)">Trenutno:</span> <strong id="cmBal" class="c-yellow"></strong></div>
+    <div style="margin-bottom:12px"><span style="font-size:.72rem;color:var(--text3)">Trenutno:</span> <strong id="cmBal" class="c-orange"></strong></div>
     <div class="form-row" style="margin-bottom:14px">
       <input class="form-input" id="cmAmount" type="number" placeholder="Iznos USD" step="1" style="width:120px">
       <button class="btn btn-g" onclick="creditAction(1)">+ Dodaj</button>
@@ -465,6 +468,7 @@ function addStudent(){
     toast('Student dodat!');refresh();
   });
 }
+function closeNewRes(){$('newRes').style.display='none'}
 $('addName').addEventListener('keydown',e=>{if(e.key==='Enter')addStudent()});
 
 function toggleStu(key,active){
@@ -494,8 +498,8 @@ function creditAction(sign){
   if(!amt){toast('Unesi iznos.');return}
   const realAmt=sign>0?amt:-amt;
   api('POST','/admin/add-credits',{key_id:cmKey,amount_usd:realAmt}).then(d=>{
-    if(d.error){$('cmRes').innerHTML='<span style="color:var(--red)">'+d.error+'</span>';return}
-    $('cmRes').innerHTML='<span style="color:var(--green)">Novo stanje: $'+d.balance_usd.toFixed(2)+'</span>';
+    if(d.error){$('cmRes').innerHTML='<span style="color:var(--text2)">'+d.error+'</span>';return}
+    $('cmRes').innerHTML='<span style="color:var(--orange)">Novo stanje: $'+d.balance_usd.toFixed(2)+'</span>';
     $('cmBal').textContent='$'+d.balance_usd.toFixed(2);
     refresh();
   });
@@ -524,7 +528,7 @@ function renderEarnings(){
   [10,20,50].forEach(budget=>{
     const real=budget/DATA.markup;
     const earn=budget-real;
-    let html=`<div style="margin-bottom:24px"><div style="font-size:.9rem;font-weight:700;margin-bottom:10px">Student placa $${budget} → zarada <span style="color:var(--green)">$${earn.toFixed(2)}</span></div><div class="earn-grid">`;
+    let html=`<div style="margin-bottom:24px"><div style="font-size:.9rem;font-weight:700;margin-bottom:10px">Student plaća $${budget} → zarada <span style="color:var(--orange)">$${earn.toFixed(2)}</span></div><div class="earn-grid">`;
     DATA.models.forEach(m=>{
       const p=PRICES[m.backendModel]||{in:3,out:15};
       const cost=(AVG_IN/1e6)*p.in+(AVG_OUT/1e6)*p.out;

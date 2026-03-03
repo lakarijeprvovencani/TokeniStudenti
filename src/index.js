@@ -567,38 +567,35 @@ app.post('/create-checkout', authLimiter, requireStudentAuth, async (req, res) =
   }
   const baseUrl = process.env.BASE_URL || (req.protocol + '://' + req.get('host'));
   try {
-    const Stripe = (await import('stripe')).default;
-    const stripe = new Stripe(stripeKey);
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: { name: 'VajbAgent kredit', description: amountUsd + ' USD kredita za potrošnju' },
-          unit_amount: Math.round(amountUsd * 100),
-        },
-        quantity: 1,
-      }],
-      metadata: { key_id: req.studentKeyId },
-      success_url: baseUrl + '/dashboard?paid=1',
-      cancel_url: baseUrl + '/dashboard',
+    const params = new URLSearchParams();
+    params.append('mode', 'payment');
+    params.append('payment_method_types[0]', 'card');
+    params.append('line_items[0][price_data][currency]', 'usd');
+    params.append('line_items[0][price_data][product_data][name]', 'VajbAgent kredit');
+    params.append('line_items[0][price_data][product_data][description]', amountUsd + ' USD kredita za potrošnju');
+    params.append('line_items[0][price_data][unit_amount]', String(Math.round(amountUsd * 100)));
+    params.append('line_items[0][quantity]', '1');
+    params.append('metadata[key_id]', req.studentKeyId);
+    params.append('success_url', baseUrl + '/dashboard?paid=1');
+    params.append('cancel_url', baseUrl + '/dashboard');
+
+    const resp = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(stripeKey + ':').toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
     });
-    res.json({ url: session.url });
-  } catch (err) {
-    console.error('Stripe checkout error:', JSON.stringify({
-      type: err.type, code: err.code, statusCode: err.statusCode,
-      message: err.message, raw: err.raw?.message,
-    }));
-    let msg = 'Greška pri kreiranju sesije plaćanja.';
-    if (err.type === 'StripeAuthenticationError') {
-      msg = 'Stripe ključ nije validan. Kontaktiraj administratora.';
-    } else if (err.type === 'StripeConnectionError') {
-      msg = 'Ne mogu da se povežem sa Stripe servisom. Pokušaj ponovo.';
-    } else if (err.statusCode) {
-      msg += ` (Stripe ${err.statusCode}: ${err.code || err.type})`;
+    const data = await resp.json();
+    if (!resp.ok) {
+      console.error('Stripe API error:', resp.status, JSON.stringify(data));
+      return res.status(502).json({ error: 'Stripe greška: ' + (data.error?.message || resp.status) });
     }
-    res.status(502).json({ error: msg });
+    res.json({ url: data.url });
+  } catch (err) {
+    console.error('Stripe checkout error:', err.message);
+    res.status(502).json({ error: 'Greška pri kreiranju sesije plaćanja. Pokušaj ponovo.' });
   }
 });
 
