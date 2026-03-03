@@ -586,8 +586,19 @@ app.post('/create-checkout', authLimiter, requireStudentAuth, async (req, res) =
     });
     res.json({ url: session.url });
   } catch (err) {
-    console.error('Stripe checkout error:', err.message);
-    res.status(502).json({ error: 'Greška pri kreiranju sesije plaćanja. Pokušaj ponovo.' });
+    console.error('Stripe checkout error:', JSON.stringify({
+      type: err.type, code: err.code, statusCode: err.statusCode,
+      message: err.message, raw: err.raw?.message,
+    }));
+    let msg = 'Greška pri kreiranju sesije plaćanja.';
+    if (err.type === 'StripeAuthenticationError') {
+      msg = 'Stripe ključ nije validan. Kontaktiraj administratora.';
+    } else if (err.type === 'StripeConnectionError') {
+      msg = 'Ne mogu da se povežem sa Stripe servisom. Pokušaj ponovo.';
+    } else if (err.statusCode) {
+      msg += ` (Stripe ${err.statusCode}: ${err.code || err.type})`;
+    }
+    res.status(502).json({ error: msg });
   }
 });
 
