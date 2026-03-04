@@ -511,9 +511,11 @@ async function handleMiniMax(req, res, keyId, resolved, messages, openAITools, s
 
   const anthropicTools = openAIToolsToAnthropic(openAITools);
   const modelMax = MAX_OUTPUT[resolved.backendModel] || 32768;
-  // MiniMax counts thinking tokens in output, so we need minimum to fit thinking + text
-  const MINIMAX_MIN_TOKENS = 300;
-  const maxTokens = Math.min(Math.max(Number(max_tokens) || 4096, MINIMAX_MIN_TOKENS), modelMax);
+  // MiniMax counts thinking tokens in output - need large minimum for complex tasks
+  // Their thinking can use 500-2000+ tokens before producing text
+  const MINIMAX_MIN_TOKENS = 4096;
+  const requestedTokens = Number(max_tokens) || 8192;
+  const maxTokens = Math.min(Math.max(requestedTokens, MINIMAX_MIN_TOKENS), modelMax);
 
   const payload = {
     model: resolved.backendModel,
