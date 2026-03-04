@@ -6,7 +6,9 @@ import { getRedis, isRedisConfigured } from './redis.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const BALANCES_FILE = path.join(DATA_DIR, 'balances.json');
+const DEPOSITS_FILE = path.join(DATA_DIR, 'deposits.json');
 const REDIS_KEY = 'vajb:balances';
+const REDIS_DEPOSITS_KEY = 'vajb:deposits';
 
 function ensureDataDir() {
   const dir = path.dirname(BALANCES_FILE);
@@ -94,6 +96,7 @@ export async function addBalance(keyId, amountUsd) {
     const next = Math.round((current + amountUsd) * 100) / 100;
     b[keyId] = next;
     await writeBalances(b);
+    await trackDeposit(keyId, amountUsd);
     return next;
   });
 }
@@ -108,6 +111,59 @@ export async function deductBalance(keyId, amountUsd) {
     await writeBalances(b);
     return next;
   });
+}
+
+// ---- Deposits tracking (total ever deposited per user) ----
+function readDepositsFile() {
+  ensureDataDir();
+  if (!fs.existsSync(DEPOSITS_FILE)) return {};
+  try { return JSON.parse(fs.readFileSync(DEPOSITS_FILE, 'utf8')); } catch { return {}; }
+}
+function writeDepositsFile(d) {
+  ensureDataDir();
+  fs.writeFileSync(DEPOSITS_FILE, JSON.stringify(d, null, 2), 'utf8');
+}
+
+let depositsCache = null;
+let depositsCacheTime = 0;
+
+async function readDeposits() {
+  if (depositsCache && (Date.now() - depositsCacheTime < CACHE_TTL)) return depositsCache;
+  const r = getRedis();
+  if (r) {
+    try {
+      let data = await r.get(REDIS_DEPOSITS_KEY);
+      if (typeof data === 'string') { try { data = JSON.parse(data); } catch {} }
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        depositsCache = data;
+        depositsCacheTime = Date.now();
+        return depositsCache;
+      }
+    } catch {}
+  }
+  const fb = readDepositsFile();
+  depositsCache = fb;
+  depositsCacheTime = Date.now();
+  return fb;
+}
+
+async function writeDeposits(deposits) {
+  const r = getRedis();
+  if (r) { try { await r.set(REDIS_DEPOSITS_KEY, deposits); } catch {} }
+  depositsCache = { ...deposits };
+  depositsCacheTime = Date.now();
+  try { writeDepositsFile(deposits); } catch {}
+}
+
+async function trackDeposit(keyId, amount) {
+  const d = await readDeposits();
+  d[keyId] = (d[keyId] || 0) + amount;
+  await writeDeposits(d);
+}
+
+export async function getTotalDeposited(keyId) {
+  const d = await readDeposits();
+  return d[keyId] || 0;
 }
 
 /**

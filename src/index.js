@@ -20,7 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { logUsage, getUsageSummary, getUsageForKey, getModelStats } from './usage.js';
-import { getBalance, deductBalance, costUsd, addBalance } from './balance.js';
+import { getBalance, deductBalance, costUsd, addBalance, getTotalDeposited } from './balance.js';
 import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, findByKey, canRegisterFromIP, trackRegistrationIP } from './students.js';
 
 await seedFromEnv();
@@ -385,6 +385,19 @@ app.post('/register', registerLimiter, async (req, res) => {
   });
 });
 
+// ---- Balance warning (injected into AI response) ----
+const LOW_BALANCE_THRESHOLD = 1.0;
+async function getBalanceWarning(keyId, newBalance) {
+  if (newBalance <= LOW_BALANCE_THRESHOLD) {
+    return `\n\n---\n⚠️ **Tvoj VajbAgent balans je nizak ($${newBalance.toFixed(2)}).** Dopuni kredite na https://vajbagent.onrender.com/dashboard → Dopuna`;
+  }
+  const deposited = await getTotalDeposited(keyId);
+  if (deposited > 0 && newBalance < deposited * 0.5) {
+    return `\n\n---\n📊 **Potrošio si više od 50% kredita** (preostalo: $${newBalance.toFixed(2)}). Dopuni kad ti odgovara na https://vajbagent.onrender.com/dashboard → Dopuna`;
+  }
+  return null;
+}
+
 // ---- Chat completions handler ----
 const chatCompletionsHandler = [
   authLimiter,
@@ -509,8 +522,13 @@ async function handleOpenAINonStream(res, keyId, resolved, payload) {
     model: resolved.backendModel,
   };
   const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
-  await deductBalance(keyId, usd);
+  const newBal = await deductBalance(keyId, usd);
   await logUsage(keyId, usage);
+
+  const warning = await getBalanceWarning(keyId, newBal);
+  if (warning && response.choices?.[0]?.message?.content) {
+    response.choices[0].message.content += warning;
+  }
 
   response.model = resolved.id;
   res.json(response);
@@ -549,8 +567,6 @@ async function handleOpenAIStream(res, keyId, resolved, payload) {
   }
 
   clearInterval(timeoutCheck);
-  res.write('data: [DONE]\n\n');
-  res.end();
 
   if (usage.input_tokens === 0 && usage.output_tokens === 0) {
     const estIn = Math.max(chunkCount * 50, 1000);
@@ -560,8 +576,18 @@ async function handleOpenAIStream(res, keyId, resolved, payload) {
   }
   usage.model = resolved.backendModel;
   const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
-  await deductBalance(keyId, usd);
+  const newBal = await deductBalance(keyId, usd);
   await logUsage(keyId, usage);
+
+  const warning = await getBalanceWarning(keyId, newBal);
+  if (warning && !res.writableEnded) {
+    const warnChunk = { id: 'vajb-warn', object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { content: warning }, finish_reason: null }] };
+    res.write('data: ' + JSON.stringify(warnChunk) + '\n\n');
+  }
+  if (!res.writableEnded) {
+    res.write('data: [DONE]\n\n');
+    res.end();
+  }
 }
 
 // ---- Anthropic backend (Pro, Max, Ultra) ----
@@ -615,12 +641,18 @@ async function handleAnthropicNonStream(res, keyId, resolved, payload) {
     model: resolved.backendModel,
   };
   const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
-  await deductBalance(keyId, usd);
+  const newBal = await deductBalance(keyId, usd);
   await logUsage(keyId, usage);
 
   const openAIResponse = toOpenAIChatCompletion(
     response, response.usage, resolved.id, response.id || 'vajb-' + Date.now()
   );
+
+  const warning = await getBalanceWarning(keyId, newBal);
+  if (warning && openAIResponse.choices?.[0]?.message?.content) {
+    openAIResponse.choices[0].message.content += warning;
+  }
+
   res.json(openAIResponse);
 }
 
@@ -687,13 +719,20 @@ async function handleAnthropicStream(res, keyId, resolved, payload) {
   } else {
     res.write(toOpenAIStreamChunk('', { id: streamId, model: resolved.id, finish: true }));
   }
-  res.write(streamDone());
-  res.end();
 
   usage.model = resolved.backendModel;
   const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
-  await deductBalance(keyId, usd);
+  const newBal = await deductBalance(keyId, usd);
   await logUsage(keyId, usage);
+
+  const warning = await getBalanceWarning(keyId, newBal);
+  if (warning && !res.writableEnded) {
+    const warnChunk = { id: streamId + '-warn', object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { content: warning }, finish_reason: null }] };
+    res.write('data: ' + JSON.stringify(warnChunk) + '\n\n');
+  }
+
+  res.write(streamDone());
+  res.end();
 }
 
 // ---- Usage + balance for current key (dashboard) ----

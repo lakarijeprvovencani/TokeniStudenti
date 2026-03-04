@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <title>VajbAgent Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0a0a0a;--sidebar:#0f0f0f;--surface:#161616;--surface2:#1c1c1c;--surface3:#222;--border:#222;--border2:#333;--text:#f5f5f5;--text2:#999;--text3:#666;--orange:#f97316;--orange2:#fb923c;--green:#22c55e;--red:#ef4444;--yellow:#eab308;--blue:#3b82f6;--radius:12px}
+:root{--bg:#0a0a0a;--sidebar:#0f0f0f;--surface:#161616;--surface2:#1c1c1c;--surface3:#222;--border:#222;--border2:#333;--text:#f5f5f5;--text2:#bbb;--text3:#888;--orange:#f97316;--orange2:#fb923c;--green:#22c55e;--red:#ef4444;--yellow:#eab308;--blue:#3b82f6;--radius:12px}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
 
@@ -32,13 +33,13 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .sidebar-brand h1{font-size:1.1rem;font-weight:900;letter-spacing:-.02em}
 .sidebar-brand h1 span{color:var(--orange)}
 .sidebar-brand .badge{display:inline-block;padding:2px 8px;background:rgba(249,115,22,.1);border-radius:5px;font-size:.55rem;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.04em;margin-top:4px}
-.nav-item{display:flex;align-items:center;gap:10px;padding:11px 22px;font-size:.84rem;font-weight:500;color:var(--text2);cursor:pointer;border-left:3px solid transparent;transition:all .15s}
+.nav-item{display:flex;align-items:center;gap:10px;padding:11px 22px;font-size:.84rem;font-weight:500;color:var(--text);cursor:pointer;border-left:3px solid transparent;transition:all .15s}
 .nav-item:hover{color:var(--text);background:rgba(255,255,255,.02)}
 .nav-item.active{color:var(--text);background:rgba(249,115,22,.06);border-left-color:var(--orange);font-weight:600}
 .nav-icon{font-size:1rem;width:20px;text-align:center}
 .sidebar-footer{margin-top:auto;padding:18px 22px;border-top:1px solid var(--border);font-size:.72rem}
-.sidebar-footer a{color:var(--text3);text-decoration:none;font-weight:500}
-.sidebar-footer a:hover{color:var(--text2)}
+.sidebar-footer a{color:var(--text2);text-decoration:none;font-weight:500}
+.sidebar-footer a:hover{color:var(--text)}
 .main{margin-left:230px;flex:1;padding:30px 36px 60px;min-height:100vh;overflow-y:auto}
 
 .page{display:none}.page.active{display:block}
@@ -58,7 +59,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 /* Model breakdown bars */
 .mb-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
-.mb-name{width:100px;font-size:.78rem;color:var(--text2);text-align:right;flex-shrink:0;font-weight:500}
+.mb-name{width:100px;font-size:.78rem;color:var(--text);text-align:right;flex-shrink:0;font-weight:500}
 .mb-bar-wrap{flex:1;height:24px;background:var(--surface2);border-radius:7px;overflow:hidden;position:relative}
 .mb-bar{height:100%;border-radius:7px;min-width:3px;transition:width .6s}
 .mb-info{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.63rem;color:var(--text3);font-weight:500}
