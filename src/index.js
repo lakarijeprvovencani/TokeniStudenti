@@ -119,12 +119,27 @@ const adminLimiter = rateLimit({
   handler: (_req, res) => res.status(429).json({ error: { message: 'Previše admin zahteva. Sačekaj.', code: 'rate_limit' } }),
 });
 
+function normalizeIP(ip) {
+  if (!ip) return ip;
+  return ip.replace(/^::ffff:/, '');
+}
+
+const WHITELIST_IPS = new Set(
+  (process.env.WHITELIST_IPS || '').split(',').map(s => s.trim()).filter(Boolean)
+);
+
+function isWhitelistedIP(req) {
+  const raw = req.ip || req.connection?.remoteAddress || '';
+  return WHITELIST_IPS.has(normalizeIP(raw));
+}
+
 const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,
   standardHeaders: true,
   legacyHeaders: false,
   validate: { trustProxy: false },
+  skip: (req) => isWhitelistedIP(req),
   handler: (_req, res) => res.status(429).json({ error: 'Previše registracija. Pokušaj ponovo za sat vremena.' }),
 });
 
@@ -317,7 +332,8 @@ app.post('/register', registerLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Neispravan zahtev.' });
   }
 
-  const clientIP = req.ip || req.connection?.remoteAddress || 'unknown';
+  const clientIP = normalizeIP(req.ip || req.connection?.remoteAddress || 'unknown');
+  console.log(`Registration attempt from IP: ${clientIP} (raw: ${req.ip})`);
   const canReg = await canRegisterFromIP(clientIP);
   if (!canReg) {
     return res.status(403).json({ error: 'Maksimalan broj naloga sa ove adrese je dostignut.' });

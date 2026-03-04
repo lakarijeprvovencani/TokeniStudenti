@@ -12,18 +12,18 @@
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
 
 /* Login */
-.login{min-height:100vh;display:none;align-items:center;justify-content:center;background:var(--bg);position:relative}
-.login::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,.06),transparent 65%);pointer-events:none}
-.login-box{width:380px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:44px;position:relative;z-index:1}
-.login-brand{font-size:1.3rem;font-weight:900;letter-spacing:-.03em;margin-bottom:4px}
+.login{min-height:100vh;display:none;align-items:center;justify-content:center;background:var(--bg);position:relative;padding:24px}
+.login::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,.06),transparent 65%);pointer-events:none}
+.login-box{width:100%;max-width:440px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:48px 44px;position:relative;z-index:1;box-shadow:0 8px 40px rgba(0,0,0,.3)}
+.login-brand{font-size:1.6rem;font-weight:900;letter-spacing:-.03em;margin-bottom:8px;text-align:center}
 .login-brand span{color:var(--orange)}
-.login-box p{font-size:.84rem;color:var(--text2);margin-bottom:28px}
-.login-box input{width:100%;padding:13px 16px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.88rem;font-family:inherit;outline:none;margin-bottom:14px;transition:border-color .2s}
-.login-box input:focus{border-color:var(--orange)}
-.login-box button{width:100%;padding:13px;background:var(--orange);color:#000;border:none;border-radius:10px;font-weight:700;font-size:.9rem;font-family:inherit;cursor:pointer;transition:opacity .15s}
-.login-box button:hover{opacity:.88}
-.login-err{color:var(--red);font-size:.8rem;margin-top:10px;display:none}
-.login-footer{text-align:center;margin-top:20px;font-size:.75rem;color:var(--text3)}
+.login-box p{font-size:.92rem;color:var(--text2);margin-bottom:28px;line-height:1.6;text-align:center}
+.login-box input{width:100%;padding:15px 18px;background:var(--bg);border:1px solid var(--border);border-radius:12px;color:var(--text);font-size:.95rem;font-family:inherit;outline:none;margin-bottom:16px;transition:border-color .2s}
+.login-box input:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(249,115,22,.1)}
+.login-box button{width:100%;padding:15px;background:var(--orange);color:#000;border:none;border-radius:12px;font-weight:700;font-size:.95rem;font-family:inherit;cursor:pointer;transition:all .2s}
+.login-box button:hover{opacity:.88;transform:translateY(-1px)}
+.login-err{color:var(--red);font-size:.82rem;margin-top:12px;display:none}
+.login-footer{text-align:center;margin-top:24px;font-size:.78rem;color:var(--text3)}
 .login-footer a{color:var(--orange);font-weight:600}
 
 /* Layout */
@@ -109,13 +109,16 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .pay-fail{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text2)}
 
 /* Login tabs */
-.login-tabs{display:flex;gap:0;margin-bottom:22px;border-bottom:1px solid var(--border)}
-.login-tab{flex:1;padding:10px;text-align:center;font-size:.84rem;font-weight:600;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.login-tabs{display:flex;gap:0;margin-bottom:28px;border-bottom:1px solid var(--border)}
+.login-tab{flex:1;padding:14px;text-align:center;font-size:.95rem;font-weight:600;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
 .login-tab.active{color:var(--orange);border-bottom-color:var(--orange)}
 .login-tab:hover{color:var(--text2)}
 .login-box .reg-hp{position:absolute;left:-9999px;top:-9999px}
-.login-box button:disabled{opacity:.5;cursor:not-allowed}
-.reg-bonus{display:inline-block;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);color:var(--orange);font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:6px;margin-bottom:6px}
+.login-box button:disabled{opacity:.45;cursor:not-allowed}
+.reg-bonus{display:inline-flex;align-items:center;gap:6px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);color:var(--orange);font-size:.78rem;font-weight:700;padding:6px 14px;border-radius:50px;margin-bottom:10px}
+.reg-bonus::before{content:'🎁';font-size:.85rem}
+.reg-names{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.reg-names input{margin-bottom:0}
 
 @media(max-width:768px){
   .sidebar{position:fixed;width:100%;height:auto;bottom:0;top:auto;flex-direction:row;padding:0;border-right:none;border-top:1px solid var(--border);overflow-x:auto}
@@ -124,6 +127,13 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
   .nav-item.active{border-top-color:var(--orange);border-left-color:transparent}
   .main{margin-left:0;padding:20px 16px 80px}
   .stats{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .login-box{padding:36px 28px;border-radius:16px}
+  .login-brand{font-size:1.4rem}
+  .login-tabs .login-tab{font-size:.88rem;padding:12px}
+  .reg-names{grid-template-columns:1fr;gap:0}
+  .reg-names input{margin-bottom:16px}
 }
 </style>
 </head>
@@ -144,10 +154,14 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <div class="login-err" id="loginErr">Neispravan ključ</div>
     </div>
     <div id="registerForm" style="display:none">
-      <div class="reg-bonus">$2 poklon kredit</div>
-      <p>Napravi besplatan nalog i kreni odmah</p>
-      <input type="text" id="regFirstName" placeholder="Ime" autocomplete="given-name">
-      <input type="text" id="regLastName" placeholder="Prezime" autocomplete="family-name">
+      <div style="text-align:center">
+        <div class="reg-bonus">$2 poklon kredit</div>
+        <p>Napravi besplatan nalog i kreni odmah</p>
+      </div>
+      <div class="reg-names">
+        <input type="text" id="regFirstName" placeholder="Ime" autocomplete="given-name">
+        <input type="text" id="regLastName" placeholder="Prezime" autocomplete="family-name">
+      </div>
       <input type="text" name="website" id="regHoneypot" class="reg-hp" tabindex="-1" autocomplete="off">
       <button id="regBtn" onclick="doRegister()" disabled>Napravi nalog</button>
       <div class="login-err" id="regErr"></div>

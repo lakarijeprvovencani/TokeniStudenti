@@ -215,10 +215,20 @@ async function writeRegistrations(regs) {
   try { writeRegistrationsFile(regs); } catch {}
 }
 
+const WHITELIST_IPS = new Set(
+  (process.env.WHITELIST_IPS || '').split(',').map(s => s.trim()).filter(Boolean)
+);
+
+function normalizeIP(ip) {
+  if (!ip) return ip;
+  return ip.replace(/^::ffff:/, '');
+}
+
 export async function canRegisterFromIP(ip) {
   if (!ip) return false;
+  if (WHITELIST_IPS.has(normalizeIP(ip))) return true;
   const regs = await readRegistrations();
-  const count = regs[ip] || 0;
+  const count = regs[normalizeIP(ip)] || 0;
   return count < MAX_REG_PER_IP;
 }
 
