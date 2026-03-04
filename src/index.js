@@ -536,37 +536,58 @@ async function handleOpenAINonStream(res, keyId, resolved, payload) {
 
 async function handleOpenAIStream(res, keyId, resolved, payload) {
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders?.();
 
   const STREAM_TIMEOUT = 5 * 60 * 1000;
+  const KEEPALIVE_INTERVAL = 15000;
   let lastChunkTime = Date.now();
+
+  const keepAlive = setInterval(() => {
+    if (!res.writableEnded) {
+      res.write(': keepalive\n\n');
+      if (res.flush) res.flush();
+    }
+  }, KEEPALIVE_INTERVAL);
+
   const timeoutCheck = setInterval(() => {
     if (Date.now() - lastChunkTime > STREAM_TIMEOUT) {
       clearInterval(timeoutCheck);
+      clearInterval(keepAlive);
       if (!res.writableEnded) { res.write('data: [DONE]\n\n'); res.end(); }
     }
   }, 30000);
+
+  res.write(': stream-start\n\n');
+  const initChunk = { id: 'vajb-init', object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] };
+  res.write('data: ' + JSON.stringify(initChunk) + '\n\n');
+  if (res.flush) res.flush();
 
   const stream = await withRetry(() => openai.chat.completions.create(payload));
 
   let usage = { input_tokens: 0, output_tokens: 0 };
   let chunkCount = 0;
 
-  for await (const chunk of stream) {
-    lastChunkTime = Date.now();
-    if (chunk.usage) {
-      usage.input_tokens = chunk.usage.prompt_tokens ?? usage.input_tokens;
-      usage.output_tokens = chunk.usage.completion_tokens ?? usage.output_tokens;
+  try {
+    for await (const chunk of stream) {
+      lastChunkTime = Date.now();
+      if (chunk.usage) {
+        usage.input_tokens = chunk.usage.prompt_tokens ?? usage.input_tokens;
+        usage.output_tokens = chunk.usage.completion_tokens ?? usage.output_tokens;
+      }
+      chunkCount++;
+      chunk.model = resolved.id;
+      res.write('data: ' + JSON.stringify(chunk) + '\n\n');
+      if (res.flush) res.flush();
     }
-    chunkCount++;
-    chunk.model = resolved.id;
-    res.write('data: ' + JSON.stringify(chunk) + '\n\n');
-    if (res.flush) res.flush();
+  } catch (streamErr) {
+    console.error('OpenAI stream error mid-flight:', streamErr.message);
   }
 
   clearInterval(timeoutCheck);
+  clearInterval(keepAlive);
 
   if (usage.input_tokens === 0 && usage.output_tokens === 0) {
     const estIn = Math.max(chunkCount * 50, 1000);
@@ -658,8 +679,9 @@ async function handleAnthropicNonStream(res, keyId, resolved, payload) {
 
 async function handleAnthropicStream(res, keyId, resolved, payload) {
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders?.();
 
   const streamId = 'vajb-' + Date.now();
@@ -668,56 +690,83 @@ async function handleAnthropicStream(res, keyId, resolved, payload) {
   let currentToolIndex = -1;
 
   const STREAM_TIMEOUT = 5 * 60 * 1000;
+  const KEEPALIVE_INTERVAL = 15000;
   let lastChunkTime = Date.now();
+
+  const keepAlive = setInterval(() => {
+    if (!res.writableEnded) {
+      res.write(': keepalive\n\n');
+      if (res.flush) res.flush();
+    }
+  }, KEEPALIVE_INTERVAL);
+
   const timeoutCheck = setInterval(() => {
     if (Date.now() - lastChunkTime > STREAM_TIMEOUT) {
       clearInterval(timeoutCheck);
+      clearInterval(keepAlive);
       if (!res.writableEnded) { res.end(); }
     }
   }, 30000);
 
+  res.write(': stream-start\n\n');
+  const initChunk = { id: streamId, object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] };
+  res.write('data: ' + JSON.stringify(initChunk) + '\n\n');
+  if (res.flush) res.flush();
+
   const stream = await withRetry(() => anthropic.messages.create({ ...payload, stream: true }));
 
-  for await (const event of stream) {
-    lastChunkTime = Date.now();
-    if (event.type === 'message_start' && event.message?.usage) {
-      usage.input_tokens = event.message.usage.input_tokens ?? 0;
-    }
-    if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
-      const b = event.content_block;
-      toolCalls.push({ id: b.id, name: b.name || 'tool', inputStr: '' });
-      currentToolIndex = toolCalls.length - 1;
-    }
-    if (event.type === 'content_block_delta') {
-      const delta = event.delta;
-      if (delta?.type === 'text_delta' && delta.text) {
-        res.write(toOpenAIStreamChunk(delta.text, { id: streamId, model: resolved.id }));
-        if (res.flush) res.flush();
+  try {
+    for await (const event of stream) {
+      lastChunkTime = Date.now();
+      if (event.type === 'message_start' && event.message?.usage) {
+        usage.input_tokens = event.message.usage.input_tokens ?? 0;
       }
-      if (delta?.type === 'input_json_delta' && typeof delta.partial_json === 'string' && currentToolIndex >= 0 && toolCalls[currentToolIndex]) {
-        toolCalls[currentToolIndex].inputStr += delta.partial_json;
+      if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+        const b = event.content_block;
+        toolCalls.push({ id: b.id, name: b.name || 'tool', inputStr: '' });
+        currentToolIndex = toolCalls.length - 1;
+      }
+      if (event.type === 'content_block_delta') {
+        const delta = event.delta;
+        if (delta?.type === 'text_delta' && delta.text) {
+          res.write(toOpenAIStreamChunk(delta.text, { id: streamId, model: resolved.id }));
+          if (res.flush) res.flush();
+        }
+        if (delta?.type === 'input_json_delta' && typeof delta.partial_json === 'string' && currentToolIndex >= 0 && toolCalls[currentToolIndex]) {
+          toolCalls[currentToolIndex].inputStr += delta.partial_json;
+        }
+      }
+      if (event.type === 'content_block_stop') {
+        currentToolIndex = -1;
+      }
+      if (event.type === 'message_delta' && event.usage) {
+        if (event.usage.input_tokens != null) usage.input_tokens = event.usage.input_tokens;
+        if (event.usage.output_tokens != null) usage.output_tokens = event.usage.output_tokens;
       }
     }
-    if (event.type === 'content_block_stop') {
-      currentToolIndex = -1;
-    }
-    if (event.type === 'message_delta' && event.usage) {
-      if (event.usage.input_tokens != null) usage.input_tokens = event.usage.input_tokens;
-      if (event.usage.output_tokens != null) usage.output_tokens = event.usage.output_tokens;
-    }
+  } catch (streamErr) {
+    console.error('Anthropic stream error mid-flight:', streamErr.message);
   }
 
   clearInterval(timeoutCheck);
+  clearInterval(keepAlive);
 
   if (toolCalls.length > 0) {
     const openAIToolCalls = toolCalls.map((tc, i) => {
       let args = tc.inputStr || '{}';
-      try { JSON.parse(args); } catch (_) { args = '{}'; }
+      try {
+        JSON.parse(args);
+      } catch (parseErr) {
+        console.warn(`Tool call JSON parse failed for ${tc.name}: ${parseErr.message}. Raw: ${args.slice(0, 200)}...`);
+        args = '{}';
+      }
       return { index: i, id: tc.id, name: tc.name, arguments: args };
     });
     res.write(toOpenAIStreamChunkToolCalls(openAIToolCalls, { id: streamId, model: resolved.id }));
+    if (res.flush) res.flush();
   } else {
     res.write(toOpenAIStreamChunk('', { id: streamId, model: resolved.id, finish: true }));
+    if (res.flush) res.flush();
   }
 
   usage.model = resolved.backendModel;
@@ -959,7 +1008,7 @@ app.get('/debug/redis', adminLimiter, async (req, res) => {
   res.json({ configured, ping, keys });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`VajbAgent proxy listening on http://localhost:${PORT}`);
   console.log(`  Redis: ${process.env.UPSTASH_REDIS_REST_URL ? 'configured' : 'NOT configured (file fallback)'}`);
   console.log(`  Models: ${VAJB_MODELS.map(m => m.id).join(', ')}`);
@@ -969,3 +1018,6 @@ app.listen(PORT, () => {
   console.log(`  GET  /setup – setup instructions`);
   console.log(`  GET  /admin/info – model info (admin only)`);
 });
+
+server.keepAliveTimeout = 120000;
+server.headersTimeout = 125000;

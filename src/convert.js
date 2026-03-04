@@ -72,8 +72,12 @@ function contentLength(content) {
 function truncateToolResult(text, max) {
   if (!text || text.length <= max) return text;
   const keep = Math.floor((max - 80) / 2);
+  const cut = text.length - keep * 2;
+  if (cut > 5000) {
+    console.log(`[context] Tool result truncated: ${text.length} → ${max} chars (-${cut} chars, ${Math.round(cut/text.length*100)}% lost)`);
+  }
   return text.slice(0, keep)
-    + '\n\n[... skraćeno ' + (text.length - keep * 2) + ' karaktera ...]\n\n'
+    + '\n\n[... skraćeno ' + cut + ' karaktera ...]\n\n'
     + text.slice(-keep);
 }
 
@@ -185,6 +189,8 @@ function applyInputLimit(system, messages, backendModel) {
   }
 
   if (kept.length < shrunkMessages.length) {
+    const dropped = shrunkMessages.length - kept.length;
+    console.log(`[context] Dropped ${dropped} older messages to fit budget (kept ${kept.length}/${shrunkMessages.length})`);
     // Ensure first message is 'user' (Anthropic requires it)
     if (kept.length === 0 || kept[0].role !== 'user') {
       kept.unshift(NOTE_MSG);
@@ -356,6 +362,7 @@ export function trimOpenAIMessages(messages, backendModel) {
   const dropped = nonSystem.length - kept.length;
   const result = [...systemMsgs];
   if (dropped > 0) {
+    console.log(`[context] OpenAI: Dropped ${dropped} older messages to fit budget (kept ${kept.length}/${nonSystem.length})`);
     result.push({ role: 'user', content: `[${dropped} starijih poruka izostavljeno zbog ograničenja konteksta]` });
   }
   result.push(...kept);
