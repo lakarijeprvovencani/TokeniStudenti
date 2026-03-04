@@ -330,11 +330,10 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 let apiKey='';
 // Ranges: za $10 koliko otprilike zahteva (kao na landingu). Za tvoj kredit skalira se.
 const MODELS=[
-  {id:'vajb-agent-nano',name:'Nano',tier:'Budget',per10:[700,2500]},
-  {id:'vajb-agent-lite',name:'Lite',tier:'Best Value',per10:[1000,3000]},
-  {id:'vajb-agent-pro',name:'Pro',tier:'Fast',per10:[400,1500]},
-  {id:'vajb-agent-max',name:'Max',tier:'Premium',per10:[50,200]},
-  {id:'vajb-agent-ultra',name:'Ultra',tier:'Elite',per10:[15,80]},
+  {id:'vajb-agent-lite',name:'Lite',tier:'Best Value',per10:[2000,5000]},
+  {id:'vajb-agent-pro',name:'Pro',tier:'Standard',per10:[400,1000]},
+  {id:'vajb-agent-max',name:'Max',tier:'Premium',per10:[200,500]},
+  {id:'vajb-agent-ultra',name:'Ultra',tier:'Elite',per10:[30,100]},
 ];
 
 function $(id){return document.getElementById(id)}

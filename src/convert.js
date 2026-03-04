@@ -37,10 +37,9 @@ export function openAIToolsToAnthropic(openAITools) {
 // Per-model input token limits (leave room for output).
 // ~4 chars per token on average.
 const MODEL_INPUT_LIMITS = {
-  // MiniMax models - 200K context window
-  'MiniMax-M2.1':           { tokens: 150000, chars: 600000 },
-  'MiniMax-M2.5':           { tokens: 150000, chars: 600000 },
-  'MiniMax-M2.5-highspeed': { tokens: 150000, chars: 600000 },
+  // OpenAI GPT-4.1 models - 1M context window
+  'gpt-4.1-mini': { tokens: 200000, chars: 800000 },
+  'gpt-4.1':      { tokens: 200000, chars: 800000 },
   // Claude models
   'claude-sonnet-4-6': { tokens: 130000, chars: 520000 },
   'claude-opus-4-6':   { tokens: 70000,  chars: 280000 },
@@ -462,7 +461,6 @@ export function openAIToAnthropicMessages(openAIMessages, backendModel) {
 /**
  * Build OpenAI-style non-streaming choice from Anthropic message.
  * Ako Claude vrati tool_use, vraćamo tool_calls da Cursor prikaže Apply i izvrši.
- * MiniMax vraća 'thinking' blokove - ignorišemo ih jer su za interno razmišljanje.
  */
 export function anthropicToOpenAIChoice(anthropicMessage, model = 'vajb-agent') {
   const blocks = Array.isArray(anthropicMessage.content) ? anthropicMessage.content : [];
