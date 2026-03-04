@@ -592,7 +592,6 @@ async function handleMiniMaxStream(res, keyId, resolved, payload) {
 
   let eventCount = 0;
   let textChunks = 0;
-  let isThinking = false;
   let thinkingIndicatorSent = false;
   
   try {
@@ -600,27 +599,27 @@ async function handleMiniMaxStream(res, keyId, resolved, payload) {
       eventCount++;
       lastChunkTime = Date.now();
       
+      // Log first few events and all content_block_start events
+      if (eventCount <= 3 || event.type === 'content_block_start') {
+        console.log(`[MiniMax] event #${eventCount}: ${event.type}`, 
+          event.content_block ? `block=${event.content_block.type}` : '');
+      }
+      
       if (event.type === 'message_start' && event.message?.usage) {
         usage.input_tokens = event.message.usage.input_tokens ?? 0;
       }
       
-      // Detect thinking block start - send indicator
+      // Detect thinking block start - send indicator immediately
       if (event.type === 'content_block_start' && event.content_block?.type === 'thinking') {
-        isThinking = true;
         if (!thinkingIndicatorSent) {
+          console.log('[MiniMax] Sending thinking indicator');
           res.write(toOpenAIStreamChunk('🧠 *Razmišljam...*\n\n', { id: streamId, model: resolved.id }));
           if (res.flush) res.flush();
           thinkingIndicatorSent = true;
         }
       }
       
-      // Detect text block start - model finished thinking
-      if (event.type === 'content_block_start' && event.content_block?.type === 'text') {
-        isThinking = false;
-      }
-      
       if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
-        isThinking = false;
         const b = event.content_block;
         toolCalls.push({ id: b.id, name: b.name || 'tool', inputStr: '' });
         currentToolIndex = toolCalls.length - 1;
@@ -647,9 +646,9 @@ async function handleMiniMaxStream(res, keyId, resolved, payload) {
         if (event.usage.output_tokens != null) usage.output_tokens = event.usage.output_tokens;
       }
     }
-    console.log(`[MiniMax stream] completed: ${eventCount} events, ${textChunks} text chunks`);
+    console.log(`[MiniMax] completed: ${eventCount} events, ${textChunks} text chunks, thinking=${thinkingIndicatorSent}`);
   } catch (streamErr) {
-    console.error('MiniMax stream error:', streamErr.message);
+    console.error('[MiniMax] stream error:', streamErr.message);
   }
 
   clearInterval(timeoutCheck);
