@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>VajbAgent – Pojačanje za Cursor Free | AI kodiranje bez pretplate</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<title>VajbAgent – Pojačanje za Cursor | AI kodiranje bez pretplate</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -12,9 +13,9 @@
 body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
 
-.ticker{background:var(--orange);color:#000;padding:10px 0;overflow:hidden;white-space:nowrap;font-size:.82rem;font-weight:600;max-width:100vw}
-.ticker-inner{display:inline-block;animation:scroll 30s linear infinite}
-.ticker-inner span{margin:0 40px}
+.ticker{background:var(--orange);color:#000;padding:10px 0;overflow:hidden;white-space:nowrap;font-size:.82rem;font-weight:600;width:100%;position:relative}
+.ticker-track{display:flex;width:max-content;animation:scroll 20s linear infinite;will-change:transform}
+.ticker-track span{flex-shrink:0;padding:0 40px}
 @keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 
 nav{background:rgba(10,10,10,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
@@ -166,7 +167,8 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 }
 @media(max-width:600px){
   html,body{overflow-x:hidden;max-width:100vw}
-  .ticker{font-size:.68rem;padding:8px 0}
+  .ticker{font-size:.62rem;padding:6px 0}
+  .ticker-track span{padding:0 20px}
   .benefits,.steps{grid-template-columns:1fr}
   .tiers{grid-template-columns:1fr 1fr}
   .cursor-intro{grid-template-columns:1fr;gap:16px}
@@ -189,13 +191,13 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 <body>
 
 <div class="ticker">
-  <div class="ticker-inner">
-    <span>Pojačanje za Cursor Free</span>
+  <div class="ticker-track">
+    <span>Pojačanje za Cursor</span>
     <span>Plati samo kad koristiš</span>
     <span>5 nivoa AI modela</span>
     <span>Bez mesečne obaveze</span>
     <span>Od $5 do premium AI-ja</span>
-    <span>Pojačanje za Cursor Free</span>
+    <span>Pojačanje za Cursor</span>
     <span>Plati samo kad koristiš</span>
     <span>5 nivoa AI modela</span>
     <span>Bez mesečne obaveze</span>
@@ -217,7 +219,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 </nav>
 
 <div class="hero">
-  <div class="hero-pill">Pojačanje za Cursor Free</div>
+  <div class="hero-pill">Pojačanje za Cursor</div>
   <h1>Ne treba ti pretplata<br><em>da bi kodirao sa AI-jem</em></h1>
   <p>Cursor ti daje besplatan AI editor. Kad ti treba pojačanje uključi VajbAgenta, platiš fiksnu cenu koju odlučiš, bez mesečne obaveze.</p>
   <div class="hero-btns">
@@ -484,7 +486,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 
 <div class="powered">Powered by <a href="https://vajbkodiranje.com" target="_blank">Vajb Kodiranje</a></div>
 
-<footer>VajbAgent &middot; Pojačanje za Cursor Free &middot; 2026</footer>
+<footer>VajbAgent &middot; Pojačanje za Cursor &middot; 2026</footer>
 
 </body>
 </html>
