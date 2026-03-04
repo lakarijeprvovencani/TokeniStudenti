@@ -37,11 +37,17 @@ export function openAIToolsToAnthropic(openAITools) {
 // Per-model input token limits (leave room for output).
 // ~4 chars per token on average.
 const MODEL_INPUT_LIMITS = {
+  // MiniMax models - 200K context window
+  'MiniMax-M2.1':           { tokens: 150000, chars: 600000 },
+  'MiniMax-M2.5':           { tokens: 150000, chars: 600000 },
+  'MiniMax-M2.5-highspeed': { tokens: 150000, chars: 600000 },
+  // Claude models
+  'claude-sonnet-4-6': { tokens: 130000, chars: 520000 },
+  'claude-opus-4-6':   { tokens: 70000,  chars: 280000 },
+  // Legacy
   'gpt-4o-mini':       { tokens: 100000, chars: 400000 },
   'gpt-4o':            { tokens: 100000, chars: 400000 },
   'claude-haiku-4-5':  { tokens: 130000, chars: 520000 },
-  'claude-sonnet-4-6': { tokens: 130000, chars: 520000 },
-  'claude-opus-4-6':   { tokens: 70000,  chars: 280000 },
 };
 const DEFAULT_LIMIT = { tokens: 100000, chars: 400000 };
 
@@ -456,11 +462,14 @@ export function openAIToAnthropicMessages(openAIMessages, backendModel) {
 /**
  * Build OpenAI-style non-streaming choice from Anthropic message.
  * Ako Claude vrati tool_use, vraćamo tool_calls da Cursor prikaže Apply i izvrši.
+ * MiniMax vraća 'thinking' blokove - ignorišemo ih jer su za interno razmišljanje.
  */
 export function anthropicToOpenAIChoice(anthropicMessage, model = 'vajb-agent') {
   const blocks = Array.isArray(anthropicMessage.content) ? anthropicMessage.content : [];
+  // Extract text blocks (skip thinking blocks - they're internal reasoning)
   const textParts = blocks.filter((b) => b && b.type === 'text').map((b) => b.text);
-  const content = textParts.join('') || null;
+  // If no text blocks, content is null (model only thought, no response)
+  const content = textParts.length > 0 ? textParts.join('') : null;
   const toolUseBlocks = blocks.filter((b) => b && b.type === 'tool_use');
   const toolCalls = toolUseBlocks.map((b) => ({
     id: b.id,

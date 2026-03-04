@@ -97,11 +97,11 @@ const baseUrl=window.location.origin;
 document.getElementById('base-url').textContent=baseUrl;
 
 const modelInfo={
-  'vajb-agent-nano':{name:'VajbAgent Nano',desc:'Najjeftiniji, daily use'},
-  'vajb-agent-lite':{name:'VajbAgent Lite',desc:'Svakodnevno kodiranje'},
-  'vajb-agent-pro':{name:'VajbAgent Pro',desc:'Brz i pouzdan'},
-  'vajb-agent-max':{name:'VajbAgent Max',desc:'Kompleksni projekti'},
-  'vajb-agent-ultra':{name:'VajbAgent Ultra',desc:'Premium, najjači'},
+  'vajb-agent-nano':{name:'VajbAgent Nano',desc:'Brza pitanja, najjeftiniji'},
+  'vajb-agent-lite':{name:'VajbAgent Lite',desc:'Najbolja vrednost, 80% SWE-bench'},
+  'vajb-agent-pro':{name:'VajbAgent Pro',desc:'2x brži od Lite, isti kvalitet'},
+  'vajb-agent-max':{name:'VajbAgent Max',desc:'Claude Sonnet, reasoning'},
+  'vajb-agent-ultra':{name:'VajbAgent Ultra',desc:'Claude Opus, premium'},
 };
 
 fetch('/v1/models').then(r=>r.json()).then(data=>{

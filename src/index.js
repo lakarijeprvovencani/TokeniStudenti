@@ -30,21 +30,25 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-// ---- Model registry: 5 tiers, dual backend (OpenAI + Anthropic) ----
+// ---- Model registry: 5 tiers (MiniMax + Anthropic) ----
 const MAX_OUTPUT = {
-  'gpt-4o-mini': 16384,
-  'gpt-4o':      16384,
-  'claude-haiku-4-5': 65536,
+  'MiniMax-M2.1': 32768,
+  'MiniMax-M2.5': 32768,
+  'MiniMax-M2.5-highspeed': 32768,
   'claude-sonnet-4-6': 65536,
   'claude-opus-4-6': 131072,
+  // Legacy
+  'gpt-4o-mini': 16384,
+  'gpt-4o': 16384,
+  'claude-haiku-4-5': 65536,
 };
 
 const VAJB_MODELS = [
-  { id: 'vajb-agent-nano',  name: 'VajbAgent Nano',  backend: 'openai',    backendModel: 'gpt-4o-mini',      desc: 'Najjeftiniji, za svakodnevna pitanja' },
-  { id: 'vajb-agent-lite',  name: 'VajbAgent Lite',  backend: 'openai',    backendModel: 'gpt-4o',           desc: 'Daily coding, odličan za cenu' },
-  { id: 'vajb-agent-pro',   name: 'VajbAgent Pro',   backend: 'anthropic', backendModel: 'claude-haiku-4-5',  desc: 'Brz Claude, solidno kodiranje' },
-  { id: 'vajb-agent-max',   name: 'VajbAgent Max',   backend: 'anthropic', backendModel: 'claude-sonnet-4-6', desc: 'Ozbiljan rad, kompleksni projekti' },
-  { id: 'vajb-agent-ultra', name: 'VajbAgent Ultra', backend: 'anthropic', backendModel: 'claude-opus-4-6',   desc: 'Premium, najjači za agente' },
+  { id: 'vajb-agent-nano',  name: 'VajbAgent Nano',  backend: 'minimax',   backendModel: 'MiniMax-M2.1',          desc: 'Najjeftiniji, 78% SWE-bench' },
+  { id: 'vajb-agent-lite',  name: 'VajbAgent Lite',  backend: 'minimax',   backendModel: 'MiniMax-M2.5',          desc: 'Najbolja vrednost, 80% SWE-bench' },
+  { id: 'vajb-agent-pro',   name: 'VajbAgent Pro',   backend: 'minimax',   backendModel: 'MiniMax-M2.5-highspeed', desc: 'Brz M2.5, 100 tok/s' },
+  { id: 'vajb-agent-max',   name: 'VajbAgent Max',   backend: 'anthropic', backendModel: 'claude-sonnet-4-6',     desc: 'Claude Sonnet, reasoning' },
+  { id: 'vajb-agent-ultra', name: 'VajbAgent Ultra', backend: 'anthropic', backendModel: 'claude-opus-4-6',       desc: 'Premium Opus, najjači agent' },
 ];
 const DEFAULT_VAJB_MODEL = VAJB_MODELS[0].id;
 
@@ -56,13 +60,18 @@ function resolveModel(requestedModel) {
 
 // ---- Clients ----
 if (!process.env.ANTHROPIC_API_KEY) {
-  console.warn('ANTHROPIC_API_KEY is not set; Anthropic models (Pro/Max/Ultra) will fail.');
+  console.warn('ANTHROPIC_API_KEY is not set; Anthropic models (Max/Ultra) will fail.');
 }
-if (!process.env.OPENAI_API_KEY) {
-  console.warn('OPENAI_API_KEY is not set; OpenAI models (Nano/Lite) will fail.');
+if (!process.env.MINIMAX_API_KEY) {
+  console.warn('MINIMAX_API_KEY is not set; MiniMax models (Nano/Lite/Pro) will fail.');
 }
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || 'dummy' });
+const minimax = new Anthropic({
+  apiKey: process.env.MINIMAX_API_KEY || 'dummy',
+  baseURL: 'https://api.minimax.io/anthropic',
+});
+// Keep OpenAI client for potential fallback
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || 'dummy' });
 
 async function withRetry(fn, { retries = 2, delayMs = 1500 } = {}) {
@@ -449,7 +458,9 @@ const chatCompletionsHandler = [
     }
 
     try {
-      if (resolved.backend === 'openai') {
+      if (resolved.backend === 'minimax') {
+        await handleMiniMax(req, res, keyId, resolved, messages, openAITools, stream, max_tokens);
+      } else if (resolved.backend === 'openai') {
         await handleOpenAI(req, res, keyId, resolved, messages, openAITools, stream, max_tokens);
       } else {
         await handleAnthropic(req, res, keyId, resolved, messages, openAITools, stream, max_tokens);
@@ -483,7 +494,167 @@ const chatCompletionsHandler = [
 app.post('/v1/chat/completions', chatCompletionsHandler);
 app.post('/chat/completions', chatCompletionsHandler);
 
-// ---- OpenAI backend (Nano, Lite) ----
+// ---- MiniMax backend (Nano, Lite, Pro) - uses Anthropic-compatible API ----
+async function handleMiniMax(req, res, keyId, resolved, messages, openAITools, stream, max_tokens) {
+  const originalMsgCount = messages.length;
+  const { system, messages: anthropicMessages } = openAIToAnthropicMessages(messages, resolved.backendModel);
+
+  if (anthropicMessages.length === 0) {
+    return res.status(400).json({
+      error: { message: 'No valid user/assistant messages after conversion.' },
+    });
+  }
+
+  const ctxChars = (system || '').length + anthropicMessages.reduce((s, m) =>
+    s + (typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content).length), 0);
+  console.log(`MiniMax request: ${originalMsgCount} msgs → ${anthropicMessages.length} msgs, ~${Math.round(ctxChars / 4000)}K tokens, model=${resolved.backendModel}`);
+
+  const anthropicTools = openAIToolsToAnthropic(openAITools);
+  const modelMax = MAX_OUTPUT[resolved.backendModel] || 32768;
+  const maxTokens = Math.min(Math.max(Number(max_tokens) || 4096, 1), modelMax);
+
+  const payload = {
+    model: resolved.backendModel,
+    max_tokens: maxTokens,
+    messages: anthropicMessages,
+    ...(system && { system }),
+    ...(anthropicTools.length > 0 && { tools: anthropicTools }),
+  };
+
+  if (stream) {
+    await handleMiniMaxStream(res, keyId, resolved, payload);
+  } else {
+    await handleMiniMaxNonStream(res, keyId, resolved, payload);
+  }
+}
+
+async function handleMiniMaxNonStream(res, keyId, resolved, payload) {
+  const response = await withRetry(() => minimax.messages.create({ ...payload, stream: false }));
+
+  const usage = {
+    input_tokens: response.usage?.input_tokens ?? 0,
+    output_tokens: response.usage?.output_tokens ?? 0,
+    model: resolved.backendModel,
+  };
+  const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
+  const newBal = await deductBalance(keyId, usd);
+  await logUsage(keyId, usage);
+
+  const openAIResponse = toOpenAIChatCompletion(
+    response, response.usage, resolved.id, response.id || 'vajb-' + Date.now()
+  );
+
+  const warning = await getBalanceWarning(keyId, newBal);
+  if (warning && openAIResponse.choices?.[0]?.message?.content) {
+    openAIResponse.choices[0].message.content += warning;
+  }
+
+  res.json(openAIResponse);
+}
+
+async function handleMiniMaxStream(res, keyId, resolved, payload) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  const streamId = 'vajb-' + Date.now();
+  let usage = { input_tokens: 0, output_tokens: 0 };
+  const toolCalls = [];
+  let currentToolIndex = -1;
+
+  const STREAM_TIMEOUT = 5 * 60 * 1000;
+  const KEEPALIVE_INTERVAL = 15000;
+  let lastChunkTime = Date.now();
+
+  const keepAlive = setInterval(() => {
+    if (!res.writableEnded) {
+      res.write(': keepalive\n\n');
+      if (res.flush) res.flush();
+    }
+  }, KEEPALIVE_INTERVAL);
+
+  const timeoutCheck = setInterval(() => {
+    if (Date.now() - lastChunkTime > STREAM_TIMEOUT) {
+      clearInterval(timeoutCheck);
+      clearInterval(keepAlive);
+      if (!res.writableEnded) { res.end(); }
+    }
+  }, 30000);
+
+  res.write(': stream-start\n\n');
+  const initChunk = { id: streamId, object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] };
+  res.write('data: ' + JSON.stringify(initChunk) + '\n\n');
+  if (res.flush) res.flush();
+
+  const stream = await withRetry(() => minimax.messages.create({ ...payload, stream: true }));
+
+  try {
+    for await (const event of stream) {
+      lastChunkTime = Date.now();
+      if (event.type === 'message_start' && event.message?.usage) {
+        usage.input_tokens = event.message.usage.input_tokens ?? 0;
+      }
+      if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+        const b = event.content_block;
+        toolCalls.push({ id: b.id, name: b.name || 'tool', inputStr: '' });
+        currentToolIndex = toolCalls.length - 1;
+      }
+      if (event.type === 'content_block_delta') {
+        const delta = event.delta;
+        if (delta?.type === 'text_delta' && delta.text) {
+          res.write(toOpenAIStreamChunk(delta.text, { id: streamId, model: resolved.id }));
+          if (res.flush) res.flush();
+        }
+        if (delta?.type === 'input_json_delta' && typeof delta.partial_json === 'string' && currentToolIndex >= 0 && toolCalls[currentToolIndex]) {
+          toolCalls[currentToolIndex].inputStr += delta.partial_json;
+        }
+      }
+      if (event.type === 'content_block_stop') {
+        currentToolIndex = -1;
+      }
+      if (event.type === 'message_delta' && event.usage) {
+        if (event.usage.input_tokens != null) usage.input_tokens = event.usage.input_tokens;
+        if (event.usage.output_tokens != null) usage.output_tokens = event.usage.output_tokens;
+      }
+    }
+  } catch (streamErr) {
+    console.error('MiniMax stream error mid-flight:', streamErr.message);
+  }
+
+  clearInterval(timeoutCheck);
+  clearInterval(keepAlive);
+
+  if (toolCalls.length > 0) {
+    const openAIToolCalls = toolCalls.map((tc, i) => {
+      let args = tc.inputStr || '{}';
+      try { JSON.parse(args); } catch { args = '{}'; }
+      return { index: i, id: tc.id, name: tc.name, arguments: args };
+    });
+    res.write(toOpenAIStreamChunkToolCalls(openAIToolCalls, { id: streamId, model: resolved.id }));
+    if (res.flush) res.flush();
+  } else {
+    res.write(toOpenAIStreamChunk('', { id: streamId, model: resolved.id, finish: true }));
+    if (res.flush) res.flush();
+  }
+
+  usage.model = resolved.backendModel;
+  const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
+  const newBal = await deductBalance(keyId, usd);
+  await logUsage(keyId, usage);
+
+  const warning = await getBalanceWarning(keyId, newBal);
+  if (warning && !res.writableEnded) {
+    const warnChunk = { id: streamId + '-warn', object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { content: warning }, finish_reason: null }] };
+    res.write('data: ' + JSON.stringify(warnChunk) + '\n\n');
+  }
+
+  res.write(streamDone());
+  res.end();
+}
+
+// ---- OpenAI backend (legacy/fallback) ----
 async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, stream, max_tokens) {
   const modelMax = MAX_OUTPUT[resolved.backendModel] || 16384;
   const requested = Number(max_tokens) || 4096;

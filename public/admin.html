@@ -76,6 +76,7 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
 .tag-red,.tag-inactive{background:rgba(255,255,255,.05);color:var(--text)}
 .tag-openai{background:rgba(16,163,127,.1);color:#34d399}
 .tag-anthropic{background:rgba(249,115,22,.1);color:var(--orange2)}
+.tag-minimax{background:rgba(59,130,246,.1);color:#60a5fa}
 
 /* Buttons */
 .btn{padding:8px 16px;border:none;border-radius:8px;font-size:.78rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s}
@@ -274,7 +275,7 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
 let secret='';
 let DATA={models:[],users:[],markup:1,students:[],model_stats:{},first_use:null};
 let lastKey='';
-const PRICES={'gpt-4o-mini':{in:.15,out:.6},'gpt-4o':{in:2.5,out:10},'claude-haiku-4-5':{in:1,out:5},'claude-sonnet-4-6':{in:3,out:15},'claude-opus-4-6':{in:5,out:25}};
+const PRICES={'MiniMax-M2.1':{in:.27,out:.95},'MiniMax-M2.5':{in:.15,out:1.2},'MiniMax-M2.5-highspeed':{in:.3,out:2.4},'claude-sonnet-4-6':{in:3,out:15},'claude-opus-4-6':{in:15,out:75}};
 const AVG_IN=25000,AVG_OUT=3000;
 
 function $(id){return document.getElementById(id)}
@@ -526,7 +527,7 @@ function renderModels(){
   DATA.models.forEach(m=>{
     const p=PRICES[m.backendModel]||{in:0,out:0};
     const cost=(AVG_IN/1e6)*p.in+(AVG_OUT/1e6)*p.out;
-    const tag=m.backend==='openai'?'tag-openai':'tag-anthropic';
+    const tag=m.backend==='minimax'?'tag-minimax':m.backend==='openai'?'tag-openai':'tag-anthropic';
     tb.innerHTML+=`<tr>
       <td class="mono">${m.id}</td><td>${m.name}</td>
       <td><span class="tag ${tag}">${m.backend}</span></td>
