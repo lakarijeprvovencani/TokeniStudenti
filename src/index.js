@@ -16,11 +16,12 @@ import {
   streamDone,
   trimOpenAIMessages,
 } from './convert.js';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { logUsage, getUsageSummary, getUsageForKey, getModelStats } from './usage.js';
 import { getBalance, deductBalance, costUsd, addBalance } from './balance.js';
-import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, findByKey } from './students.js';
+import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, findByKey, canRegisterFromIP, trackRegistrationIP } from './students.js';
 
 await seedFromEnv();
 
@@ -135,8 +136,55 @@ app.use((req, res, next) => {
 });
 
 // ---- Stripe webhook (raw body before express.json) ----
-const processedStripeEvents = new Set();
-const STRIPE_EVENT_TTL = 60 * 60 * 1000;
+import { getRedis } from './redis.js';
+
+const STRIPE_EVENTS_FILE = path.join(process.env.DATA_DIR || path.join(__dirname, '..', 'data'), 'stripe-events.json');
+const STRIPE_EVENT_TTL = 24 * 60 * 60 * 1000;
+const STRIPE_REDIS_KEY = 'vajb:stripe_events';
+
+function readStripeEventsFile() {
+  try {
+    if (!fs.existsSync(STRIPE_EVENTS_FILE)) return {};
+    return JSON.parse(fs.readFileSync(STRIPE_EVENTS_FILE, 'utf8')) || {};
+  } catch { return {}; }
+}
+function writeStripeEventsFile(events) {
+  const dir = path.dirname(STRIPE_EVENTS_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(STRIPE_EVENTS_FILE, JSON.stringify(events, null, 2), 'utf8');
+}
+async function isStripeEventProcessed(eventId) {
+  const r = getRedis();
+  if (r) {
+    try {
+      let data = await r.get(STRIPE_REDIS_KEY);
+      if (typeof data === 'string') { try { data = JSON.parse(data); } catch {} }
+      if (data && typeof data === 'object' && data[eventId]) return true;
+    } catch {}
+  }
+  const file = readStripeEventsFile();
+  return !!file[eventId];
+}
+async function markStripeEventProcessed(eventId) {
+  const now = Date.now();
+  const r = getRedis();
+  let events = {};
+  if (r) {
+    try {
+      let data = await r.get(STRIPE_REDIS_KEY);
+      if (typeof data === 'string') { try { data = JSON.parse(data); } catch {} }
+      if (data && typeof data === 'object') events = data;
+    } catch {}
+  } else {
+    events = readStripeEventsFile();
+  }
+  for (const [id, ts] of Object.entries(events)) {
+    if (now - ts > STRIPE_EVENT_TTL) delete events[id];
+  }
+  events[eventId] = now;
+  if (r) { try { await r.set(STRIPE_REDIS_KEY, events); } catch {} }
+  try { writeStripeEventsFile(events); } catch {}
+}
 
 app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
   console.log('Stripe webhook received:', { hasBody: !!req.body, bodyLen: req.body?.length, hasSig: !!req.headers['stripe-signature'] });
@@ -159,12 +207,11 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
   if (event.type !== 'checkout.session.completed') {
     return res.status(200).send();
   }
-  if (processedStripeEvents.has(event.id)) {
+  if (await isStripeEventProcessed(event.id)) {
     console.log('Stripe webhook: duplicate event ignored', event.id);
     return res.status(200).send();
   }
-  processedStripeEvents.add(event.id);
-  setTimeout(() => processedStripeEvents.delete(event.id), STRIPE_EVENT_TTL);
+  await markStripeEventProcessed(event.id);
 
   const session = event.data.object;
   if (session.payment_status !== 'paid') {
@@ -270,6 +317,12 @@ app.post('/register', registerLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Neispravan zahtev.' });
   }
 
+  const clientIP = req.ip || req.connection?.remoteAddress || 'unknown';
+  const canReg = await canRegisterFromIP(clientIP);
+  if (!canReg) {
+    return res.status(403).json({ error: 'Maksimalan broj naloga sa ove adrese je dostignut.' });
+  }
+
   const tokenCheck = verifyRegisterToken(token);
   if (!tokenCheck.valid) {
     if (tokenCheck.reason === 'too_fast') {
@@ -301,7 +354,8 @@ app.post('/register', registerLimiter, async (req, res) => {
     await addBalance(result.student.key, REGISTER_BONUS);
   }
 
-  console.log(`Self-registration: "${fullName}" → key ${result.student.key.slice(0, 12)}...`);
+  await trackRegistrationIP(clientIP);
+  console.log(`Self-registration: "${fullName}" → key ${result.student.key.slice(0, 12)}... [IP: ${clientIP}]`);
 
   res.json({
     name: result.student.name,

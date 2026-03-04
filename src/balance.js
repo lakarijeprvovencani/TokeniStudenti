@@ -76,24 +76,38 @@ export async function getBalance(keyId) {
   return typeof v === 'number' ? v : 0;
 }
 
+const balanceLocks = new Map();
+async function withBalanceLock(keyId, fn) {
+  while (balanceLocks.has(keyId)) await balanceLocks.get(keyId);
+  let resolve;
+  const p = new Promise(r => { resolve = r; });
+  balanceLocks.set(keyId, p);
+  try { return await fn(); }
+  finally { balanceLocks.delete(keyId); resolve(); }
+}
+
 export async function addBalance(keyId, amountUsd) {
-  balanceCache = null;
-  const b = await readBalances();
-  const current = typeof b[keyId] === 'number' ? b[keyId] : 0;
-  const next = Math.round((current + amountUsd) * 100) / 100;
-  b[keyId] = next;
-  await writeBalances(b);
-  return next;
+  return withBalanceLock(keyId, async () => {
+    balanceCache = null;
+    const b = await readBalances();
+    const current = typeof b[keyId] === 'number' ? b[keyId] : 0;
+    const next = Math.round((current + amountUsd) * 100) / 100;
+    b[keyId] = next;
+    await writeBalances(b);
+    return next;
+  });
 }
 
 export async function deductBalance(keyId, amountUsd) {
-  balanceCache = null;
-  const b = await readBalances();
-  const current = typeof b[keyId] === 'number' ? b[keyId] : 0;
-  const next = Math.round((current - amountUsd) * 100) / 100;
-  b[keyId] = next;
-  await writeBalances(b);
-  return next;
+  return withBalanceLock(keyId, async () => {
+    balanceCache = null;
+    const b = await readBalances();
+    const current = typeof b[keyId] === 'number' ? b[keyId] : 0;
+    const next = Math.round((current - amountUsd) * 100) / 100;
+    b[keyId] = next;
+    await writeBalances(b);
+    return next;
+  });
 }
 
 /**
