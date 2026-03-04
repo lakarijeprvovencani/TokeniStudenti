@@ -152,6 +152,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <input type="password" id="keyIn" placeholder="Tvoj API ključ" autocomplete="off">
       <button onclick="doLogin()">Pristupi</button>
       <div class="login-err" id="loginErr">Neispravan ključ</div>
+      <div style="text-align:center;margin-top:16px"><a href="mailto:info@vajbkodiranje.com" style="font-size:.78rem;color:var(--text3);text-decoration:underline;text-underline-offset:3px">Zaboravio si ključ?</a></div>
     </div>
     <div id="registerForm" style="display:none">
       <div style="text-align:center">
@@ -203,6 +204,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <div class="card">
         <div class="card-title">Tvoj API ključ</div>
         <div class="copy-box"><code id="dashKey">-</code><button onclick="copyEl('dashKey')">Kopiraj</button></div>
+        <p style="font-size:.78rem;color:var(--text3);margin-top:10px;line-height:1.5">Sačuvaj ovaj ključ na sigurno mesto — koristiš ga za logovanje na dashboard i za povezivanje sa Cursor IDE. Radi na svim uređajima, bez ograničenja.</p>
       </div>
       <div class="card">
         <div class="card-title">Detalji</div>

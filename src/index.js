@@ -89,7 +89,7 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(hashA, hashB);
 }
 
-app.set('trust proxy', 1);
+app.set('trust proxy', true);
 
 app.use(helmet({
   contentSecurityPolicy: false,
