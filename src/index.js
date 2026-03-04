@@ -146,7 +146,12 @@ const registerLimiter = rateLimit({
 app.use((req, res, next) => {
   let logPath = req.path;
   if (req.query.secret) logPath = req.path + '?secret=***';
-  console.log(`${req.method} ${logPath}`);
+  const ip = normalizeIP(req.ip || req.connection?.remoteAddress || '?');
+  if (logPath.includes('register')) {
+    console.log(`${req.method} ${logPath} [IP: ${ip}, raw: ${req.ip}, xff: ${req.headers['x-forwarded-for'] || 'none'}]`);
+  } else {
+    console.log(`${req.method} ${logPath}`);
+  }
   next();
 });
 
