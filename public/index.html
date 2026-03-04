@@ -57,7 +57,7 @@ section{max-width:1100px;margin:0 auto;padding:80px 24px}
 .bcard p{font-size:.84rem;color:var(--text2);line-height:1.6}
 
 /* Primeri: koji nivo za šta – jasnije kartice i ikone */
-#primeri .benefits{gap:20px}
+#primeri .benefits{gap:20px;grid-template-columns:repeat(2,1fr);max-width:800px;margin:0 auto}
 #primeri .bcard{background:var(--surface2);border:1px solid var(--border2);border-radius:16px;padding:28px 24px;position:relative;border-left:4px solid var(--orange)}
 #primeri .bcard:hover{border-color:rgba(249,115,22,.4);box-shadow:0 6px 24px rgba(0,0,0,.25)}
 #primeri .bcard-icon{width:52px;height:52px;font-size:1.6rem;background:rgba(249,115,22,.15);color:var(--orange);border:1px solid rgba(249,115,22,.25)}
@@ -73,7 +73,7 @@ section{max-width:1100px;margin:0 auto;padding:80px 24px}
 .cursor-intro .intro-card h3{font-size:1.05rem;font-weight:700;margin-bottom:10px;color:var(--text);line-height:1.3}
 .cursor-intro .intro-card p{font-size:.9rem;color:var(--text2);line-height:1.65}
 
-.tiers{display:grid;grid-template-columns:repeat(5,minmax(172px,1fr));gap:16px;overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;padding-top:4px}
+.tiers{display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));gap:16px;overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;padding-top:4px;max-width:900px;margin:0 auto}
 .tier{background:var(--surface2);border:1px solid var(--border2);border-radius:16px;padding:28px 20px;text-align:center;transition:all .25s;position:relative;min-height:220px;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;overflow:visible}
 .tier:hover{border-color:var(--orange);transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
 .tier.pop{border-color:rgba(249,115,22,.45)}
@@ -161,7 +161,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 
 @media(max-width:900px){
   .benefits,.steps{grid-template-columns:1fr 1fr}
-  .tiers{grid-template-columns:repeat(3,1fr)}
+  .tiers{grid-template-columns:repeat(2,1fr);max-width:100%}
   .sum-grid{grid-template-columns:1fr}
   .cursor-intro{grid-template-columns:1fr}
 }
@@ -266,7 +266,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
       <div class="p-wrap"><span class="p-num">2</span></div>
       <div>
         <h3>Kad ti zatreba više, uključiš VajbAgenta</h3>
-        <p>Više zahteva, nema čekanja u redu. Povežeš svoj nalog sa Cursorom i biraš nivo (Nano do Ultra) po potrebi.</p>
+        <p>Više zahteva, nema čekanja u redu. Povežeš svoj nalog sa Cursorom i biraš nivo (Lite do Ultra) po potrebi.</p>
       </div>
     </div>
     <div class="pathway-step">
@@ -280,14 +280,14 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
       <div class="p-wrap"><span class="p-num">4</span></div>
       <div>
         <h3>Biraš nivo snage</h3>
-        <p>Od Nano za brza pitanja do Ultra za najteže zadatke. Jači nivo, jači AI, više troši po zahtevu. Ti odlučuješ.</p>
+        <p>Od Lite za svakodnevno do Ultra za najteže zadatke. Jači nivo, jači AI, više troši po zahtevu. Ti odlučuješ.</p>
       </div>
     </div>
     <div class="pathway-step poklon">
       <div class="p-wrap"><span class="p-num">🎁</span></div>
       <div>
         <h3>$2 na poklon kad napraviš nalog</h3>
-        <p>Dobijaš $2 kredita besplatno. To je otprilike 150 do 500+ zahteva na Nano/Lite, ili 80+ na Pro. Dovoljno da probaš bez kartice i bez obaveze.</p>
+        <p>Dobijaš $2 kredita besplatno. To je otprilike 400 do 1.000+ zahteva na Lite, ili 80+ na Pro. Dovoljno da probaš bez kartice i bez obaveze.</p>
       </div>
     </div>
   </div>
@@ -333,28 +333,28 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
       <div class="t-desc">Svakodnevno</div>
       <div class="t-val t-val-wide">2.000–5.000+</div>
       <div class="t-val-sub">zahteva za $10*</div>
-      <div class="t-price">GPT-4.1 Mini – brz i pouzdan, 54% SWE-bench</div>
+      <div class="t-price">Brz i pouzdan za većinu zadataka</div>
     </div>
     <div class="tier">
       <div class="t-name">Pro</div>
-      <div class="t-desc">Ozbiljniji kod</div>
+      <div class="t-desc">Jači projekti</div>
       <div class="t-val">400–1.000</div>
       <div class="t-val-sub">zahteva za $10*</div>
-      <div class="t-price">GPT-4.1 – bolji za kompleksnije projekte</div>
+      <div class="t-price">Bolje razumevanje kompleksnijeg koda</div>
     </div>
     <div class="tier">
       <div class="t-name">Max</div>
       <div class="t-desc">Kompleksno</div>
       <div class="t-val">200–500</div>
       <div class="t-val-sub">zahteva za $10*</div>
-      <div class="t-price">Claude Sonnet – 77% SWE-bench, reasoning</div>
+      <div class="t-price">Za teže probleme i duže razmišljanje</div>
     </div>
     <div class="tier">
       <div class="t-name">Ultra</div>
       <div class="t-desc">Premium</div>
       <div class="t-val">30–100</div>
       <div class="t-val-sub">zahteva za $10*</div>
-      <div class="t-price">Claude Opus – najteži problemi i agenti</div>
+      <div class="t-price">Kad ti treba najjači AI</div>
     </div>
   </div>
   <p style="text-align:center;font-size:.8rem;color:var(--text);margin-top:20px;">*Broj zahteva zavisi od kompleksnosti, kratko pitanje troši manje, veliki projekat sa puno fajlova troši više. U dashboardu vidiš tačnu potrošnju.</p>
@@ -372,32 +372,22 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     <div class="bcard">
       <div class="bcard-icon">💬</div>
       <h3>Lite, svakodnevno</h3>
-      <p>"Šta radi ova funkcija?" "Napiši mi funkciju koja sortira." "Dodaj validaciju formu." Brz i pouzdan za većinu zadataka.</p>
+      <p>"Šta radi ova funkcija?" "Napiši mi login stranu." "Zašto mi ne radi ovo?" Brz i pouzdan za većinu zadataka.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon">📝</div>
-      <h3>Pro, ozbiljniji projekti</h3>
-      <p>"Refaktoruj mi celu klasu." "Napravi API endpoint sa autentikacijom." Kompleksniji kod, bolje razumevanje konteksta.</p>
-    </div>
-    <div class="bcard">
-      <div class="bcard-icon">🔧</div>
-      <h3>Pro, brzina kad ti treba</h3>
-      <p>"Napravi mi REST API za korisnike." "Refaktoriši ovaj kod." Isti kvalitet kao Lite, ali 2x brži odgovori.</p>
+      <h3>Pro, jači projekti</h3>
+      <p>"Sredi mi ceo fajl." "Dodaj dark mode." "Napravi mi navbar komponentu." Kad Lite nije dovoljan.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon">🏗️</div>
-      <h3>Max, kompleksni zadaci</h3>
-      <p>"Dizajniraj arhitekturu sistema." "Debuguj ovu grešku u velikom projektu." Za teže probleme.</p>
+      <h3>Max, teži problemi</h3>
+      <p>"Zašto mi app puca?" "Pomozi mi da sredim strukturu projekta." Za kad zapneš na nečemu.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon">🚀</div>
-      <h3>Ultra, najteži problemi</h3>
-      <p>"Optimizuj performanse aplikacije." "Implementiraj kompleksan algoritam." Kad ti treba najbolji AI.</p>
-    </div>
-    <div class="bcard">
-      <div class="bcard-icon">💡</div>
-      <h3>Kombinuj nivoe</h3>
-      <p>Koristi Nano za pitanja, Lite za kodiranje. Pro kad ti treba brzina. Mešaj po potrebi, tako kredit duže traje.</p>
+      <h3>Ultra, premium</h3>
+      <p>"Napravi mi celu aplikaciju." "Objasni mi detaljno kako ovo radi." Kad ti treba najjači AI.</p>
     </div>
   </div>
   <div class="mini-cta">
