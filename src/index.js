@@ -592,26 +592,40 @@ async function handleMiniMaxStream(res, keyId, resolved, payload) {
 
   let eventCount = 0;
   let textChunks = 0;
+  let isThinking = false;
+  let thinkingIndicatorSent = false;
+  
   try {
     for await (const event of stream) {
       eventCount++;
       lastChunkTime = Date.now();
       
-      // Debug: log every event type
-      if (eventCount <= 5 || event.type === 'content_block_start' || event.type === 'message_delta') {
-        console.log(`[MiniMax stream] event #${eventCount}: type=${event.type}`, 
-          event.type === 'content_block_start' ? `block_type=${event.content_block?.type}` : '',
-          event.type === 'content_block_delta' ? `delta_type=${event.delta?.type}` : '');
-      }
-      
       if (event.type === 'message_start' && event.message?.usage) {
         usage.input_tokens = event.message.usage.input_tokens ?? 0;
       }
+      
+      // Detect thinking block start - send indicator
+      if (event.type === 'content_block_start' && event.content_block?.type === 'thinking') {
+        isThinking = true;
+        if (!thinkingIndicatorSent) {
+          res.write(toOpenAIStreamChunk('🧠 *Razmišljam...*\n\n', { id: streamId, model: resolved.id }));
+          if (res.flush) res.flush();
+          thinkingIndicatorSent = true;
+        }
+      }
+      
+      // Detect text block start - model finished thinking
+      if (event.type === 'content_block_start' && event.content_block?.type === 'text') {
+        isThinking = false;
+      }
+      
       if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+        isThinking = false;
         const b = event.content_block;
         toolCalls.push({ id: b.id, name: b.name || 'tool', inputStr: '' });
         currentToolIndex = toolCalls.length - 1;
       }
+      
       if (event.type === 'content_block_delta') {
         const delta = event.delta;
         if (delta?.type === 'text_delta' && delta.text) {
@@ -623,17 +637,19 @@ async function handleMiniMaxStream(res, keyId, resolved, payload) {
           toolCalls[currentToolIndex].inputStr += delta.partial_json;
         }
       }
+      
       if (event.type === 'content_block_stop') {
         currentToolIndex = -1;
       }
+      
       if (event.type === 'message_delta' && event.usage) {
         if (event.usage.input_tokens != null) usage.input_tokens = event.usage.input_tokens;
         if (event.usage.output_tokens != null) usage.output_tokens = event.usage.output_tokens;
       }
     }
-    console.log(`[MiniMax stream] completed: ${eventCount} events total, ${textChunks} text chunks sent`);
+    console.log(`[MiniMax stream] completed: ${eventCount} events, ${textChunks} text chunks`);
   } catch (streamErr) {
-    console.error('MiniMax stream error mid-flight:', streamErr.message, streamErr.stack);
+    console.error('MiniMax stream error:', streamErr.message);
   }
 
   clearInterval(timeoutCheck);
@@ -899,17 +915,39 @@ async function handleAnthropicStream(res, keyId, resolved, payload) {
 
   const stream = await withRetry(() => anthropic.messages.create({ ...payload, stream: true }));
 
+  let isThinking = false;
+  let thinkingIndicatorSent = false;
+  
   try {
     for await (const event of stream) {
       lastChunkTime = Date.now();
+      
       if (event.type === 'message_start' && event.message?.usage) {
         usage.input_tokens = event.message.usage.input_tokens ?? 0;
       }
+      
+      // Detect thinking block start - send indicator
+      if (event.type === 'content_block_start' && event.content_block?.type === 'thinking') {
+        isThinking = true;
+        if (!thinkingIndicatorSent) {
+          res.write(toOpenAIStreamChunk('🧠 *Razmišljam...*\n\n', { id: streamId, model: resolved.id }));
+          if (res.flush) res.flush();
+          thinkingIndicatorSent = true;
+        }
+      }
+      
+      // Detect text block start - model finished thinking
+      if (event.type === 'content_block_start' && event.content_block?.type === 'text') {
+        isThinking = false;
+      }
+      
       if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+        isThinking = false;
         const b = event.content_block;
         toolCalls.push({ id: b.id, name: b.name || 'tool', inputStr: '' });
         currentToolIndex = toolCalls.length - 1;
       }
+      
       if (event.type === 'content_block_delta') {
         const delta = event.delta;
         if (delta?.type === 'text_delta' && delta.text) {
@@ -920,16 +958,18 @@ async function handleAnthropicStream(res, keyId, resolved, payload) {
           toolCalls[currentToolIndex].inputStr += delta.partial_json;
         }
       }
+      
       if (event.type === 'content_block_stop') {
         currentToolIndex = -1;
       }
+      
       if (event.type === 'message_delta' && event.usage) {
         if (event.usage.input_tokens != null) usage.input_tokens = event.usage.input_tokens;
         if (event.usage.output_tokens != null) usage.output_tokens = event.usage.output_tokens;
       }
     }
   } catch (streamErr) {
-    console.error('Anthropic stream error mid-flight:', streamErr.message);
+    console.error('Anthropic stream error:', streamErr.message);
   }
 
   clearInterval(timeoutCheck);
