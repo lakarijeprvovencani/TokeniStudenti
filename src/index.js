@@ -511,11 +511,12 @@ async function handleMiniMax(req, res, keyId, resolved, messages, openAITools, s
 
   const anthropicTools = openAIToolsToAnthropic(openAITools);
   const modelMax = MAX_OUTPUT[resolved.backendModel] || 32768;
-  // MiniMax counts thinking tokens in output - need large minimum for complex tasks
-  // Their thinking can use 500-2000+ tokens before producing text
-  const MINIMAX_MIN_TOKENS = 4096;
+  // MiniMax thinking uses tokens from max_tokens budget
+  // Set high max_tokens and limit thinking budget to ensure text output
   const requestedTokens = Number(max_tokens) || 8192;
-  const maxTokens = Math.min(Math.max(requestedTokens, MINIMAX_MIN_TOKENS), modelMax);
+  const maxTokens = Math.min(Math.max(requestedTokens, 8192), modelMax);
+  // Limit thinking to 2048 tokens so rest goes to actual text/code output
+  const thinkingBudget = Math.min(2048, Math.floor(maxTokens * 0.25));
 
   const payload = {
     model: resolved.backendModel,
@@ -523,6 +524,11 @@ async function handleMiniMax(req, res, keyId, resolved, messages, openAITools, s
     messages: anthropicMessages,
     ...(system && { system }),
     ...(anthropicTools.length > 0 && { tools: anthropicTools }),
+    // Limit thinking budget to ensure room for text output
+    thinking: {
+      type: 'enabled',
+      budget_tokens: thinkingBudget,
+    },
   };
 
   if (stream) {
