@@ -590,9 +590,20 @@ async function handleMiniMaxStream(res, keyId, resolved, payload) {
 
   const stream = await withRetry(() => minimax.messages.create({ ...payload, stream: true }));
 
+  let eventCount = 0;
+  let textChunks = 0;
   try {
     for await (const event of stream) {
+      eventCount++;
       lastChunkTime = Date.now();
+      
+      // Debug: log every event type
+      if (eventCount <= 5 || event.type === 'content_block_start' || event.type === 'message_delta') {
+        console.log(`[MiniMax stream] event #${eventCount}: type=${event.type}`, 
+          event.type === 'content_block_start' ? `block_type=${event.content_block?.type}` : '',
+          event.type === 'content_block_delta' ? `delta_type=${event.delta?.type}` : '');
+      }
+      
       if (event.type === 'message_start' && event.message?.usage) {
         usage.input_tokens = event.message.usage.input_tokens ?? 0;
       }
@@ -604,6 +615,7 @@ async function handleMiniMaxStream(res, keyId, resolved, payload) {
       if (event.type === 'content_block_delta') {
         const delta = event.delta;
         if (delta?.type === 'text_delta' && delta.text) {
+          textChunks++;
           res.write(toOpenAIStreamChunk(delta.text, { id: streamId, model: resolved.id }));
           if (res.flush) res.flush();
         }
@@ -619,8 +631,9 @@ async function handleMiniMaxStream(res, keyId, resolved, payload) {
         if (event.usage.output_tokens != null) usage.output_tokens = event.usage.output_tokens;
       }
     }
+    console.log(`[MiniMax stream] completed: ${eventCount} events total, ${textChunks} text chunks sent`);
   } catch (streamErr) {
-    console.error('MiniMax stream error mid-flight:', streamErr.message);
+    console.error('MiniMax stream error mid-flight:', streamErr.message, streamErr.stack);
   }
 
   clearInterval(timeoutCheck);
