@@ -118,6 +118,15 @@ const adminLimiter = rateLimit({
   handler: (_req, res) => res.status(429).json({ error: { message: 'Previše admin zahteva. Sačekaj.', code: 'rate_limit' } }),
 });
 
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { trustProxy: false },
+  handler: (_req, res) => res.status(429).json({ error: 'Previše registracija. Pokušaj ponovo za sat vremena.' }),
+});
+
 app.use((req, res, next) => {
   let logPath = req.path;
   if (req.query.secret) logPath = req.path + '?secret=***';
@@ -221,6 +230,84 @@ app.get('/admin/models', adminLimiter, (req, res) => {
     backendModel: m.backendModel,
     desc: m.desc,
   })));
+});
+
+// ---- Self-registration ----
+const REGISTER_TOKEN_SECRET = process.env.ADMIN_SECRET || 'fallback-reg-secret';
+const REGISTER_BONUS = (() => {
+  const v = parseFloat(process.env.SELF_REGISTER_BONUS);
+  return Number.isFinite(v) && v >= 0 ? v : 2;
+})();
+const REGISTER_MIN_WAIT_MS = 2000;
+
+function createRegisterToken() {
+  const ts = Date.now().toString();
+  const hmac = crypto.createHmac('sha256', REGISTER_TOKEN_SECRET).update(ts).digest('hex');
+  return ts + '.' + hmac;
+}
+
+function verifyRegisterToken(token) {
+  if (!token || typeof token !== 'string') return { valid: false, reason: 'missing_token' };
+  const parts = token.split('.');
+  if (parts.length !== 2) return { valid: false, reason: 'bad_format' };
+  const [ts, sig] = parts;
+  const expected = crypto.createHmac('sha256', REGISTER_TOKEN_SECRET).update(ts).digest('hex');
+  if (!safeEqual(sig, expected)) return { valid: false, reason: 'bad_signature' };
+  const age = Date.now() - Number(ts);
+  if (age < REGISTER_MIN_WAIT_MS) return { valid: false, reason: 'too_fast' };
+  if (age > 30 * 60 * 1000) return { valid: false, reason: 'expired' };
+  return { valid: true };
+}
+
+app.get('/register/token', registerLimiter, (_req, res) => {
+  res.json({ token: createRegisterToken() });
+});
+
+app.post('/register', registerLimiter, async (req, res) => {
+  const { first_name, last_name, honeypot, token } = req.body || {};
+
+  if (honeypot) {
+    return res.status(400).json({ error: 'Neispravan zahtev.' });
+  }
+
+  const tokenCheck = verifyRegisterToken(token);
+  if (!tokenCheck.valid) {
+    if (tokenCheck.reason === 'too_fast') {
+      return res.status(429).json({ error: 'Sačekaj nekoliko sekundi pre slanja forme.' });
+    }
+    if (tokenCheck.reason === 'expired') {
+      return res.status(400).json({ error: 'Forma je istekla. Osveži stranicu i pokušaj ponovo.' });
+    }
+    return res.status(400).json({ error: 'Neispravan sigurnosni token. Osveži stranicu.' });
+  }
+
+  if (!first_name || typeof first_name !== 'string' || first_name.trim().length < 2) {
+    return res.status(400).json({ error: 'Ime mora imati najmanje 2 karaktera.' });
+  }
+  if (!last_name || typeof last_name !== 'string' || last_name.trim().length < 2) {
+    return res.status(400).json({ error: 'Prezime mora imati najmanje 2 karaktera.' });
+  }
+  if (first_name.length > 50 || last_name.length > 50) {
+    return res.status(400).json({ error: 'Ime i prezime ne mogu biti duži od 50 karaktera.' });
+  }
+
+  const fullName = first_name.trim() + ' ' + last_name.trim();
+  const result = await addStudent(fullName);
+  if (result.error) {
+    return res.status(400).json({ error: result.error });
+  }
+
+  if (REGISTER_BONUS > 0) {
+    await addBalance(result.student.key, REGISTER_BONUS);
+  }
+
+  console.log(`Self-registration: "${fullName}" → key ${result.student.key.slice(0, 12)}...`);
+
+  res.json({
+    name: result.student.name,
+    key: result.student.key,
+    balance_usd: await getBalance(result.student.key),
+  });
 });
 
 // ---- Chat completions handler ----

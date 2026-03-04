@@ -108,6 +108,15 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .pay-ok{background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.25);color:var(--orange)}
 .pay-fail{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text2)}
 
+/* Login tabs */
+.login-tabs{display:flex;gap:0;margin-bottom:22px;border-bottom:1px solid var(--border)}
+.login-tab{flex:1;padding:10px;text-align:center;font-size:.84rem;font-weight:600;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.login-tab.active{color:var(--orange);border-bottom-color:var(--orange)}
+.login-tab:hover{color:var(--text2)}
+.login-box .reg-hp{position:absolute;left:-9999px;top:-9999px}
+.login-box button:disabled{opacity:.5;cursor:not-allowed}
+.reg-bonus{display:inline-block;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);color:var(--orange);font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:6px;margin-bottom:6px}
+
 @media(max-width:768px){
   .sidebar{position:fixed;width:100%;height:auto;bottom:0;top:auto;flex-direction:row;padding:0;border-right:none;border-top:1px solid var(--border);overflow-x:auto}
   .sidebar-brand,.sidebar-footer{display:none}
@@ -120,14 +129,29 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 </head>
 <body>
 
-<!-- Login -->
+<!-- Login / Register -->
 <div class="login" id="login">
   <div class="login-box">
     <div class="login-brand">Vajb<span>Agent</span></div>
-    <p>Uloguj se sa svojim API ključem</p>
-    <input type="password" id="keyIn" placeholder="Tvoj API ključ" autocomplete="off" autofocus>
-    <button onclick="doLogin()">Pristupi</button>
-    <div class="login-err" id="loginErr">Neispravan ključ</div>
+    <div class="login-tabs">
+      <div class="login-tab active" id="tabLogin" onclick="switchTab('login')">Prijava</div>
+      <div class="login-tab" id="tabRegister" onclick="switchTab('register')">Novi nalog</div>
+    </div>
+    <div id="loginForm">
+      <p>Uloguj se sa svojim API ključem</p>
+      <input type="password" id="keyIn" placeholder="Tvoj API ključ" autocomplete="off">
+      <button onclick="doLogin()">Pristupi</button>
+      <div class="login-err" id="loginErr">Neispravan ključ</div>
+    </div>
+    <div id="registerForm" style="display:none">
+      <div class="reg-bonus">$2 poklon kredit</div>
+      <p>Napravi besplatan nalog i kreni odmah</p>
+      <input type="text" id="regFirstName" placeholder="Ime" autocomplete="given-name">
+      <input type="text" id="regLastName" placeholder="Prezime" autocomplete="family-name">
+      <input type="text" name="website" id="regHoneypot" class="reg-hp" tabindex="-1" autocomplete="off">
+      <button id="regBtn" onclick="doRegister()" disabled>Napravi nalog</button>
+      <div class="login-err" id="regErr"></div>
+    </div>
     <div class="login-footer"><a href="/">← Nazad na početnu</a></div>
   </div>
 </div>
@@ -161,6 +185,10 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
         <div class="stat"><div class="stat-label">Zahtevi</div><div class="stat-val" id="vReqs">0</div><div class="stat-bar"><div class="stat-fill" id="bReqs" style="width:0%;background:var(--orange)"></div></div></div>
         <div class="stat"><div class="stat-label">Ulazni tokeni</div><div class="stat-val" id="vIn">0</div><div class="stat-bar"><div class="stat-fill" id="bIn" style="width:0%;background:var(--orange)"></div></div></div>
         <div class="stat"><div class="stat-label">Izlazni tokeni</div><div class="stat-val" id="vOut">0</div><div class="stat-bar"><div class="stat-fill" id="bOut" style="width:0%;background:var(--orange)"></div></div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Tvoj API ključ</div>
+        <div class="copy-box"><code id="dashKey">-</code><button onclick="copyEl('dashKey')">Kopiraj</button></div>
       </div>
       <div class="card">
         <div class="card-title">Detalji</div>
@@ -254,6 +282,84 @@ function doLogin(){
 }
 $('keyIn').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 
+let regToken='';
+let regCountdownTimer=null;
+let regBtnReady=false;
+
+function switchTab(tab){
+  $('loginErr').style.display='none';
+  $('regErr').style.display='none';
+  if(tab==='register'){
+    $('tabLogin').classList.remove('active');$('tabRegister').classList.add('active');
+    $('loginForm').style.display='none';$('registerForm').style.display='block';
+    fetchRegToken();
+    resetRegBtn();
+  } else {
+    $('tabRegister').classList.remove('active');$('tabLogin').classList.add('active');
+    $('registerForm').style.display='none';$('loginForm').style.display='block';
+    resetRegBtn();
+  }
+}
+function fetchRegToken(){
+  fetch('/register/token').then(r=>r.json()).then(d=>{regToken=d.token}).catch(()=>{});
+}
+function resetRegBtn(){
+  clearInterval(regCountdownTimer);regCountdownTimer=null;regBtnReady=false;
+  const btn=$('regBtn');btn.disabled=true;btn.textContent='Napravi nalog';
+}
+function onRegFieldInput(){
+  const fn=$('regFirstName').value.trim();
+  const ln=$('regLastName').value.trim();
+  const btn=$('regBtn');
+  if(fn.length<2||ln.length<2){
+    clearInterval(regCountdownTimer);regCountdownTimer=null;regBtnReady=false;
+    btn.disabled=true;btn.textContent='Napravi nalog';
+    return;
+  }
+  if(regBtnReady||regCountdownTimer)return;
+  let count=3;
+  btn.disabled=true;btn.textContent='Verifikacija... '+count;
+  regCountdownTimer=setInterval(()=>{
+    count--;
+    if(count>0){btn.textContent='Verifikacija... '+count}
+    else{clearInterval(regCountdownTimer);regCountdownTimer=null;regBtnReady=true;btn.disabled=false;btn.textContent='Napravi nalog'}
+  },1000);
+}
+$('regFirstName').addEventListener('input',onRegFieldInput);
+$('regLastName').addEventListener('input',onRegFieldInput);
+
+function doRegister(){
+  if(!regBtnReady)return;
+  const fn=$('regFirstName').value.trim();
+  const ln=$('regLastName').value.trim();
+  const hp=$('regHoneypot').value;
+  const err=$('regErr');
+  const btn=$('regBtn');
+  err.style.display='none';
+  if(!fn||fn.length<2){err.textContent='Ime mora imati najmanje 2 karaktera.';err.style.display='block';return}
+  if(!ln||ln.length<2){err.textContent='Prezime mora imati najmanje 2 karaktera.';err.style.display='block';return}
+  btn.disabled=true;btn.textContent='Kreiranje...';
+  fetch('/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({first_name:fn,last_name:ln,honeypot:hp,token:regToken})})
+    .then(r=>r.json().then(d=>({ok:r.ok,data:d})))
+    .then(({ok,data})=>{
+      if(!ok){
+        err.textContent=data.error||'Greška pri registraciji.';err.style.display='block';
+        fetchRegToken();regBtnReady=false;setTimeout(onRegFieldInput,100);
+        return;
+      }
+      apiKey=data.key;
+      localStorage.setItem('vajb_key',apiKey);
+      showApp();refreshData();
+      toast('Nalog kreiran! Dobrodošao, '+data.name);
+    })
+    .catch(()=>{
+      err.textContent='Greška pri povezivanju. Pokušaj ponovo.';err.style.display='block';
+      regBtnReady=false;setTimeout(onRegFieldInput,100);
+    });
+}
+$('regFirstName').addEventListener('keydown',e=>{if(e.key==='Enter')$('regLastName').focus()});
+$('regLastName').addEventListener('keydown',e=>{if(e.key==='Enter'&&regBtnReady)doRegister()});
+
 function doLogout(){localStorage.removeItem('vajb_key');apiKey='';showLogin();$('keyIn').value='';$('loginErr').style.display='none'}
 
 function refreshData(){
@@ -271,7 +377,11 @@ function refreshData(){
       .then(r=>{if(!r.ok)throw new Error();return r.json()})
       .then(d=>{showApp();render(d)})
       .catch(()=>{showLogin()});
-  } else {showLogin()}
+  } else {
+    showLogin();
+    const p=new URLSearchParams(location.search);
+    if(p.get('tab')==='register')switchTab('register');
+  }
   setInterval(refreshData,30000);
 })();
 
@@ -294,6 +404,7 @@ function render(d){
   $('vCost').textContent='$'+(d.estimated_cost_usd??0).toFixed(2);
   $('vTotal').textContent=fmt((d.input_tokens||0)+(d.output_tokens||0));
   $('topBal').textContent='$'+(d.balance_usd??0).toFixed(2);
+  $('dashKey').textContent=apiKey;
   $('setupKey').textContent=apiKey;
   $('setupUrl').textContent=location.origin;
 
