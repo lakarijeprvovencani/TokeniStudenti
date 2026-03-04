@@ -29,19 +29,20 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 /* Layout */
 .app{display:flex;min-height:100vh;display:none}
-.sidebar{width:230px;background:var(--sidebar);border-right:1px solid var(--border);padding:24px 0;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10}
-.sidebar-brand{padding:0 22px 22px;border-bottom:1px solid var(--border);margin-bottom:8px}
-.sidebar-brand h1{font-size:1.1rem;font-weight:900;letter-spacing:-.02em}
+.sidebar{width:260px;background:var(--sidebar);border-right:1px solid var(--border);padding:28px 0;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10}
+.sidebar-brand{padding:0 24px 24px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.sidebar-brand h1{font-size:1.2rem;font-weight:900;letter-spacing:-.02em}
 .sidebar-brand h1 span{color:var(--orange)}
-.sidebar-brand p{font-size:.68rem;color:var(--text2);margin-top:3px;font-family:'SF Mono',ui-monospace,monospace}
-.nav-item{display:flex;align-items:center;gap:10px;padding:11px 22px;font-size:.84rem;font-weight:500;color:var(--text);cursor:pointer;border-left:3px solid transparent;transition:all .15s}
+.sidebar-brand p{font-size:.72rem;color:var(--text2);margin-top:4px;font-family:'SF Mono',ui-monospace,monospace}
+.nav-item{display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:.92rem;font-weight:500;color:var(--text);cursor:pointer;border-left:3px solid transparent;transition:all .15s}
 .nav-item:hover{color:var(--text);background:rgba(255,255,255,.02)}
 .nav-item.active{color:var(--text);background:rgba(249,115,22,.06);border-left-color:var(--orange);font-weight:600}
-.nav-icon{font-size:1rem;width:20px;text-align:center}
-.sidebar-footer{margin-top:auto;padding:18px 22px;border-top:1px solid var(--border)}
-.sidebar-footer button{width:100%;padding:9px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:8px;font-size:.78rem;font-family:inherit;cursor:pointer;font-weight:500;transition:all .15s}
+.nav-icon{flex-shrink:0;width:22px;height:22px;display:flex;align-items:center;justify-content:center}
+.nav-icon svg{width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sidebar-footer{margin-top:auto;padding:20px 24px;border-top:1px solid var(--border)}
+.sidebar-footer button{width:100%;padding:10px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:8px;font-size:.82rem;font-family:inherit;cursor:pointer;font-weight:500;transition:all .15s}
 .sidebar-footer button:hover{border-color:var(--border2);color:var(--text)}
-.main{margin-left:230px;flex:1;padding:30px 36px 60px;min-height:100vh}
+.main{margin-left:260px;flex:1;padding:30px 36px 60px;min-height:100vh}
 
 /* Pages */
 .page{display:none}.page.active{display:block}
@@ -50,22 +51,27 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 /* Cards */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:16px}
 .card-title{font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;font-weight:700}
+.card-title-light{color:var(--text)}
+.api-key-note{font-size:.78rem;color:var(--text);margin-top:10px;line-height:1.5}
 
-/* Hero balance */
-.hero-bal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;margin-bottom:20px;position:relative;overflow:hidden}
+/* Hero balance (Overview) */
+.hero-bal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;margin-bottom:20px;position:relative;overflow:hidden;border-left:4px solid var(--orange);background:linear-gradient(135deg,var(--surface) 0%,rgba(249,115,22,.04) 100%)}
 .hero-bal::before{content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,.08),transparent 70%)}
-.hero-label{font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-weight:700}
-.hero-val{font-size:3rem;font-weight:900;letter-spacing:-.04em;margin:8px 0 4px;line-height:1}
+.hero-label{font-size:.72rem;color:var(--text2);text-transform:uppercase;letter-spacing:.1em;font-weight:700}
+.hero-val{font-size:3rem;font-weight:900;letter-spacing:-.04em;margin:8px 0 4px;line-height:1;color:var(--text)}
 .hero-val .cur{font-size:1.1rem;font-weight:500;color:var(--text2);margin-left:4px}
-.hero-sub{font-size:.78rem;color:var(--text2)}
+.hero-sub{font-size:.78rem;color:var(--text2);line-height:1.4}
 
 /* Stats */
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
-.stat-label{font-size:.63rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:700}
-.stat-val{font-size:1.5rem;font-weight:800;letter-spacing:-.02em}
-.stat-bar{margin-top:10px;height:4px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.overview-intro{font-size:.9rem;color:var(--text2);line-height:1.55;margin-bottom:22px;max-width:480px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:24px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;transition:border-color .2s}
+.stat:hover{border-color:var(--border2)}
+.stat-label{font-size:.7rem;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;font-weight:700}
+.stat-val{font-size:1.6rem;font-weight:800;letter-spacing:-.02em;color:var(--text)}
+.stat-bar{margin-top:12px;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden}
 .stat-fill{height:100%;border-radius:3px;transition:width .5s}
+@media(max-width:640px){.stats{grid-template-columns:1fr}}
 
 /* Models */
 .model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
@@ -75,13 +81,22 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .model-tier{font-size:.6rem;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;font-weight:600}
 .model-stat{font-size:1.3rem;font-weight:900}
 .model-detail{font-size:.68rem;color:var(--text2);margin-top:4px}
+.model-disclaimer{font-size:.75rem;color:var(--text);margin-bottom:16px;line-height:1.5}
+.model-disclaimer .link-pregled{color:var(--orange);text-decoration:underline;text-underline-offset:2px}
+.model-disclaimer .link-pregled:hover{color:var(--orange2)}
 .cheap{color:var(--orange)}.mid{color:var(--orange)}.pricey{color:var(--orange)}
 
 /* Topup */
+.topup-intro{font-size:.9rem;color:var(--text2);line-height:1.6;margin-bottom:24px;max-width:560px}
+.topup-balance-card{border-left:4px solid var(--orange);background:linear-gradient(135deg,var(--surface) 0%,rgba(249,115,22,.04) 100%)}
+.topup-balance-val{font-size:2.5rem;font-weight:900;letter-spacing:-.03em;margin:8px 0 6px;color:var(--text)}
+.topup-balance-sub{font-size:.8rem;color:var(--text2);line-height:1.5;margin:0}
+.topup-choose-sub{font-size:.82rem;color:var(--text2);margin-bottom:16px;line-height:1.5}
 .topup-grid{display:flex;gap:12px;flex-wrap:wrap}
 .btn-topup{padding:14px 28px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:.95rem;font-weight:700;font-family:inherit;border-radius:10px;cursor:pointer;transition:all .15s}
 .btn-topup:hover{border-color:var(--orange);color:var(--orange)}
 .topup-err{color:var(--red);font-size:.8rem;margin-top:12px;display:none}
+.topup-secure{font-size:.75rem;color:var(--text3);margin-top:16px;line-height:1.5}
 
 /* Setup */
 .setup-step{display:flex;gap:14px;margin-bottom:18px}
@@ -108,6 +123,21 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .pay-banner .close-b:hover{opacity:1}
 .pay-ok{background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.25);color:var(--orange)}
 .pay-fail{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text2)}
+
+/* Link as button (forgot key) */
+.link-btn{background:none;border:none;font-size:.78rem;color:var(--text3);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-family:inherit;padding:0}
+.link-btn:hover{color:var(--text2)}
+
+/* Modal (forgot key) */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;visibility:hidden;transition:opacity .2s, visibility .2s}
+.modal-overlay.show{opacity:1;visibility:visible}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px 32px;max-width:380px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+.modal-box p{margin:0 0 16px;font-size:.9rem;color:var(--text);line-height:1.6}
+.modal-box p:last-of-type{margin-bottom:0}
+.modal-box a{color:var(--orange);font-weight:600}
+.modal-box a:hover{text-decoration:underline}
+.modal-close{display:block;margin-top:20px;width:100%;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.88rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s}
+.modal-close:hover{border-color:var(--border2);background:var(--border)}
 
 /* Login tabs */
 .login-tabs{display:flex;gap:0;margin-bottom:28px;border-bottom:1px solid var(--border)}
@@ -153,7 +183,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <input type="password" id="keyIn" placeholder="Tvoj API ključ" autocomplete="off">
       <button onclick="doLogin()">Pristupi</button>
       <div class="login-err" id="loginErr">Neispravan ključ</div>
-      <div style="text-align:center;margin-top:16px"><a href="mailto:info@vajbkodiranje.com" style="font-size:.78rem;color:var(--text3);text-decoration:underline;text-underline-offset:3px">Zaboravio si ključ?</a></div>
+      <div style="text-align:center;margin-top:16px"><button type="button" class="link-btn" onclick="openKeyModal()">Zaboravio si ključ?</button></div>
     </div>
     <div id="registerForm" style="display:none">
       <div style="text-align:center">
@@ -172,6 +202,15 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
   </div>
 </div>
 
+<!-- Modal: Zaboravio si ključ? -->
+<div class="modal-overlay" id="keyModal" onclick="if(event.target===this) closeKeyModal()">
+  <div class="modal-box">
+    <p>Ukoliko ti je potreban tvoj API ključ, kontaktiraj nas putem emaila. Odgovaramo u roku od nekoliko sati.</p>
+    <p><a href="mailto:info@vajbkodiranje.com">info@vajbkodiranje.com</a></p>
+    <button type="button" class="modal-close" onclick="closeKeyModal()">U redu</button>
+  </div>
+</div>
+
 <!-- App -->
 <div class="app" id="app">
   <aside class="sidebar">
@@ -179,10 +218,10 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <h1>Vajb<span>Agent</span></h1>
       <p id="sideKey"></p>
     </div>
-    <div class="nav-item active" data-page="overview"><span class="nav-icon">&#9635;</span> Pregled</div>
-    <div class="nav-item" data-page="models"><span class="nav-icon">&#9881;</span> Modeli</div>
-    <div class="nav-item" data-page="topup"><span class="nav-icon">&#9733;</span> Dopuna</div>
-    <div class="nav-item" data-page="setup"><span class="nav-icon">&#9881;</span> Podešavanja</div>
+    <div class="nav-item active" data-page="overview"><span class="nav-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span> Pregled</div>
+    <div class="nav-item" data-page="models"><span class="nav-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg></span> Modeli</div>
+    <div class="nav-item" data-page="topup"><span class="nav-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg></span> Dopuna</div>
+    <div class="nav-item" data-page="setup"><span class="nav-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span> Podešavanja</div>
     <div class="sidebar-footer"><button onclick="doLogout()">Odjavi se</button></div>
   </aside>
 
@@ -190,12 +229,13 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     <!-- PREGLED -->
     <div class="page active" id="pg-overview">
       <div class="page-title">Pregled</div>
+      <p class="overview-intro">Tvoj kredit i upotreba u jednom mestu. Stanje se osvežava pri učitavanju.</p>
       <div class="pay-banner pay-ok" id="payOk" style="display:none">&#10003; Uplata uspešna! Krediti su dodati na tvoj nalog.<button class="close-b" onclick="closeBanner('payOk')">&times;</button></div>
       <div class="pay-banner pay-fail" id="payFail" style="display:none">Plaćanje je otkazano. Krediti nisu naplaćeni.<button class="close-b" onclick="closeBanner('payFail')">&times;</button></div>
       <div class="hero-bal">
         <div class="hero-label">Raspoloživi kredit</div>
         <div class="hero-val"><span id="hBal">0.00</span><span class="cur">USD</span></div>
-        <div class="hero-sub">Troši se automatski po zahtevu</div>
+        <div class="hero-sub">Troši se automatski po zahtevu u Cursor-u</div>
       </div>
       <div class="stats">
         <div class="stat"><div class="stat-label">Zahtevi</div><div class="stat-val" id="vReqs">0</div><div class="stat-bar"><div class="stat-fill" id="bReqs" style="width:0%;background:var(--orange)"></div></div></div>
@@ -203,12 +243,12 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
         <div class="stat"><div class="stat-label">Izlazni tokeni</div><div class="stat-val" id="vOut">0</div><div class="stat-bar"><div class="stat-fill" id="bOut" style="width:0%;background:var(--orange)"></div></div></div>
       </div>
       <div class="card">
-        <div class="card-title">Tvoj API ključ</div>
+        <div class="card-title card-title-light">Tvoj API ključ</div>
         <div class="copy-box"><code id="dashKey">-</code><button onclick="copyEl('dashKey')">Kopiraj</button></div>
-        <p style="font-size:.78rem;color:var(--text3);margin-top:10px;line-height:1.5">Sačuvaj ovaj ključ na sigurno mesto — koristiš ga za logovanje na dashboard i za povezivanje sa Cursor IDE. Radi na svim uređajima, bez ograničenja.</p>
+        <p class="api-key-note">Sačuvaj ovaj ključ na sigurno mesto, koristiš ga za logovanje na dashboard i za povezivanje sa Cursor IDE.</p>
       </div>
       <div class="card">
-        <div class="card-title">Detalji</div>
+        <div class="card-title card-title-light">Detalji</div>
         <div class="detail-row"><span class="detail-label">Poslednja upotreba</span><span class="detail-val" id="vLast">-</span></div>
         <div class="detail-row"><span class="detail-label">Ukupno potrošeno</span><span class="detail-val" id="vCost">$0.00</span></div>
         <div class="detail-row"><span class="detail-label">Ukupno tokena</span><span class="detail-val" id="vTotal">0</span></div>
@@ -219,7 +259,8 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     <div class="page" id="pg-models">
       <div class="page-title">Modeli</div>
       <div class="card">
-        <div class="card-title">Koliko zahteva možeš sa trenutnim kreditom</div>
+        <div class="card-title card-title-light">Orijentaciono: zahteva za tvoj kredit</div>
+        <p class="model-disclaimer">Broj zavisi od dužine i kompleksnosti (kratko pitanje = manje, veliki kontekst = više). Stvarnu potrošnju vidiš u <a href="#" class="link-pregled" onclick="document.querySelector('.nav-item[data-page=\'overview\']').click();return false">Pregledu</a>.</p>
         <div class="model-grid" id="modelGrid"></div>
       </div>
     </div>
@@ -227,8 +268,17 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     <!-- DOPUNA -->
     <div class="page" id="pg-topup">
       <div class="page-title">Dopuna kredita</div>
+      <p class="topup-intro">Dopuni kredit karticom. Iznos koji izabereš naplaćuje se putem Stripe-a i odmah se pripisuje na tvoj nalog — nema mesečne obaveze, trošiš kad koristiš.</p>
+
+      <div class="card topup-balance-card">
+        <div class="card-title card-title-light">Trenutno stanje</div>
+        <div class="topup-balance-val" id="topBal">$0.00</div>
+        <p class="topup-balance-sub">Nepotrošeni kredit na tvom nalogu. Troši se automatski pri svakom zahtevu u Cursor-u.</p>
+      </div>
+
       <div class="card">
-        <div class="card-title">Izaberi iznos</div>
+        <div class="card-title card-title-light">Izaberi iznos za dopunu</div>
+        <p class="topup-choose-sub">Klik na iznos otvara sigurnu Stripe stranicu za plaćanje. Krediti se pripisuju odmah po uspešnoj uplati.</p>
         <div class="topup-grid">
           <button class="btn-topup" onclick="topup(5)">+ $5</button>
           <button class="btn-topup" onclick="topup(10)">+ $10</button>
@@ -246,10 +296,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
           <button class="btn-topup" onclick="topup(70)">+ $70</button>
         </div>
         <div class="topup-err" id="topErr"></div>
-      </div>
-      <div class="card">
-        <div class="card-title">Trenutno stanje</div>
-        <div style="font-size:2.2rem;font-weight:900;letter-spacing:-.03em" id="topBal">$0.00</div>
+        <p class="topup-secure">Plaćanje se obavlja putem Stripe-a. Podatke kartice ne skladištimo.</p>
       </div>
     </div>
 
@@ -281,12 +328,13 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 <script>
 let apiKey='';
+// Ranges: za $10 koliko otprilike zahteva (kao na landingu). Za tvoj kredit skalira se.
 const MODELS=[
-  {id:'vajb-agent-nano',name:'Nano',costPer:.008325,tier:'Budget'},
-  {id:'vajb-agent-lite',name:'Lite',costPer:.13875,tier:'Daily'},
-  {id:'vajb-agent-pro',name:'Pro',costPer:.06,tier:'Standard'},
-  {id:'vajb-agent-max',name:'Max',costPer:.18,tier:'Premium'},
-  {id:'vajb-agent-ultra',name:'Ultra',costPer:.3,tier:'Elite'},
+  {id:'vajb-agent-nano',name:'Nano',tier:'Budget',per10:[500,3000]},
+  {id:'vajb-agent-lite',name:'Lite',tier:'Daily',per10:[100,400]},
+  {id:'vajb-agent-pro',name:'Pro',tier:'Standard',per10:[200,800]},
+  {id:'vajb-agent-max',name:'Max',tier:'Premium',per10:[80,300]},
+  {id:'vajb-agent-ultra',name:'Ultra',tier:'Elite',per10:[50,200]},
 ];
 
 function $(id){return document.getElementById(id)}
@@ -443,14 +491,18 @@ function render(d){
   const grid=$('modelGrid');grid.innerHTML='';
   const bal=d.balance_usd||0;
   MODELS.forEach(m=>{
-    const reqs=bal>0?Math.floor(bal/m.costPer):0;
-    const hrs=(reqs*2.5/60).toFixed(1);
-    const cls=m.costPer<.02?'cheap':m.costPer<.1?'mid':'pricey';
-    grid.innerHTML+=`<div class="model-card"><div class="model-name">${m.name}</div><div class="model-tier">${m.tier}</div><div class="model-stat ${cls}">${fmt(reqs)}</div><div class="model-detail">zahteva · ~${hrs}h</div></div>`;
+    const [a,b]=m.per10;
+    const minR=bal>0?Math.round((a*bal)/10):0;
+    const maxR=bal>0?Math.round((b*bal)/10):0;
+    const rangeStr=minR>=maxR?`~${fmt(minR)}`:`~${fmt(minR)}–${fmt(maxR)}`;
+    grid.innerHTML+=`<div class="model-card"><div class="model-name">${m.name}</div><div class="model-tier">${m.tier}</div><div class="model-stat cheap">${rangeStr}</div><div class="model-detail">zahteva (orijentaciono)</div></div>`;
   });
 }
 
 function closeBanner(id){$(id).style.display='none';history.replaceState(null,'','/dashboard')}
+function openKeyModal(){$('keyModal').classList.add('show');document.body.style.overflow='hidden'}
+function closeKeyModal(){$('keyModal').classList.remove('show');document.body.style.overflow=''}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeKeyModal()});
 (function(){
   const p=new URLSearchParams(location.search);
   if(p.get('status')==='success'||p.get('paid')==='1')$('payOk').style.display='flex';

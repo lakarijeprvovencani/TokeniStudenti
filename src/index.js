@@ -920,6 +920,9 @@ app.get('/admin', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));
 });
 
+// ---- Static assets (favicon, etc.) ----
+app.use(express.static(path.join(__dirname, '..', 'public'), { index: false }));
+
 // ---- 404 ----
 app.use((req, res) => {
   res.status(404).json({ error: { message: 'Not found' } });

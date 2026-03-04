@@ -19,7 +19,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .login-brand{font-size:1.3rem;font-weight:900;letter-spacing:-.03em;margin-bottom:2px}
 .login-brand span{color:var(--orange)}
 .login-badge{display:inline-block;padding:3px 10px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);border-radius:6px;font-size:.6rem;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.05em;margin-bottom:16px}
-.login-box p{font-size:.84rem;color:var(--text2);margin-bottom:28px}
+.login-box p{font-size:.84rem;color:var(--text);margin-bottom:28px}
 .login-box input{width:100%;padding:13px 16px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.88rem;font-family:inherit;outline:none;margin-bottom:14px;transition:border-color .2s}
 .login-box input:focus{border-color:var(--orange)}
 .login-box button{width:100%;padding:13px;background:var(--orange);color:#000;border:none;border-radius:10px;font-weight:700;font-size:.9rem;font-family:inherit;cursor:pointer}
@@ -28,33 +28,34 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 /* Layout */
 .app{display:flex;min-height:100vh;display:none}
-.sidebar{width:230px;background:var(--sidebar);border-right:1px solid var(--border);padding:24px 0;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10}
-.sidebar-brand{padding:0 22px 22px;border-bottom:1px solid var(--border);margin-bottom:8px}
-.sidebar-brand h1{font-size:1.1rem;font-weight:900;letter-spacing:-.02em}
+.sidebar{width:260px;background:var(--sidebar);border-right:1px solid var(--border);padding:28px 0;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10}
+.sidebar-brand{padding:0 24px 24px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.sidebar-brand h1{font-size:1.2rem;font-weight:900;letter-spacing:-.02em}
 .sidebar-brand h1 span{color:var(--orange)}
-.sidebar-brand .badge{display:inline-block;padding:2px 8px;background:rgba(249,115,22,.1);border-radius:5px;font-size:.55rem;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.04em;margin-top:4px}
-.nav-item{display:flex;align-items:center;gap:10px;padding:11px 22px;font-size:.84rem;font-weight:500;color:var(--text);cursor:pointer;border-left:3px solid transparent;transition:all .15s}
+.sidebar-brand .badge{display:inline-block;padding:3px 10px;background:rgba(249,115,22,.1);border-radius:6px;font-size:.6rem;font-weight:700;color:var(--orange);text-transform:uppercase;letter-spacing:.04em;margin-top:4px}
+.nav-item{display:flex;align-items:center;gap:14px;padding:14px 24px;font-size:.92rem;font-weight:500;color:var(--text);cursor:pointer;border-left:3px solid transparent;transition:all .15s}
 .nav-item:hover{color:var(--text);background:rgba(255,255,255,.02)}
 .nav-item.active{color:var(--text);background:rgba(249,115,22,.06);border-left-color:var(--orange);font-weight:600}
-.nav-icon{font-size:1rem;width:20px;text-align:center}
-.sidebar-footer{margin-top:auto;padding:18px 22px;border-top:1px solid var(--border);font-size:.72rem}
-.sidebar-footer a{color:var(--text2);text-decoration:none;font-weight:500}
+.nav-icon{flex-shrink:0;width:22px;height:22px;display:flex;align-items:center;justify-content:center}
+.nav-icon svg{width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sidebar-footer{margin-top:auto;padding:20px 24px;border-top:1px solid var(--border);font-size:.75rem}
+.sidebar-footer a{color:var(--text);text-decoration:none;font-weight:500}
 .sidebar-footer a:hover{color:var(--text)}
-.main{margin-left:230px;flex:1;padding:30px 36px 60px;min-height:100vh;overflow-y:auto}
+.main{margin-left:260px;flex:1;padding:30px 36px 60px;min-height:100vh;overflow-y:auto}
 
 .page{display:none}.page.active{display:block}
 .page-title{font-size:1.25rem;font-weight:800;letter-spacing:-.02em;margin-bottom:22px}
 
 /* Cards */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:16px}
-.card-title{font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;font-weight:700}
+.card-title{font-size:.65rem;color:var(--text);text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;font-weight:700}
 
 /* Summary cards */
 .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
 .sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
-.sum-label{font-size:.63rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:700}
+.sum-label{font-size:.63rem;color:var(--text);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:700}
 .sum-val{font-size:1.6rem;font-weight:900;letter-spacing:-.03em}
-.sum-sub{font-size:.68rem;color:var(--text3);margin-top:4px}
+.sum-sub{font-size:.68rem;color:var(--text);margin-top:4px}
 .c-green{color:var(--green)}.c-red{color:var(--red)}.c-orange{color:var(--orange)}.c-yellow{color:var(--yellow)}.c-blue{color:var(--blue)}
 
 /* Model breakdown bars */
@@ -62,17 +63,17 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .mb-name{width:100px;font-size:.78rem;color:var(--text);text-align:right;flex-shrink:0;font-weight:500}
 .mb-bar-wrap{flex:1;height:24px;background:var(--surface2);border-radius:7px;overflow:hidden;position:relative}
 .mb-bar{height:100%;border-radius:7px;min-width:3px;transition:width .6s}
-.mb-info{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.63rem;color:var(--text3);font-weight:500}
+.mb-info{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.63rem;color:var(--text);font-weight:500}
 .mb-cost{width:80px;font-size:.78rem;text-align:right;color:var(--red);flex-shrink:0;font-weight:600}
 
 /* Tables */
 table{width:100%;border-collapse:collapse}
 th,td{padding:10px 12px;text-align:left;font-size:.8rem;border-bottom:1px solid var(--border)}
-th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:.63rem}
+th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:.63rem}
 .mono{font-family:'SF Mono',ui-monospace,monospace;font-size:.73rem}
 .tag{display:inline-block;padding:3px 10px;border-radius:6px;font-size:.63rem;font-weight:700}
 .tag-green,.tag-active{background:var(--orange-dim,rgba(249,115,22,.1));color:var(--orange)}
-.tag-red,.tag-inactive{background:rgba(255,255,255,.05);color:var(--text3)}
+.tag-red,.tag-inactive{background:rgba(255,255,255,.05);color:var(--text)}
 .tag-openai{background:rgba(16,163,127,.1);color:#34d399}
 .tag-anthropic{background:rgba(249,115,22,.1);color:var(--orange2)}
 
@@ -82,7 +83,7 @@ th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.0
 .btn-g{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)}.btn-g:hover{background:rgba(34,197,94,.2)}
 .btn-r{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)}.btn-r:hover{background:rgba(239,68,68,.2)}
 .btn-y{background:rgba(234,179,8,.1);color:var(--yellow);border:1px solid rgba(234,179,8,.2)}.btn-y:hover{background:rgba(234,179,8,.2)}
-.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text);border-color:var(--border2)}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text);border-color:var(--border2)}
 .btn-sm{padding:5px 10px;font-size:.72rem}
 
 /* Forms */
@@ -92,9 +93,9 @@ th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.0
 
 /* New student result */
 .new-result{margin-top:16px;padding:18px;border-radius:10px;background:rgba(249,115,22,.05);border:1px solid rgba(249,115,22,.2);display:none;position:relative}
-.new-result .lbl{font-size:.68rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.new-result .lbl{font-size:.68rem;color:var(--text);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
 .new-result code{color:var(--orange);font-family:'SF Mono',monospace;font-size:.85rem}
-.new-result .close-btn{position:absolute;top:12px;right:14px;background:none;border:none;color:var(--text3);font-size:1.1rem;cursor:pointer;padding:4px 8px;border-radius:6px;transition:all .15s}
+.new-result .close-btn{position:absolute;top:12px;right:14px;background:none;border:none;color:var(--text);font-size:1.1rem;cursor:pointer;padding:4px 8px;border-radius:6px;transition:all .15s}
 .new-result .close-btn:hover{color:var(--text);background:rgba(255,255,255,.05)}
 
 /* Credit modal */
@@ -104,11 +105,19 @@ th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.0
 .modal h3{font-size:1.05rem;font-weight:800;margin-bottom:18px}
 
 /* Earn grid */
-.earn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
-.earn-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px}
-.earn-card .etop{font-size:.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;font-weight:700}
-.earn-card .eval{font-size:1.2rem;font-weight:900;margin:4px 0}
-.earn-card .esub{font-size:.68rem;color:var(--text3)}
+.earn-intro{font-size:.85rem;color:var(--text2);line-height:1.55;margin-bottom:20px;max-width:520px}
+.earn-block{margin-bottom:28px;padding-bottom:28px;border-bottom:1px solid var(--border)}
+.earn-block:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none}
+.earn-block-title{font-size:.95rem;font-weight:700;margin-bottom:14px;color:var(--text)}
+.earn-block-title .earn-amt{color:var(--orange)}
+.earn-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.earn-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
+.earn-card .etop{font-size:.6rem;color:var(--text);text-transform:uppercase;letter-spacing:.05em;font-weight:700;margin-bottom:6px}
+.earn-card .eval{font-size:1.1rem;font-weight:900;margin:2px 0}
+.earn-card .eval span{font-size:.7rem;font-weight:500;color:var(--text2)}
+.earn-card .esub{font-size:.68rem;color:var(--text2);margin-top:4px}
+@media(max-width:900px){.earn-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:500px){.earn-grid{grid-template-columns:1fr}}
 
 /* Toast */
 .toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:12px 20px;border-radius:10px;font-size:.82rem;font-weight:500;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
@@ -145,14 +154,14 @@ th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.0
       <h1>Vajb<span>Agent</span></h1>
       <div class="badge">Admin</div>
     </div>
-    <div class="nav-item active" data-page="overview"><span class="nav-icon">&#9635;</span> Analitika</div>
-    <div class="nav-item" data-page="students"><span class="nav-icon">&#9823;</span> Studenti</div>
-    <div class="nav-item" data-page="models"><span class="nav-icon">&#9881;</span> Modeli</div>
-    <div class="nav-item" data-page="earnings"><span class="nav-icon">&#9733;</span> Zarada</div>
+    <div class="nav-item active" data-page="overview"><span class="nav-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span> Analitika</div>
+    <div class="nav-item" data-page="students"><span class="nav-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Studenti</div>
+    <div class="nav-item" data-page="models"><span class="nav-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg></span> Modeli</div>
+    <div class="nav-item" data-page="earnings"><span class="nav-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span> Zarada</div>
     <div class="sidebar-footer">
       <a href="/dashboard" target="_blank">Student Dashboard</a> &middot;
       <a href="/setup" target="_blank">Setup</a>
-      <div style="margin-top:10px"><button onclick="doAdminLogout()" style="width:100%;padding:8px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:8px;font-size:.72rem;font-family:inherit;cursor:pointer;font-weight:500">Odjavi se</button></div>
+      <div style="margin-top:10px"><button onclick="doAdminLogout()" style="width:100%;padding:8px;background:transparent;border:1px solid var(--border);color:var(--text);border-radius:8px;font-size:.72rem;font-family:inherit;cursor:pointer;font-weight:500">Odjavi se</button></div>
     </div>
   </aside>
 
@@ -217,7 +226,7 @@ th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.0
         <div class="card-title">Svi studenti</div>
         <table><thead><tr><th>Ime</th><th>API ključ</th><th>Balans</th><th>Status</th><th>Kreiran</th><th>Akcije</th></tr></thead>
         <tbody id="stuBody"></tbody></table>
-        <div id="stuEmpty" style="display:none;text-align:center;padding:28px;color:var(--text3);font-size:.85rem">Nema studenata. Dodaj prvog iznad.</div>
+        <div id="stuEmpty" style="display:none;text-align:center;padding:28px;color:var(--text);font-size:.85rem">Nema studenata. Dodaj prvog iznad.</div>
       </div>
     </div>
 
@@ -234,8 +243,9 @@ th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.0
     <!-- ZARADA -->
     <div class="page" id="pg-earnings">
       <div class="page-title">Kalkulator zarade</div>
+      <p class="earn-intro">Orijentaciono: ako student dopuni npr. $10, tvoja zarada je razlika (na markup 1.5× ostaje ti ~$3.33). Broj zahteva zavisi od modela i dužine razgovora.</p>
       <div class="card">
-        <div class="card-title">Koliko zarađuješ po budžetu studenta</div>
+        <div class="card-title">Po iznosu koji student dopuni</div>
         <div id="earnWrap"></div>
       </div>
     </div>
@@ -246,8 +256,8 @@ th{color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.0
 <div class="modal-bg" id="creditModal">
   <div class="modal">
     <h3>Izmeni kredite</h3>
-    <div style="margin-bottom:12px"><span style="font-size:.72rem;color:var(--text3)">Student:</span> <strong id="cmName"></strong></div>
-    <div style="margin-bottom:12px"><span style="font-size:.72rem;color:var(--text3)">Trenutno:</span> <strong id="cmBal" class="c-orange"></strong></div>
+    <div style="margin-bottom:12px"><span style="font-size:.72rem;color:var(--text)">Student:</span> <strong id="cmName"></strong></div>
+    <div style="margin-bottom:12px"><span style="font-size:.72rem;color:var(--text)">Trenutno:</span> <strong id="cmBal" class="c-orange"></strong></div>
     <div class="form-row" style="margin-bottom:14px">
       <input class="form-input" id="cmAmount" type="number" placeholder="Iznos USD" step="1" style="width:120px">
       <button class="btn btn-g" onclick="creditAction(1)">+ Dodaj</button>
@@ -385,7 +395,7 @@ function renderOverview(){
     </div>`;
   });
   if(modelData.every(d=>d.reqs===0)){
-    mb.innerHTML+='<div style="text-align:center;padding:20px;color:var(--text3);font-size:.82rem">Nema podataka još. Statistika se popunjava kako studenti koriste modele.</div>';
+    mb.innerHTML+='<div style="text-align:center;padding:20px;color:var(--text);font-size:.82rem">Nema podataka još. Statistika se popunjava kako studenti koriste modele.</div>';
   }
 
   // Monthly projection
@@ -432,7 +442,7 @@ function renderOverview(){
       <td>${fmt(u.requests||0)}</td>
       <td style="font-size:.75rem">${fmt(uIn)} / ${fmt(uOut)}</td>
       <td style="font-size:.75rem">$${uCost.toFixed(3)}</td>
-      <td style="color:var(--text3);font-size:.75rem">${fmtD(u.last_used)}</td>
+      <td style="color:var(--text);font-size:.75rem">${fmtD(u.last_used)}</td>
     </tr>`;
   });
 }
@@ -448,7 +458,7 @@ function renderStudents(){
       <td class="mono" style="cursor:pointer;color:var(--orange)" onclick="copyText('${esc(s.key)}')" title="Klikni za kopiranje">${esc(s.key)}</td>
       <td class="c-orange">$${(s.balance_usd||0).toFixed(2)}</td>
       <td>${s.active?'<span class="tag tag-active">Aktivan</span>':'<span class="tag tag-inactive">Neaktivan</span>'}</td>
-      <td style="color:var(--text3)">${fmtD(s.created)}</td>
+      <td style="color:var(--text)">${fmtD(s.created)}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-sm btn-y" onclick="openCredit('${esc(s.key)}','${esc(s.name)}',${s.balance_usd||0})">Krediti</button>
         <button class="btn btn-sm ${s.active?'btn-ghost':'btn-g'}" onclick="toggleStu('${esc(s.key)}',${!s.active})">${s.active?'Deaktiviraj':'Aktiviraj'}</button>
@@ -503,7 +513,7 @@ function creditAction(sign){
   if(!amt){toast('Unesi iznos.');return}
   const realAmt=sign>0?amt:-amt;
   api('POST','/admin/add-credits',{key_id:cmKey,amount_usd:realAmt}).then(d=>{
-    if(d.error){$('cmRes').innerHTML='<span style="color:var(--text2)">'+d.error+'</span>';return}
+    if(d.error){$('cmRes').innerHTML='<span style="color:var(--text)">'+d.error+'</span>';return}
     $('cmRes').innerHTML='<span style="color:var(--orange)">Novo stanje: $'+d.balance_usd.toFixed(2)+'</span>';
     $('cmBal').textContent='$'+d.balance_usd.toFixed(2);
     refresh();
@@ -533,13 +543,13 @@ function renderEarnings(){
   [10,20,50].forEach(budget=>{
     const real=budget/DATA.markup;
     const earn=budget-real;
-    let html=`<div style="margin-bottom:24px"><div style="font-size:.9rem;font-weight:700;margin-bottom:10px">Student plaća $${budget} → zarada <span style="color:var(--orange)">$${earn.toFixed(2)}</span></div><div class="earn-grid">`;
+    let html=`<div class="earn-block"><div class="earn-block-title">Student dopuni $${budget} → tvoja zarada <span class="earn-amt">$${earn.toFixed(2)}</span></div><div class="earn-grid">`;
     DATA.models.forEach(m=>{
       const p=PRICES[m.backendModel]||{in:3,out:15};
       const cost=(AVG_IN/1e6)*p.in+(AVG_OUT/1e6)*p.out;
-      const reqs=Math.floor(real/cost);
-      const hrs=(reqs*2.5/60).toFixed(0);
-      html+=`<div class="earn-card"><div class="etop">${m.name}</div><div class="eval">${fmt(reqs)} <span style="font-size:.65rem;font-weight:400;color:var(--text3)">zahteva</span></div><div class="esub">~${hrs}h kodiranja</div></div>`;
+      const reqs=cost>0?Math.floor(real/cost):0;
+      const hrs=reqs>0?(reqs*2.5/60).toFixed(0):'0';
+      html+=`<div class="earn-card"><div class="etop">${m.name}</div><div class="eval">${fmt(reqs)} <span>zahteva</span></div><div class="esub">~${hrs}h</div></div>`;
     });
     html+='</div></div>';
     w.innerHTML+=html;
