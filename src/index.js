@@ -588,65 +588,103 @@ async function handleMiniMaxStream(res, keyId, resolved, payload) {
   res.write('data: ' + JSON.stringify(initChunk) + '\n\n');
   if (res.flush) res.flush();
 
-  const stream = await withRetry(() => minimax.messages.create({ ...payload, stream: true }));
+  // Use raw fetch for MiniMax streaming (SDK has issues with their SSE format)
+  const apiPayload = { ...payload, stream: true };
+  const response = await fetch('https://api.minimax.io/anthropic/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.MINIMAX_API_KEY,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify(apiPayload),
+  });
 
-  let eventCount = 0;
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[MiniMax] API error:', response.status, errorText);
+    res.write(toOpenAIStreamChunk(`Error: ${response.status}`, { id: streamId, model: resolved.id }));
+    res.write(toOpenAIStreamChunk('', { id: streamId, model: resolved.id, finish: true }));
+    res.write(streamDone());
+    clearInterval(keepAlive);
+    clearInterval(timeoutCheck);
+    res.end();
+    return;
+  }
+
   let textChunks = 0;
   let thinkingIndicatorSent = false;
-  
+  let buffer = '';
+
   try {
-    for await (const event of stream) {
-      eventCount++;
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
       lastChunkTime = Date.now();
-      
-      // Log first few events and all content_block_start events
-      if (eventCount <= 3 || event.type === 'content_block_start') {
-        console.log(`[MiniMax] event #${eventCount}: ${event.type}`, 
-          event.content_block ? `block=${event.content_block.type}` : '');
-      }
-      
-      if (event.type === 'message_start' && event.message?.usage) {
-        usage.input_tokens = event.message.usage.input_tokens ?? 0;
-      }
-      
-      // Detect thinking block start - send indicator immediately
-      if (event.type === 'content_block_start' && event.content_block?.type === 'thinking') {
-        if (!thinkingIndicatorSent) {
-          console.log('[MiniMax] Sending thinking indicator');
-          res.write(toOpenAIStreamChunk('🧠 *Razmišljam...*\n\n', { id: streamId, model: resolved.id }));
-          if (res.flush) res.flush();
-          thinkingIndicatorSent = true;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete SSE events from buffer
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const jsonStr = line.slice(6);
+          if (jsonStr === '[DONE]') continue;
+
+          try {
+            const event = JSON.parse(jsonStr);
+
+            if (event.type === 'message_start' && event.message?.usage) {
+              usage.input_tokens = event.message.usage.input_tokens ?? 0;
+            }
+
+            // Detect thinking block start - send indicator
+            if (event.type === 'content_block_start' && event.content_block?.type === 'thinking') {
+              if (!thinkingIndicatorSent) {
+                res.write(toOpenAIStreamChunk('🧠 *Razmišljam...*\n\n', { id: streamId, model: resolved.id }));
+                if (res.flush) res.flush();
+                thinkingIndicatorSent = true;
+              }
+            }
+
+            if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+              const b = event.content_block;
+              toolCalls.push({ id: b.id, name: b.name || 'tool', inputStr: '' });
+              currentToolIndex = toolCalls.length - 1;
+            }
+
+            if (event.type === 'content_block_delta') {
+              const delta = event.delta;
+              if (delta?.type === 'text_delta' && delta.text) {
+                textChunks++;
+                res.write(toOpenAIStreamChunk(delta.text, { id: streamId, model: resolved.id }));
+                if (res.flush) res.flush();
+              }
+              if (delta?.type === 'input_json_delta' && typeof delta.partial_json === 'string' && currentToolIndex >= 0 && toolCalls[currentToolIndex]) {
+                toolCalls[currentToolIndex].inputStr += delta.partial_json;
+              }
+            }
+
+            if (event.type === 'content_block_stop') {
+              currentToolIndex = -1;
+            }
+
+            if (event.type === 'message_delta' && event.usage) {
+              if (event.usage.input_tokens != null) usage.input_tokens = event.usage.input_tokens;
+              if (event.usage.output_tokens != null) usage.output_tokens = event.usage.output_tokens;
+            }
+          } catch (parseErr) {
+            // Ignore parse errors for incomplete JSON
+          }
         }
-      }
-      
-      if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
-        const b = event.content_block;
-        toolCalls.push({ id: b.id, name: b.name || 'tool', inputStr: '' });
-        currentToolIndex = toolCalls.length - 1;
-      }
-      
-      if (event.type === 'content_block_delta') {
-        const delta = event.delta;
-        if (delta?.type === 'text_delta' && delta.text) {
-          textChunks++;
-          res.write(toOpenAIStreamChunk(delta.text, { id: streamId, model: resolved.id }));
-          if (res.flush) res.flush();
-        }
-        if (delta?.type === 'input_json_delta' && typeof delta.partial_json === 'string' && currentToolIndex >= 0 && toolCalls[currentToolIndex]) {
-          toolCalls[currentToolIndex].inputStr += delta.partial_json;
-        }
-      }
-      
-      if (event.type === 'content_block_stop') {
-        currentToolIndex = -1;
-      }
-      
-      if (event.type === 'message_delta' && event.usage) {
-        if (event.usage.input_tokens != null) usage.input_tokens = event.usage.input_tokens;
-        if (event.usage.output_tokens != null) usage.output_tokens = event.usage.output_tokens;
       }
     }
-    console.log(`[MiniMax] completed: ${eventCount} events, ${textChunks} text chunks, thinking=${thinkingIndicatorSent}`);
+    console.log(`[MiniMax] stream completed: ${textChunks} text chunks, thinking=${thinkingIndicatorSent}`);
   } catch (streamErr) {
     console.error('[MiniMax] stream error:', streamErr.message);
   }
