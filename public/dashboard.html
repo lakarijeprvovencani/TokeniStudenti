@@ -316,8 +316,9 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
           <div class="copy-box"><code>vajb-agent-pro</code><button onclick="copyText('vajb-agent-pro')">Kopiraj</button></div>
           <div class="copy-box"><code>vajb-agent-max</code><button onclick="copyText('vajb-agent-max')">Kopiraj</button></div>
           <div class="copy-box"><code>vajb-agent-ultra</code><button onclick="copyText('vajb-agent-ultra')">Kopiraj</button></div>
+          <div class="copy-box"><code>vajb-agent-power</code><button onclick="copyText('vajb-agent-power')">Kopiraj</button></div>
         </div>
-        <div class="setup-step"><div class="step-num">5</div><div class="step-text">Izaberi model u chatu i pošalji poruku. Ako dobiješ odgovor, sve radi!</div></div>
+        <div class="setup-step"><div class="step-num">5</div><div class="step-text">Pošalji poruku. Ako dobiješ odgovor, sve radi!</div></div>
       </div>
     </div>
   </main>
@@ -333,6 +334,7 @@ const MODELS=[
   {id:'vajb-agent-pro',name:'Pro',tier:'Standard',per10:[400,1000]},
   {id:'vajb-agent-max',name:'Max',tier:'Premium',per10:[200,500]},
   {id:'vajb-agent-ultra',name:'Ultra',tier:'Elite',per10:[30,100]},
+  {id:'vajb-agent-power',name:'Power',tier:'Architect',per10:[30,100]},
 ];
 
 function $(id){return document.getElementById(id)}

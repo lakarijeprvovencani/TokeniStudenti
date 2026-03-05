@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<title>VajbAgent – Pojačanje za Cursor | AI kodiranje bez pretplate</title>
+<title>VajbAgent – AI kodiranje u VS Code | Bez pretplate, plati koliko koristiš</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -57,7 +57,9 @@ section{max-width:1100px;margin:0 auto;padding:80px 24px}
 .bcard p{font-size:.84rem;color:var(--text2);line-height:1.6}
 
 /* Primeri: koji nivo za šta – jasnije kartice i ikone */
-#primeri .benefits{gap:20px;grid-template-columns:repeat(2,1fr);max-width:800px;margin:0 auto}
+#primeri .benefits{gap:16px;grid-template-columns:repeat(3,1fr);max-width:900px;margin:0 auto}
+@media(max-width:800px){#primeri .benefits{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:500px){#primeri .benefits{grid-template-columns:1fr}}
 #primeri .bcard{background:var(--surface2);border:1px solid var(--border2);border-radius:16px;padding:28px 24px;position:relative;border-left:4px solid var(--orange)}
 #primeri .bcard:hover{border-color:rgba(249,115,22,.4);box-shadow:0 6px 24px rgba(0,0,0,.25)}
 #primeri .bcard-icon{width:52px;height:52px;font-size:1.6rem;background:rgba(249,115,22,.15);color:var(--orange);border:1px solid rgba(249,115,22,.25)}
@@ -73,7 +75,7 @@ section{max-width:1100px;margin:0 auto;padding:80px 24px}
 .cursor-intro .intro-card h3{font-size:1.05rem;font-weight:700;margin-bottom:10px;color:var(--text);line-height:1.3}
 .cursor-intro .intro-card p{font-size:.9rem;color:var(--text2);line-height:1.65}
 
-.tiers{display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));gap:16px;overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;padding-top:4px;max-width:900px;margin:0 auto}
+.tiers{display:grid;grid-template-columns:repeat(5,minmax(160px,1fr));gap:14px;overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;padding-top:4px;max-width:1000px;margin:0 auto}
 .tier{background:var(--surface2);border:1px solid var(--border2);border-radius:16px;padding:28px 20px;text-align:center;transition:all .25s;position:relative;min-height:220px;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;overflow:visible}
 .tier:hover{border-color:var(--orange);transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
 .tier.pop{border-color:rgba(249,115,22,.45)}
@@ -161,9 +163,12 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 
 @media(max-width:900px){
   .benefits,.steps{grid-template-columns:1fr 1fr}
-  .tiers{grid-template-columns:repeat(2,1fr);max-width:100%}
+  .tiers{grid-template-columns:repeat(3,1fr);max-width:100%}
   .sum-grid{grid-template-columns:1fr}
   .cursor-intro{grid-template-columns:1fr}
+}
+@media(max-width:700px){
+  .tiers{grid-template-columns:repeat(2,1fr)}
 }
 @media(max-width:600px){
   html,body{overflow-x:hidden;max-width:100vw}
@@ -192,12 +197,12 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 
 <div class="ticker">
   <div class="ticker-track">
-    <span>Pojačanje za Cursor</span>
+    <span>VS Code + Cline = besplatno</span>
     <span>Plati samo kad koristiš</span>
     <span>5 nivoa AI modela</span>
     <span>Bez mesečne obaveze</span>
     <span>Od $5 do premium AI-ja</span>
-    <span>Pojačanje za Cursor</span>
+    <span>VS Code + Cline = besplatno</span>
     <span>Plati samo kad koristiš</span>
     <span>5 nivoa AI modela</span>
     <span>Bez mesečne obaveze</span>
@@ -209,7 +214,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
   <div class="nav-inner">
     <div class="nav-brand">Vajb<span>Agent</span></div>
     <div class="nav-links">
-      <a href="#sta-je-cursor">Šta je Cursor?</a>
+      <a href="#kako-funkcionise">Kako radi?</a>
       <a href="#modeli">Nivoi</a>
       <a href="#uporedi">Uporedi</a>
       <a href="/dashboard" class="btn-nav-login">Uloguj se</a>
@@ -219,88 +224,88 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 </nav>
 
 <div class="hero">
-  <div class="hero-pill">Pojačanje za Cursor</div>
-  <h1>Ne treba ti pretplata<br><em>da bi kodirao sa AI-jem</em></h1>
-  <p>Cursor ti daje besplatan AI editor. Kad ti treba pojačanje uključi VajbAgenta, platiš fiksnu cenu koju odlučiš, bez mesečne obaveze.</p>
+  <div class="hero-pill">VS Code + Cline + VajbAgent</div>
+  <h1>AI kodiranje <em>bez pretplate</em><br>u besplatnom editoru</h1>
+  <p>VS Code je besplatan. Cline ekstenzija je besplatna. VajbAgent ti daje pristup premium AI modelima - platiš samo koliko koristiš, bez mesečne obaveze.</p>
   <div class="hero-btns">
     <a href="/dashboard?tab=register" class="btn-hero btn-primary">Počni odmah i dajemo ti $2 na poklon</a>
-    <a href="#kako-radi" class="btn-hero btn-secondary">Kako funkcioniše?</a>
+    <a href="#kako-funkcionise" class="btn-hero btn-secondary">Kako funkcioniše?</a>
   </div>
 </div>
 
-<section id="sta-je-cursor">
-  <div class="stitle">Hajde ispočetka: <em>šta je Cursor?</em></div>
-  <div class="ssub">Program u kome AI radi umesto tebe. Kažeš šta hoćeš, on napiše kod. Evo tri stvari koje treba da znaš.</div>
+<section id="kako-funkcionise">
+  <div class="stitle">Kako funkcioniše: <em>VS Code + Cline</em></div>
+  <div class="ssub">Potpuno besplatno rešenje za AI kodiranje. Evo tri stvari koje treba da znaš.</div>
   <div class="cursor-intro">
     <div class="intro-card">
       <span class="num">1</span>
-      <h3>Cursor je program u kome pišeš kod</h3>
-      <p>Kao Word za dokumente, samo za programiranje. Tu praviš sajtove, aplikacije, bilo šta. Otvoriš fajl, kucaš ili tražiš od AI da napiše umesto tebe.</p>
+      <h3>VS Code je besplatan editor</h3>
+      <p>Najkorišćeniji editor na svetu. Skineš sa code.visualstudio.com, instaliraš i to je to. Radi na Windows, Mac i Linux. 100% besplatno, zauvek.</p>
     </div>
     <div class="intro-card">
       <span class="num">2</span>
-      <h3>AI radi posao umesto tebe</h3>
-      <p>Nemaš pojma kako nešto da napišeš? Napišeš u običnom jeziku šta ti treba, AI napiše kod. Greška u kodu? Pitaš AI, on ti objasni i ispravi. Suština: ti govoriš, AI kodira.</p>
+      <h3>Cline je besplatna AI ekstenzija</h3>
+      <p>Instaliraš Cline iz VS Code marketplace-a. Pričaš sa AI-jem, on piše i menja kod umesto tebe. Kao ChatGPT, ali direktno u editoru - vidi tvoje fajlove i edituje ih.</p>
     </div>
     <div class="intro-card">
       <span class="num">3</span>
-      <h3>Cursor je besplatan za preuzimanje</h3>
-      <p>Skineš, instaliraš, odmah možeš da koristiš. Besplatna verzija ima AI uključen, samo sa ograničenjima. Za početak ti je dovoljno. Kasnije, ako zatreba više, tu je VajbAgent.</p>
+      <h3>VajbAgent daje pristup AI modelima</h3>
+      <p>Cline treba API ključ da bi radio. VajbAgent ti daje ključ + pristup premium modelima. Platiš koliko koristiš, bez mesečne pretplate.</p>
     </div>
   </div>
 </section>
 
 <section id="benefiti">
-  <div class="stag">Kako funkcioniše</div>
-  <div class="stitle">Cursor je besplatan, ali ima <em>ograničenja</em></div>
-  <div class="ssub">Besplatan plan ti daje manji broj zahteva i ponekad duže čekaš u redu, kao u pošti kad je gužva. Kad ne želiš da čekaš i hoćeš više zahteva odmah, uključiš VajbAgenta.</div>
+  <div class="stag">Zašto ovo?</div>
+  <div class="stitle">Idealno rešenje: <em>potpuno besplatno + plati koliko koristiš</em></div>
+  <div class="ssub">VS Code i Cline su besplatni. VajbAgent ti daje pristup AI modelima bez mesečne pretplate - platiš samo ono što potrošiš.</div>
   <div class="pathway">
     <div class="pathway-step">
       <div class="p-wrap"><span class="p-num">1</span></div>
       <div>
-        <h3>Krećeš sa Cursorom</h3>
-        <p>Skineš Cursor besplatno i kodiraš sa AI-jem. Manji broj zahteva mesečno, ponekad čekaš u redu. Za probu i lagano korišćenje sasvim dovoljno.</p>
+        <h3>Skineš VS Code (besplatno)</h3>
+        <p>code.visualstudio.com - najkorišćeniji editor na svetu. Radi na svim platformama. Potpuno besplatan, bez ograničenja.</p>
       </div>
     </div>
     <div class="pathway-step">
       <div class="p-wrap"><span class="p-num">2</span></div>
       <div>
-        <h3>Kad ti zatreba više, uključiš VajbAgenta</h3>
-        <p>Više zahteva, nema čekanja u redu. Povežeš svoj nalog sa Cursorom i biraš nivo (Lite do Ultra) po potrebi.</p>
+        <h3>Instaliraš Cline ekstenziju (besplatno)</h3>
+        <p>U VS Code-u odeš na Extensions, tražiš "Cline" i instaliraš. AI asistent koji čita i menja tvoj kod direktno u editoru.</p>
       </div>
     </div>
     <div class="pathway-step">
       <div class="p-wrap"><span class="p-num">3</span></div>
       <div>
-        <h3>Platiš koliko koristiš</h3>
-        <p>Nema mesečne pretplate. Uplatiš $5, $10 ili $20 kad zatreba. U dashboardu vidiš tačnu potrošnju, cent po cent.</p>
+        <h3>Povežeš VajbAgent</h3>
+        <p>Uneseš naš API ključ i Base URL u Cline podešavanja. Setup traje 2 minuta, dajemo ti detaljno uputstvo.</p>
       </div>
     </div>
     <div class="pathway-step">
       <div class="p-wrap"><span class="p-num">4</span></div>
       <div>
         <h3>Biraš nivo snage</h3>
-        <p>Od Lite za svakodnevno do Ultra za najteže zadatke. Jači nivo, jači AI, više troši po zahtevu. Ti odlučuješ.</p>
+        <p>5 nivoa AI modela: Lite za svakodnevno, Pro i Max za jače projekte, Ultra za premium, Power za full-stack arhitekturu.</p>
       </div>
     </div>
     <div class="pathway-step poklon">
       <div class="p-wrap"><span class="p-num">🎁</span></div>
       <div>
         <h3>$2 na poklon kad napraviš nalog</h3>
-        <p>Dobijaš $2 kredita besplatno. To je otprilike 400 do 1.000+ zahteva na Lite, ili 80+ na Pro. Dovoljno da probaš bez kartice i bez obaveze.</p>
+        <p>Dobijaš $2 kredita besplatno. To je 400-1.000+ zahteva na Lite, ili 80+ na Pro. Dovoljno da probaš sve bez kartice.</p>
       </div>
     </div>
   </div>
 
   <div class="pathway-note">
-    <p><strong>Cursor Auto je uvek besplatan.</strong> Možeš da ga koristiš non stop. Odlična kombinacija: uradiš par zahteva sa VajbAgentom kad ti zatreba pojačanje, prođe ti red ili ne želiš da trošiš kredit, prebaciš se na Auto. Sve zavisi od tebe i tvog ritma. Niko te ne tera da sve radiš preko VajbAgenta.</p>
+    <p><strong>Radi i sa Cursorom!</strong> Ako već imaš Cursor Pro plan ($20/mes), možeš koristiti VajbAgent kao dopunu. U Cursor Settings → Models dodaš naš Base URL. Nije idealno kao u VS Code, ali radi.</p>
   </div>
 </section>
 
 <section id="uporedi">
   <div class="stag">Uporedi</div>
-  <div class="stitle">Kada koristiti <em>šta?</em></div>
-  <div class="ssub">VajbAgent nije zamena za Cursor, već dodatak. Evo kada šta ima smisla.</div>
+  <div class="stitle">Šta odabrati za <em>tvoju situaciju?</em></div>
+  <div class="ssub">Evo pregleda opcija za AI kodiranje i gde se VajbAgent uklapa.</div>
 
   <div class="cmp">
     <div class="cmp-head">
@@ -308,13 +313,13 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
       <div class="col-va">Preporuka</div>
       <div class="col-cp">Zašto</div>
     </div>
-    <div class="cmp-row"><div>Tek počinješ sa AI kodiranjem</div><div class="win">Cursor Free</div><div>Potpuno besplatno, skineš i koristiš</div></div>
-    <div class="cmp-row"><div>Free ti je spor ili ti nedostaje zahteva</div><div class="win">Free + VajbAgent</div><div>Uključiš pojačanje kad zatreba</div></div>
-    <div class="cmp-row"><div>Kodiraš povremeno, par puta nedeljno</div><div class="win">Free + VajbAgent $5-15</div><div>Manje od Cursor Pro ($20/mes)</div></div>
-    <div class="cmp-row"><div>Kodiraš redovno, ali ne želiš pretplatu</div><div class="win">Free + VajbAgent $15-20</div><div>Bez mesečne obaveze</div></div>
-    <div class="cmp-row"><div>Kodiraš svaki dan i voliš fiksnu cenu</div><div>Cursor Pro $20/mes</div><div>Fiksna cena, sve uključeno</div></div>
-    <div class="cmp-row"><div>Imaš Cursor Pro, ali ti nestaje kredita</div><div class="win">Pro + VajbAgent</div><div>Dopuni $5-10 kad zatreba</div></div>
-    <div class="cmp-row"><div>Treba ti više od onoga što Pro daje ($20/mes)</div><div class="win">VajbAgent $30-50 ili Pro+ $60/mes</div><div>Dopuna bez pretplate, ili Cursorov plan od $60</div></div>
+    <div class="cmp-row"><div>Tek počinješ sa AI kodiranjem</div><div class="win">VS Code + Cline + VajbAgent</div><div>Sve besplatno, platiš samo AI</div></div>
+    <div class="cmp-row"><div>Hoćeš da probaš AI kodiranje bez troška</div><div class="win">VajbAgent $2 poklon</div><div>400-1000+ zahteva besplatno</div></div>
+    <div class="cmp-row"><div>Kodiraš povremeno, par puta nedeljno</div><div class="win">VajbAgent $5-10/mes</div><div>Jeftinije od bilo koje pretplate</div></div>
+    <div class="cmp-row"><div>Kodiraš redovno ali ne želiš pretplatu</div><div class="win">VajbAgent $15-25/mes</div><div>Bez obaveze, platiš kad treba</div></div>
+    <div class="cmp-row"><div>Trebaš napredne AI funkcije</div><div class="win">VajbAgent Power model</div><div>Arhitektura, security, DevOps</div></div>
+    <div class="cmp-row"><div>Već imaš Cursor Pro ($20/mes)</div><div class="win">Cursor + VajbAgent dopuna</div><div>Radi kao dodatak kad ti treba više</div></div>
+    <div class="cmp-row"><div>Voliš Cursor UI i hoćeš fiksnu cenu</div><div>Cursor Pro $20/mes</div><div>Cursor je odličan, ali plaćaš mesečno</div></div>
   </div>
   <div class="mini-cta">
     <p>Probaj besplatno uz $2 na poklon, bez kartice.</p>
@@ -325,7 +330,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 <section id="modeli">
   <div class="stag">Nivoi</div>
   <div class="stitle">Kao u igricama: <em>jači nivo = jači AI</em></div>
-  <div class="ssub">4 nivoa snage. Svaki nivo = drugi AI model = druga cena. Lite za svakodnevno kodiranje, Pro za ozbiljnije projekte, Max i Ultra za kompleksne zadatke.</div>
+  <div class="ssub">5 nivoa snage. Svaki nivo = drugi AI model = druga cena. Biraj po potrebi projekta.</div>
   <div class="tiers">
     <div class="tier pop">
       <span class="tier-badge" aria-hidden="true">BEST VALUE</span>
@@ -333,31 +338,38 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
       <div class="t-desc">Svakodnevno</div>
       <div class="t-val t-val-wide">2.000–5.000+</div>
       <div class="t-val-sub">zahteva za $10*</div>
-      <div class="t-price">Brz i pouzdan za većinu zadataka</div>
+      <div class="t-price">Brz i pouzdan</div>
     </div>
     <div class="tier">
       <div class="t-name">Pro</div>
       <div class="t-desc">Jači projekti</div>
       <div class="t-val">400–1.000</div>
       <div class="t-val-sub">zahteva za $10*</div>
-      <div class="t-price">Bolje razumevanje kompleksnijeg koda</div>
+      <div class="t-price">Kompleksniji kod</div>
     </div>
     <div class="tier">
       <div class="t-name">Max</div>
       <div class="t-desc">Kompleksno</div>
       <div class="t-val">200–500</div>
       <div class="t-val-sub">zahteva za $10*</div>
-      <div class="t-price">Za teže probleme i duže razmišljanje</div>
+      <div class="t-price">Teži problemi</div>
     </div>
     <div class="tier">
       <div class="t-name">Ultra</div>
       <div class="t-desc">Premium</div>
       <div class="t-val">30–100</div>
       <div class="t-val-sub">zahteva za $10*</div>
-      <div class="t-price">Kad ti treba najjači AI</div>
+      <div class="t-price">Najjači AI</div>
+    </div>
+    <div class="tier">
+      <div class="t-name">Power</div>
+      <div class="t-desc">Arhitekta</div>
+      <div class="t-val">30–100</div>
+      <div class="t-val-sub">zahteva za $10*</div>
+      <div class="t-price">Full-stack ekspert</div>
     </div>
   </div>
-  <p style="text-align:center;font-size:.8rem;color:var(--text);margin-top:20px;">*Broj zahteva zavisi od kompleksnosti, kratko pitanje troši manje, veliki projekat sa puno fajlova troši više. U dashboardu vidiš tačnu potrošnju.</p>
+  <p style="text-align:center;font-size:.8rem;color:var(--text);margin-top:20px;">*Broj zahteva zavisi od kompleksnosti, kratko pitanje troši manje, veliki projekat troši više. U dashboardu vidiš tačnu potrošnju.</p>
   <div class="mini-cta">
     <p>Probaj besplatno uz $2 na poklon.</p>
     <a href="/dashboard?tab=register">Počni odmah</a>
@@ -377,17 +389,22 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     <div class="bcard">
       <div class="bcard-icon">📝</div>
       <h3>Pro, jači projekti</h3>
-      <p>"Sredi mi ceo fajl." "Dodaj dark mode." "Napravi mi navbar komponentu." Kad Lite nije dovoljan.</p>
+      <p>"Sredi mi ceo fajl." "Dodaj dark mode." "Napravi mi navbar." Kad Lite nije dovoljan.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon">🏗️</div>
       <h3>Max, teži problemi</h3>
-      <p>"Zašto mi app puca?" "Pomozi mi da sredim strukturu projekta." Za kad zapneš na nečemu.</p>
+      <p>"Zašto mi app puca?" "Pomozi da sredim strukturu." Za kad zapneš na nečemu.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon">🚀</div>
       <h3>Ultra, premium</h3>
-      <p>"Napravi mi celu aplikaciju." "Objasni mi detaljno kako ovo radi." Kad ti treba najjači AI.</p>
+      <p>"Napravi mi celu aplikaciju." "Objasni mi detaljno." Kad ti treba najjači AI.</p>
+    </div>
+    <div class="bcard">
+      <div class="bcard-icon">⚡</div>
+      <h3>Power, arhitekta</h3>
+      <p>"Napravi mi backend sa autentikacijom." "Proveri mi security." Full-stack ekspert za ozbiljne projekte.</p>
     </div>
   </div>
   <div class="mini-cta">
@@ -398,23 +415,23 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 
 <section id="kako-radi">
   <div class="stag">Kako početi</div>
-  <div class="stitle">3 koraka do <em>pojačanja</em></div>
-  <div class="ssub">Imaš Cursor? Odlično. Evo kako da dodaš VajbAgenta.</div>
+  <div class="stitle">3 koraka do <em>AI kodiranja</em></div>
+  <div class="ssub">Setup traje 5 minuta. Evo šta treba da uradiš.</div>
   <div class="steps">
     <div class="step-card">
       <div class="step-num">1</div>
       <h3>Napravi nalog</h3>
-      <p>Registruj se i dobijaš $2 kredita na poklon. Bez kartice, bez obaveze.</p>
+      <p>Registruj se i dobijaš $2 kredita + API ključ. Bez kartice, bez obaveze.</p>
     </div>
     <div class="step-card">
       <div class="step-num">2</div>
-      <h3>Poveži sa Cursorom</h3>
-      <p>Dajemo ti uputstvo kako da povežeš sve za 3 minuta.</p>
+      <h3>Instaliraj Cline u VS Code</h3>
+      <p>Extensions → traži "Cline" → Install. Ili skini VS Code prvo ako ga nemaš.</p>
     </div>
     <div class="step-card">
       <div class="step-num">3</div>
-      <h3>Koristi kad zatreba</h3>
-      <p>Cursor Free za svakodnevno, VajbAgent kad ti treba pojačanje. Dopuni kad poželiš.</p>
+      <h3>Unesi API ključ i Base URL</h3>
+      <p>U Cline podešavanjima uneseš ključ i naš URL. Dajemo ti detaljno uputstvo.</p>
     </div>
   </div>
   <div class="mini-cta">
@@ -424,28 +441,28 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 </section>
 
 <section id="cursor-cene">
-  <div class="stag">Cursor cene</div>
-  <div class="stitle">Gde se <em>VajbAgent</em> uklapa?</div>
-  <div class="ssub">Cursor ima svoje planove. VajbAgent popunjava praznine između njih.</div>
+  <div class="stag">Uporedi cene</div>
+  <div class="stitle">Koliko košta <em>AI kodiranje?</em></div>
+  <div class="ssub">VS Code + Cline + VajbAgent nema mesečnu pretplatu. Platiš samo koliko koristiš.</div>
   <div class="sum-grid">
     <div class="sum-card">
-      <h3>Cursor planovi</h3>
+      <h3>VajbAgent (plati koliko koristiš)</h3>
       <p>
-        <span class="win-line"><b>Free</b>, $0, ograničeni AI zahtevi</span><br>
-        <span class="win-line"><b>Pro</b>, $20/mes, $20 API kredita</span><br>
-        <span class="win-line"><b>Pro+</b>, $60/mes, $70 API kredita</span><br>
-        <span class="win-line"><b>Ultra</b>, $200/mes, $400 kredita</span><br>
-        <span class="win-line"><b>Teams</b>, $40 po korisniku za firme</span>
+        <span class="win-line"><b>$2</b> poklon za početak</span><br>
+        <span class="win-line"><b>$5</b> za povremeno kodiranje</span><br>
+        <span class="win-line"><b>$10–15</b> za redovno kodiranje</span><br>
+        <span class="win-line"><b>$20–30</b> za intenzivno korišćenje</span><br>
+        <span class="win-line"><b>Bez obaveze</b>, dopuni kad hoćeš</span>
       </p>
     </div>
-    <div class="sum-card">
-      <h3>VajbAgent dopunjuje</h3>
+    <div class="sum-card sum-muted">
+      <h3>Cursor (mesečna pretplata)</h3>
       <p>
-        <span class="win-line"><b>$5</b>, kad Free nije dovoljan</span><br>
-        <span class="win-line"><b>$10–15</b>, između Free i Pro</span><br>
-        <span class="win-line"><b>$20</b>, kao Pro, bez mesečne obaveze</span><br>
-        <span class="win-line"><b>$30–50</b>, između Pro i Pro+</span><br>
-        <span class="win-line"><b>Dopuna</b> uz bilo koji Cursor plan</span>
+        <span class="win-line"><b>Free</b>, $0, ograničeni zahtevi</span><br>
+        <span class="win-line"><b>Pro</b>, $20/mes, fiksno</span><br>
+        <span class="win-line"><b>Pro+</b>, $60/mes, više kredita</span><br>
+        <span class="win-line"><b>Ultra</b>, $200/mes, enterprise</span><br>
+        <span class="win-line"><b>Mesečna obaveza</b></span>
       </p>
     </div>
   </div>
@@ -470,7 +487,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 
 <div class="powered">Powered by <a href="https://vajbkodiranje.com" target="_blank">Vajb Kodiranje</a></div>
 
-<footer>VajbAgent &middot; Pojačanje za Cursor &middot; 2026</footer>
+<footer>VajbAgent &middot; AI kodiranje u VS Code &middot; 2026</footer>
 
 </body>
 </html>

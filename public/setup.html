@@ -97,10 +97,11 @@ const baseUrl=window.location.origin;
 document.getElementById('base-url').textContent=baseUrl;
 
 const modelInfo={
-  'vajb-agent-lite':{name:'VajbAgent Lite',desc:'GPT-4.1 Mini, svakodnevno kodiranje'},
-  'vajb-agent-pro':{name:'VajbAgent Pro',desc:'GPT-4.1, ozbiljniji projekti'},
-  'vajb-agent-max':{name:'VajbAgent Max',desc:'Claude Sonnet, kompleksni zadaci'},
-  'vajb-agent-ultra':{name:'VajbAgent Ultra',desc:'Claude Opus, premium'},
+  'vajb-agent-lite':{name:'VajbAgent Lite',desc:'Svakodnevno kodiranje, brz i pouzdan'},
+  'vajb-agent-pro':{name:'VajbAgent Pro',desc:'Ozbiljniji projekti, bolji za kompleksniji kod'},
+  'vajb-agent-max':{name:'VajbAgent Max',desc:'Kompleksni zadaci, duže razmišljanje'},
+  'vajb-agent-ultra':{name:'VajbAgent Ultra',desc:'Premium, najjači AI model'},
+  'vajb-agent-power':{name:'VajbAgent Power',desc:'Full-stack arhitekta, backend/security/DevOps'},
 };
 
 fetch('/v1/models').then(r=>r.json()).then(data=>{
