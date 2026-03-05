@@ -16,6 +16,73 @@ function getOpenAITextContent(content) {
 }
 
 /**
+ * Convert OpenAI message content to Anthropic content blocks (with vision support).
+ * Handles text, image_url (base64 and URLs).
+ */
+function openAIContentToAnthropic(content) {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  
+  const blocks = [];
+  
+  for (const part of content) {
+    if (!part) continue;
+    
+    // Text content
+    if (part.type === 'text' && part.text) {
+      blocks.push({ type: 'text', text: part.text });
+    }
+    // Input text (alternative format)
+    else if (part.type === 'input_text' && part.text) {
+      blocks.push({ type: 'text', text: part.text });
+    }
+    // Image URL content
+    else if (part.type === 'image_url' && part.image_url) {
+      const imgUrl = part.image_url.url || part.image_url;
+      
+      if (typeof imgUrl === 'string') {
+        // Base64 data URL
+        if (imgUrl.startsWith('data:')) {
+          const match = imgUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
+          if (match) {
+            blocks.push({
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: match[1],
+                data: match[2],
+              },
+            });
+          }
+        }
+        // Regular URL - Anthropic supports URL images too
+        else if (imgUrl.startsWith('http://') || imgUrl.startsWith('https://')) {
+          blocks.push({
+            type: 'image',
+            source: {
+              type: 'url',
+              url: imgUrl,
+            },
+          });
+        }
+      }
+    }
+  }
+  
+  // If only text blocks, return as string for simpler format
+  if (blocks.length === 1 && blocks[0].type === 'text') {
+    return blocks[0].text;
+  }
+  
+  // If no blocks, return empty string
+  if (blocks.length === 0) {
+    return getOpenAITextContent(content) || '';
+  }
+  
+  return blocks;
+}
+
+/**
  * OpenAI tools (function declarations) → Anthropic tools.
  */
 export function openAIToolsToAnthropic(openAITools) {
@@ -401,8 +468,9 @@ export function openAIToAnthropicMessages(openAIMessages, backendModel) {
     }
 
     if (role === 'user') {
-      const text = getOpenAITextContent(msg.content);
-      messages.push({ role: 'user', content: text || '' });
+      // Use openAIContentToAnthropic to preserve images for Claude Vision
+      const content = openAIContentToAnthropic(msg.content);
+      messages.push({ role: 'user', content: content || '' });
       continue;
     }
 

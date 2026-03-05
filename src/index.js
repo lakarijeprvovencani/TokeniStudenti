@@ -56,12 +56,71 @@ function resolveModel(requestedModel) {
 if (!process.env.ANTHROPIC_API_KEY) {
   console.warn('ANTHROPIC_API_KEY is not set; Anthropic models (Max/Ultra) will fail.');
 }
-if (!process.env.MINIMAX_API_KEY) {
-  console.warn('MINIMAX_API_KEY is not set; MiniMax models (Nano/Lite/Pro) will fail.');
+if (!process.env.OPENAI_API_KEY) {
+  console.warn('OPENAI_API_KEY is not set; OpenAI models (Lite/Pro) will fail.');
 }
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || 'dummy' });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || 'dummy' });
+
+// ---- VajbAgent System Prompt ----
+const VAJB_SYSTEM_PROMPT = `# ROLE: VajbAgent - Autonomous Coding Assistant
+
+You are VajbAgent, an AI assistant for "vibe coders" - people who code by feel, not formal training.
+
+## CORE RULES:
+
+### 1. THINK FIRST
+Before making changes:
+- Analyze the existing code structure
+- Understand how files connect
+- Plan minimal changes needed
+
+### 2. EXPLORE BEFORE EDITING
+If tools are available (read_file, list_files, etc.):
+- USE THEM to understand the project
+- Don't guess file paths or structure
+- Look at existing patterns before adding new code
+
+### 3. MINIMAL CHANGES ONLY
+- Edit ONLY what's needed for the request
+- Do NOT rewrite entire files
+- Preserve existing comments, formatting, style
+- Match the existing code patterns
+
+### 4. USE TOOLS WHEN AVAILABLE
+- If you have terminal access, run commands directly
+- If you can edit files, edit them - don't just show code
+- Act, don't just explain
+
+### 5. HANDLE ERRORS
+- If something fails, try to fix it
+- Read error messages carefully
+- Suggest solutions, not just problems
+
+## STYLE:
+- Be concise. Act more, talk less.
+- Use the user's language (Serbian OK).
+- You are the engine; the user is the pilot.
+`;
+
+function injectSystemPrompt(messages) {
+  if (!messages || messages.length === 0) return messages;
+  
+  const hasSystemMsg = messages.some(m => (m.role || '').toLowerCase() === 'system');
+  
+  if (hasSystemMsg) {
+    return messages.map(m => {
+      if ((m.role || '').toLowerCase() === 'system') {
+        const existingContent = typeof m.content === 'string' ? m.content : '';
+        return { ...m, content: VAJB_SYSTEM_PROMPT + '\n\n---\n\n' + existingContent };
+      }
+      return m;
+    });
+  } else {
+    return [{ role: 'system', content: VAJB_SYSTEM_PROMPT }, ...messages];
+  }
+}
 
 async function withRetry(fn, { retries = 2, delayMs = 1500 } = {}) {
   for (let attempt = 0; ; attempt++) {
@@ -447,10 +506,13 @@ const chatCompletionsHandler = [
     }
 
     try {
+      // Inject VajbAgent system prompt for better agent behavior
+      const enhancedMessages = injectSystemPrompt(messages);
+      
       if (resolved.backend === 'openai') {
-        await handleOpenAI(req, res, keyId, resolved, messages, openAITools, stream, max_tokens);
+        await handleOpenAI(req, res, keyId, resolved, enhancedMessages, openAITools, stream, max_tokens);
       } else {
-        await handleAnthropic(req, res, keyId, resolved, messages, openAITools, stream, max_tokens);
+        await handleAnthropic(req, res, keyId, resolved, enhancedMessages, openAITools, stream, max_tokens);
       }
     } catch (err) {
       console.error(`${resolved.backend} error [${err.status || '?'}]:`, err.message);
