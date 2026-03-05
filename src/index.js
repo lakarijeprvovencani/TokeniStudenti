@@ -338,9 +338,9 @@ const authLimiter = rateLimit({
 
 const adminLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: 150,
   validate: { trustProxy: false },
-  handler: (_req, res) => res.status(429).json({ error: { message: 'Previše admin zahteva. Sačekaj.', code: 'rate_limit' } }),
+  handler: (_req, res) => res.status(429).json({ error: { message: 'Previše admin zahteva. Sačekaj 1 minut.', code: 'rate_limit' } }),
 });
 
 function normalizeIP(ip) {

@@ -147,7 +147,7 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
     <p>Unesi admin tajnu za pristup</p>
     <input type="password" id="secretIn" placeholder="Admin secret" autofocus>
     <button onclick="doLogin()">Pristupi</button>
-    <div class="login-err" id="loginErr">Pogrešna tajna</div>
+    <div class="login-err" id="loginErr">Pogrešna tajna ili server nije dostupan. Probaj ponovo.</div>
   </div>
 </div>
 
@@ -575,13 +575,22 @@ function renderEarnings(){
 
 function doAdminLogout(){localStorage.removeItem('vajb_admin');secret='';showLogin();$('secretIn').value='';$('loginErr').style.display='none'}
 
+// Auto-login with retry (handles server restart during deploy)
 (function(){
   const s=localStorage.getItem('vajb_admin');
-  if(s){secret=s;$('secretIn').value=s;
-    api('GET','/admin/api/overview?secret='+encodeURIComponent(secret))
-      .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;DATA.totals=d.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0};return api('GET','/admin/students?secret='+encodeURIComponent(secret))})
-      .then(s2=>{if(s2.error)throw s2;DATA.students=s2;showApp();renderAll()})
-      .catch(()=>{showLogin()});
+  if(s){
+    secret=s;$('secretIn').value=s;
+    let retries=0;
+    const tryLogin=()=>{
+      api('GET','/admin/api/overview?secret='+encodeURIComponent(secret))
+        .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;DATA.totals=d.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0};return api('GET','/admin/students?secret='+encodeURIComponent(secret))})
+        .then(s2=>{if(s2.error)throw s2;DATA.students=s2;showApp();renderAll()})
+        .catch(()=>{
+          if(retries<2){retries++;setTimeout(tryLogin,2000)}
+          else{showLogin()}
+        });
+    };
+    tryLogin();
   } else {showLogin()}
   setInterval(()=>{if(secret)refresh()},30000);
 })();
