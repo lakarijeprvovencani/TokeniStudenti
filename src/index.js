@@ -1215,6 +1215,12 @@ app.get('/admin/api/overview', adminLimiter, async (req, res) => {
   const users = [];
   let totalProviderCost = 0;
   let totalCharged = 0;
+  let openaiCost = 0;
+  let anthropicCost = 0;
+  
+  // Map backend models to providers
+  const modelToProvider = {};
+  VAJB_MODELS.forEach(m => { modelToProvider[m.backendModel] = m.backend; });
   
   for (const [keyId, data] of Object.entries(allUsage)) {
     const bal = await getBalance(keyId);
@@ -1230,6 +1236,14 @@ app.get('/admin/api/overview', adminLimiter, async (req, res) => {
         userProviderCost += pCost;
         // If user has noMarkup, they were charged provider cost, otherwise with markup
         userCharged += noMarkup ? pCost : pCost * markup;
+        
+        // Track by provider
+        const provider = modelToProvider[model] || (model.startsWith('gpt') ? 'openai' : 'anthropic');
+        if (provider === 'openai') {
+          openaiCost += pCost;
+        } else {
+          anthropicCost += pCost;
+        }
       }
     }
     totalProviderCost += userProviderCost;
@@ -1260,6 +1274,8 @@ app.get('/admin/api/overview', adminLimiter, async (req, res) => {
       provider_cost_usd: Math.round(totalProviderCost * 1e6) / 1e6,
       charged_usd: Math.round(totalCharged * 1e6) / 1e6,
       profit_usd: Math.round((totalCharged - totalProviderCost) * 1e6) / 1e6,
+      openai_cost_usd: Math.round(openaiCost * 1e6) / 1e6,
+      anthropic_cost_usd: Math.round(anthropicCost * 1e6) / 1e6,
     },
     model_stats: modelStats,
     first_use: firstUse,

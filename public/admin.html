@@ -182,6 +182,11 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
         <div class="sum-card"><div class="sum-label">Moja zarada</div><div class="sum-val c-green" id="sProfit">$0</div><div class="sum-sub" id="sProfitD"></div></div>
       </div>
 
+      <div class="summary" style="grid-template-columns:repeat(2,1fr)">
+        <div class="sum-card" style="border-left:3px solid #10a37f"><div class="sum-label">OpenAI trošak</div><div class="sum-val" style="color:#34d399" id="sOpenAI">$0</div><div class="sum-sub">GPT-4.1 Mini, GPT-4.1</div></div>
+        <div class="sum-card" style="border-left:3px solid var(--orange)"><div class="sum-label">Anthropic trošak</div><div class="sum-val c-orange" id="sAnthropic">$0</div><div class="sum-sub">Claude Sonnet, Claude Opus</div></div>
+      </div>
+
       <div class="summary" style="grid-template-columns:repeat(3,1fr)">
         <div class="sum-card"><div class="sum-label">Ukupno tokena (ulaz)</div><div class="sum-val" id="sTokIn">0</div><div class="sum-sub" id="sTokInD"></div></div>
         <div class="sum-card"><div class="sum-label">Ukupno tokena (izlaz)</div><div class="sum-val" id="sTokOut">0</div><div class="sum-sub" id="sTokOutD"></div></div>
@@ -341,6 +346,8 @@ function renderOverview(){
   const provCost=DATA.totals.provider_cost_usd||0;
   const studentPaid=DATA.totals.charged_usd||0;
   const profit=DATA.totals.profit_usd||0;
+  const openaiCost=DATA.totals.openai_cost_usd||0;
+  const anthropicCost=DATA.totals.anthropic_cost_usd||0;
   let totalBal=0;sts.forEach(s=>totalBal+=(s.balance_usd||0));
   const ms=DATA.model_stats||{};
 
@@ -356,6 +363,8 @@ function renderOverview(){
   $('sChargedD').textContent='Skinuto sa balansa studenata';
   $('sProfit').textContent='$'+profit.toFixed(2);
   $('sProfitD').textContent='Markup '+DATA.markup+'x = '+((DATA.markup-1)*100).toFixed(0)+'% marža';
+  $('sOpenAI').textContent='$'+openaiCost.toFixed(2);
+  $('sAnthropic').textContent='$'+anthropicCost.toFixed(2);
 
   let inCost=0,outCost=0;
   for(const m of DATA.models){
