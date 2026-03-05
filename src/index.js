@@ -262,16 +262,39 @@ function injectSystemPrompt(messages, isPower = false) {
   }
 }
 
-async function withRetry(fn, { retries = 2, delayMs = 1500 } = {}) {
+async function withRetry(fn, { retries = 3, delayMs = 1500 } = {}) {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await fn();
+      const result = await fn();
+      
+      // Check for empty response (common cause of "Invalid API Response")
+      if (!result) {
+        throw new Error('Empty response from model');
+      }
+      
+      return result;
     } catch (err) {
       const status = err.status || err.statusCode || 0;
-      const retryable = status === 429 || status === 529 || status === 503;
+      const msg = (err.message || '').toLowerCase();
+      
+      // Retryable conditions: rate limit, overload, network issues, empty response
+      const retryable = 
+        status === 429 || 
+        status === 529 || 
+        status === 503 ||
+        status === 502 ||
+        status === 504 ||
+        msg.includes('timeout') ||
+        msg.includes('econnreset') ||
+        msg.includes('econnrefused') ||
+        msg.includes('network') ||
+        msg.includes('empty response') ||
+        msg.includes('socket hang up');
+      
       if (!retryable || attempt >= retries) throw err;
-      const wait = delayMs * (attempt + 1);
-      console.log(`Retrying after ${status} (attempt ${attempt + 1}/${retries}, wait ${wait}ms)`);
+      
+      const wait = delayMs * Math.pow(1.5, attempt); // Exponential backoff
+      console.log(`Retrying after error: ${status || msg} (attempt ${attempt + 1}/${retries}, wait ${Math.round(wait)}ms)`);
       await new Promise(r => setTimeout(r, wait));
     }
   }
@@ -716,6 +739,14 @@ async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, st
 async function handleOpenAINonStream(res, keyId, resolved, payload) {
   const response = await withRetry(() => openai.chat.completions.create(payload));
 
+  // Validate response has content
+  if (!response?.choices?.[0]?.message) {
+    console.error('OpenAI returned empty/invalid response:', JSON.stringify(response));
+    return res.status(502).json({
+      error: { message: 'Model returned empty response. Please try again.', code: 'empty_response' }
+    });
+  }
+
   const usage = {
     input_tokens: response.usage?.prompt_tokens ?? 0,
     output_tokens: response.usage?.completion_tokens ?? 0,
@@ -855,6 +886,14 @@ async function handleAnthropic(req, res, keyId, resolved, messages, openAITools,
 
 async function handleAnthropicNonStream(res, keyId, resolved, payload) {
   const response = await withRetry(() => anthropic.messages.create({ ...payload, stream: false }));
+
+  // Validate response has content
+  if (!response?.content || response.content.length === 0) {
+    console.error('Anthropic returned empty/invalid response:', JSON.stringify(response));
+    return res.status(502).json({
+      error: { message: 'Model returned empty response. Please try again.', code: 'empty_response' }
+    });
+  }
 
   const usage = {
     input_tokens: response.usage?.input_tokens ?? 0,
