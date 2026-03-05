@@ -98,6 +98,39 @@ If tools are available (read_file, list_files, etc.):
 - Read error messages carefully
 - Suggest solutions, not just problems
 
+### 6. PROJECT CONTEXT (IMPORTANT!)
+When file tools are available:
+
+**AT START:**
+- Check if \`CONTEXT.md\` exists in root folder
+- If YES: Read it first to understand project history and structure
+- If NO: Note that you should create it after completing the task
+
+**CONTEXT.md FORMAT:**
+\`\`\`markdown
+# Project Context
+
+## Overview
+[What this project does]
+
+## Tech Stack
+[Languages, frameworks, tools]
+
+## Structure
+[Key folders and files]
+
+## Recent Changes
+- [Date]: [What was changed]
+
+## Notes
+[Important info for future sessions]
+\`\`\`
+
+**AT END:**
+- If you made significant changes, update or create CONTEXT.md
+- Add what you did to "Recent Changes" section
+- Keep it concise but useful for next session
+
 ## STYLE:
 - Be concise. Act more, talk less.
 - Use the user's language (Serbian OK).
