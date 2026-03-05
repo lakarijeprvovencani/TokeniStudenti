@@ -124,13 +124,16 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
 .toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:12px 20px;border-radius:10px;font-size:.82rem;font-weight:500;opacity:0;transition:opacity .25s;pointer-events:none;z-index:99}
 .toast.show{opacity:1}
 
+@media(max-width:900px){
+  .summary{grid-template-columns:repeat(3,1fr)!important}
+}
 @media(max-width:768px){
   .sidebar{position:fixed;width:100%;height:auto;bottom:0;top:auto;flex-direction:row;padding:0;border-right:none;border-top:1px solid var(--border);overflow-x:auto}
   .sidebar-brand,.sidebar-footer{display:none}
   .nav-item{flex-direction:column;gap:2px;padding:10px 14px;font-size:.62rem;border-left:none;border-top:2px solid transparent}
   .nav-item.active{border-top-color:var(--orange);border-left-color:transparent}
   .main{margin-left:0;margin-bottom:60px;padding:20px 16px 80px}
-  .summary{grid-template-columns:repeat(2,1fr)}
+  .summary{grid-template-columns:repeat(2,1fr)!important}
 }
 </style>
 </head>
@@ -171,11 +174,12 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
     <div class="page active" id="pg-overview">
       <div class="page-title">Analitika</div>
 
-      <div class="summary">
+      <div class="summary" style="grid-template-columns:repeat(5,1fr)">
         <div class="sum-card"><div class="sum-label">Aktivni studenti</div><div class="sum-val c-orange" id="sUsers">0</div><div class="sum-sub" id="sUsersD"></div></div>
         <div class="sum-card"><div class="sum-label">Ukupni zahtevi</div><div class="sum-val" id="sReqs">0</div><div class="sum-sub" id="sReqsD"></div></div>
-        <div class="sum-card"><div class="sum-label">Moj trošak (API)</div><div class="sum-val" id="sCost">$0</div><div class="sum-sub" id="sCostD"></div></div>
-        <div class="sum-card"><div class="sum-label">Moja zarada</div><div class="sum-val c-orange" id="sProfit">$0</div><div class="sum-sub" id="sProfitD"></div></div>
+        <div class="sum-card"><div class="sum-label">Moj trošak (API)</div><div class="sum-val c-red" id="sCost">$0</div><div class="sum-sub" id="sCostD"></div></div>
+        <div class="sum-card"><div class="sum-label">Naplaćeno</div><div class="sum-val c-blue" id="sCharged">$0</div><div class="sum-sub" id="sChargedD"></div></div>
+        <div class="sum-card"><div class="sum-label">Moja zarada</div><div class="sum-val c-green" id="sProfit">$0</div><div class="sum-sub" id="sProfitD"></div></div>
       </div>
 
       <div class="summary" style="grid-template-columns:repeat(3,1fr)">
@@ -200,7 +204,7 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
 
       <div class="card">
         <div class="card-title">Svi korisnici - detalji</div>
-        <table><thead><tr><th>Ime</th><th>Ključ</th><th>Stanje</th><th>Zahtevi</th><th>Tokeni (ulaz/izlaz)</th><th>~Trošak</th><th>Poslednje</th></tr></thead>
+        <table><thead><tr><th>Ime</th><th>Ključ</th><th>Stanje</th><th>Zahtevi</th><th>API trošak</th><th>Naplaćeno</th><th>Profit</th><th>Poslednje</th></tr></thead>
         <tbody id="ovUsersBody"></tbody></table>
       </div>
     </div>
@@ -225,7 +229,7 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
       </div>
       <div class="card">
         <div class="card-title">Svi studenti</div>
-        <table><thead><tr><th>Ime</th><th>API ključ</th><th>Balans</th><th>Status</th><th>Kreiran</th><th>Akcije</th></tr></thead>
+        <table><thead><tr><th>Ime</th><th>API ključ</th><th>Balans</th><th>Status</th><th>Marža</th><th>Kreiran</th><th>Akcije</th></tr></thead>
         <tbody id="stuBody"></tbody></table>
         <div id="stuEmpty" style="display:none;text-align:center;padding:28px;color:var(--text);font-size:.85rem">Nema studenata. Dodaj prvog iznad.</div>
       </div>
@@ -273,7 +277,7 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
 
 <script>
 let secret='';
-let DATA={models:[],users:[],markup:1,students:[],model_stats:{},first_use:null};
+let DATA={models:[],users:[],markup:1,students:[],model_stats:{},first_use:null,totals:{provider_cost_usd:0,charged_usd:0,profit_usd:0}};
 let lastKey='';
 const PRICES={'gpt-4.1-mini':{in:.4,out:1.6},'gpt-4.1':{in:2,out:8},'claude-sonnet-4-6':{in:3,out:15},'claude-opus-4-6':{in:15,out:75}};
 const AVG_IN=25000,AVG_OUT=3000;
@@ -298,7 +302,7 @@ function doLogin(){
   secret=$('secretIn').value.trim();
   if(!secret)return;
   api('GET','/admin/api/overview?secret='+encodeURIComponent(secret))
-    .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;return api('GET','/admin/students?secret='+encodeURIComponent(secret))})
+    .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;DATA.totals=d.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0};return api('GET','/admin/students?secret='+encodeURIComponent(secret))})
     .then(s=>{if(s.error)throw s;DATA.students=s;localStorage.setItem('vajb_admin',secret);showApp();renderAll()})
     .catch(()=>{showLogin();$('loginErr').style.display='block'});
 }
@@ -320,7 +324,7 @@ function refresh(){
     api('GET','/admin/api/overview?secret='+encodeURIComponent(secret)),
     api('GET','/admin/students?secret='+encodeURIComponent(secret))
   ]).then(([ov,st])=>{
-    if(!ov.error){DATA.models=ov.models;DATA.users=ov.users;DATA.markup=ov.markup;DATA.model_stats=ov.model_stats||{};DATA.first_use=ov.first_use||null}
+    if(!ov.error){DATA.models=ov.models;DATA.users=ov.users;DATA.markup=ov.markup;DATA.model_stats=ov.model_stats||{};DATA.first_use=ov.first_use||null;DATA.totals=ov.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0}}
     if(!st.error)DATA.students=st;
     renderAll();
   });
@@ -333,32 +337,23 @@ function renderOverview(){
   let totalReqs=0,totalIn=0,totalOut=0;
   DATA.users.forEach(u=>{totalReqs+=u.requests||0;totalIn+=u.input_tokens||0;totalOut+=u.output_tokens||0});
 
-  // Real cost from per-model data
-  let provCost=0;
-  const ms=DATA.model_stats||{};
-  for(const m of DATA.models){
-    const p=PRICES[m.backendModel]||{in:3,out:15};
-    const st=ms[m.backendModel]||{input_tokens:0,output_tokens:0};
-    provCost+=(st.input_tokens/1e6)*p.in+(st.output_tokens/1e6)*p.out;
-  }
-  if(provCost===0&&totalIn>0){
-    let wIn=0,wOut=0,cnt=0;
-    DATA.models.forEach(m=>{const p=PRICES[m.backendModel]||{in:3,out:15};wIn+=p.in;wOut+=p.out;cnt++});
-    if(cnt){wIn/=cnt;wOut/=cnt}
-    provCost=(totalIn/1e6)*wIn+(totalOut/1e6)*wOut;
-  }
-  const studentPaid=provCost*DATA.markup;
-  const profit=studentPaid-provCost;
+  // Use server-calculated totals for accuracy
+  const provCost=DATA.totals.provider_cost_usd||0;
+  const studentPaid=DATA.totals.charged_usd||0;
+  const profit=DATA.totals.profit_usd||0;
   let totalBal=0;sts.forEach(s=>totalBal+=(s.balance_usd||0));
+  const ms=DATA.model_stats||{};
 
   $('sUsers').textContent=activeSts.length;
   $('sUsersD').textContent=sts.length+' ukupno, '+(sts.length-activeSts.length)+' neaktivnih';
   $('sReqs').textContent=fmt(totalReqs);
   const avgIn=totalReqs>0?Math.round((totalIn/totalReqs)/1000):0;
   const avgOut=totalReqs>0?Math.round((totalOut/totalReqs)/1000):0;
-  $('sReqsD').textContent='~'+avgIn+'K in / ~'+avgOut+'K out prosek po zahtevu';
+  $('sReqsD').textContent='~'+avgIn+'K in / ~'+avgOut+'K out prosek';
   $('sCost').textContent='$'+provCost.toFixed(2);
-  $('sCostD').textContent='Prosečna cena po zahtevu: $'+((provCost/Math.max(totalReqs,1))).toFixed(4);
+  $('sCostD').textContent='Plaćeno provajderima (OpenAI/Anthropic)';
+  $('sCharged').textContent='$'+studentPaid.toFixed(2);
+  $('sChargedD').textContent='Skinuto sa balansa studenata';
   $('sProfit').textContent='$'+profit.toFixed(2);
   $('sProfitD').textContent='Markup '+DATA.markup+'x = '+((DATA.markup-1)*100).toFixed(0)+'% marža';
 
@@ -423,26 +418,18 @@ function renderOverview(){
   const tb=$('ovUsersBody');tb.innerHTML='';
   sts.forEach(s=>{
     const u=DATA.users.find(x=>x.key_id===s.key)||{};
-    const uIn=u.input_tokens||0,uOut=u.output_tokens||0;
-    let uCost=0;
-    if(u.by_model){
-      for(const[mdl,st] of Object.entries(u.by_model)){
-        const p=PRICES[mdl]||{in:3,out:15};
-        uCost+=(st.input_tokens/1e6)*p.in+(st.output_tokens/1e6)*p.out;
-      }
-    } else {
-      let wIn=0,wOut=0,cnt=0;
-      DATA.models.forEach(m=>{const p=PRICES[m.backendModel]||{in:3,out:15};wIn+=p.in;wOut+=p.out;cnt++});
-      if(cnt){wIn/=cnt;wOut/=cnt}
-      uCost=(uIn/1e6)*wIn+(uOut/1e6)*wOut;
-    }
+    const uProvCost=u.provider_cost_usd||0;
+    const uCharged=u.charged_usd||0;
+    const uProfit=u.profit_usd||0;
+    const noMarkupBadge=u.noMarkup?'<span style="font-size:.6rem;color:var(--yellow);margin-left:4px">(bez marže)</span>':'';
     tb.innerHTML+=`<tr>
-      <td style="font-weight:700">${esc(s.name)}</td>
+      <td style="font-weight:700">${esc(s.name)}${noMarkupBadge}</td>
       <td class="mono" style="cursor:pointer;color:var(--orange);font-size:.68rem" onclick="copyText('${esc(s.key)}')" title="${esc(s.key)}">${esc(s.key).slice(0,16)}…</td>
       <td class="c-orange">$${(s.balance_usd||0).toFixed(2)}</td>
       <td>${fmt(u.requests||0)}</td>
-      <td style="font-size:.75rem">${fmt(uIn)} / ${fmt(uOut)}</td>
-      <td style="font-size:.75rem">$${uCost.toFixed(3)}</td>
+      <td class="c-red" style="font-size:.75rem">$${uProvCost.toFixed(4)}</td>
+      <td class="c-blue" style="font-size:.75rem">$${uCharged.toFixed(4)}</td>
+      <td class="${uProfit>0?'c-green':'c-yellow'}" style="font-size:.75rem">$${uProfit.toFixed(4)}</td>
       <td style="color:var(--text);font-size:.75rem">${fmtD(u.last_used)}</td>
     </tr>`;
   });
@@ -454,11 +441,17 @@ function renderStudents(){
   const tb=$('stuBody');tb.innerHTML='';
   $('stuEmpty').style.display=sts.length?'none':'block';
   sts.forEach(s=>{
+    const hasMarkup=!s.noMarkup;
     tb.innerHTML+=`<tr>
       <td style="font-weight:700">${esc(s.name)}</td>
       <td class="mono" style="cursor:pointer;color:var(--orange)" onclick="copyText('${esc(s.key)}')" title="Klikni za kopiranje">${esc(s.key)}</td>
       <td class="c-orange">$${(s.balance_usd||0).toFixed(2)}</td>
       <td>${s.active?'<span class="tag tag-active">Aktivan</span>':'<span class="tag tag-inactive">Neaktivan</span>'}</td>
+      <td>
+        <button class="btn btn-sm ${hasMarkup?'btn-g':'btn-ghost'}" onclick="toggleMarkup('${esc(s.key)}',${hasMarkup})" title="${hasMarkup?'Plaća sa maržom ('+DATA.markup+'x)':'Plaća samo API cenu'}">
+          ${hasMarkup?'✓ '+DATA.markup+'x':'Bez marže'}
+        </button>
+      </td>
       <td style="color:var(--text)">${fmtD(s.created)}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-sm btn-y" onclick="openCredit('${esc(s.key)}','${esc(s.name)}',${s.balance_usd||0})">Krediti</button>
@@ -491,6 +484,13 @@ function toggleStu(key,active){
   api('PATCH','/admin/students/'+encodeURIComponent(key),{active}).then(d=>{
     if(d.error){toast(d.error);return}
     toast(active?'Aktiviran':'Deaktiviran');refresh();
+  });
+}
+function toggleMarkup(key,currentlyHasMarkup){
+  const noMarkup=currentlyHasMarkup;
+  api('PATCH','/admin/students/'+encodeURIComponent(key)+'/markup',{noMarkup}).then(d=>{
+    if(d.error){toast(d.error);return}
+    toast(noMarkup?'Marža isključena':'Marža uključena');refresh();
   });
 }
 function delStu(key,name){
@@ -563,7 +563,7 @@ function doAdminLogout(){localStorage.removeItem('vajb_admin');secret='';showLog
   const s=localStorage.getItem('vajb_admin');
   if(s){secret=s;$('secretIn').value=s;
     api('GET','/admin/api/overview?secret='+encodeURIComponent(secret))
-      .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;return api('GET','/admin/students?secret='+encodeURIComponent(secret))})
+      .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;DATA.totals=d.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0};return api('GET','/admin/students?secret='+encodeURIComponent(secret))})
       .then(s2=>{if(s2.error)throw s2;DATA.students=s2;showApp();renderAll()})
       .catch(()=>{showLogin()});
   } else {showLogin()}

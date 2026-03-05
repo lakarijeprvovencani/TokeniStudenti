@@ -164,6 +164,15 @@ export async function toggleStudent(key, active) {
   return { student };
 }
 
+export async function toggleStudentMarkup(key, noMarkup) {
+  const students = await readStudents();
+  const student = students.find(s => s.key === key);
+  if (!student) return { error: 'Student sa tim ključem ne postoji.' };
+  student.noMarkup = noMarkup;
+  await writeStudents(students);
+  return { student };
+}
+
 // ---- IP registration tracking (persistent) ----
 let regCache = null;
 let regCacheTime = 0;

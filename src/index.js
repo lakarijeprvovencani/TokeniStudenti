@@ -20,10 +20,14 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { logUsage, getUsageSummary, getUsageForKey, getModelStats } from './usage.js';
-import { getBalance, deductBalance, costUsd, addBalance, getTotalDeposited } from './balance.js';
-import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, findByKey, canRegisterFromIP, trackRegistrationIP } from './students.js';
+import { getBalance, deductBalance, costUsd, addBalance, getTotalDeposited, loadStudentMarkupFlags, setStudentNoMarkup, getStudentMarkup, providerCostUsd } from './balance.js';
+import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, toggleStudentMarkup, findByKey, canRegisterFromIP, trackRegistrationIP } from './students.js';
 
 await seedFromEnv();
+
+// Load student markup flags from storage
+const allStudentsInit = await getAllStudents();
+loadStudentMarkupFlags(allStudentsInit);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -752,7 +756,7 @@ async function handleOpenAINonStream(res, keyId, resolved, payload) {
     output_tokens: response.usage?.completion_tokens ?? 0,
     model: resolved.backendModel,
   };
-  const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
+  const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel, keyId);
   const newBal = await deductBalance(keyId, usd);
   await logUsage(keyId, usage);
 
@@ -827,7 +831,7 @@ async function handleOpenAIStream(res, keyId, resolved, payload) {
     console.log(`OpenAI stream: no usage reported, estimating ~${estIn} in / ~${estOut} out from ${chunkCount} chunks`);
   }
   usage.model = resolved.backendModel;
-  const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
+  const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel, keyId);
   const newBal = await deductBalance(keyId, usd);
   await logUsage(keyId, usage);
 
@@ -900,7 +904,7 @@ async function handleAnthropicNonStream(res, keyId, resolved, payload) {
     output_tokens: response.usage?.output_tokens ?? 0,
     model: resolved.backendModel,
   };
-  const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
+  const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel, keyId);
   const newBal = await deductBalance(keyId, usd);
   await logUsage(keyId, usage);
 
@@ -1033,7 +1037,7 @@ async function handleAnthropicStream(res, keyId, resolved, payload) {
   }
 
   usage.model = resolved.backendModel;
-  const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel);
+  const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel, keyId);
   const newBal = await deductBalance(keyId, usd);
   await logUsage(keyId, usage);
 
@@ -1180,6 +1184,21 @@ app.patch('/admin/students/:key', adminLimiter, requireAdmin, async (req, res) =
   res.json(result.student);
 });
 
+// Toggle markup for a student (noMarkup = true means they pay raw API cost)
+app.patch('/admin/students/:key/markup', adminLimiter, requireAdmin, async (req, res) => {
+  const { noMarkup } = req.body || {};
+  if (typeof noMarkup !== 'boolean') {
+    return res.status(400).json({ error: 'Body: { "noMarkup": true/false }' });
+  }
+  const result = await toggleStudentMarkup(req.params.key, noMarkup);
+  if (result.error) return res.status(404).json({ error: result.error });
+  
+  // Update in-memory cache
+  setStudentNoMarkup(req.params.key, noMarkup);
+  
+  res.json(result.student);
+});
+
 // ---- Admin usage ----
 app.get('/usage', adminLimiter, requireAdmin, async (_req, res) => {
   res.json(await getUsageSummary());
@@ -1192,12 +1211,40 @@ app.get('/admin/api/overview', adminLimiter, async (req, res) => {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   const allUsage = await getUsageSummary();
-  const markup = parseFloat(process.env.STUDENT_MARKUP) || 1;
+  const markup = getStudentMarkup();
   const users = [];
+  let totalProviderCost = 0;
+  let totalCharged = 0;
+  
   for (const [keyId, data] of Object.entries(allUsage)) {
     const bal = await getBalance(keyId);
     const student = await findByKey(keyId);
-    users.push({ key_id: keyId, name: student?.name || keyId, balance_usd: bal, ...data });
+    const noMarkup = student?.noMarkup || false;
+    
+    // Calculate provider cost and charged amount for this user
+    let userProviderCost = 0;
+    let userCharged = 0;
+    if (data.by_model) {
+      for (const [model, stats] of Object.entries(data.by_model)) {
+        const pCost = providerCostUsd(stats.input_tokens, stats.output_tokens, model);
+        userProviderCost += pCost;
+        // If user has noMarkup, they were charged provider cost, otherwise with markup
+        userCharged += noMarkup ? pCost : pCost * markup;
+      }
+    }
+    totalProviderCost += userProviderCost;
+    totalCharged += userCharged;
+    
+    users.push({
+      key_id: keyId,
+      name: student?.name || keyId,
+      balance_usd: bal,
+      noMarkup,
+      provider_cost_usd: Math.round(userProviderCost * 1e6) / 1e6,
+      charged_usd: Math.round(userCharged * 1e6) / 1e6,
+      profit_usd: Math.round((userCharged - userProviderCost) * 1e6) / 1e6,
+      ...data
+    });
   }
   const modelStats = await getModelStats();
   const firstUse = Object.values(allUsage)
@@ -1209,6 +1256,11 @@ app.get('/admin/api/overview', adminLimiter, async (req, res) => {
     })),
     users,
     markup,
+    totals: {
+      provider_cost_usd: Math.round(totalProviderCost * 1e6) / 1e6,
+      charged_usd: Math.round(totalCharged * 1e6) / 1e6,
+      profit_usd: Math.round((totalCharged - totalProviderCost) * 1e6) / 1e6,
+    },
     model_stats: modelStats,
     first_use: firstUse,
   });

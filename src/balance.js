@@ -204,12 +204,36 @@ export function providerCostUsd(inputTokens, outputTokens, model) {
 
 export const anthropicCostUsd = providerCostUsd;
 
-function getStudentMarkup() {
+export function getStudentMarkup() {
   const v = parseFloat(process.env.STUDENT_MARKUP);
   return Number.isFinite(v) && v >= 1 ? v : 1;
 }
 
-export function costUsd(inputTokens, outputTokens, model) {
+// Student-specific markup check (for friends/self with no markup)
+let studentMarkupCache = new Map();
+
+export function setStudentNoMarkup(keyId, noMarkup) {
+  studentMarkupCache.set(keyId, noMarkup);
+}
+
+export function getStudentNoMarkup(keyId) {
+  return studentMarkupCache.get(keyId) || false;
+}
+
+export function loadStudentMarkupFlags(students) {
+  studentMarkupCache.clear();
+  for (const s of students) {
+    if (s.noMarkup) {
+      studentMarkupCache.set(s.key, true);
+    }
+  }
+}
+
+export function costUsd(inputTokens, outputTokens, model, keyId = null) {
   const raw = providerCostUsd(inputTokens, outputTokens, model);
+  // If student has noMarkup flag, charge only provider cost
+  if (keyId && getStudentNoMarkup(keyId)) {
+    return Math.round(raw * 1e6) / 1e6;
+  }
   return Math.round(raw * getStudentMarkup() * 1e6) / 1e6;
 }
