@@ -52,7 +52,12 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:16px}
 .card-title{font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px;font-weight:700}
 .card-title-light{color:var(--text)}
-.api-key-note{font-size:.78rem;color:var(--text);margin-top:10px;line-height:1.5}
+.api-key-card{border:2px solid var(--orange);background:linear-gradient(135deg,var(--surface) 0%,rgba(249,115,22,.06) 100%)}
+.api-key-card .card-title{color:var(--orange);font-size:.75rem}
+.api-key-note{font-size:.82rem;color:var(--text2);margin-top:12px;line-height:1.6}
+.api-key-note strong{color:var(--text)}
+.btn-download{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;margin-left:8px;transition:all .15s}
+.btn-download:hover{border-color:var(--orange);color:var(--orange)}
 
 /* Hero balance (Overview) */
 .hero-bal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;margin-bottom:20px;position:relative;overflow:hidden;border-left:4px solid var(--orange);background:linear-gradient(135deg,var(--surface) 0%,rgba(249,115,22,.04) 100%)}
@@ -99,10 +104,23 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .topup-secure{font-size:.75rem;color:var(--text3);margin-top:16px;line-height:1.5}
 
 /* Setup */
+.setup-tabs{display:flex;gap:8px;margin-bottom:20px}
+.setup-tab{padding:12px 20px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text2);font-size:.88rem;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:8px}
+.setup-tab:hover{border-color:var(--border2);color:var(--text)}
+.setup-tab.active{background:var(--orange);color:#000;border-color:var(--orange)}
+.setup-tab.active .tab-badge{background:rgba(0,0,0,.2);color:#000}
+.tab-badge{font-size:.6rem;padding:3px 8px;background:rgba(249,115,22,.15);color:var(--orange);border-radius:4px;font-weight:700;text-transform:uppercase}
+.setup-panel{display:none}
+.setup-panel.active{display:block}
+.setup-intro{font-size:.88rem;color:var(--text2);margin-bottom:20px;line-height:1.6}
+.setup-intro strong{color:var(--text)}
+.link-orange{color:var(--orange);text-decoration:underline;text-underline-offset:2px}
+.link-orange:hover{color:var(--orange2)}
 .setup-step{display:flex;gap:14px;margin-bottom:18px}
 .step-num{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;color:var(--orange)}
 .step-text{font-size:.85rem;color:var(--text);line-height:1.65;padding-top:4px}
 .step-text strong{color:var(--text)}
+.step-text a{color:var(--orange)}
 .copy-box{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:11px 14px;margin:8px 0}
 .copy-box code{flex:1;font-family:'SF Mono',ui-monospace,monospace;font-size:.82rem;color:var(--orange);word-break:break-all}
 .copy-box button{flex-shrink:0;padding:6px 14px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);color:var(--orange);border-radius:7px;font-size:.72rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s}
@@ -235,17 +253,17 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <div class="hero-bal">
         <div class="hero-label">Raspoloživi kredit</div>
         <div class="hero-val"><span id="hBal">0.00</span><span class="cur">USD</span></div>
-        <div class="hero-sub">Troši se automatski po zahtevu u Cursor-u</div>
+        <div class="hero-sub">Troši se automatski po zahtevu u tvom IDE-u</div>
       </div>
       <div class="stats">
         <div class="stat"><div class="stat-label">Zahtevi</div><div class="stat-val" id="vReqs">0</div><div class="stat-bar"><div class="stat-fill" id="bReqs" style="width:0%;background:var(--orange)"></div></div></div>
         <div class="stat"><div class="stat-label">Ulazni tokeni</div><div class="stat-val" id="vIn">0</div><div class="stat-bar"><div class="stat-fill" id="bIn" style="width:0%;background:var(--orange)"></div></div></div>
         <div class="stat"><div class="stat-label">Izlazni tokeni</div><div class="stat-val" id="vOut">0</div><div class="stat-bar"><div class="stat-fill" id="bOut" style="width:0%;background:var(--orange)"></div></div></div>
       </div>
-      <div class="card">
-        <div class="card-title card-title-light">Tvoj API ključ</div>
-        <div class="copy-box"><code id="dashKey">-</code><button onclick="copyEl('dashKey')">Kopiraj</button></div>
-        <p class="api-key-note">Sačuvaj ovaj ključ na sigurno mesto, koristiš ga za logovanje na dashboard i za povezivanje sa Cursor IDE.</p>
+      <div class="card api-key-card">
+        <div class="card-title card-title-light">⚠️ Tvoj API ključ — SAČUVAJ GA!</div>
+        <div class="copy-box"><code id="dashKey">-</code><button onclick="copyEl('dashKey')">Kopiraj</button><button onclick="downloadKey()" class="btn-download">⬇ Preuzmi</button></div>
+        <p class="api-key-note"><strong>Ovaj ključ ti je potreban za:</strong> logovanje na dashboard i povezivanje sa tvojim IDE-om (VS Code, Cursor...). Sačuvaj ga na sigurno mesto ili preuzmi kao fajl.</p>
       </div>
       <div class="card">
         <div class="card-title card-title-light">Detalji</div>
@@ -273,7 +291,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <div class="card topup-balance-card">
         <div class="card-title card-title-light">Trenutno stanje</div>
         <div class="topup-balance-val" id="topBal">$0.00</div>
-        <p class="topup-balance-sub">Nepotrošeni kredit na tvom nalogu. Troši se automatski pri svakom zahtevu u Cursor-u.</p>
+        <p class="topup-balance-sub">Nepotrošeni kredit na tvom nalogu. Troši se automatski pri svakom zahtevu u tvom IDE-u.</p>
       </div>
 
       <div class="card">
@@ -302,14 +320,57 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
     <!-- PODESAVANJA -->
     <div class="page" id="pg-setup">
-      <div class="page-title">Podešavanja za Cursor</div>
-      <div class="card">
-        <div class="card-title">Korak po korak</div>
+      <div class="page-title">Podešavanja</div>
+      
+      <div class="setup-tabs">
+        <button class="setup-tab active" onclick="showSetupTab('vscode')">VS Code + Cline <span class="tab-badge">Preporučeno</span></button>
+        <button class="setup-tab" onclick="showSetupTab('cursor')">Cursor</button>
+      </div>
+
+      <!-- VS Code + Cline -->
+      <div class="card setup-panel active" id="setup-vscode">
+        <div class="card-title">VS Code + Cline (Besplatno)</div>
+        <p class="setup-intro">VS Code je besplatan editor, Cline je besplatna AI ekstenzija. Ovo je naša preporučena kombinacija.</p>
+        
+        <div class="setup-step"><div class="step-num">1</div><div class="step-text">Ako nemaš VS Code, preuzmi ga sa <a href="https://code.visualstudio.com" target="_blank" class="link-orange">code.visualstudio.com</a></div></div>
+        
+        <div class="setup-step"><div class="step-num">2</div><div class="step-text">U VS Code-u idi na <strong>Extensions</strong> (Ctrl+Shift+X), traži <strong>"Cline"</strong> i klikni <strong>Install</strong></div></div>
+        
+        <div class="setup-step"><div class="step-num">3</div><div class="step-text">Otvori Cline panel (ikona u sidebar-u) → klikni na ⚙️ <strong>Settings</strong></div></div>
+        
+        <div class="setup-step"><div class="step-num">4</div><div class="step-text">U <strong>API Provider</strong> izaberi <strong>"OpenAI Compatible"</strong></div></div>
+        
+        <div class="setup-step"><div class="step-num">5</div><div class="step-text">Unesi <strong>Base URL</strong>:</div></div>
+        <div class="copy-box"><code id="setupUrlVS">-</code><button onclick="copyEl('setupUrlVS')">Kopiraj</button></div>
+        
+        <div class="setup-step"><div class="step-num">6</div><div class="step-text">Unesi <strong>API Key</strong>:</div></div>
+        <div class="copy-box"><code id="setupKeyVS">-</code><button onclick="copyEl('setupKeyVS')">Kopiraj</button></div>
+        
+        <div class="setup-step"><div class="step-num">7</div><div class="step-text">U <strong>Model ID</strong> unesi jedan od modela:</div></div>
+        <div style="margin-left:44px">
+          <div class="copy-box"><code>vajb-agent-lite</code><button onclick="copyText('vajb-agent-lite')">Kopiraj</button></div>
+          <div class="copy-box"><code>vajb-agent-pro</code><button onclick="copyText('vajb-agent-pro')">Kopiraj</button></div>
+          <div class="copy-box"><code>vajb-agent-max</code><button onclick="copyText('vajb-agent-max')">Kopiraj</button></div>
+          <div class="copy-box"><code>vajb-agent-ultra</code><button onclick="copyText('vajb-agent-ultra')">Kopiraj</button></div>
+          <div class="copy-box"><code>vajb-agent-power</code><button onclick="copyText('vajb-agent-power')">Kopiraj</button></div>
+        </div>
+        
+        <div class="setup-step"><div class="step-num">8</div><div class="step-text">Klikni <strong>Save</strong> i pošalji poruku. Ako dobiješ odgovor, sve radi!</div></div>
+      </div>
+
+      <!-- Cursor -->
+      <div class="card setup-panel" id="setup-cursor">
+        <div class="card-title">Cursor IDE</div>
+        <p class="setup-intro">Cursor je odličan AI editor. Za korišćenje VajbAgenta potreban ti je <strong>Cursor Pro plan ($20/mes)</strong> jer besplatna verzija ne podržava eksterne API-je.</p>
+        
         <div class="setup-step"><div class="step-num">1</div><div class="step-text">Otvori <strong>Cursor</strong> → Settings → <strong>Models</strong></div></div>
+        
         <div class="setup-step"><div class="step-num">2</div><div class="step-text">Proširi <strong>OpenAI API Key</strong> sekciju i unesi svoj API ključ:</div></div>
         <div class="copy-box"><code id="setupKey">-</code><button onclick="copyEl('setupKey')">Kopiraj</button></div>
+        
         <div class="setup-step"><div class="step-num">3</div><div class="step-text">Uključi <strong>Override OpenAI Base URL</strong> i unesi:</div></div>
         <div class="copy-box"><code id="setupUrl">-</code><button onclick="copyEl('setupUrl')">Kopiraj</button></div>
+        
         <div class="setup-step"><div class="step-num">4</div><div class="step-text">Klikni <strong>+ Add Custom Model</strong> i dodaj model:</div></div>
         <div style="margin-left:44px">
           <div class="copy-box"><code>vajb-agent-lite</code><button onclick="copyText('vajb-agent-lite')">Kopiraj</button></div>
@@ -318,6 +379,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
           <div class="copy-box"><code>vajb-agent-ultra</code><button onclick="copyText('vajb-agent-ultra')">Kopiraj</button></div>
           <div class="copy-box"><code>vajb-agent-power</code><button onclick="copyText('vajb-agent-power')">Kopiraj</button></div>
         </div>
+        
         <div class="setup-step"><div class="step-num">5</div><div class="step-text">Pošalji poruku. Ako dobiješ odgovor, sve radi!</div></div>
       </div>
     </div>
@@ -343,6 +405,24 @@ function fmt(n){return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'
 function fmtD(iso){if(!iso)return'-';const d=new Date(iso);return d.toLocaleDateString('sr-RS')+' '+d.toLocaleTimeString('sr-RS',{hour:'2-digit',minute:'2-digit'})}
 function copyText(t){navigator.clipboard.writeText(t).then(()=>toast('Kopirano!'))}
 function copyEl(id){copyText($(id).textContent)}
+function showSetupTab(tab){
+  document.querySelectorAll('.setup-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.setup-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector('.setup-tab[onclick*="'+tab+'"]').classList.add('active');
+  document.getElementById('setup-'+tab).classList.add('active');
+}
+function downloadKey(){
+  const key=apiKey;
+  if(!key){toast('Nema ključa za preuzimanje');return}
+  const content=`VajbAgent API Ključ\n==================\n\nTvoj API ključ: ${key}\n\nBase URL: ${location.origin}/v1\n\nOvaj ključ koristiš za:\n- Logovanje na dashboard\n- Povezivanje sa VS Code (Cline ekstenzija)\n- Povezivanje sa Cursor IDE\n\nČuvaj ovaj fajl na sigurnom mestu!\n`;
+  const blob=new Blob([content],{type:'text/plain'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='vajbagent-api-key.txt';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Ključ preuzet!');
+}
 
 function showLogin(){$('login').style.display='flex';$('app').style.display='none'}
 function showApp(){$('login').style.display='none';$('app').style.display='flex'}
@@ -482,6 +562,8 @@ function render(d){
   $('dashKey').textContent=apiKey;
   $('setupKey').textContent=apiKey;
   $('setupUrl').textContent=location.origin;
+  $('setupKeyVS').textContent=apiKey;
+  $('setupUrlVS').textContent=location.origin+'/v1';
 
   const mx=Math.max(d.input_tokens||1,d.output_tokens||1,1);
   $('bReqs').style.width=Math.min(((d.requests||0)/500)*100,100)+'%';
