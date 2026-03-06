@@ -125,6 +125,8 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .copy-box code{flex:1;font-family:'SF Mono',ui-monospace,monospace;font-size:.82rem;color:var(--orange);word-break:break-all}
 .copy-box button{flex-shrink:0;padding:6px 14px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);color:var(--orange);border-radius:7px;font-size:.72rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s}
 .copy-box button:hover{background:rgba(249,115,22,.2)}
+.copy-btn-full{width:100%;padding:9px 16px;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.2);color:var(--orange);border-radius:8px;font-size:.78rem;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s}
+.copy-btn-full:hover{background:rgba(249,115,22,.2)}
 
 /* Detail rows */
 .detail-row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);font-size:.84rem}
@@ -382,6 +384,39 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
         
         <div class="setup-step"><div class="step-num">5</div><div class="step-text">Pošalji poruku. Ako dobiješ odgovor, sve radi!</div></div>
       </div>
+
+      <!-- Web pretraga MCP -->
+      <div class="card" style="margin-top:24px;border:1px solid rgba(249,115,22,.25)">
+        <div class="card-title" style="display:flex;align-items:center;gap:10px">🌐 Web pretraga za agenta (besplatno)</div>
+        <p class="setup-intro">Dodaj web pretragu svom agentu u Cline-u. Potpuno besplatno — bez API ključa, bez naloga. Agent će moći da pretražuje internet kad mu zatreba.</p>
+
+        <div class="setup-step"><div class="step-num">1</div><div class="step-text">U VS Code-u mora da ti bude instaliran <strong>Node.js</strong> (proveri sa <code style="color:var(--orange)">node -v</code> u terminalu). Ako nemaš, preuzmi sa <a href="https://nodejs.org" target="_blank" class="link-orange">nodejs.org</a></div></div>
+
+        <div class="setup-step"><div class="step-num">2</div><div class="step-text">Otvori <strong>Cline</strong> panel → ⚙️ Settings → skroluj do <strong>MCP Servers</strong> → klikni <strong>"Configure"</strong> (ili "Edit MCP Settings")</div></div>
+
+        <div class="setup-step"><div class="step-num">3</div><div class="step-text">Otvoriće se fajl <code style="color:var(--orange)">cline_mcp_settings.json</code>. Zameni <strong>ceo sadržaj</strong> ovim:</div></div>
+        <div class="copy-box" style="flex-direction:column;align-items:stretch;gap:8px">
+          <pre style="font-family:'SF Mono','Fira Code',ui-monospace,monospace;font-size:.82rem;color:var(--orange);white-space:pre;overflow-x:auto;margin:0;line-height:1.6">{
+  "mcpServers": {
+    "web-search": {
+      "command": "npx",
+      "args": ["open-websearch@latest"],
+      "env": {
+        "MODE": "stdio",
+        "DEFAULT_SEARCH_ENGINE": "duckduckgo"
+      }
+    }
+  }
+}</pre>
+          <button onclick="copyMcpConfig()" class="copy-btn-full">Kopiraj JSON</button>
+        </div>
+
+        <div class="setup-step"><div class="step-num">4</div><div class="step-text">Sačuvaj fajl (Ctrl+S). Cline će automatski pokrenuti MCP server.</div></div>
+
+        <div class="setup-step"><div class="step-num">5</div><div class="step-text">Testiranje: u chatu pitaj agenta nešto što zahteva internet, npr. <em>"Pretraži šta je novo u React 19"</em>. Cline će ponuditi <strong>web_search</strong> alat — odobri ga i agent pretražuje!</div></div>
+
+        <div class="note" style="margin-top:16px"><strong>Napomena:</strong> Ako već imaš nešto u <code>cline_mcp_settings.json</code>, samo dodaj <code>"web-search"</code> objekat unutar postojećeg <code>mcpServers</code>. Na Windows-u koristi <code>"command": "cmd"</code> i <code>"args": ["/c", "npx", "open-websearch@latest"]</code>.</div>
+      </div>
     </div>
   </main>
 </div>
@@ -405,6 +440,7 @@ function fmt(n){return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'
 function fmtD(iso){if(!iso)return'-';const d=new Date(iso);return d.toLocaleDateString('sr-RS')+' '+d.toLocaleTimeString('sr-RS',{hour:'2-digit',minute:'2-digit'})}
 function copyText(t){navigator.clipboard.writeText(t).then(()=>toast('Kopirano!'))}
 function copyEl(id){copyText($(id).textContent)}
+function copyMcpConfig(){copyText(JSON.stringify({mcpServers:{"web-search":{command:"npx",args:["open-websearch@latest"],env:{MODE:"stdio",DEFAULT_SEARCH_ENGINE:"duckduckgo"}}}},null,2))}
 function showSetupTab(tab){
   document.querySelectorAll('.setup-tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.setup-panel').forEach(p=>p.classList.remove('active'));
