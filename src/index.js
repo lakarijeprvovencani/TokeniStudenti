@@ -730,13 +730,12 @@ async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, st
   const trimmedMessages = trimOpenAIMessages(messages, resolved.backendModel);
 
   const isReasoning = resolved.backendModel.startsWith('o');
+  const isGpt5 = resolved.backendModel.startsWith('gpt-5');
 
   const payload = {
     model: resolved.backendModel,
     messages: trimmedMessages,
-    ...(isReasoning
-      ? { max_completion_tokens: maxTokens }
-      : { max_tokens: maxTokens }),
+    max_completion_tokens: maxTokens,
     stream,
     ...(stream && { stream_options: { include_usage: true } }),
     ...(isReasoning && { reasoning_effort: maxTokens <= 2048 ? 'low' : 'medium' }),
