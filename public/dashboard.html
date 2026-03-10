@@ -351,10 +351,12 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
         <div class="setup-step"><div class="step-num">7</div><div class="step-text">U <strong>Model ID</strong> unesi jedan od modela:</div></div>
         <div style="margin-left:44px">
           <div class="copy-box"><code>vajb-agent-lite</code><button onclick="copyText('vajb-agent-lite')">Kopiraj</button></div>
+          <div class="copy-box"><code>vajb-agent-turbo</code><button onclick="copyText('vajb-agent-turbo')">Kopiraj</button></div>
           <div class="copy-box"><code>vajb-agent-pro</code><button onclick="copyText('vajb-agent-pro')">Kopiraj</button></div>
           <div class="copy-box"><code>vajb-agent-max</code><button onclick="copyText('vajb-agent-max')">Kopiraj</button></div>
-          <div class="copy-box"><code>vajb-agent-ultra</code><button onclick="copyText('vajb-agent-ultra')">Kopiraj</button></div>
           <div class="copy-box"><code>vajb-agent-power</code><button onclick="copyText('vajb-agent-power')">Kopiraj</button></div>
+          <div class="copy-box"><code>vajb-agent-ultra</code><button onclick="copyText('vajb-agent-ultra')">Kopiraj</button></div>
+          <div class="copy-box"><code>vajb-agent-architect</code><button onclick="copyText('vajb-agent-architect')">Kopiraj</button></div>
         </div>
         
         <div class="setup-step"><div class="step-num">8</div><div class="step-text">Klikni <strong>Save</strong> i pošalji poruku. Ako dobiješ odgovor, sve radi!</div></div>
@@ -376,10 +378,12 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
         <div class="setup-step"><div class="step-num">4</div><div class="step-text">Klikni <strong>+ Add Custom Model</strong> i dodaj model:</div></div>
         <div style="margin-left:44px">
           <div class="copy-box"><code>vajb-agent-lite</code><button onclick="copyText('vajb-agent-lite')">Kopiraj</button></div>
+          <div class="copy-box"><code>vajb-agent-turbo</code><button onclick="copyText('vajb-agent-turbo')">Kopiraj</button></div>
           <div class="copy-box"><code>vajb-agent-pro</code><button onclick="copyText('vajb-agent-pro')">Kopiraj</button></div>
           <div class="copy-box"><code>vajb-agent-max</code><button onclick="copyText('vajb-agent-max')">Kopiraj</button></div>
-          <div class="copy-box"><code>vajb-agent-ultra</code><button onclick="copyText('vajb-agent-ultra')">Kopiraj</button></div>
           <div class="copy-box"><code>vajb-agent-power</code><button onclick="copyText('vajb-agent-power')">Kopiraj</button></div>
+          <div class="copy-box"><code>vajb-agent-ultra</code><button onclick="copyText('vajb-agent-ultra')">Kopiraj</button></div>
+          <div class="copy-box"><code>vajb-agent-architect</code><button onclick="copyText('vajb-agent-architect')">Kopiraj</button></div>
         </div>
         
         <div class="setup-step"><div class="step-num">5</div><div class="step-text">Pošalji poruku. Ako dobiješ odgovor, sve radi!</div></div>
@@ -425,13 +429,15 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 <script>
 let apiKey='';
-// Ranges: za $10 koliko otprilike zahteva (kao na landingu). Za tvoj kredit skalira se.
+// Realna procena zahteva za $15 (~8K in + ~1.2K out tokena po zahtevu, 1.25x markup)
 const MODELS=[
-  {id:'vajb-agent-lite',name:'Lite',tier:'Best Value',per10:[2000,5000]},
-  {id:'vajb-agent-pro',name:'Pro',tier:'Standard',per10:[400,1000]},
-  {id:'vajb-agent-max',name:'Max',tier:'Premium',per10:[200,500]},
-  {id:'vajb-agent-ultra',name:'Ultra',tier:'Elite',per10:[30,100]},
-  {id:'vajb-agent-power',name:'Power',tier:'Architect',per10:[30,100]},
+  {id:'vajb-agent-lite',name:'Lite',tier:'Best Value',per15:2700},
+  {id:'vajb-agent-turbo',name:'Turbo',tier:'Reasoning',per15:855},
+  {id:'vajb-agent-pro',name:'Pro',tier:'Standard',per15:540},
+  {id:'vajb-agent-max',name:'Max',tier:'Premium',per15:285},
+  {id:'vajb-agent-power',name:'Power',tier:'Flagship',per15:315},
+  {id:'vajb-agent-ultra',name:'Ultra',tier:'Elite',per15:57},
+  {id:'vajb-agent-architect',name:'Architect',tier:'Arhitekta',per15:57},
 ];
 
 function $(id){return document.getElementById(id)}
@@ -609,11 +615,8 @@ function render(d){
   const grid=$('modelGrid');grid.innerHTML='';
   const bal=d.balance_usd||0;
   MODELS.forEach(m=>{
-    const [a,b]=m.per10;
-    const minR=bal>0?Math.round((a*bal)/10):0;
-    const maxR=bal>0?Math.round((b*bal)/10):0;
-    const rangeStr=minR>=maxR?`~${fmt(minR)}`:`~${fmt(minR)}–${fmt(maxR)}`;
-    grid.innerHTML+=`<div class="model-card"><div class="model-name">${m.name}</div><div class="model-tier">${m.tier}</div><div class="model-stat cheap">${rangeStr}</div><div class="model-detail">zahteva (orijentaciono)</div></div>`;
+    const est=bal>0?Math.round((m.per15*bal)/15):0;
+    grid.innerHTML+=`<div class="model-card"><div class="model-name">${m.name}</div><div class="model-tier">${m.tier}</div><div class="model-stat cheap">~${fmt(est)}</div><div class="model-detail">zahteva (orijentaciono)</div></div>`;
   });
 }
 

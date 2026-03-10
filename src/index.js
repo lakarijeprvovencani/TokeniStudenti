@@ -34,27 +34,39 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-// ---- Model registry: 4 tiers (OpenAI 4.1 + Anthropic) ----
+// ---- Model registry: 7 tiers (OpenAI GPT-5 + Anthropic) ----
 const MAX_OUTPUT = {
+  'gpt-5-mini':        16384,
+  'o4-mini':           100000,
+  'gpt-5':             65536,
+  'claude-sonnet-4-6': 65536,
+  'gpt-5.4':           65536,
+  'claude-opus-4-6':   131072,
+  // Legacy (fallback)
   'gpt-4.1-mini':      32768,
   'gpt-4.1':           32768,
-  'claude-sonnet-4-6': 65536,
-  'claude-opus-4-6':   131072,
 };
 
 const VAJB_MODELS = [
-  { id: 'vajb-agent-lite',  name: 'VajbAgent Lite',  backend: 'openai',    backendModel: 'gpt-4.1-mini',      desc: 'GPT-4.1 Mini - svakodnevno kodiranje' },
-  { id: 'vajb-agent-pro',   name: 'VajbAgent Pro',   backend: 'openai',    backendModel: 'gpt-4.1',           desc: 'GPT-4.1 - ozbiljniji projekti' },
-  { id: 'vajb-agent-max',   name: 'VajbAgent Max',   backend: 'anthropic', backendModel: 'claude-sonnet-4-6', desc: 'Claude Sonnet - kompleksni zadaci' },
-  { id: 'vajb-agent-ultra', name: 'VajbAgent Ultra', backend: 'anthropic', backendModel: 'claude-opus-4-6',   desc: 'Claude Opus - premium, najjači' },
-  { id: 'vajb-agent-power', name: 'VajbAgent Power', backend: 'anthropic', backendModel: 'claude-opus-4-6',   desc: 'Opus Architect - backend expert, security', isPower: true },
+  { id: 'vajb-agent-lite',      name: 'VajbAgent Lite',      backend: 'openai',    backendModel: 'gpt-5-mini',      desc: 'GPT-5 Mini — svakodnevno kodiranje, best value' },
+  { id: 'vajb-agent-turbo',     name: 'VajbAgent Turbo',     backend: 'openai',    backendModel: 'o4-mini',          desc: 'o4 Mini — reasoning model, logika i debugging' },
+  { id: 'vajb-agent-pro',       name: 'VajbAgent Pro',       backend: 'openai',    backendModel: 'gpt-5',            desc: 'GPT-5 — ozbiljniji projekti, jak i pametan' },
+  { id: 'vajb-agent-max',       name: 'VajbAgent Max',       backend: 'anthropic', backendModel: 'claude-sonnet-4-6', desc: 'Claude Sonnet — kompleksni zadaci' },
+  { id: 'vajb-agent-power',     name: 'VajbAgent Power',     backend: 'openai',    backendModel: 'gpt-5.4',          desc: 'GPT-5.4 — najjači OpenAI, flagship' },
+  { id: 'vajb-agent-ultra',     name: 'VajbAgent Ultra',     backend: 'anthropic', backendModel: 'claude-opus-4-6',   desc: 'Claude Opus — premium Anthropic' },
+  { id: 'vajb-agent-architect', name: 'VajbAgent Architect', backend: 'anthropic', backendModel: 'claude-opus-4-6',   desc: 'Opus Architect — full-stack arhitekta', isPower: true },
 ];
 const DEFAULT_VAJB_MODEL = VAJB_MODELS[0].id;
+
+const MODEL_ALIASES = {
+  'vajb-agent-power-old': 'vajb-agent-architect',
+};
 
 function resolveModel(requestedModel) {
   const id = (requestedModel || '').trim();
   if (!id) return null;
-  return VAJB_MODELS.find((m) => m.id === id) || null;
+  const resolved = MODEL_ALIASES[id] || id;
+  return VAJB_MODELS.find((m) => m.id === resolved) || null;
 }
 
 // ---- Clients ----
@@ -717,7 +729,7 @@ async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, st
   const maxTokens = Math.min(Math.max(requested, 256), modelMax);
   const trimmedMessages = trimOpenAIMessages(messages, resolved.backendModel);
 
-  const isReasoning = resolved.backendModel.startsWith('o') || resolved.backendModel.includes('gpt-5');
+  const isReasoning = resolved.backendModel.startsWith('o');
 
   const payload = {
     model: resolved.backendModel,

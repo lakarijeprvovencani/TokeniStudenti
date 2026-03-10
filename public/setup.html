@@ -97,11 +97,13 @@ const baseUrl=window.location.origin;
 document.getElementById('base-url').textContent=baseUrl;
 
 const modelInfo={
-  'vajb-agent-lite':{name:'VajbAgent Lite',desc:'Svakodnevno kodiranje, brz i pouzdan'},
-  'vajb-agent-pro':{name:'VajbAgent Pro',desc:'Ozbiljniji projekti, bolji za kompleksniji kod'},
-  'vajb-agent-max':{name:'VajbAgent Max',desc:'Kompleksni zadaci, duže razmišljanje'},
-  'vajb-agent-ultra':{name:'VajbAgent Ultra',desc:'Premium, najjači AI model'},
-  'vajb-agent-power':{name:'VajbAgent Power',desc:'Full-stack arhitekta, backend/security/DevOps'},
+  'vajb-agent-lite':{name:'VajbAgent Lite',desc:'GPT-5 Mini — svakodnevno kodiranje, best value'},
+  'vajb-agent-turbo':{name:'VajbAgent Turbo',desc:'o4 Mini — reasoning model, logika i debugging'},
+  'vajb-agent-pro':{name:'VajbAgent Pro',desc:'GPT-5 — ozbiljniji projekti, jak i pametan'},
+  'vajb-agent-max':{name:'VajbAgent Max',desc:'Claude Sonnet 4.6 — kompleksni zadaci'},
+  'vajb-agent-power':{name:'VajbAgent Power',desc:'GPT-5.4 — najjači OpenAI, flagship'},
+  'vajb-agent-ultra':{name:'VajbAgent Ultra',desc:'Claude Opus 4.6 — premium Anthropic'},
+  'vajb-agent-architect':{name:'VajbAgent Architect',desc:'Opus 4.6 + full-stack arhitekta prompt'},
 };
 
 fetch('/v1/models').then(r=>r.json()).then(data=>{

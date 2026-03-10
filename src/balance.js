@@ -170,16 +170,20 @@ export async function getTotalDeposited(keyId) {
  * All model prices: USD per million tokens (input, output).
  */
 const PRICES = {
-  // OpenAI GPT-4.1 models (Lite/Pro)
-  'gpt-4.1-mini': { in: 0.40, out: 1.60 },
-  'gpt-4.1':      { in: 2.00, out: 8.00 },
-  // Claude models (Max/Ultra)
+  // OpenAI GPT-5 series
+  'gpt-5-mini': { in: 0.25, out: 2.00 },
+  'o4-mini':    { in: 1.10, out: 4.40 },
+  'gpt-5':      { in: 1.25, out: 10.00 },
+  'gpt-5.4':    { in: 2.50, out: 15.00 },
+  // Claude models
   'claude-sonnet-4-6': { in: 3.00, out: 15.0 },
   'claude-opus-4-6':   { in: 15.00, out: 75.0 },
-  // Legacy
-  'gpt-4o-mini':       { in: 0.15, out: 0.60 },
-  'gpt-4o':            { in: 2.50, out: 10.0 },
-  'claude-haiku-4-5':  { in: 1.00, out: 5.00 },
+  // Legacy (for historical cost calculations)
+  'gpt-4.1-mini': { in: 0.40, out: 1.60 },
+  'gpt-4.1':      { in: 2.00, out: 8.00 },
+  'gpt-4o-mini':  { in: 0.15, out: 0.60 },
+  'gpt-4o':       { in: 2.50, out: 10.0 },
+  'claude-haiku-4-5': { in: 1.00, out: 5.00 },
 };
 
 const DEFAULT_PRICE = { in: 3, out: 15 };
@@ -187,11 +191,15 @@ const DEFAULT_PRICE = { in: 3, out: 15 };
 function getPrice(model) {
   if (model && PRICES[model]) return PRICES[model];
   const m = (model || '').toLowerCase();
-  if (m.includes('4.1-mini')) return PRICES['gpt-4.1-mini'];
-  if (m.includes('gpt-4.1'))  return PRICES['gpt-4.1'];
+  if (m.includes('5-mini'))   return PRICES['gpt-5-mini'];
+  if (m.includes('5.4'))      return PRICES['gpt-5.4'];
+  if (m.includes('gpt-5'))    return PRICES['gpt-5'];
+  if (m.includes('o4-mini'))  return PRICES['o4-mini'];
   if (m.includes('opus'))     return PRICES['claude-opus-4-6'];
   if (m.includes('sonnet'))   return PRICES['claude-sonnet-4-6'];
   if (m.includes('haiku'))    return PRICES['claude-haiku-4-5'];
+  if (m.includes('4.1-mini')) return PRICES['gpt-4.1-mini'];
+  if (m.includes('gpt-4.1'))  return PRICES['gpt-4.1'];
   if (m.includes('4o-mini'))  return PRICES['gpt-4o-mini'];
   if (m.includes('gpt-4o'))   return PRICES['gpt-4o'];
   return DEFAULT_PRICE;
