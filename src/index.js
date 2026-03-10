@@ -762,11 +762,15 @@ async function handleOpenAINonStream(res, keyId, resolved, payload) {
     });
   }
 
+  const reasoning = response.usage?.completion_tokens_details?.reasoning_tokens ?? 0;
   const usage = {
     input_tokens: response.usage?.prompt_tokens ?? 0,
     output_tokens: response.usage?.completion_tokens ?? 0,
     model: resolved.backendModel,
   };
+  if (reasoning > 0) {
+    console.log(`OpenAI reasoning tokens: ${reasoning} (billed as output, total output=${usage.output_tokens})`);
+  }
   const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel, keyId);
   const newBal = await deductBalance(keyId, usd);
   await logUsage(keyId, usage);
@@ -822,6 +826,7 @@ async function handleOpenAIStream(res, keyId, resolved, payload) {
       if (chunk.usage) {
         usage.input_tokens = chunk.usage.prompt_tokens ?? usage.input_tokens;
         usage.output_tokens = chunk.usage.completion_tokens ?? usage.output_tokens;
+        usage.reasoning_tokens = chunk.usage.completion_tokens_details?.reasoning_tokens ?? usage.reasoning_tokens ?? 0;
       }
       chunkCount++;
       chunk.model = resolved.id;
@@ -840,6 +845,9 @@ async function handleOpenAIStream(res, keyId, resolved, payload) {
     const estOut = Math.max(chunkCount * 15, 200);
     usage = { input_tokens: estIn, output_tokens: estOut };
     console.log(`OpenAI stream: no usage reported, estimating ~${estIn} in / ~${estOut} out from ${chunkCount} chunks`);
+  }
+  if (usage.reasoning_tokens > 0) {
+    console.log(`OpenAI stream reasoning tokens: ${usage.reasoning_tokens} (billed as output, total output=${usage.output_tokens})`);
   }
   usage.model = resolved.backendModel;
   const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel, keyId);
