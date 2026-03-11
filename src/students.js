@@ -224,14 +224,7 @@ async function writeRegistrations(regs) {
   try { writeRegistrationsFile(regs); } catch {}
 }
 
-const WHITELIST_IPS = new Set(
-  (process.env.WHITELIST_IPS || '').split(',').map(s => s.trim()).filter(Boolean)
-);
-
-function normalizeIP(ip) {
-  if (!ip) return ip;
-  return ip.replace(/^::ffff:/, '');
-}
+import { normalizeIP, WHITELIST_IPS } from './utils.js';
 
 export async function canRegisterFromIP(ip) {
   if (!ip) return false;

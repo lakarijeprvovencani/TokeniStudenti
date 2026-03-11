@@ -355,14 +355,7 @@ const adminLimiter = rateLimit({
   handler: (_req, res) => res.status(429).json({ error: { message: 'Previše admin zahteva. Sačekaj 1 minut.', code: 'rate_limit' } }),
 });
 
-function normalizeIP(ip) {
-  if (!ip) return ip;
-  return ip.replace(/^::ffff:/, '');
-}
-
-const WHITELIST_IPS = new Set(
-  (process.env.WHITELIST_IPS || '').split(',').map(s => s.trim()).filter(Boolean)
-);
+import { normalizeIP, WHITELIST_IPS } from './utils.js';
 
 function isWhitelistedIP(req) {
   const raw = req.ip || req.connection?.remoteAddress || '';
@@ -1084,7 +1077,8 @@ app.get('/me', authLimiter, requireStudentAuth, async (req, res) => {
   }
   const input = data.input_tokens || 0;
   const output = data.output_tokens || 0;
-  const estimatedCost = costUsd(input, output);
+  const lastModel = data.model || 'gpt-5-mini';
+  const estimatedCost = costUsd(input, output, lastModel, keyId);
   res.json({
     key_id: keyId, name, balance_usd: balanceUsd,
     input_tokens: input, output_tokens: output,
@@ -1322,18 +1316,7 @@ app.get('/admin', (_req, res) => {
 // ---- Static assets (favicon, etc.) ----
 app.use(express.static(path.join(__dirname, '..', 'public'), { index: false }));
 
-// ---- 404 ----
-app.use((req, res) => {
-  res.status(404).json({ error: { message: 'Not found' } });
-});
-
-// ---- Global error handler (never leak stack traces) ----
-app.use((err, _req, res, _next) => {
-  console.error('Unhandled error:', err.message);
-  if (res.headersSent) return;
-  res.status(500).json({ error: { message: 'Internal server error' } });
-});
-
+// ---- Debug ----
 app.get('/debug/redis', adminLimiter, async (req, res) => {
   const secret = req.headers['x-admin-secret'] || req.query.secret;
   if (!safeEqual(secret, process.env.ADMIN_SECRET)) return res.status(401).json({ error: 'Unauthorized' });
@@ -1356,6 +1339,18 @@ app.get('/debug/redis', adminLimiter, async (req, res) => {
     } catch (err) { ping = 'error: ' + err.message; }
   }
   res.json({ configured, ping, keys });
+});
+
+// ---- 404 ----
+app.use((req, res) => {
+  res.status(404).json({ error: { message: 'Not found' } });
+});
+
+// ---- Global error handler (never leak stack traces) ----
+app.use((err, _req, res, _next) => {
+  console.error('Unhandled error:', err.message);
+  if (res.headersSent) return;
+  res.status(500).json({ error: { message: 'Internal server error' } });
 });
 
 const server = app.listen(PORT, () => {

@@ -104,12 +104,17 @@ export function openAIToolsToAnthropic(openAITools) {
 // Per-model input token limits (leave room for output).
 // ~4 chars per token on average.
 const MODEL_INPUT_LIMITS = {
-  // OpenAI GPT-4.1 models - 1M context window
+  // OpenAI GPT-5 family (context windows from developers.openai.com, March 2026)
+  'gpt-5-mini':   { tokens: 270000, chars: 1080000 },  // 400K context - 128K max output
+  'gpt-5':        { tokens: 270000, chars: 1080000 },  // 400K context - 128K max output
+  'gpt-5.4':      { tokens: 900000, chars: 3600000 },  // 1.05M context - 128K max output
+  'o4-mini':      { tokens: 100000, chars: 400000 },   // 200K context - 100K max output
+  // OpenAI GPT-4.1 models (legacy)
   'gpt-4.1-mini': { tokens: 200000, chars: 800000 },
   'gpt-4.1':      { tokens: 200000, chars: 800000 },
-  // Claude models
-  'claude-sonnet-4-6': { tokens: 130000, chars: 520000 },
-  'claude-opus-4-6':   { tokens: 70000,  chars: 280000 },
+  // Claude models (context windows from platform.claude.com, March 2026)
+  'claude-sonnet-4-6': { tokens: 130000, chars: 520000 },  // 200K context - 65K max output
+  'claude-opus-4-6':   { tokens: 70000,  chars: 280000 },  // 200K context - 131K max output
   // Legacy
   'gpt-4o-mini':       { tokens: 100000, chars: 400000 },
   'gpt-4o':            { tokens: 100000, chars: 400000 },
