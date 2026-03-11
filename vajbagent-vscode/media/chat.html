@@ -100,25 +100,25 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 8px 12px;
+      padding: 7px 12px;
       font-size: 11px;
       opacity: 0.7;
       flex-shrink: 0;
-      border-top: 1px solid var(--vscode-panel-border);
+      border-bottom: 1px solid var(--vscode-panel-border);
       transition: opacity 0.2s;
     }
     .context-bar:hover { opacity: 1; }
     .context-progress {
       flex: 1;
-      height: 6px;
+      height: 7px;
       background: rgba(255,255,255,0.08);
-      border-radius: 3px;
+      border-radius: 4px;
       overflow: hidden;
     }
     .context-fill {
       height: 100%;
       background: #FA7315;
-      border-radius: 3px;
+      border-radius: 4px;
       transition: width 0.3s, background 0.3s;
       width: 0%;
     }
@@ -818,6 +818,11 @@
     </div>
   </div>
 
+  <div class="context-bar" id="contextBar">
+    <div class="context-progress"><div class="context-fill" id="contextFill"></div></div>
+    <span class="context-label" id="contextLabel">0K / 128K</span>
+    <button class="context-new-session" id="contextNewSession">Novi chat</button>
+  </div>
   <div class="messages" id="messages">
     <div class="welcome-msg" id="welcome">
       <h3>VajbAgent</h3>
@@ -865,11 +870,6 @@
         </select>
       </div>
     </div>
-  </div>
-  <div class="context-bar" id="contextBar">
-    <div class="context-progress"><div class="context-fill" id="contextFill"></div></div>
-    <span class="context-label" id="contextLabel">0K / 128K</span>
-    <button class="context-new-session" id="contextNewSession">Novi chat</button>
   </div>
 
   <script nonce="{{nonce}}">
