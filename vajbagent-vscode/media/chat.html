@@ -212,6 +212,7 @@
       font-size: 13px;
       line-height: 1.55;
       word-wrap: break-word;
+      flex-shrink: 0;
     }
     .msg-user {
       align-self: flex-end;
@@ -236,11 +237,14 @@
     /* Tool call blocks */
     .tool-block {
       align-self: flex-start;
+      width: 100%;
       max-width: 95%;
+      min-height: 32px;
       border: 1px solid var(--vscode-panel-border);
       border-radius: 6px;
       overflow: hidden;
       font-size: 12px;
+      flex-shrink: 0;
     }
     .tool-header {
       display: flex;
@@ -281,6 +285,7 @@
       font-size: 12px;
       color: var(--vscode-foreground);
       opacity: 0.7;
+      flex-shrink: 0;
     }
     .status-spinner {
       width: 14px;
@@ -1298,6 +1303,8 @@
 
     function scrollToBottom() {
       messagesEl.scrollTop = messagesEl.scrollHeight;
+      setTimeout(() => { messagesEl.scrollTop = messagesEl.scrollHeight; }, 50);
+      setTimeout(() => { messagesEl.scrollTop = messagesEl.scrollHeight; }, 150);
     }
 
     // Messages from extension
