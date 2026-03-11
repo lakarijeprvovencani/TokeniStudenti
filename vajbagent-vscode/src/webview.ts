@@ -57,9 +57,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           models: MODEL_INFO,
           autoApprove: getAutoApprove(),
         });
+        this._agent.sendContextUpdate();
         break;
       case 'setModel':
         await setModel(message.model as string);
+        this._agent.sendContextUpdate();
         break;
       case 'getApiKey': {
         let key = await getApiKey(this._context.secrets);

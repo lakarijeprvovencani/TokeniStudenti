@@ -297,6 +297,10 @@ export class Agent {
     });
   }
 
+  public sendContextUpdate() {
+    this._sendContextUpdate();
+  }
+
   public abort() {
     this._abortController?.abort();
     this._abortController = null;
