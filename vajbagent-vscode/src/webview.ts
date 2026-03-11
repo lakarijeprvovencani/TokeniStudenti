@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { getModel, setModel, getApiKey, promptForApiKey, MODEL_INFO, getAutoApprove, setAutoApprove, AutoApproveSettings } from './settings';
+import { getModel, setModel, getApiKey, setApiKey, getApiUrl, setApiUrl, promptForApiKey, MODEL_INFO, getAutoApprove, setAutoApprove, AutoApproveSettings } from './settings';
 import { Agent } from './agent';
 import { setPostMessage, handleDiffResponse, handleCommandResponse } from './tools';
 
@@ -50,15 +50,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private async _handleMessage(message: { type: string; [key: string]: unknown }) {
     switch (message.type) {
-      case 'ready':
+      case 'ready': {
+        const existingKey = await getApiKey(this._context.secrets);
         this._view?.webview.postMessage({
           type: 'init',
           model: getModel(),
           models: MODEL_INFO,
           autoApprove: getAutoApprove(),
+          apiUrl: getApiUrl(),
+          hasApiKey: !!existingKey,
         });
         this._agent.sendContextUpdate();
         break;
+      }
       case 'setModel':
         await setModel(message.model as string);
         this._agent.sendContextUpdate();
@@ -90,6 +94,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'commandResponse':
         handleCommandResponse(message.accepted as boolean);
+        break;
+      case 'setApiKey':
+        await setApiKey(this._context.secrets, message.key as string);
+        break;
+      case 'setApiUrl':
+        await setApiUrl(message.url as string);
         break;
       case 'setAutoApprove':
         await setAutoApprove(

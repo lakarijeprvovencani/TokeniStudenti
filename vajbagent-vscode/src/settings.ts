@@ -16,6 +16,10 @@ export function getApiUrl(): string {
   return vscode.workspace.getConfiguration('vajbagent').get<string>('apiUrl', 'https://vajbagent.onrender.com');
 }
 
+export function setApiUrl(url: string): Thenable<void> {
+  return vscode.workspace.getConfiguration('vajbagent').update('apiUrl', url, vscode.ConfigurationTarget.Global);
+}
+
 export function getModel(): string {
   return vscode.workspace.getConfiguration('vajbagent').get<string>('model', 'vajb-agent-lite');
 }
