@@ -1,0 +1,117 @@
+{
+  "name": "vajbagent",
+  "displayName": "VajbAgent",
+  "description": "AI coding assistant za studente — koristi native tool calling za minimalan overhead",
+  "version": "0.1.0",
+  "publisher": "vajbagent",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "ai",
+    "assistant",
+    "coding",
+    "agent",
+    "vajbagent"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "vajbagent",
+          "title": "VajbAgent",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "vajbagent": [
+        {
+          "type": "webview",
+          "id": "vajbagent.chatView",
+          "name": "Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "vajbagent.newSession",
+        "title": "VajbAgent: New Session"
+      },
+      {
+        "command": "vajbagent.setApiKey",
+        "title": "VajbAgent: Set API Key"
+      }
+    ],
+    "configuration": {
+      "title": "VajbAgent",
+      "properties": {
+        "vajbagent.apiUrl": {
+          "type": "string",
+          "default": "https://vajbagent.onrender.com",
+          "description": "VajbAgent API server URL"
+        },
+        "vajbagent.model": {
+          "type": "string",
+          "default": "vajb-agent-lite",
+          "enum": [
+            "vajb-agent-lite",
+            "vajb-agent-turbo",
+            "vajb-agent-pro",
+            "vajb-agent-max",
+            "vajb-agent-power",
+            "vajb-agent-ultra",
+            "vajb-agent-architect"
+          ],
+          "enumDescriptions": [
+            "Lite — GPT-5 Mini ($0.25/$2.00 per M tokena)",
+            "Turbo — o4-mini ($1.10/$4.40 per M)",
+            "Pro — GPT-5 ($1.25/$10.00 per M)",
+            "Max — Claude Sonnet 4.6 ($3.00/$15.00 per M)",
+            "Power — GPT-5.4 ($2.50/$15.00 per M)",
+            "Ultra — Claude Opus 4.6 ($15.00/$75.00 per M)",
+            "Architect — Claude Opus + architect prompt ($15.00/$75.00 per M)"
+          ],
+          "description": "AI model za koriscenje"
+        },
+        "vajbagent.autoApprove.writeFile": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-approve write_file (kreiranje/prepisivanje fajlova)"
+        },
+        "vajbagent.autoApprove.replaceInFile": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-approve replace_in_file (izmene u fajlovima)"
+        },
+        "vajbagent.autoApprove.executeCommand": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-approve execute_command (pokretanje komandi)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.7.1",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "marked": "^17.0.4"
+  }
+}

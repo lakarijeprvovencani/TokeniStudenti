@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src {{cspSource}} 'unsafe-inline'; script-src 'nonce-{{nonce}}'; img-src {{cspSource}} data:;">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style nonce="{{nonce}}">
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--vscode-font-family);
+      font-size: var(--vscode-font-size);
+      color: var(--vscode-foreground);
+      background: var(--vscode-sideBar-background);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      flex-shrink: 0;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .header-title {
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.3px;
+      opacity: 0.85;
+    }
+    .model-select {
+      background: transparent;
+      color: var(--vscode-foreground);
+      border: none;
+      border-radius: 4px;
+      padding: 2px 4px;
+      font-size: 11px;
+      cursor: pointer;
+      outline: none;
+      opacity: 0.5;
+      transition: opacity 0.15s;
+      direction: rtl;
+    }
+    .model-select option { direction: ltr; }
+    .model-select:hover { opacity: 0.8; }
+    .model-select:focus { opacity: 0.8; }
+    .input-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 4px 0;
+    }
+    .input-footer-left {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .icon-btn {
+      background: none;
+      border: none;
+      color: var(--vscode-foreground);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 6px;
+      opacity: 0.45;
+      line-height: 1;
+      transition: opacity 0.15s, background 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .icon-btn:hover { opacity: 0.9; background: var(--vscode-toolbar-hoverBackground); }
+    .icon-btn svg { width: 18px; height: 18px; }
+
+    /* Context bar */
+    .context-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px 4px;
+      font-size: 10px;
+      opacity: 0.5;
+      flex-shrink: 0;
+      transition: opacity 0.2s;
+    }
+    .context-bar:hover { opacity: 0.8; }
+    .context-progress {
+      flex: 1;
+      height: 3px;
+      background: var(--vscode-input-background);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .context-fill {
+      height: 100%;
+      background: var(--vscode-textLink-foreground);
+      border-radius: 2px;
+      transition: width 0.3s, background 0.3s;
+      width: 0%;
+    }
+    .context-fill.warning { background: #cca700; }
+    .context-fill.danger { background: #f14c4c; }
+    .context-label {
+      white-space: nowrap;
+      font-family: var(--vscode-editor-font-family);
+    }
+    .context-new-session {
+      display: none;
+      background: none;
+      border: 1px solid var(--vscode-panel-border);
+      color: var(--vscode-foreground);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 9px;
+      cursor: pointer;
+      opacity: 0.6;
+      transition: opacity 0.15s;
+    }
+    .context-new-session:hover { opacity: 1; }
+    .context-new-session.visible { display: block; }
+
+    /* Messages area */
+    .messages {
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .messages::-webkit-scrollbar { width: 6px; }
+    .messages::-webkit-scrollbar-thumb {
+      background: var(--vscode-scrollbarSlider-background);
+      border-radius: 3px;
+    }
+
+    .welcome-msg {
+      text-align: center;
+      margin-top: 48px;
+      opacity: 0.4;
+    }
+    .welcome-msg h3 { margin-bottom: 4px; font-size: 14px; font-weight: 600; }
+    .welcome-msg p { font-size: 12px; line-height: 1.4; }
+
+    /* Message bubbles */
+    .msg {
+      max-width: 100%;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.55;
+      word-wrap: break-word;
+    }
+    .msg-user {
+      align-self: flex-end;
+      max-width: 85%;
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border-bottom-right-radius: 3px;
+      white-space: pre-wrap;
+    }
+    .msg-assistant {
+      align-self: flex-start;
+      background: transparent;
+      color: var(--vscode-foreground);
+      border: none;
+      padding: 4px 2px;
+    }
+
+    /* Tool call blocks */
+    .tool-block {
+      align-self: flex-start;
+      max-width: 95%;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      overflow: hidden;
+      font-size: 12px;
+    }
+    .tool-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: var(--vscode-editor-background);
+      cursor: pointer;
+      user-select: none;
+    }
+    .tool-header:hover { background: var(--vscode-list-hoverBackground); }
+    .tool-icon { font-size: 11px; transition: transform 0.15s; }
+    .tool-icon.open { transform: rotate(90deg); }
+    .tool-name { font-weight: 600; color: var(--vscode-textLink-foreground); }
+    .tool-status { margin-left: auto; opacity: 0.6; }
+    .tool-body {
+      display: none;
+      padding: 8px 10px;
+      background: var(--vscode-editor-background);
+      color: var(--vscode-foreground);
+      border-top: 1px solid var(--vscode-panel-border);
+      white-space: pre-wrap;
+      font-family: var(--vscode-editor-font-family);
+      font-size: 11px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .tool-body.open { display: block; }
+
+    /* Typing indicator */
+    /* Status indicator */
+    .status-indicator {
+      align-self: flex-start;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: var(--vscode-foreground);
+      opacity: 0.7;
+    }
+    .status-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--vscode-foreground);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      opacity: 0.6;
+      flex-shrink: 0;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .status-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Input area — Cursor-inspired design */
+    .input-area {
+      padding: 8px 10px 10px;
+      flex-shrink: 0;
+    }
+    .input-container {
+      background: var(--vscode-input-background);
+      border: 1px solid var(--vscode-input-border);
+      border-radius: 12px;
+      transition: border-color 0.15s;
+      overflow: hidden;
+    }
+    .input-container:focus-within {
+      border-color: var(--vscode-focusBorder);
+    }
+    .input-container.drag-over {
+      border-color: #4ec9b0;
+      background: rgba(78, 201, 176, 0.06);
+    }
+    #userInput {
+      width: 100%;
+      min-height: 44px;
+      max-height: 180px;
+      padding: 12px 14px 6px;
+      background: transparent;
+      color: var(--vscode-input-foreground);
+      border: none;
+      font-family: var(--vscode-font-family);
+      font-size: 13px;
+      resize: none;
+      outline: none;
+      line-height: 1.5;
+    }
+    #userInput::placeholder { color: var(--vscode-input-placeholderForeground); }
+    .input-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 6px 6px;
+    }
+    .input-toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .input-toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .toolbar-btn {
+      background: none;
+      border: none;
+      color: var(--vscode-foreground);
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 6px;
+      opacity: 0.4;
+      transition: opacity 0.15s, background 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .toolbar-btn:hover {
+      opacity: 0.8;
+      background: var(--vscode-toolbar-hoverBackground);
+    }
+    .toolbar-btn svg { width: 16px; height: 16px; }
+
+    .send-btn {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: none;
+      border-radius: 8px;
+      width: 32px;
+      height: 28px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .send-btn:hover { background: var(--vscode-button-hoverBackground); }
+    .send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .send-btn svg { width: 14px; height: 14px; }
+
+    .stop-btn {
+      display: none;
+      background: var(--vscode-errorForeground);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      width: 32px;
+      height: 28px;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .stop-btn:hover { opacity: 0.85; }
+    .stop-btn.visible { display: flex; }
+    .stop-btn svg { width: 12px; height: 12px; }
+
+    /* Image previews */
+    .image-previews {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding: 6px 10px 0;
+    }
+    .image-previews:empty { display: none; }
+    .img-preview {
+      position: relative;
+      width: 52px;
+      height: 52px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--vscode-panel-border);
+    }
+    .img-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .img-preview .remove-img {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      background: rgba(0,0,0,0.65);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      font-size: 9px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    .img-preview .remove-img:hover { background: rgba(220,50,50,0.8); }
+
+    .msg img.inline-img {
+      max-width: 200px;
+      max-height: 150px;
+      border-radius: 6px;
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* Markdown content styles */
+    .msg-assistant p { margin: 4px 0; }
+    .msg-assistant p:first-child { margin-top: 0; }
+    .msg-assistant p:last-child { margin-bottom: 0; }
+    .msg-assistant ul, .msg-assistant ol { margin: 4px 0; padding-left: 20px; }
+    .msg-assistant li { margin: 2px 0; }
+    .msg-assistant h1, .msg-assistant h2, .msg-assistant h3 {
+      margin: 8px 0 4px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .msg-assistant h1 { font-size: 16px; }
+    .msg-assistant h2 { font-size: 15px; }
+    .msg-assistant code {
+      background: var(--vscode-textCodeBlock-background);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-family: var(--vscode-editor-font-family);
+      font-size: 12px;
+    }
+    .code-block-wrapper {
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      margin: 6px 0;
+      overflow: hidden;
+    }
+    .code-block-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 10px;
+      background: var(--vscode-editor-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+      font-size: 11px;
+      color: var(--vscode-foreground);
+      opacity: 0.7;
+    }
+    .code-block-lang {
+      font-weight: 600;
+      text-transform: lowercase;
+    }
+    .copy-btn {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      border-radius: 3px;
+      padding: 2px 8px;
+      font-size: 10px;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.15s;
+    }
+    .copy-btn:hover { opacity: 1; background: var(--vscode-button-secondaryHoverBackground); }
+    .msg-assistant pre {
+      background: var(--vscode-textCodeBlock-background);
+      padding: 8px 10px;
+      margin: 0;
+      overflow-x: auto;
+      position: relative;
+    }
+    .msg-assistant pre code {
+      background: none;
+      padding: 0;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .msg-assistant blockquote {
+      border-left: 3px solid var(--vscode-textBlockQuote-border);
+      margin: 4px 0;
+      padding: 2px 10px;
+      opacity: 0.8;
+    }
+    .msg-assistant a {
+      color: var(--vscode-textLink-foreground);
+      text-decoration: none;
+    }
+    .msg-assistant hr {
+      border: none;
+      border-top: 1px solid var(--vscode-panel-border);
+      margin: 8px 0;
+      opacity: 0.3;
+    }
+    .msg-assistant a:hover { text-decoration: underline; }
+    .msg-assistant.streaming { white-space: pre-wrap; }
+    .msg-assistant table {
+      border-collapse: collapse;
+      margin: 6px 0;
+      font-size: 12px;
+    }
+    .msg-assistant th, .msg-assistant td {
+      border: 1px solid var(--vscode-panel-border);
+      padding: 4px 8px;
+    }
+    .msg-assistant th { background: var(--vscode-editor-background); font-weight: 600; }
+
+    /* Inline diff block */
+    .diff-block {
+      align-self: flex-start;
+      max-width: 95%;
+      width: 100%;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      overflow: hidden;
+      font-size: 12px;
+      margin: 4px 0;
+    }
+    .diff-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: var(--vscode-editor-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+      font-size: 12px;
+    }
+    .diff-header .diff-icon { opacity: 0.6; }
+    .diff-header .diff-filename { font-weight: 600; color: var(--vscode-foreground); }
+    .diff-header .diff-stats {
+      margin-left: auto;
+      font-size: 11px;
+      opacity: 0.6;
+    }
+    .diff-header .diff-stats .added { color: #4ec9b0; }
+    .diff-header .diff-stats .removed { color: #f14c4c; }
+    .diff-lines {
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: var(--vscode-editor-font-family);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .diff-line {
+      padding: 0 10px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .diff-line.added {
+      background: rgba(78, 201, 176, 0.15);
+      color: var(--vscode-foreground);
+    }
+    .diff-line.added::before {
+      content: '+';
+      color: #4ec9b0;
+      margin-right: 6px;
+      font-weight: bold;
+    }
+    .diff-line.removed {
+      background: rgba(241, 76, 76, 0.15);
+      color: var(--vscode-foreground);
+      opacity: 0.7;
+    }
+    .diff-line.removed::before {
+      content: '-';
+      color: #f14c4c;
+      margin-right: 6px;
+      font-weight: bold;
+    }
+    .diff-line.context {
+      color: var(--vscode-foreground);
+      opacity: 0.5;
+    }
+    .diff-line.context::before {
+      content: ' ';
+      margin-right: 6px;
+    }
+    .diff-actions {
+      display: flex;
+      gap: 8px;
+      padding: 8px 10px;
+      border-top: 1px solid var(--vscode-panel-border);
+      background: var(--vscode-editor-background);
+    }
+    .diff-accept {
+      background: #4ec9b0;
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .diff-accept:hover { background: #3db89f; }
+    .diff-reject {
+      background: transparent;
+      color: var(--vscode-foreground);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      padding: 4px 16px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .diff-reject:hover { background: var(--vscode-list-hoverBackground); }
+
+    /* Settings panel */
+    .settings-panel {
+      display: none;
+      position: absolute;
+      top: 100%;
+      right: 0;
+      z-index: 100;
+      min-width: 240px;
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      padding: 10px 0;
+      margin-top: 4px;
+    }
+    .settings-panel.open { display: block; }
+    .settings-title {
+      padding: 0 12px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      opacity: 0.5;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      margin-bottom: 4px;
+    }
+    .settings-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .settings-item:hover { background: var(--vscode-list-hoverBackground); }
+    .settings-label {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .settings-label-main { font-weight: 500; }
+    .settings-label-desc { font-size: 10px; opacity: 0.5; }
+
+    /* Toggle switch */
+    .toggle {
+      position: relative;
+      width: 32px;
+      height: 18px;
+      flex-shrink: 0;
+      margin-left: 8px;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--vscode-input-background);
+      border: 1px solid var(--vscode-input-border);
+      border-radius: 9px;
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      left: 2px;
+      top: 2px;
+      background: var(--vscode-foreground);
+      border-radius: 50%;
+      transition: transform 0.2s;
+      opacity: 0.5;
+    }
+    .toggle input:checked + .toggle-track {
+      background: #4ec9b0;
+      border-color: #4ec9b0;
+    }
+    .toggle input:checked + .toggle-track::after {
+      transform: translateX(14px);
+      opacity: 1;
+      background: #000;
+    }
+
+    /* Command approval block */
+    .cmd-block {
+      align-self: flex-start;
+      max-width: 95%;
+      width: 100%;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      overflow: hidden;
+      font-size: 12px;
+      margin: 4px 0;
+    }
+    .cmd-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: var(--vscode-editor-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+      font-size: 12px;
+    }
+    .cmd-header .cmd-icon { opacity: 0.6; }
+    .cmd-header .cmd-label { font-weight: 600; color: var(--vscode-foreground); opacity: 0.7; }
+    .cmd-command {
+      padding: 8px 10px;
+      background: var(--vscode-textCodeBlock-background);
+      font-family: var(--vscode-editor-font-family);
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--vscode-foreground);
+    }
+    .cmd-actions {
+      display: flex;
+      gap: 8px;
+      padding: 8px 10px;
+      border-top: 1px solid var(--vscode-panel-border);
+      background: var(--vscode-editor-background);
+    }
+    .cmd-accept {
+      background: #4ec9b0;
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .cmd-accept:hover { background: #3db89f; }
+    .cmd-reject {
+      background: transparent;
+      color: var(--vscode-foreground);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      padding: 4px 16px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .cmd-reject:hover { background: var(--vscode-list-hoverBackground); }
+
+    /* Auto-approved notification */
+    .auto-approved-notice {
+      align-self: flex-start;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      color: #4ec9b0;
+      opacity: 0.7;
+    }
+
+    .header { position: relative; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <span class="header-title">VajbAgent</span>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="settingsBtn" title="Podesavanja">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </button>
+      <button class="icon-btn" id="newSessionBtn" title="Nova sesija">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </div>
+    <div class="settings-panel" id="settingsPanel">
+      <div class="settings-title">Auto-Approve</div>
+      <label class="settings-item">
+        <div class="settings-label">
+          <span class="settings-label-main">Write File</span>
+          <span class="settings-label-desc">Kreiranje / prepisivanje fajlova</span>
+        </div>
+        <div class="toggle">
+          <input type="checkbox" id="autoWriteFile">
+          <span class="toggle-track"></span>
+        </div>
+      </label>
+      <label class="settings-item">
+        <div class="settings-label">
+          <span class="settings-label-main">Replace in File</span>
+          <span class="settings-label-desc">Izmene delova fajla</span>
+        </div>
+        <div class="toggle">
+          <input type="checkbox" id="autoReplaceInFile">
+          <span class="toggle-track"></span>
+        </div>
+      </label>
+      <label class="settings-item">
+        <div class="settings-label">
+          <span class="settings-label-main">Execute Command</span>
+          <span class="settings-label-desc">Pokretanje shell komandi</span>
+        </div>
+        <div class="toggle">
+          <input type="checkbox" id="autoExecuteCommand">
+          <span class="toggle-track"></span>
+        </div>
+      </label>
+    </div>
+  </div>
+
+  <div class="context-bar" id="contextBar">
+    <div class="context-progress"><div class="context-fill" id="contextFill"></div></div>
+    <span class="context-label" id="contextLabel">0K / 128K</span>
+    <button class="context-new-session" id="contextNewSession">Novi chat</button>
+  </div>
+  <div class="messages" id="messages">
+    <div class="welcome-msg" id="welcome">
+      <h3>VajbAgent</h3>
+      <p>Pitaj me bilo sta o kodu — citam, pisem i pokrecem komande.</p>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <div class="input-container">
+      <div class="image-previews" id="imagePreviews"></div>
+      <textarea id="userInput" rows="1" placeholder="Pitaj VajbAgent-a..."></textarea>
+      <div class="input-toolbar">
+        <div class="input-toolbar-left">
+          <button class="toolbar-btn" id="imagePickerBtn" title="Dodaj sliku">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="3"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <path d="M21 15l-5-5L5 21"/>
+            </svg>
+          </button>
+        </div>
+        <div class="input-toolbar-right">
+          <button class="stop-btn" id="stopBtn" title="Zaustavi">
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          </button>
+          <button class="send-btn" id="sendBtn" title="Posalji (Enter)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="imageFileInput" accept="image/*" multiple style="display:none;">
+    <div class="input-footer">
+      <div class="input-footer-left">
+        <select class="model-select" id="modelSelect">
+          <option value="vajb-agent-lite">Lite</option>
+          <option value="vajb-agent-turbo">Turbo</option>
+          <option value="vajb-agent-pro">Pro</option>
+          <option value="vajb-agent-max">Max</option>
+          <option value="vajb-agent-power">Power</option>
+          <option value="vajb-agent-ultra">Ultra</option>
+          <option value="vajb-agent-architect">Architect</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <script nonce="{{nonce}}">
+    const vscode = acquireVsCodeApi();
+
+    const messagesEl = document.getElementById('messages');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const modelSelect = document.getElementById('modelSelect');
+    const newSessionBtn = document.getElementById('newSessionBtn');
+    const welcomeEl = document.getElementById('welcome');
+    const imagePreviewsEl = document.getElementById('imagePreviews');
+    const inputContainer = document.querySelector('.input-container');
+    const contextFill = document.getElementById('contextFill');
+    const contextLabel = document.getElementById('contextLabel');
+    const contextNewSession = document.getElementById('contextNewSession');
+    const imagePickerBtn = document.getElementById('imagePickerBtn');
+    const imageFileInput = document.getElementById('imageFileInput');
+    let statusIndicator = null;
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsPanel = document.getElementById('settingsPanel');
+    const autoWriteFile = document.getElementById('autoWriteFile');
+    const autoReplaceInFile = document.getElementById('autoReplaceInFile');
+    const autoExecuteCommand = document.getElementById('autoExecuteCommand');
+
+    let isStreaming = false;
+    let pendingImages = [];
+
+    // Auto-resize textarea
+    userInput.addEventListener('input', () => {
+      userInput.style.height = 'auto';
+      userInput.style.height = Math.min(userInput.scrollHeight, 180) + 'px';
+    });
+
+    // Enter to send, Shift+Enter for newline
+    userInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    sendBtn.addEventListener('click', sendMessage);
+    stopBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'stopGeneration' });
+    });
+
+    modelSelect.addEventListener('change', () => {
+      vscode.postMessage({ type: 'setModel', model: modelSelect.value });
+    });
+
+    newSessionBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'newSession' });
+    });
+    contextNewSession.addEventListener('click', () => {
+      vscode.postMessage({ type: 'newSession' });
+    });
+
+    // Settings panel toggle
+    settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      settingsPanel.classList.toggle('open');
+    });
+    document.addEventListener('click', (e) => {
+      if (!settingsPanel.contains(e.target) && e.target !== settingsBtn) {
+        settingsPanel.classList.remove('open');
+      }
+    });
+    settingsPanel.addEventListener('click', (e) => { e.stopPropagation(); });
+
+    autoWriteFile.addEventListener('change', () => {
+      vscode.postMessage({ type: 'setAutoApprove', key: 'writeFile', value: autoWriteFile.checked });
+    });
+    autoReplaceInFile.addEventListener('change', () => {
+      vscode.postMessage({ type: 'setAutoApprove', key: 'replaceInFile', value: autoReplaceInFile.checked });
+    });
+    autoExecuteCommand.addEventListener('change', () => {
+      vscode.postMessage({ type: 'setAutoApprove', key: 'executeCommand', value: autoExecuteCommand.checked });
+    });
+
+    // Image file picker
+    imagePickerBtn.addEventListener('click', () => { imageFileInput.click(); });
+    imageFileInput.addEventListener('change', () => {
+      const files = imageFileInput.files;
+      if (!files) return;
+      for (const file of files) {
+        if (file.type.startsWith('image/')) addImageFile(file);
+      }
+      imageFileInput.value = '';
+    });
+
+    // Image paste
+    userInput.addEventListener('paste', (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) addImageFile(file);
+        }
+      }
+    });
+
+    // Drag and drop — must intercept at document level to prevent VS Code from stealing the event
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+      inputContainer.classList.add('drag-over');
+    });
+    document.addEventListener('dragleave', (e) => {
+      if (!e.relatedTarget || e.relatedTarget === document.documentElement) {
+        inputContainer.classList.remove('drag-over');
+      }
+    });
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      inputContainer.classList.remove('drag-over');
+      const files = e.dataTransfer?.files;
+      if (!files) return;
+      for (const file of files) {
+        if (file.type.startsWith('image/')) addImageFile(file);
+      }
+    });
+
+    function addImageFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result;
+        pendingImages.push({ base64, type: file.type });
+        renderImagePreviews();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function renderImagePreviews() {
+      imagePreviewsEl.innerHTML = '';
+      pendingImages.forEach((img, idx) => {
+        const div = document.createElement('div');
+        div.className = 'img-preview';
+        div.innerHTML = '<img src="' + img.base64 + '"><button class="remove-img" data-idx="' + idx + '">x</button>';
+        div.querySelector('.remove-img').addEventListener('click', () => {
+          pendingImages.splice(idx, 1);
+          renderImagePreviews();
+        });
+        imagePreviewsEl.appendChild(div);
+      });
+    }
+
+    function sendMessage() {
+      const text = userInput.value.trim();
+      if (!text && pendingImages.length === 0) return;
+      if (isStreaming) return;
+
+      if (welcomeEl) welcomeEl.remove();
+
+      if (text) {
+        addMessageBubble('user', text);
+      }
+      pendingImages.forEach(img => {
+        const el = document.createElement('div');
+        el.className = 'msg msg-user';
+        el.innerHTML = '<img class="inline-img" src="' + img.base64 + '">';
+        messagesEl.appendChild(el);
+      });
+
+      vscode.postMessage({
+        type: 'sendMessage',
+        text,
+        images: pendingImages.map(i => ({ base64: i.base64, mimeType: i.type })),
+      });
+
+      userInput.value = '';
+      userInput.style.height = 'auto';
+      pendingImages = [];
+      renderImagePreviews();
+      setStreaming(true);
+      showStatus('Razmisljam...');
+    }
+
+    function addMessageBubble(role, text) {
+      const div = document.createElement('div');
+      div.className = 'msg msg-' + role;
+      if (role === 'user') {
+        div.textContent = text;
+      } else {
+        div.innerHTML = renderMarkdown(text);
+        addCopyButtons(div);
+      }
+      messagesEl.appendChild(div);
+      scrollToBottom();
+      return div;
+    }
+
+    let currentAssistantEl = null;
+    let currentAssistantRawText = '';
+
+    function setStreaming(on) {
+      isStreaming = on;
+      sendBtn.disabled = on;
+      sendBtn.style.display = on ? 'none' : 'flex';
+      stopBtn.classList.toggle('visible', on);
+      if (!on) hideStatus();
+    }
+
+    function showStatus(text) {
+      if (!statusIndicator) {
+        statusIndicator = document.createElement('div');
+        statusIndicator.className = 'status-indicator visible';
+        statusIndicator.innerHTML = '<div class="status-spinner"></div><span class="status-text"></span>';
+      }
+      statusIndicator.querySelector('.status-text').textContent = text;
+      statusIndicator.classList.add('visible');
+      messagesEl.appendChild(statusIndicator);
+      scrollToBottom();
+    }
+
+    function hideStatus() {
+      if (statusIndicator) {
+        statusIndicator.classList.remove('visible');
+        if (statusIndicator.parentNode) {
+          statusIndicator.parentNode.removeChild(statusIndicator);
+        }
+      }
+    }
+
+    function scrollToBottom() {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    // Messages from extension
+    window.addEventListener('message', (event) => {
+      const msg = event.data;
+      switch (msg.type) {
+        case 'init':
+          modelSelect.value = msg.model;
+          if (msg.autoApprove) {
+            autoWriteFile.checked = msg.autoApprove.writeFile || false;
+            autoReplaceInFile.checked = msg.autoApprove.replaceInFile || false;
+            autoExecuteCommand.checked = msg.autoApprove.executeCommand || false;
+          }
+          break;
+
+        case 'newSession': {
+          const allMsgs = messagesEl.querySelectorAll('.msg, .tool-block');
+          allMsgs.forEach(el => el.remove());
+          const oldWelcome = messagesEl.querySelector('.welcome-msg');
+          if (!oldWelcome) {
+            const w = document.createElement('div');
+            w.className = 'welcome-msg';
+            w.innerHTML = '<h3>VajbAgent</h3><p>Pitaj me bilo sta o kodu — citam, pisem i pokrecem komande.</p>';
+            messagesEl.insertBefore(w, messagesEl.firstChild);
+          }
+          currentAssistantEl = null;
+          setStreaming(false);
+          break;
+        }
+
+        case 'streamStart': {
+          hideStatus();
+          showStatus('Pisem odgovor...');
+          currentAssistantRawText = '';
+          const div = document.createElement('div');
+          div.className = 'msg msg-assistant streaming';
+          messagesEl.appendChild(div);
+          currentAssistantEl = div;
+          scrollToBottom();
+          break;
+        }
+
+        case 'streamDelta':
+          hideStatus();
+          if (currentAssistantEl) {
+            currentAssistantRawText += msg.text;
+            currentAssistantEl.textContent = currentAssistantRawText;
+            scrollToBottom();
+          }
+          break;
+
+        case 'streamEnd':
+          if (currentAssistantEl) {
+            const trimmed = (currentAssistantRawText || '').trim();
+            if (trimmed) {
+              currentAssistantEl.classList.remove('streaming');
+              currentAssistantEl.innerHTML = renderMarkdown(trimmed);
+              addCopyButtons(currentAssistantEl);
+            } else {
+              currentAssistantEl.remove();
+            }
+          }
+          currentAssistantEl = null;
+          currentAssistantRawText = '';
+          setStreaming(false);
+          scrollToBottom();
+          break;
+
+        case 'toolCall': {
+          hideStatus();
+          const toolLabel = {
+            'read_file': 'Citam fajl...',
+            'write_file': 'Pisem fajl...',
+            'replace_in_file': 'Menjam fajl...',
+            'list_files': 'Listajem fajlove...',
+            'search_files': 'Pretrazujem...',
+            'execute_command': 'Pokrecem komandu...',
+            'fetch_url': 'Ucitavam sa weba...',
+          }[msg.name] || 'Koristim ' + msg.name + '...';
+          showStatus(toolLabel);
+
+          const block = document.createElement('div');
+          block.className = 'tool-block';
+          block.innerHTML =
+            '<div class="tool-header">' +
+              '<span class="tool-icon">&#9654;</span>' +
+              '<span class="tool-name">' + escapeHtml(msg.name) + '</span>' +
+              '<span class="tool-status">' + (msg.status || 'running...') + '</span>' +
+            '</div>' +
+            '<div class="tool-body">' + escapeHtml(msg.args || '') + '</div>';
+          block.querySelector('.tool-header').addEventListener('click', () => {
+            block.querySelector('.tool-icon').classList.toggle('open');
+            block.querySelector('.tool-body').classList.toggle('open');
+          });
+          block.dataset.toolCallId = msg.id || '';
+          messagesEl.appendChild(block);
+          scrollToBottom();
+          break;
+        }
+
+        case 'toolResult': {
+          showStatus('Razmisljam...');
+          const blocks = messagesEl.querySelectorAll('.tool-block');
+          for (const b of blocks) {
+            if (b.dataset.toolCallId === msg.id) {
+              b.querySelector('.tool-status').textContent = msg.status || 'done';
+              const body = b.querySelector('.tool-body');
+              if (msg.result) {
+                body.textContent += '\n--- Result ---\n' + msg.result;
+              }
+              break;
+            }
+          }
+          scrollToBottom();
+          break;
+        }
+
+        case 'diffPreview': {
+          hideStatus();
+          const diffEl = createDiffBlock(msg.filePath, msg.oldContent, msg.newContent);
+          messagesEl.appendChild(diffEl);
+          setTimeout(() => {
+            const actions = diffEl.querySelector('.diff-actions');
+            if (actions) actions.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          }, 50);
+          break;
+        }
+
+        case 'commandPreview': {
+          hideStatus();
+          const cmdBlock = document.createElement('div');
+          cmdBlock.className = 'cmd-block';
+          cmdBlock.innerHTML =
+            '<div class="cmd-header">' +
+              '<span class="cmd-icon">&#9654;</span>' +
+              '<span class="cmd-label">Pokretanje komande</span>' +
+            '</div>' +
+            '<div class="cmd-command">' + escapeHtml(msg.command) + '</div>' +
+            '<div class="cmd-actions">' +
+              '<button class="cmd-accept">Pokreni</button>' +
+              '<button class="cmd-reject">Odbij</button>' +
+            '</div>';
+          cmdBlock.querySelector('.cmd-accept').addEventListener('click', () => {
+            vscode.postMessage({ type: 'commandResponse', accepted: true });
+            cmdBlock.querySelector('.cmd-actions').innerHTML = '<span style="color:#4ec9b0;font-size:12px;padding:4px;">&#10003; Pokrenuto</span>';
+          });
+          cmdBlock.querySelector('.cmd-reject').addEventListener('click', () => {
+            vscode.postMessage({ type: 'commandResponse', accepted: false });
+            cmdBlock.querySelector('.cmd-actions').innerHTML = '<span style="color:#f14c4c;font-size:12px;padding:4px;">&#10007; Odbijeno</span>';
+          });
+          messagesEl.appendChild(cmdBlock);
+          setTimeout(() => {
+            const actions = cmdBlock.querySelector('.cmd-actions');
+            if (actions) actions.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          }, 50);
+          break;
+        }
+
+        case 'autoApproved': {
+          const notice = document.createElement('div');
+          notice.className = 'auto-approved-notice';
+          const label = msg.toolName === 'execute_command' ? msg.filePath : msg.filePath;
+          notice.innerHTML = '&#10003; Auto-approved: <strong>' + escapeHtml(label) + '</strong>';
+          messagesEl.appendChild(notice);
+          scrollToBottom();
+          break;
+        }
+
+        case 'contextUpdate': {
+          const used = msg.used || 0;
+          const limit = msg.limit || 128000;
+          const pct = Math.min(100, Math.round((used / limit) * 100));
+          const usedK = (used / 1000).toFixed(used >= 10000 ? 0 : 1);
+          const limitK = (limit / 1000).toFixed(0);
+          contextFill.style.width = pct + '%';
+          contextFill.className = 'context-fill' + (pct >= 85 ? ' danger' : pct >= 65 ? ' warning' : '');
+          contextLabel.textContent = usedK + 'K / ' + limitK + 'K';
+          contextNewSession.classList.toggle('visible', pct >= 75);
+          break;
+        }
+
+        case 'error':
+          addMessageBubble('assistant', 'Greska: ' + msg.text);
+          setStreaming(false);
+          break;
+      }
+    });
+
+    function computeDiffLines(oldText, newText) {
+      const oldLines = oldText.split('\n');
+      const newLines = newText.split('\n');
+      const result = [];
+      let oi = 0, ni = 0;
+
+      while (oi < oldLines.length || ni < newLines.length) {
+        if (oi < oldLines.length && ni < newLines.length && oldLines[oi] === newLines[ni]) {
+          result.push({ type: 'context', text: oldLines[oi] });
+          oi++; ni++;
+        } else {
+          let foundMatch = false;
+          // Look ahead in new lines for a match with current old line
+          for (let look = 1; look <= 5 && ni + look < newLines.length; look++) {
+            if (oi < oldLines.length && newLines[ni + look] === oldLines[oi]) {
+              for (let j = 0; j < look; j++) {
+                result.push({ type: 'added', text: newLines[ni + j] });
+              }
+              ni += look;
+              foundMatch = true;
+              break;
+            }
+          }
+          if (!foundMatch) {
+            // Look ahead in old lines for a match with current new line
+            for (let look = 1; look <= 5 && oi + look < oldLines.length; look++) {
+              if (ni < newLines.length && oldLines[oi + look] === newLines[ni]) {
+                for (let j = 0; j < look; j++) {
+                  result.push({ type: 'removed', text: oldLines[oi + j] });
+                }
+                oi += look;
+                foundMatch = true;
+                break;
+              }
+            }
+          }
+          if (!foundMatch) {
+            if (oi < oldLines.length) { result.push({ type: 'removed', text: oldLines[oi] }); oi++; }
+            if (ni < newLines.length) { result.push({ type: 'added', text: newLines[ni] }); ni++; }
+          }
+        }
+      }
+      return result;
+    }
+
+    function createDiffBlock(fileName, oldContent, newContent) {
+      const lines = computeDiffLines(oldContent || '', newContent || '');
+      const added = lines.filter(l => l.type === 'added').length;
+      const removed = lines.filter(l => l.type === 'removed').length;
+
+      const block = document.createElement('div');
+      block.className = 'diff-block';
+
+      let linesHtml = '';
+      lines.forEach(line => {
+        const escaped = escapeHtml(line.text || ' ');
+        linesHtml += '<div class="diff-line ' + line.type + '">' + escaped + '</div>';
+      });
+
+      block.innerHTML =
+        '<div class="diff-header">' +
+          '<span class="diff-icon">&#9998;</span>' +
+          '<span class="diff-filename">' + escapeHtml(fileName) + '</span>' +
+          '<span class="diff-stats">' +
+            '<span class="added">+' + added + '</span> ' +
+            '<span class="removed">-' + removed + '</span>' +
+          '</span>' +
+        '</div>' +
+        '<div class="diff-lines">' + linesHtml + '</div>' +
+        '<div class="diff-actions">' +
+          '<button class="diff-accept">Accept</button>' +
+          '<button class="diff-reject">Reject</button>' +
+        '</div>';
+
+      block.querySelector('.diff-accept').addEventListener('click', () => {
+        vscode.postMessage({ type: 'diffResponse', accepted: true });
+        block.querySelector('.diff-actions').innerHTML = '<span style="color:#4ec9b0;font-size:12px;padding:4px;">&#10003; Prihvaceno</span>';
+        hideStatus();
+      });
+      block.querySelector('.diff-reject').addEventListener('click', () => {
+        vscode.postMessage({ type: 'diffResponse', accepted: false });
+        block.querySelector('.diff-actions').innerHTML = '<span style="color:#f14c4c;font-size:12px;padding:4px;">&#10007; Odbijeno</span>';
+        hideStatus();
+      });
+
+      return block;
+    }
+
+    function renderMarkdown(text) {
+      if (!text) return '';
+      let html = escapeHtml(text);
+
+      // Code blocks: ```lang\ncode\n```
+      html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+        const langName = lang || 'code';
+        return '<div class="code-block-wrapper">' +
+          '<div class="code-block-header">' +
+            '<span class="code-block-lang">' + langName + '</span>' +
+          '</div>' +
+          '<pre><code>' + code.replace(/\n$/, '') + '</code></pre>' +
+        '</div>';
+      });
+
+      // Horizontal rules
+      html = html.replace(/^-{3,}$/gm, '<hr>');
+      html = html.replace(/^_{3,}$/gm, '<hr>');
+      html = html.replace(/^\*{3,}$/gm, '<hr>');
+
+      // Inline code
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+      // Headers
+      html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+      html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+      html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+      // Bold + italic
+      html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+      html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+      // Blockquotes
+      html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+      // Unordered lists
+      html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+      html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+
+      // Links
+      html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$1" target="_blank">$1</a>');
+
+      // Paragraphs (double newline)
+      html = html.replace(/\n\n/g, '</p><p>');
+      html = '<p>' + html + '</p>';
+
+      // Clean up empty paragraphs
+      html = html.replace(/<p>\s*<\/p>/g, '');
+      html = html.replace(/<p>\s*(<h[1-3]>)/g, '$1');
+      html = html.replace(/(<\/h[1-3]>)\s*<\/p>/g, '$1');
+      html = html.replace(/<p>\s*(<pre>)/g, '$1');
+      html = html.replace(/(<\/pre>)\s*<\/p>/g, '$1');
+      html = html.replace(/<p>\s*(<ul>)/g, '$1');
+      html = html.replace(/(<\/ul>)\s*<\/p>/g, '$1');
+      html = html.replace(/<p>\s*(<blockquote>)/g, '$1');
+      html = html.replace(/(<\/blockquote>)\s*<\/p>/g, '$1');
+      html = html.replace(/<p>\s*(<hr>)/g, '$1');
+      html = html.replace(/(<hr>)\s*<\/p>/g, '$1');
+
+      return html;
+    }
+
+    function addCopyButtons(container) {
+      container.querySelectorAll('.code-block-wrapper').forEach(wrapper => {
+        const header = wrapper.querySelector('.code-block-header');
+        const code = wrapper.querySelector('code');
+        if (!header || !code) return;
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.textContent = 'Copy';
+        btn.addEventListener('click', () => {
+          navigator.clipboard.writeText(code.textContent || '');
+          btn.textContent = 'Copied!';
+          setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+        });
+        header.appendChild(btn);
+      });
+    }
+
+    function escapeHtml(text) {
+      const d = document.createElement('div');
+      d.textContent = text;
+      return d.innerHTML;
+    }
+
+    vscode.postMessage({ type: 'ready' });
+  </script>
+</body>
+</html>
