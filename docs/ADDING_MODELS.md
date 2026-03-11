@@ -173,3 +173,51 @@ Minimalne izmene za postojeći provajder (3 linije):
 ```
 
 Plus: handler funkcija `handleGoogle()` (~100-150 linija) i SDK instalacija.
+
+---
+
+## VajbAgent VS Code Extension — sinhronizacija modela
+
+Extension koristi isti backend i iste model ID-ove. Kad dodas novi model na backend, treba ga dodati i u extension na **2 mesta**:
+
+### 1. Settings — `vajbagent-vscode/src/settings.ts`
+
+**`MODEL_INFO` niz** — dodaj novi objekat:
+
+```ts
+{ id: 'vajb-agent-flash', label: 'Flash', description: 'Ultra brz, za jednostavne taskove' },
+```
+
+Polja:
+- `id` — MORA biti identican `id`-u iz backend-a (`VAJB_MODELS`)
+- `label` — kratko ime koje se prikazuje u dropdown-u (npr. "Flash", "Lite", "Pro")
+- `description` — kratak opis za korisnika
+
+### 2. Token limiti — `vajbagent-vscode/src/agent.ts`
+
+**`_getContextLimit()` metoda** — dodaj limit za novi model:
+
+```ts
+'vajb-agent-flash': 1000000,
+```
+
+Ova vrednost kontrolise context progress bar u UI-ju. Trebalo bi da odgovara ukupnom input limitu modela (vidi `MODEL_INPUT_LIMITS` u `src/convert.js` na backendu).
+
+### 3. `package.json` — enum lista
+
+**`vajbagent.model` enum** — dodaj novi model ID u listu:
+
+```json
+"enum": ["vajb-agent-lite", "vajb-agent-turbo", "vajb-agent-pro", "vajb-agent-max", "vajb-agent-power", "vajb-agent-ultra", "vajb-agent-architect", "vajb-agent-flash"]
+```
+
+### Extension checklist za novi model
+
+```
+[ ] vajbagent-vscode/src/settings.ts   → MODEL_INFO niz (id, label, description)
+[ ] vajbagent-vscode/src/agent.ts      → _getContextLimit() (token limit)
+[ ] vajbagent-vscode/package.json      → vajbagent.model enum lista
+[ ] Rebuild: cd vajbagent-vscode && npx tsc && npx vsce package --no-dependencies --allow-missing-repository
+```
+
+> **Napomena:** Extension NE treba handler za novi provajder — to je sve na backendu. Extension samo salje model ID, a backend rutira na pravi provajder.

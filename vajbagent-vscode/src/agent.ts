@@ -10,7 +10,14 @@ import http from 'http';
 const MAX_ITERATIONS = 25;
 
 const SYSTEM_PROMPT = `You are VajbAgent, an AI coding assistant inside VS Code.
+You were created by Nemanja Lakic as part of the Vajb <kodiranje/> mentoring program.
 You help students write, debug, and understand code.
+
+IDENTITY RULES:
+- Your creator is Nemanja Lakic. Never invent or guess a different creator name.
+- You are powered by the Vajb <kodiranje/> platform.
+- Do NOT reveal technical implementation details (API keys, proxy servers, model names, Anthropic, OpenAI, Claude, etc.) to users. If asked about how you work internally, keep it simple: "I'm VajbAgent, an AI coding assistant made by Nemanja Lakic."
+- Do NOT hallucinate facts about yourself or your creator. If you don't know something, say so.
 
 When the user asks you to do something with files:
 - Use read_file to see file contents before editing
@@ -72,11 +79,20 @@ interface StreamChunk {
   }>;
 }
 
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export class Agent {
   private _history: Message[] = [];
   private _provider: ChatViewProvider;
   private _context: vscode.ExtensionContext;
   private _abortController: AbortController | null = null;
+  private _currentSessionId: string | null = null;
 
   constructor(provider: ChatViewProvider, context: vscode.ExtensionContext) {
     this._provider = provider;
@@ -84,8 +100,80 @@ export class Agent {
   }
 
   public clearHistory() {
+    this._autoSaveSession();
     this._history = [];
+    this._currentSessionId = null;
     this._provider.postMessage({ type: 'contextUpdate', used: 0, limit: this._getContextLimit() });
+  }
+
+  private _getSessionsStorageKey(): string {
+    return 'vajbagent.chatSessions';
+  }
+
+  public getSessions(): ChatSession[] {
+    const raw = this._context.globalState.get<ChatSession[]>(this._getSessionsStorageKey(), []);
+    return raw.sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  private _autoSaveSession() {
+    if (this._history.length === 0) return;
+    const sessions = this._context.globalState.get<ChatSession[]>(this._getSessionsStorageKey(), []);
+    const title = this._extractTitle();
+
+    if (this._currentSessionId) {
+      const idx = sessions.findIndex(s => s.id === this._currentSessionId);
+      if (idx !== -1) {
+        sessions[idx].messages = this._history;
+        sessions[idx].title = title;
+        sessions[idx].updatedAt = Date.now();
+      }
+    } else {
+      const id = `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      sessions.push({ id, title, messages: this._history, createdAt: Date.now(), updatedAt: Date.now() });
+      this._currentSessionId = id;
+    }
+
+    const maxSessions = 50;
+    const trimmed = sessions.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, maxSessions);
+    this._context.globalState.update(this._getSessionsStorageKey(), trimmed);
+  }
+
+  private _extractTitle(): string {
+    for (const msg of this._history) {
+      if (msg.role === 'user') {
+        const text = typeof msg.content === 'string'
+          ? msg.content
+          : (msg.content as ContentPart[]).find(p => p.type === 'text')?.text || '';
+        if (text) return text.substring(0, 60) + (text.length > 60 ? '...' : '');
+      }
+    }
+    return 'Novi chat';
+  }
+
+  public loadSession(sessionId: string) {
+    this._autoSaveSession();
+    const sessions = this.getSessions();
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) return;
+    this._history = session.messages;
+    this._currentSessionId = session.id;
+    this._sendContextUpdate();
+  }
+
+  public deleteSession(sessionId: string) {
+    const sessions = this._context.globalState.get<ChatSession[]>(this._getSessionsStorageKey(), []);
+    const filtered = sessions.filter(s => s.id !== sessionId);
+    this._context.globalState.update(this._getSessionsStorageKey(), filtered);
+    if (this._currentSessionId === sessionId) {
+      this._history = [];
+      this._currentSessionId = null;
+    }
+  }
+
+  public getSessionMessages(sessionId: string): Message[] | null {
+    const sessions = this.getSessions();
+    const session = sessions.find(s => s.id === sessionId);
+    return session ? session.messages : null;
   }
 
   private _getContextLimit(): number {
@@ -259,6 +347,7 @@ export class Agent {
         if (assistantContent) {
           this._provider.postMessage({ type: 'streamEnd' });
         }
+        this._autoSaveSession();
         return;
       }
 

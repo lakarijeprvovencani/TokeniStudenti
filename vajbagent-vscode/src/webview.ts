@@ -81,6 +81,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'newSession':
         this._agent.abort();
         this._agent.clearHistory();
+        this._view?.webview.postMessage({ type: 'newSession' });
         break;
       case 'diffResponse':
         handleDiffResponse(message.accepted as boolean);
@@ -94,6 +95,34 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           message.value as boolean
         );
         break;
+      case 'getHistory': {
+        const sessions = this._agent.getSessions().map(s => ({
+          id: s.id,
+          title: s.title,
+          updatedAt: s.updatedAt,
+        }));
+        this._view?.webview.postMessage({ type: 'historyList', sessions });
+        break;
+      }
+      case 'loadSession': {
+        const sessionId = message.sessionId as string;
+        this._agent.loadSession(sessionId);
+        const msgs = this._agent.getSessionMessages(sessionId);
+        if (msgs) {
+          this._view?.webview.postMessage({ type: 'sessionLoaded', messages: msgs });
+        }
+        break;
+      }
+      case 'deleteSession': {
+        this._agent.deleteSession(message.sessionId as string);
+        const updatedSessions = this._agent.getSessions().map(s => ({
+          id: s.id,
+          title: s.title,
+          updatedAt: s.updatedAt,
+        }));
+        this._view?.webview.postMessage({ type: 'historyList', sessions: updatedSessions });
+        break;
+      }
     }
   }
 
@@ -101,8 +130,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const htmlPath = path.join(this._context.extensionPath, 'media', 'chat.html');
     let html = fs.readFileSync(htmlPath, 'utf-8');
     const nonce = getNonce();
+    const logoUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._context.extensionUri, 'media', 'vajb-logo.png')
+    );
     html = html.replace(/{{nonce}}/g, nonce);
     html = html.replace(/{{cspSource}}/g, webview.cspSource);
+    html = html.replace(/{{logoUri}}/g, logoUri.toString());
     return html;
   }
 }
