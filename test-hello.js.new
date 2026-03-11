@@ -1,0 +1,4 @@
+// Komentar: test fajl - promenjen pozdrav
+// Simple script that prints Hello World and the current date
+console.log("Zdravo Svete");
+console.log(new Date().toString());

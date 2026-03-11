@@ -258,15 +258,15 @@ export class Agent {
   private _getContextLimit(): number {
     const model = getModel();
     const limits: Record<string, number> = {
-      'vajb-agent-lite': 128000,
-      'vajb-agent-turbo': 128000,
-      'vajb-agent-pro': 128000,
-      'vajb-agent-max': 200000,
-      'vajb-agent-power': 128000,
-      'vajb-agent-ultra': 200000,
-      'vajb-agent-architect': 200000,
+      'vajb-agent-lite': 400000,       // GPT-5 Mini: 400K context
+      'vajb-agent-turbo': 200000,      // o4-mini: 200K context
+      'vajb-agent-pro': 400000,        // GPT-5: 400K context
+      'vajb-agent-max': 200000,        // Claude Sonnet 4.6: 200K context
+      'vajb-agent-power': 1050000,     // GPT-5.4: 1.05M context
+      'vajb-agent-ultra': 200000,      // Claude Opus 4.6: 200K context
+      'vajb-agent-architect': 200000,  // Claude Opus 4.6: 200K context
     };
-    return limits[model] || 128000;
+    return limits[model] || 200000;
   }
 
   private _estimateTokens(): number {

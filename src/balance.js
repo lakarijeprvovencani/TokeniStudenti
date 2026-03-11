@@ -177,7 +177,7 @@ const PRICES = {
   'gpt-5.4':    { in: 2.50, out: 15.00 },
   // Claude models
   'claude-sonnet-4-6': { in: 3.00, out: 15.0 },
-  'claude-opus-4-6':   { in: 15.00, out: 75.0 },
+  'claude-opus-4-6':   { in: 5.00, out: 25.0 },
   // Legacy (for historical cost calculations)
   'gpt-4.1-mini': { in: 0.40, out: 1.60 },
   'gpt-4.1':      { in: 2.00, out: 8.00 },

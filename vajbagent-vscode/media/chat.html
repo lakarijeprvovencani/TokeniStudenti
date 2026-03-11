@@ -259,7 +259,17 @@
     .tool-icon { font-size: 11px; transition: transform 0.15s; }
     .tool-icon.open { transform: rotate(90deg); }
     .tool-name { font-weight: 600; color: #FA7315; }
-    .tool-status { margin-left: auto; opacity: 0.6; }
+    .tool-detail {
+      opacity: 0.7;
+      font-size: 11px;
+      font-family: var(--vscode-editor-font-family), monospace;
+      margin-left: 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 55%;
+    }
+    .tool-status { margin-left: auto; opacity: 0.6; flex-shrink: 0; }
     .tool-body {
       display: none;
       padding: 8px 10px;
@@ -1380,16 +1390,31 @@
 
         case 'toolCall': {
           hideStatus();
-          const toolLabel = {
-            'read_file': 'Citam fajl...',
-            'write_file': 'Pisem fajl...',
-            'replace_in_file': 'Menjam fajl...',
-            'list_files': 'Listajem fajlove...',
-            'search_files': 'Pretrazujem...',
-            'execute_command': 'Pokrecem komandu...',
-            'fetch_url': 'Ucitavam sa weba...',
-          }[msg.name] || 'Koristim ' + msg.name + '...';
-          showStatus(toolLabel);
+          let parsedArgs = {};
+          try { parsedArgs = JSON.parse(msg.args || '{}'); } catch {}
+
+          const toolDetail = (function() {
+            const p = parsedArgs.path || '';
+            const short = p ? p.split('/').slice(-2).join('/') : '';
+            switch (msg.name) {
+              case 'read_file':       return { label: 'Citam', detail: short };
+              case 'write_file':      return { label: 'Pisem', detail: short };
+              case 'replace_in_file': return { label: 'Menjam', detail: short };
+              case 'list_files':      return { label: 'Listajem', detail: short || parsedArgs.path || '' };
+              case 'search_files':    return { label: 'Pretrazujem', detail: parsedArgs.pattern ? '"' + parsedArgs.pattern + '"' : '' };
+              case 'execute_command': return { label: 'Pokrecem', detail: (parsedArgs.command || '').substring(0, 60) };
+              case 'fetch_url':       return { label: 'Ucitavam', detail: (parsedArgs.url || '').substring(0, 50) };
+              default:                return { label: msg.name, detail: '' };
+            }
+          })();
+          const statusLabel = toolDetail.detail
+            ? toolDetail.label + ': ' + toolDetail.detail + '...'
+            : toolDetail.label + '...';
+          showStatus(statusLabel);
+
+          const detailSpan = toolDetail.detail
+            ? ' <span class="tool-detail">' + escapeHtml(toolDetail.detail) + '</span>'
+            : '';
 
           const block = document.createElement('div');
           block.className = 'tool-block';
@@ -1397,6 +1422,7 @@
             '<div class="tool-header">' +
               '<span class="tool-icon">&#9654;</span>' +
               '<span class="tool-name">' + escapeHtml(msg.name) + '</span>' +
+              detailSpan +
               '<span class="tool-status">' + (msg.status || 'running...') + '</span>' +
             '</div>' +
             '<div class="tool-body">' + escapeHtml(msg.args || '') + '</div>';
