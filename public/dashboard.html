@@ -440,16 +440,15 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 <script>
 let apiKey='';
-// Realna procena zahteva za $15 (~8K in + ~1.2K out tokena po zahtevu)
-// Cene: developers.openai.com/api/docs/pricing, platform.claude.com/docs/en/about-claude/pricing (mart 2026)
+// Realna procena zahteva za $15 (~8K in + ~1.2K out tokena po zahtevu, sa markup-om)
 const MODELS=[
-  {id:'vajb-agent-lite',name:'Lite',tier:'GPT-5 Mini · 400K',per15:3400},
-  {id:'vajb-agent-turbo',name:'Turbo',tier:'o4-mini · 200K',per15:1060},
-  {id:'vajb-agent-pro',name:'Pro',tier:'GPT-5 · 400K',per15:680},
-  {id:'vajb-agent-power',name:'Power',tier:'GPT-5.4 · 1.05M',per15:395},
-  {id:'vajb-agent-max',name:'Max',tier:'Sonnet 4.6 · 200K',per15:357},
-  {id:'vajb-agent-ultra',name:'Ultra',tier:'Opus 4.6 · 200K',per15:214},
-  {id:'vajb-agent-architect',name:'Architect',tier:'Opus 4.6 + prompt',per15:214},
+  {id:'vajb-agent-lite',name:'Lite',tier:'GPT-5 Mini · 400K',per15:1900},
+  {id:'vajb-agent-turbo',name:'Turbo',tier:'o4-mini · 200K',per15:590},
+  {id:'vajb-agent-pro',name:'Pro',tier:'GPT-5 · 400K',per15:380},
+  {id:'vajb-agent-power',name:'Power',tier:'GPT-5.4 · 1.05M',per15:220},
+  {id:'vajb-agent-max',name:'Max',tier:'Sonnet 4.6 · 200K',per15:245},
+  {id:'vajb-agent-ultra',name:'Ultra',tier:'Opus 4.6 · 200K',per15:150},
+  {id:'vajb-agent-architect',name:'Architect',tier:'Opus 4.6 + prompt',per15:150},
 ];
 
 function $(id){return document.getElementById(id)}

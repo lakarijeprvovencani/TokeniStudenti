@@ -3,7 +3,7 @@
   "displayName": "VajbAgent",
   "description": "AI coding assistant za studente — koristi native tool calling za minimalan overhead",
   "version": "0.3.0",
-  "publisher": "vajbagent",
+  "publisher": "VajbAgent",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -77,8 +77,8 @@
             "Pro — GPT-5 ($1.25/$10.00 per M)",
             "Max — Claude Sonnet 4.6 ($3.00/$15.00 per M)",
             "Power — GPT-5.4 ($2.50/$15.00 per M)",
-            "Ultra — Claude Opus 4.6 ($15.00/$75.00 per M)",
-            "Architect — Claude Opus + architect prompt ($15.00/$75.00 per M)"
+            "Ultra — Claude Opus 4.6 ($5.00/$25.00 per M)",
+            "Architect — Claude Opus + architect prompt ($5.00/$25.00 per M)"
           ],
           "description": "AI model za koriscenje"
         },

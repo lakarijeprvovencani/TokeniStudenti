@@ -260,7 +260,7 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
     <!-- ZARADA -->
     <div class="page" id="pg-earnings">
       <div class="page-title">Kalkulator zarade</div>
-      <p class="earn-intro">Orijentaciono: ako student dopuni npr. $10, tvoja zarada je razlika (na markup 1.5× ostaje ti ~$3.33). Broj zahteva zavisi od modela i dužine razgovora.</p>
+      <p class="earn-intro">Orijentaciono: ako student dopuni npr. $10, tvoja zarada je razlika zavisno od markupa po provajderu. Broj zahteva zavisi od modela i dužine razgovora.</p>
       <div class="card">
         <div class="card-title">Po iznosu koji student dopuni</div>
         <div id="earnWrap"></div>
@@ -376,7 +376,10 @@ function renderOverview(){
   $('sCharged').textContent='$'+studentPaid.toFixed(2);
   $('sChargedD').textContent='Skinuto sa balansa studenata';
   $('sProfit').textContent='$'+profit.toFixed(2);
-  $('sProfitD').textContent='Markup '+DATA.markup+'x = '+((DATA.markup-1)*100).toFixed(0)+'% marža';
+  const mkLabel = typeof DATA.markup === 'object'
+    ? 'OpenAI '+DATA.markup.openai+'x / Anthropic '+DATA.markup.anthropic+'x'
+    : 'Markup '+DATA.markup+'x';
+  $('sProfitD').textContent=mkLabel;
   $('sOpenAI').textContent='$'+openaiCost.toFixed(2);
   $('sAnthropic').textContent='$'+anthropicCost.toFixed(2);
 
@@ -427,7 +430,8 @@ function renderOverview(){
   const dailyCost=provCost/Math.max(daysSinceStart,1);
   const dailyReqs=totalReqs/Math.max(daysSinceStart,1);
   const monthlyCost=dailyCost*30;
-  const monthlyRev=monthlyCost*DATA.markup;
+  const avgMarkup = typeof DATA.markup === 'object' ? ((DATA.markup.openai + DATA.markup.anthropic) / 2) : DATA.markup;
+  const monthlyRev=monthlyCost*avgMarkup;
   const monthlyProfit=monthlyRev-monthlyCost;
 
   $('projCost').textContent='$'+monthlyCost.toFixed(2);
@@ -435,7 +439,7 @@ function renderOverview(){
   $('projRev').textContent='$'+monthlyRev.toFixed(2);
   $('projRevD').textContent='Ono što studenti plaćaju';
   $('projProfit').textContent='$'+monthlyProfit.toFixed(2);
-  $('projProfitD').textContent=activeSts.length+' aktivnih × '+DATA.markup+'x markup';
+  $('projProfitD').textContent=activeSts.length+' aktivnih × ~'+avgMarkup.toFixed(2)+'x avg markup';
 
   // Users table
   const tb=$('ovUsersBody');tb.innerHTML='';
@@ -471,8 +475,8 @@ function renderStudents(){
       <td class="c-orange">$${(s.balance_usd||0).toFixed(2)}</td>
       <td>${s.active?'<span class="tag tag-active">Aktivan</span>':'<span class="tag tag-inactive">Neaktivan</span>'}</td>
       <td>
-        <button class="btn btn-sm ${hasMarkup?'btn-g':'btn-ghost'}" onclick="toggleMarkup('${esc(s.key)}',${hasMarkup})" title="${hasMarkup?'Plaća sa maržom ('+DATA.markup+'x)':'Plaća samo API cenu'}">
-          ${hasMarkup?'✓ '+DATA.markup+'x':'Bez marže'}
+        <button class="btn btn-sm ${hasMarkup?'btn-g':'btn-ghost'}" onclick="toggleMarkup('${esc(s.key)}',${hasMarkup})" title="${hasMarkup?'Plaća sa maržom':'Plaća samo API cenu'}">
+          ${hasMarkup?'✓ Markup':'Bez marže'}
         </button>
       </td>
       <td style="color:var(--text)">${fmtD(s.created)}</td>
@@ -565,7 +569,8 @@ function renderModels(){
 function renderEarnings(){
   const w=$('earnWrap');w.innerHTML='';
   [10,20,50].forEach(budget=>{
-    const real=budget/DATA.markup;
+    const avgMk = typeof DATA.markup === 'object' ? ((DATA.markup.openai + DATA.markup.anthropic) / 2) : DATA.markup;
+    const real=budget/avgMk;
     const earn=budget-real;
     let html=`<div class="earn-block"><div class="earn-block-title">Student dopuni $${budget} → tvoja zarada <span class="earn-amt">$${earn.toFixed(2)}</span></div><div class="earn-grid">`;
     DATA.models.forEach(m=>{
