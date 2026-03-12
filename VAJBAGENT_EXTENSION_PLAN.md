@@ -23,7 +23,7 @@ Nasi modeli (GPT-5 serija, Claude) vec imaju native tool calling — ne treba im
 ```
 Student u VS Code
   → VajbAgent extension (nas, ~800 tokena overhead)
-    → vajbagent.onrender.com (nas proxy, vec postoji)
+    → vajbagent.com (nas proxy, vec postoji)
       → OpenAI / Anthropic API
 ```
 
@@ -99,7 +99,7 @@ Extension salje OpenAI-kompatibilne zahteve na proxy. Proxy vec hendla sve: rout
 
 ### 7. Settings
 - `vajbagent.apiKey`: string (VSCode secret storage)
-- `vajbagent.apiUrl`: string, default `https://vajbagent.onrender.com`
+- `vajbagent.apiUrl`: string, default `https://vajbagent.com`
 - `vajbagent.model`: enum sa 7 modela
 - Onboarding: ako nema API key, prikazi poruku sa linkom na dashboard
 
@@ -127,7 +127,7 @@ Extension salje OpenAI-kompatibilne zahteve na proxy. Proxy vec hendla sve: rout
 
 ## Postojeci proxy (NE DIRATI)
 
-Proxy vec postoji i radi na `https://vajbagent.onrender.com`.
+Proxy vec postoji i radi na `https://vajbagent.com`.
 Source code: `/Users/nemanjalakic/Documents/TokeniStudenti/src/index.js`
 
 **API format**: OpenAI-kompatibilan

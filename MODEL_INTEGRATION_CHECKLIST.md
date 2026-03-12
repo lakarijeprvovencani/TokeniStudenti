@@ -122,13 +122,13 @@ Za Anthropic modele:
 
 ### 4.1 Basic test — da li radi?
 ```bash
-curl -s https://vajbagent.onrender.com/v1/models | python3 -c "import sys,json; [print(m['id']) for m in json.load(sys.stdin)['data']]"
+curl -s https://vajbagent.com/v1/models | python3 -c "import sys,json; [print(m['id']) for m in json.load(sys.stdin)['data']]"
 ```
 - [ ] Novi model se pojavljuje u listi
 
 ### 4.2 Non-stream test
 ```bash
-curl -s https://vajbagent.onrender.com/v1/chat/completions \
+curl -s https://vajbagent.com/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer STUDENT_KEY" \
   -d '{"model":"vajb-agent-NAZIV","messages":[{"role":"user","content":"Reci samo: OK"}],"max_tokens":10}'
@@ -139,7 +139,7 @@ curl -s https://vajbagent.onrender.com/v1/chat/completions \
 
 ### 4.3 Stream test
 ```bash
-curl -sN https://vajbagent.onrender.com/v1/chat/completions \
+curl -sN https://vajbagent.com/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer STUDENT_KEY" \
   -d '{"model":"vajb-agent-NAZIV","messages":[{"role":"user","content":"Napiši 3 rečenice."}],"max_tokens":200,"stream":true}'
@@ -150,7 +150,7 @@ curl -sN https://vajbagent.onrender.com/v1/chat/completions \
 
 ### 4.4 Tool calling test
 ```bash
-curl -s https://vajbagent.onrender.com/v1/chat/completions \
+curl -s https://vajbagent.com/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer STUDENT_KEY" \
   -d '{"model":"vajb-agent-NAZIV","messages":[{"role":"user","content":"Koliko je 15+27?"}],"max_tokens":200,"tools":[{"type":"function","function":{"name":"calculator","parameters":{"type":"object","properties":{"expression":{"type":"string"}}}}}]}'
@@ -160,7 +160,7 @@ curl -s https://vajbagent.onrender.com/v1/chat/completions \
 
 ### 4.5 Vision test (ako model podržava slike)
 ```bash
-curl -s https://vajbagent.onrender.com/v1/chat/completions \
+curl -s https://vajbagent.com/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer STUDENT_KEY" \
   -d '{"model":"vajb-agent-NAZIV","messages":[{"role":"user","content":[{"type":"text","text":"Šta vidiš?"},{"type":"image_url","image_url":{"url":"https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Camponotus_flavomarginatus_ant.jpg/320px-Camponotus_flavomarginatus_ant.jpg"}}]}],"max_tokens":200}'

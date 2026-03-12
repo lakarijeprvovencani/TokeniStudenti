@@ -193,11 +193,11 @@ Proxy proverava `Authorization: Bearer <student-api-key>` i loguje usage po tom 
    - `STUDENT_API_KEYS` = npr. `student-key-1,student-key-2` (zapeti, bez razmaka)
    - `ADMIN_SECRET` = npr. `kalabunga1991`
 6. **Create Web Service.** Render će buildovati i pokrenuti; sačekaj da status bude **Live** (zelena kvačica).
-7. **URL:** Ispod imena servisa videćeš URL, npr. `https://vajb-agent.onrender.com`. To je tvoj **Base URL**.
-8. **Cursor:** U Override OpenAI Base URL stavi **taj URL** (npr. `https://vajb-agent.onrender.com`). API Key ostaje `student-key-1`. Osveži modele / pošalji poruku – trebalo bi da radi (prvi zahtev posle duže pauze može da traje ~1 min dok se free instanca probudi).
+7. **URL:** Ispod imena servisa videćeš URL, npr. `https://vajbagent.com`. To je tvoj **Base URL**.
+8. **Cursor:** U Override OpenAI Base URL stavi **taj URL** (npr. `https://vajbagent.com`). API Key ostaje `student-key-1`. Osveži modele / pošalji poruku – trebalo bi da radi (prvi zahtev posle duže pauze može da traje ~1 min dok se free instanca probudi).
 9. **Kredit:** Dodaj sebi kredit preko curl-a, zamenjujući domen:
    ```bash
-   curl -X POST https://vajb-agent.onrender.com/admin/add-credits \
+   curl -X POST https://vajbagent.com/admin/add-credits \
      -H "X-Admin-Secret: kalabunga1991" \
      -H "Content-Type: application/json" \
      -d '{"key_id":"ent-key-1","amount_usd":5}'

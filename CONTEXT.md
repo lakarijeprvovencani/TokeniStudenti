@@ -10,7 +10,7 @@ The primary product is the **VajbAgent VS Code Extension** — works in VS Code,
 - **Framework:** Express.js
 - **Storage:** Redis (primary) with JSON file fallback for persistence
 - **Providers:** OpenAI (GPT-5 family) and Anthropic (Claude Sonnet/Opus)
-- **Deployment:** Render (vajbagent.onrender.com)
+- **Deployment:** Render (vajbagent.com)
 - **Client:** VajbAgent VS Code Extension (`vajbagent-vscode/`)
 
 ## Key Files

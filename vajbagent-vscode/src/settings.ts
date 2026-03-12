@@ -13,7 +13,7 @@ export const MODEL_INFO: Record<string, { label: string; description: string }> 
 };
 
 export function getApiUrl(): string {
-  return vscode.workspace.getConfiguration('vajbagent').get<string>('apiUrl', 'https://vajbagent.onrender.com');
+  return vscode.workspace.getConfiguration('vajbagent').get<string>('apiUrl', 'https://vajbagent.com');
 }
 
 export function setApiUrl(url: string): Thenable<void> {

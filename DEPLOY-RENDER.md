@@ -52,12 +52,12 @@ Sve tri stavi kao **Secret** (kad ima opciju).
 
 ## 6. Uzmi URL
 
-- Ispod imena servisa videćeš link, npr. `https://vajb-agent.onrender.com`. To je tvoj **Base URL** – kopiraj ga.
+- Ispod imena servisa videćeš link, npr. `https://vajbagent.com`. To je tvoj **Base URL** – kopiraj ga.
 
 ## 7. Cursor
 
 - **Settings** → **Models** → **API Keys**.
-- **Override OpenAI Base URL:** uključeno, u polje stavi **Render URL** (npr. `https://vajb-agent.onrender.com`).
+- **Override OpenAI Base URL:** uključeno, u polje stavi **Render URL** (npr. `https://vajbagent.com`).
 - **OpenAI API Key:** uključeno, u polje stavi `student-key-1` (ili neki drugi iz `STUDENT_API_KEYS`).
 - Ako nemaš model u listi: **+ Add Custom Model** → unesi `vajb-agent-pro` (pa eventualno `vajb-agent-max`).
 
@@ -66,7 +66,7 @@ Sve tri stavi kao **Secret** (kad ima opciju).
 U terminalu (zameni URL svojim):
 
 ```bash
-curl -X POST https://vajb-agent.onrender.com/admin/add-credits \
+curl -X POST https://vajbagent.com/admin/add-credits \
   -H "X-Admin-Secret: kalabunga1991" \
   -H "Content-Type: application/json" \
   -d '{"key_id":"ent-key-1","amount_usd":5}'

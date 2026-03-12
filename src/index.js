@@ -631,11 +631,11 @@ app.post('/register', registerLimiter, async (req, res) => {
 const LOW_BALANCE_THRESHOLD = 1.0;
 async function getBalanceWarning(keyId, newBalance) {
   if (newBalance <= LOW_BALANCE_THRESHOLD) {
-    return `\n\n---\n⚠️ **Tvoj VajbAgent balans je nizak ($${newBalance.toFixed(2)}).** Dopuni kredite na https://vajbagent.onrender.com/dashboard → Dopuna`;
+    return `\n\n---\n⚠️ **Tvoj VajbAgent balans je nizak ($${newBalance.toFixed(2)}).** Dopuni kredite na https://vajbagent.com/dashboard → Dopuna`;
   }
   const deposited = await getTotalDeposited(keyId);
   if (deposited > 0 && newBalance < deposited * 0.5) {
-    return `\n\n---\n📊 **Potrošio si više od 50% kredita** (preostalo: $${newBalance.toFixed(2)}). Dopuni kad ti odgovara na https://vajbagent.onrender.com/dashboard → Dopuna`;
+    return `\n\n---\n📊 **Potrošio si više od 50% kredita** (preostalo: $${newBalance.toFixed(2)}). Dopuni kad ti odgovara na https://vajbagent.com/dashboard → Dopuna`;
   }
   return null;
 }

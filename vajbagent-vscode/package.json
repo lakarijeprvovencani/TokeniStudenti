@@ -55,7 +55,7 @@
       "properties": {
         "vajbagent.apiUrl": {
           "type": "string",
-          "default": "https://vajbagent.onrender.com",
+          "default": "https://vajbagent.com",
           "description": "VajbAgent API server URL"
         },
         "vajbagent.model": {
