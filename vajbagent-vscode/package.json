@@ -1,8 +1,8 @@
 {
   "name": "vajbagent",
   "displayName": "VajbAgent",
-  "description": "AI coding assistant za studente — koristi native tool calling za minimalan overhead",
-  "version": "0.3.0",
+  "description": "AI coding asistent — cita, pise i menja kod umesto tebe. 7 modela, Plan Mode, MCP podrska.",
+  "version": "0.3.2",
   "publisher": "VajbAgent",
   "engines": {
     "vscode": "^1.85.0"
@@ -72,13 +72,13 @@
             "vajb-agent-architect"
           ],
           "enumDescriptions": [
-            "Lite — GPT-5 Mini ($0.25/$2.00 per M tokena)",
-            "Turbo — o4-mini ($1.10/$4.40 per M)",
-            "Pro — GPT-5 ($1.25/$10.00 per M)",
-            "Max — Claude Sonnet 4.6 ($3.00/$15.00 per M)",
-            "Power — GPT-5.4 ($2.50/$15.00 per M)",
-            "Ultra — Claude Opus 4.6 ($5.00/$25.00 per M)",
-            "Architect — Claude Opus + architect prompt ($5.00/$25.00 per M)"
+            "Lite — brz i jeftin, svakodnevno kodiranje",
+            "Turbo — reasoning model, logika i debugging",
+            "Pro — jak i pametan, ozbiljniji projekti",
+            "Max — kompleksni zadaci i planiranje",
+            "Power — flagship, najjaci nivo",
+            "Ultra — premium, najzahtevniji zadaci",
+            "Architect — full-stack arhitekta, cele aplikacije od nule"
           ],
           "description": "AI model za koriscenje"
         },

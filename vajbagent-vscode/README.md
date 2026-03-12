@@ -1,32 +1,39 @@
-# VajbAgent — AI Coding Assistant za VS Code
+# VajbAgent — AI Coding Asistent
 
-AI coding assistant koji koristi native tool calling za minimalan token overhead.
+AI coding asistent koji cita, pise, menja fajlove i pokrece komande umesto tebe.
+
+## Kako poceti
+
+1. **Napravi nalog** na [vajbagent.com/dashboard](https://vajbagent.com/dashboard) — dobijes API kljuc + $2 kredita na poklon
+2. **Instaliraj ekstenziju** i otvori VajbAgent panel u sidebar-u
+3. **Unesi API kljuc** — klikni ⚙️ gore desno, nalepi kljuc i sacuvaj
+4. **Pitaj bilo sta!**
 
 ## Features
 
-- **Chat sa AI modelima** — 7 modela (GPT-5 serija + Claude)
-- **Native tool calling** — ~800 tokena overhead umesto 10,500
+- **7 AI modela** — od brzih i jeftinih do premium nivoa, biraj po potrebi projekta
+- **Native tool calling** — manji overhead, brzi odgovori, manje tokena
+- **Plan Mode** — agent pravi plan pre nego sto menja kod
 - **6 alata** — read_file, write_file, replace_in_file, list_files, search_files, execute_command
 - **Diff preview** — pregled promena pre primene
 - **Vision** — paste, drag-and-drop, file picker za slike
+- **MCP podrska** — povezi Supabase, GitHub, Netlify, Vercel i druge servise
 - **Markdown** — renderovanje sa syntax highlighting
-- **@file mentions** — `@src/index.js` automatski dodaje sadrzaj fajla
-
-## Setup
-
-1. Instaliraj extension
-2. Otvori VajbAgent panel u sidebar-u
-3. Unesi API key (komanda: `VajbAgent: Set API Key`)
-4. Pitaj bilo sta!
 
 ## Modeli
 
 | Model | Opis |
 |---|---|
-| Lite | GPT-5 Mini — svakodnevno kodiranje |
-| Turbo | o4-mini — reasoning i debugging |
-| Pro | GPT-5 — ozbiljniji projekti |
-| Max | Claude Sonnet 4.6 — kompleksni zadaci |
-| Power | GPT-5.4 — najjaci OpenAI |
-| Ultra | Claude Opus 4.6 — premium |
-| Architect | Claude Opus + architect prompt |
+| Lite | Brz i jeftin — svakodnevno kodiranje |
+| Turbo | Reasoning — logika i debugging |
+| Pro | Jak i pametan — ozbiljniji projekti |
+| Max | Kompleksni zadaci i planiranje |
+| Power | Flagship — najjaci nivo |
+| Ultra | Premium — najzahtevniji zadaci |
+| Architect | Full-stack arhitekta — cele aplikacije od nule |
+
+## Cena
+
+Bez mesecne pretplate. Platis koliko koristis — dopunis kredit kad hoces, koristis dok traje.
+
+Vise informacija: [vajbagent.com](https://vajbagent.com)
