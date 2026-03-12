@@ -35,9 +35,11 @@ The primary product is the **VajbAgent VS Code Extension** — works in VS Code,
 - `src/agent.ts` — Core agent loop, conversation history, API calls, system prompt, context estimation
 - `src/webview.ts` — Webview provider, message handling between UI and agent
 - `src/settings.ts` — API key (SecretStorage), API URL, model selection, auto-approve settings
-- `src/tools.ts` — Tool implementations (read/write/search files, execute commands, fetch URLs, diff preview)
-- `media/chat.html` — Full chat UI (markdown rendering, tool blocks, settings panel, history, welcome screen)
+- `src/tools.ts` — Tool implementations (read/write/search files, execute commands, fetch URLs, web search, diff preview)
+- `src/mcp.ts` — MCP client (stdio transport, JSON-RPC protocol, tool discovery, server lifecycle)
+- `media/chat.html` — Full chat UI (markdown rendering, tool blocks, settings panel, MCP status, history, welcome screen)
 - `media/vajb-logo.png` — Branding logo
+- `vajbagent-X.Y.Z.vsix` — Packaged extension for install (always lives in `vajbagent-vscode/`)
 
 ### Docs
 - `docs/ADDING_MODELS.md` — Guide for adding/changing model tiers (backend + extension)
@@ -70,12 +72,13 @@ Students select tier in extension UI; backend resolves to real provider model.
 
 ## API
 - `POST /v1/chat/completions` — Main endpoint (OpenAI-compatible)
+- `POST /v1/web-search` — Web search endpoint (Tavily API), used by agent's `web_search` tool
 - Supports: streaming (SSE), tool/function calling, vision (images)
 - Context trimming: automatically trims conversation to fit model limits (`MODEL_INPUT_LIMITS` in `src/convert.js`)
 
 ## Extension Features (Current)
 - **Chat UI** with streaming markdown (tables, code blocks, headings, lists, blockquotes)
-- **7 agent tools:** `read_file`, `write_file`, `replace_in_file`, `list_files`, `search_files`, `execute_command`, `fetch_url`
+- **8 agent tools:** `read_file`, `write_file`, `replace_in_file`, `list_files`, `search_files`, `execute_command`, `fetch_url`, `web_search`
 - **Inline diff preview** with accept/reject buttons for file changes
 - **Inline command approval** with run/reject buttons
 - **Auto-approve settings** per tool type (write, replace, execute)
@@ -86,23 +89,24 @@ Students select tier in extension UI; backend resolves to real provider model.
 - **Image support** — paste or file picker for vision-capable models
 - **Welcome screen** with branding on empty chat
 - **System prompt** with anti-hallucination rules, explore-before-edit strategy, identity protection
+- **MCP Support** — connect external MCP servers (stdio transport), auto-discover tools, agent can invoke them
+  - Configure via `vajbagent.mcpServers` in VS Code Settings
+  - Status visible in settings panel with restart button
+  - Tools prefixed as `mcp_<server>_<tool>` and automatically merged with built-in tools
+  - Supports any MCP-compatible server (GitHub, databases, Slack, custom APIs, etc.)
 
 ## Planned Features
 
-### Web Search Tool (next)
-- New `web_search` tool for the agent to search the internet
-- Backend endpoint that calls a search API (Tavily, SerpAPI, or Brave Search)
-- Agent gets search results and can then use `fetch_url` to read specific pages
-- Enables answering questions about latest docs, libraries, APIs, error messages
-- Relatively simple: one new tool definition + one backend route
+### One-Click Integrations (future)
+- OAuth-based integrations for GitHub, Vercel, Netlify etc.
+- User clicks button → authorizes on provider site → token stored automatically
+- Requires OAuth app registration per provider + backend callback endpoints
 
-### MCP Support (Model Context Protocol)
-- Allow users to connect MCP servers to the extension
-- Extension acts as MCP client, communicating via stdio or SSE
-- User configures MCP servers in extension settings (similar to Cursor/Claude Desktop)
-- Agent automatically discovers and can invoke MCP tools
-- Enables integrations with databases, GitHub, Slack, custom APIs, etc.
-- Larger effort: requires MCP client implementation, server lifecycle management, tool discovery, config UI
+## Building the Extension
+- Extension source: `vajbagent-vscode/`
+- Build: `cd vajbagent-vscode && npm run compile && npx @vscode/vsce package --no-dependencies`
+- Output: `vajbagent-vscode/vajbagent-X.Y.Z.vsix`
+- Install: VS Code/Cursor → `Ctrl+Shift+P` → "Extensions: Install from VSIX..." → pick the `.vsix` file
 
 ## Branding
 - **Name:** VajbAgent (Vajb in white, Agent in orange)

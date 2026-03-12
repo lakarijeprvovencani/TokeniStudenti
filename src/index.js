@@ -108,6 +108,8 @@ If tools are available (read_file, list_files, etc.):
 ### 4. USE TOOLS WHEN AVAILABLE
 - If you have terminal access, run commands directly
 - If you can edit files, edit them - don't just show code
+- Use web_search for up-to-date info (latest docs, library versions, error messages, APIs)
+- After web_search, use fetch_url to read specific pages from the results
 - Act, don't just explain
 
 ### 5. HANDLE ERRORS
@@ -1339,6 +1341,58 @@ app.get('/debug/redis', adminLimiter, async (req, res) => {
     } catch (err) { ping = 'error: ' + err.message; }
   }
   res.json({ configured, ping, keys });
+});
+
+// ---- Web Search (Tavily) ----
+app.post('/v1/web-search', authLimiter, requireStudentAuth, async (req, res) => {
+  const tavilyKey = process.env.TAVILY_API_KEY;
+  if (!tavilyKey || tavilyKey === 'tvly-YOUR_KEY_HERE') {
+    return res.status(503).json({ error: { message: 'Web search nije konfigurisan.', code: 'search_not_configured' } });
+  }
+
+  const { query, max_results = 5, include_answer = true } = req.body || {};
+  if (!query || typeof query !== 'string' || query.trim().length < 2) {
+    return res.status(400).json({ error: { message: 'Parametar "query" je obavezan (min 2 karaktera).', code: 'invalid_query' } });
+  }
+
+  try {
+    const tavilyRes = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: tavilyKey,
+        query: query.trim(),
+        max_results: Math.min(Math.max(Number(max_results) || 5, 1), 10),
+        include_answer: !!include_answer,
+        include_raw_content: false,
+        search_depth: 'advanced',
+      }),
+    });
+
+    if (!tavilyRes.ok) {
+      const errBody = await tavilyRes.text();
+      console.error('Tavily API error:', tavilyRes.status, errBody);
+      return res.status(502).json({ error: { message: 'Web search greška.', code: 'search_error' } });
+    }
+
+    const data = await tavilyRes.json();
+
+    const results = (data.results || []).map(r => ({
+      title: r.title || '',
+      url: r.url || '',
+      content: r.content || '',
+      score: r.score || 0,
+    }));
+
+    res.json({
+      query: query.trim(),
+      answer: data.answer || null,
+      results,
+    });
+  } catch (err) {
+    console.error('Web search error:', err.message);
+    res.status(502).json({ error: { message: 'Web search nedostupan. Pokušaj ponovo.', code: 'search_error' } });
+  }
 });
 
 // ---- 404 ----

@@ -4,17 +4,24 @@ import * as fs from 'fs';
 import { getModel, setModel, getApiKey, setApiKey, getApiUrl, setApiUrl, promptForApiKey, MODEL_INFO, getAutoApprove, setAutoApprove, AutoApproveSettings } from './settings';
 import { Agent } from './agent';
 import { setPostMessage, handleDiffResponse, handleCommandResponse } from './tools';
+import { McpManager, McpServerConfig } from './mcp';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'vajbagent.chatView';
   private _view?: vscode.WebviewView;
   private _context: vscode.ExtensionContext;
   private _agent: Agent;
+  private _mcpManager: McpManager;
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(context: vscode.ExtensionContext, mcpManager: McpManager) {
     this._context = context;
-    this._agent = new Agent(this, context);
+    this._mcpManager = mcpManager;
+    this._agent = new Agent(this, context, mcpManager);
     setPostMessage((msg) => this.postMessage(msg));
+
+    mcpManager.onToolsChanged(() => {
+      this._sendMcpStatus();
+    });
   }
 
   public resolveWebviewView(
@@ -44,6 +51,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: 'newSession' });
   }
 
+  private _sendMcpStatus() {
+    const status = this._mcpManager.getStatus();
+    const totalTools = status.reduce((s, c) => s + c.toolCount, 0);
+    this._view?.webview.postMessage({ type: 'mcpStatus', servers: status, totalTools });
+  }
+
+  private async _restartMcp() {
+    this._view?.webview.postMessage({ type: 'mcpStatus', servers: [], totalTools: 0, loading: true });
+    this._mcpManager.stopAll();
+    try {
+      await this._mcpManager.startFromConfig();
+    } catch (err) {
+      console.error('[MCP] Restart failed:', (err as Error).message);
+    }
+    this._sendMcpStatus();
+  }
+
   public postMessage(message: unknown) {
     this._view?.webview.postMessage(message);
   }
@@ -52,6 +76,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     switch (message.type) {
       case 'ready': {
         const existingKey = await getApiKey(this._context.secrets);
+        const mcpStatus = this._mcpManager.getStatus();
+        const mcpTotalTools = mcpStatus.reduce((s, c) => s + c.toolCount, 0);
         this._view?.webview.postMessage({
           type: 'init',
           model: getModel(),
@@ -59,6 +85,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           autoApprove: getAutoApprove(),
           apiUrl: getApiUrl(),
           hasApiKey: !!existingKey,
+          mcpServers: mcpStatus,
+          mcpTotalTools,
         });
         this._agent.sendContextUpdate();
         break;
@@ -133,6 +161,36 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           updatedAt: s.updatedAt,
         }));
         this._view?.webview.postMessage({ type: 'historyList', sessions: updatedSessions });
+        break;
+      }
+      case 'getMcpStatus':
+        this._sendMcpStatus();
+        break;
+      case 'restartMcp':
+        await this._restartMcp();
+        break;
+      case 'openMcpSettings': {
+        const configPath = McpManager.createConfigTemplate();
+        if (configPath) {
+          const doc = await vscode.workspace.openTextDocument(configPath);
+          await vscode.window.showTextDocument(doc);
+        } else {
+          vscode.window.showWarningMessage('Otvori folder u editoru da bi konfigurisao MCP servere.');
+        }
+        break;
+      }
+      case 'openFile': {
+        const filePath = message.path as string;
+        if (!filePath) break;
+        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!root) break;
+        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
+        try {
+          const doc = await vscode.workspace.openTextDocument(fullPath);
+          await vscode.window.showTextDocument(doc);
+        } catch {
+          vscode.window.showWarningMessage(`Fajl nije pronadjen: ${filePath}`);
+        }
         break;
       }
     }

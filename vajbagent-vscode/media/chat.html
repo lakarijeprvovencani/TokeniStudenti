@@ -383,6 +383,11 @@
       opacity: 0.8;
       background: var(--vscode-toolbar-hoverBackground);
     }
+    .toolbar-btn.active {
+      opacity: 1;
+      color: #FA7315;
+      background: rgba(250, 115, 21, 0.1);
+    }
     .toolbar-btn svg { width: 16px; height: 16px; }
 
     .send-btn {
@@ -492,6 +497,16 @@
       border-radius: 3px;
       font-family: var(--vscode-editor-font-family);
       font-size: 12px;
+    }
+    .msg-assistant code.file-link {
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 2px;
+    }
+    .msg-assistant code.file-link:hover {
+      background: rgba(250, 115, 21, 0.2);
+      text-decoration-style: solid;
     }
     .code-block-wrapper {
       border: 1px solid rgba(250, 115, 21, 0.15);
@@ -989,6 +1004,115 @@
     .history-item:hover .history-item-delete { opacity: 0.4; }
     .history-item-delete:hover { opacity: 1 !important; background: rgba(255,255,255,0.06); }
     .history-item-delete svg { width: 14px; height: 14px; }
+
+    /* MCP Guide overlay */
+    .mcp-guide-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--vscode-sideBar-background);
+      z-index: 200;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .mcp-guide-overlay.visible { display: flex; }
+    .mcp-guide-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      flex-shrink: 0;
+    }
+    .mcp-guide-header-title {
+      font-weight: 700;
+      font-size: 12px;
+      opacity: 0.85;
+    }
+    .mcp-guide-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+    .mcp-guide-content::-webkit-scrollbar { width: 5px; }
+    .mcp-guide-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+    .mcp-guide-section {
+      margin-bottom: 16px;
+    }
+    .mcp-guide-section-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #FA7315;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .mcp-guide-desc {
+      font-size: 11px;
+      opacity: 0.6;
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+    .mcp-guide-code {
+      background: var(--vscode-textCodeBlock-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-family: var(--vscode-editor-font-family);
+      font-size: 11px;
+      line-height: 1.5;
+      white-space: pre;
+      overflow-x: auto;
+      position: relative;
+    }
+    .mcp-guide-code .copy-guide-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: rgba(250, 115, 21, 0.15);
+      color: #FA7315;
+      border: none;
+      border-radius: 3px;
+      padding: 2px 8px;
+      font-size: 10px;
+      cursor: pointer;
+      opacity: 0.8;
+    }
+    .mcp-guide-code .copy-guide-btn:hover { opacity: 1; }
+    .mcp-guide-note {
+      font-size: 10px;
+      opacity: 0.5;
+      margin-top: 4px;
+      line-height: 1.3;
+    }
+    .mcp-guide-steps {
+      font-size: 11px;
+      line-height: 1.5;
+      opacity: 0.7;
+      padding-left: 16px;
+      margin-bottom: 6px;
+    }
+    .mcp-guide-steps li { margin-bottom: 3px; }
+    .mcp-guide-steps code {
+      background: rgba(250, 115, 21, 0.1);
+      color: #FA7315;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-family: var(--vscode-editor-font-family);
+      font-size: 11px;
+    }
+    .mcp-guide-steps a {
+      color: #FA7315;
+      text-decoration: none;
+    }
+    .mcp-guide-steps a:hover { text-decoration: underline; }
+    .mcp-guide-divider {
+      border: none;
+      border-top: 1px solid var(--vscode-panel-border);
+      margin: 12px 0;
+      opacity: 0.3;
+    }
   </style>
 </head>
 <body>
@@ -1009,16 +1133,23 @@
     </div>
     <div class="settings-panel" id="settingsPanel">
       <div class="settings-title">API kljuc</div>
-      <div class="settings-field">
-        <input type="password" id="settingsApiKey" placeholder="vajb_xxxxxxxxxxxxxxxx" spellcheck="false" autocomplete="off">
-        <button id="settingsApiKeySave" class="settings-save-btn">Sacuvaj</button>
+      <div id="apiKeySavedState" style="display:none;padding:4px 12px 8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:11px;color:#4CAF50;display:flex;align-items:center;gap:4px;">
+            <span style="font-size:13px;">✓</span> Kljuc sacuvan
+          </span>
+          <button id="apiKeyChangeBtn" style="font-size:10px;padding:2px 10px;cursor:pointer;background:transparent;color:var(--vscode-foreground);border:1px solid var(--vscode-panel-border);border-radius:4px;opacity:0.6;">Promeni</button>
+        </div>
       </div>
-      <div class="settings-field-status" id="apiKeyStatus"></div>
-
-      <div class="settings-title" style="margin-top:8px">API URL</div>
-      <div class="settings-field">
-        <input type="text" id="settingsApiUrl" spellcheck="false" autocomplete="off">
-        <button id="settingsApiUrlSave" class="settings-save-btn">Sacuvaj</button>
+      <div id="apiKeyEditState">
+        <div class="settings-field">
+          <input type="password" id="settingsApiKey" placeholder="vajb_xxxxxxxxxxxxxxxx" spellcheck="false" autocomplete="off">
+          <button id="settingsApiKeySave" class="settings-save-btn">Sacuvaj</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:2px;">
+          <div class="settings-field-status" id="apiKeyStatus" style="margin:0;flex:1;"></div>
+          <button id="apiKeyCancelBtn" style="display:none;font-size:10px;padding:2px 8px;cursor:pointer;background:transparent;color:var(--vscode-foreground);border:none;opacity:0.5;text-decoration:underline;">Otkazi</button>
+        </div>
       </div>
 
       <div class="settings-title" style="margin-top:8px">Auto-Approve</div>
@@ -1052,6 +1183,16 @@
           <span class="toggle-track"></span>
         </div>
       </label>
+
+      <div class="settings-title" style="margin-top:8px">MCP Serveri</div>
+      <div id="mcpStatusArea" style="padding:0 12px 6px;font-size:11px;opacity:0.7;">Nema konfigurisanih servera</div>
+      <div style="padding:0 12px 6px;display:flex;gap:6px;flex-wrap:wrap;">
+        <button id="mcpRestartBtn" style="font-size:11px;padding:3px 10px;cursor:pointer;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:4px;">Restartuj</button>
+        <button id="mcpConfigBtn" style="font-size:11px;padding:3px 10px;cursor:pointer;background:transparent;color:#FA7315;border:1px solid #FA7315;border-radius:4px;">Konfiguriši</button>
+        <button id="mcpGuideBtn" style="font-size:11px;padding:3px 10px;cursor:pointer;background:transparent;color:var(--vscode-foreground);border:1px solid var(--vscode-panel-border);border-radius:4px;opacity:0.7;">Kako dodati?</button>
+      </div>
+      <input type="hidden" id="settingsApiUrl">
+      <button id="settingsApiUrlSave" style="display:none;"></button>
     </div>
   </div>
 
@@ -1068,6 +1209,130 @@
     </div>
   </div>
 
+  <!-- MCP Guide overlay -->
+  <div class="mcp-guide-overlay" id="mcpGuideOverlay">
+    <div class="mcp-guide-header">
+      <span class="mcp-guide-header-title">Kako povezati MCP servise</span>
+      <button class="history-close" id="mcpGuideClose">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="mcp-guide-content">
+
+      <div class="mcp-guide-desc" style="margin-bottom:12px;">
+        Otvori fajl <code>.vajbagent/mcp.json</code> u tvom projektu (klikni "Konfiguriši") i dodaj servise koje zelis. Ispod su primeri za svaki servis — kopiraj kod i zameni vrednosti oznacene sa <code>TVOJ_...</code>
+      </div>
+
+      <hr class="mcp-guide-divider">
+
+      <!-- FILESYSTEM -->
+      <div class="mcp-guide-section">
+        <div class="mcp-guide-section-title">📁 File System (pristup fajlovima)</div>
+        <div class="mcp-guide-desc">Daje agentu pristup fajlovima na tvom racunaru. Zameni putanju sa folderom koji zelis.</div>
+        <div class="mcp-guide-code" id="guideFs">"filesystem": {
+  "command": "npx",
+  "args": [
+    "-y",
+    "@modelcontextprotocol/server-filesystem",
+    "TVOJ_FOLDER_PUTANJA"
+  ]
+}<button class="copy-guide-btn" data-target="guideFs">Copy</button></div>
+        <div class="mcp-guide-note">Primer putanje: <code>/Users/ime/Documents</code> ili <code>C:\\Users\\ime\\Documents</code></div>
+      </div>
+
+      <hr class="mcp-guide-divider">
+
+      <!-- SUPABASE -->
+      <div class="mcp-guide-section">
+        <div class="mcp-guide-section-title">⚡ Supabase (baza podataka)</div>
+        <ol class="mcp-guide-steps">
+          <li>Idi na <a href="https://supabase.com/dashboard/account/tokens" target="_blank">supabase.com/dashboard/account/tokens</a></li>
+          <li>Klikni <strong>Generate new token</strong> i kopiraj token</li>
+          <li>Project Ref nadjes u URL-u dashboarda: <code>supabase.com/dashboard/project/<strong>TVOJ_REF</strong></code></li>
+        </ol>
+        <div class="mcp-guide-code" id="guideSupabase">"supabase": {
+  "command": "npx",
+  "args": [
+    "-y",
+    "@supabase/mcp-server-supabase",
+    "--project-ref",
+    "TVOJ_PROJECT_REF"
+  ],
+  "env": {
+    "SUPABASE_ACCESS_TOKEN": "TVOJ_ACCESS_TOKEN"
+  }
+}<button class="copy-guide-btn" data-target="guideSupabase">Copy</button></div>
+        <div class="mcp-guide-note">Dodaj <code>"--read-only"</code> u args ako zelis samo citanje (bez menjanja baze).</div>
+      </div>
+
+      <hr class="mcp-guide-divider">
+
+      <!-- GITHUB -->
+      <div class="mcp-guide-section">
+        <div class="mcp-guide-section-title">🐙 GitHub (repozitorijumi, issues, PR)</div>
+        <ol class="mcp-guide-steps">
+          <li>Idi na <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a></li>
+          <li>Klikni <strong>Generate new token (classic)</strong></li>
+          <li>Ukljuci permisije: <code>repo</code>, <code>read:org</code></li>
+        </ol>
+        <div class="mcp-guide-code" id="guideGithub">"github": {
+  "command": "npx",
+  "args": [
+    "-y",
+    "@modelcontextprotocol/server-github"
+  ],
+  "env": {
+    "GITHUB_PERSONAL_ACCESS_TOKEN": "TVOJ_GITHUB_TOKEN"
+  }
+}<button class="copy-guide-btn" data-target="guideGithub">Copy</button></div>
+      </div>
+
+      <hr class="mcp-guide-divider">
+
+      <!-- NETLIFY -->
+      <div class="mcp-guide-section">
+        <div class="mcp-guide-section-title">🌐 Netlify (deploy, hosting)</div>
+        <ol class="mcp-guide-steps">
+          <li>Idi na <a href="https://app.netlify.com/user/applications#personal-access-tokens" target="_blank">app.netlify.com → User Settings → Applications</a></li>
+          <li>Kreiraj <strong>Personal Access Token</strong></li>
+        </ol>
+        <div class="mcp-guide-code" id="guideNetlify">"netlify": {
+  "command": "npx",
+  "args": ["-y", "@netlify/mcp"],
+  "env": {
+    "NETLIFY_PERSONAL_ACCESS_TOKEN": "TVOJ_NETLIFY_TOKEN"
+  }
+}<button class="copy-guide-btn" data-target="guideNetlify">Copy</button></div>
+      </div>
+
+      <hr class="mcp-guide-divider">
+
+      <!-- VERCEL -->
+      <div class="mcp-guide-section">
+        <div class="mcp-guide-section-title">▲ Vercel (deploy, hosting)</div>
+        <ol class="mcp-guide-steps">
+          <li>Idi na <a href="https://vercel.com/account/tokens" target="_blank">vercel.com/account/tokens</a></li>
+          <li>Kreiraj novi token</li>
+        </ol>
+        <div class="mcp-guide-code" id="guideVercel">"vercel": {
+  "command": "npx",
+  "args": ["-y", "vercel", "mcp", "start"],
+  "env": {
+    "VERCEL_TOKEN": "TVOJ_VERCEL_TOKEN"
+  }
+}<button class="copy-guide-btn" data-target="guideVercel">Copy</button></div>
+      </div>
+
+      <hr class="mcp-guide-divider">
+
+      <div class="mcp-guide-desc" style="margin-top:8px;opacity:0.4;text-align:center;">
+        Posle dodavanja, klikni <strong>Restartuj</strong> u podesavanjima.<br>
+        Svaki servis ce dobiti zelenu tacku kad je spreman.
+      </div>
+
+    </div>
+  </div>
+
   <div class="context-bar" id="contextBar">
     <div class="context-progress"><div class="context-fill" id="contextFill"></div></div>
     <span class="context-label" id="contextLabel">0K / 128K</span>
@@ -1078,6 +1343,14 @@
       <img class="welcome-logo" src="{{logoUri}}" alt="VajbAgent">
       <h3>Pitaj me bilo sta o kodu</h3>
       <p>Citam, pisem, menjam fajlove i pokrecem komande.</p>
+      <div id="welcomeApiHint" style="display:none;margin-top:6px;padding:8px 14px;background:rgba(250,115,21,0.08);border:1px solid rgba(250,115,21,0.25);border-radius:8px;font-size:11px;line-height:1.5;color:var(--vscode-foreground);">
+        <strong style="color:#FA7315;">Prvo podesi API kljuc</strong><br>
+        Klikni na ⚙️ gore desno → unesi svoj API kljuc i sacuvaj.
+      </div>
+      <div style="margin-top:10px;padding:8px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;font-size:11px;line-height:1.5;color:var(--vscode-descriptionForeground);">
+        <strong style="color:var(--vscode-foreground);font-size:11px;">💡 Preporuka</strong><br>
+        Za vece zadatke, ukljuci <strong style="color:#FA7315;">Plan Mode</strong> <span style="opacity:0.5;">(📋 dugme dole)</span> — agent ce prvo napraviti plan i pitati te za odobrenje pre nego sto menja kod.
+      </div>
       <div class="welcome-powered">
         Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski<br>
         Kreirao <strong>Nemanja Lakic</strong>
@@ -1087,6 +1360,10 @@
 
   <div class="input-area">
     <div class="input-container">
+      <div id="planModeBar" style="display:none;padding:5px 12px;font-size:10px;color:#FA7315;background:rgba(250,115,21,0.06);border-bottom:1px solid rgba(250,115,21,0.15);align-items:center;gap:6px;">
+        <span style="font-size:12px;">📋</span> <strong>Plan mode</strong> — agent ce napraviti plan, nece menjati kod
+        <button id="planModeOff" style="margin-left:auto;background:none;border:none;color:var(--vscode-foreground);opacity:0.5;cursor:pointer;font-size:12px;padding:0 4px;">✕</button>
+      </div>
       <div class="image-previews" id="imagePreviews"></div>
       <textarea id="userInput" rows="1" placeholder="Pitaj VajbAgent-a..."></textarea>
       <div class="input-toolbar">
@@ -1096,6 +1373,14 @@
               <rect x="3" y="3" width="18" height="18" rx="3"/>
               <circle cx="8.5" cy="8.5" r="1.5"/>
               <path d="M21 15l-5-5L5 21"/>
+            </svg>
+          </button>
+          <button class="toolbar-btn" id="planModeBtn" title="Plan mode — agent pravi plan pre izmena">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+              <rect x="9" y="3" width="6" height="4" rx="1"/>
+              <line x1="9" y1="12" x2="15" y2="12"/>
+              <line x1="9" y1="16" x2="13" y2="16"/>
             </svg>
           </button>
         </div>
@@ -1153,12 +1438,26 @@
     const settingsPanel = document.getElementById('settingsPanel');
     const settingsApiKey = document.getElementById('settingsApiKey');
     const settingsApiKeySave = document.getElementById('settingsApiKeySave');
+    const apiKeySavedState = document.getElementById('apiKeySavedState');
+    const apiKeyEditState = document.getElementById('apiKeyEditState');
+    const apiKeyChangeBtn = document.getElementById('apiKeyChangeBtn');
+    const apiKeyCancelBtn = document.getElementById('apiKeyCancelBtn');
     const settingsApiUrl = document.getElementById('settingsApiUrl');
     const settingsApiUrlSave = document.getElementById('settingsApiUrlSave');
     const apiKeyStatus = document.getElementById('apiKeyStatus');
     const autoWriteFile = document.getElementById('autoWriteFile');
     const autoReplaceInFile = document.getElementById('autoReplaceInFile');
     const autoExecuteCommand = document.getElementById('autoExecuteCommand');
+    const mcpStatusArea = document.getElementById('mcpStatusArea');
+    const mcpRestartBtn = document.getElementById('mcpRestartBtn');
+    const mcpConfigBtn = document.getElementById('mcpConfigBtn');
+    const mcpGuideBtn = document.getElementById('mcpGuideBtn');
+    const mcpGuideOverlay = document.getElementById('mcpGuideOverlay');
+    const mcpGuideClose = document.getElementById('mcpGuideClose');
+    const planModeBtn = document.getElementById('planModeBtn');
+    const planModeBar = document.getElementById('planModeBar');
+    const planModeOff = document.getElementById('planModeOff');
+    let planModeActive = false;
 
     let isStreaming = false;
     let pendingImages = [];
@@ -1224,15 +1523,106 @@
       vscode.postMessage({ type: 'setAutoApprove', key: 'executeCommand', value: autoExecuteCommand.checked });
     });
 
+    function renderMcpStatus(servers, totalTools, loading) {
+      if (loading) {
+        mcpStatusArea.textContent = 'Pokrecem MCP servere...';
+        return;
+      }
+      if (!servers || servers.length === 0) {
+        mcpStatusArea.textContent = 'Nema konfigurisanih servera';
+        return;
+      }
+      const lines = servers.map(s => {
+        const dot = s.ready ? '🟢' : '🔴';
+        let line = dot + ' ' + s.name;
+        if (s.ready) line += ' (' + s.toolCount + ' tools)';
+        if (s.error) line += ' — ' + s.error;
+        return line;
+      });
+      if (totalTools > 0) lines.push('Ukupno: ' + totalTools + ' MCP tools');
+      mcpStatusArea.textContent = lines.join('\n');
+      mcpStatusArea.style.whiteSpace = 'pre-line';
+    }
+
+    mcpRestartBtn.onclick = function() {
+      mcpStatusArea.textContent = 'Pokrecem MCP servere...';
+      mcpRestartBtn.disabled = true;
+      mcpRestartBtn.textContent = '...';
+      vscode.postMessage({ type: 'restartMcp' });
+      setTimeout(() => {
+        mcpRestartBtn.disabled = false;
+        mcpRestartBtn.textContent = 'Restartuj';
+      }, 15000);
+    };
+
+    mcpConfigBtn.onclick = function() {
+      vscode.postMessage({ type: 'openMcpSettings' });
+    };
+
+    mcpGuideBtn.onclick = function() {
+      settingsPanel.classList.remove('open');
+      mcpGuideOverlay.classList.add('visible');
+    };
+    mcpGuideClose.onclick = function() {
+      mcpGuideOverlay.classList.remove('visible');
+    };
+
+    function togglePlanMode(on) {
+      planModeActive = on;
+      planModeBtn.classList.toggle('active', on);
+      planModeBar.style.display = on ? 'flex' : 'none';
+      if (on) {
+        userInput.placeholder = 'Opisi sta zelis da se uradi...';
+      } else {
+        userInput.placeholder = 'Pitaj VajbAgent-a...';
+      }
+    }
+
+    planModeBtn.onclick = function() {
+      togglePlanMode(!planModeActive);
+    };
+
+    planModeOff.onclick = function() {
+      togglePlanMode(false);
+    };
+
+    document.querySelectorAll('.copy-guide-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = document.getElementById(btn.dataset.target);
+        if (!target) return;
+        const text = target.textContent.replace('Copy', '').replace('Copied!', '').trim();
+        navigator.clipboard.writeText(text);
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+      });
+    });
+
+    let hadSavedKey = false;
+    function showApiKeySaved() {
+      hadSavedKey = true;
+      apiKeySavedState.style.display = 'block';
+      apiKeyEditState.style.display = 'none';
+      apiKeyCancelBtn.style.display = 'none';
+    }
+    function showApiKeyEdit() {
+      apiKeySavedState.style.display = 'none';
+      apiKeyEditState.style.display = 'block';
+      apiKeyCancelBtn.style.display = hadSavedKey ? 'inline' : 'none';
+      settingsApiKey.value = '';
+      settingsApiKey.placeholder = 'vajb_xxxxxxxxxxxxxxxx';
+      apiKeyStatus.textContent = '';
+      settingsApiKey.focus();
+    }
+
+    apiKeyChangeBtn.addEventListener('click', showApiKeyEdit);
+    apiKeyCancelBtn.addEventListener('click', showApiKeySaved);
+
     settingsApiKeySave.addEventListener('click', () => {
       const key = settingsApiKey.value.trim();
       if (!key) return;
       vscode.postMessage({ type: 'setApiKey', key });
       settingsApiKey.value = '';
-      settingsApiKey.placeholder = '••••••••••••••••';
-      apiKeyStatus.textContent = 'Kljuc sacuvan!';
-      apiKeyStatus.style.color = '#FA7315';
-      setTimeout(() => { apiKeyStatus.style.color = '#4CAF50'; apiKeyStatus.textContent = 'Kljuc sacuvan'; }, 2000);
+      showApiKeySaved();
     });
 
     settingsApiUrlSave.addEventListener('click', () => {
@@ -1323,7 +1713,7 @@
       document.querySelectorAll('.welcome-msg').forEach(el => el.remove());
 
       if (text) {
-        addMessageBubble('user', text);
+        addMessageBubble('user', planModeActive ? '📋 [Plan] ' + text : text);
       }
       pendingImages.forEach(img => {
         const el = document.createElement('div');
@@ -1332,9 +1722,15 @@
         messagesEl.appendChild(el);
       });
 
+      let sendText = text;
+      if (planModeActive) {
+        sendText = '[PLAN MODE] Korisnik zeli SAMO plan. NE menjaj kod, NE koristi write_file ili replace_in_file za kod. Umesto toga:\n1. Istrazi projekat sa list_files i read_file da razumes trenutno stanje.\n2. Napravi detaljan plan korak po korak.\n3. Sacuvaj plan u .vajbagent/PLAN.md koristeci write_file.\n4. Prikazi plan korisniku i pitaj da li zeli da ga izvrsis.\n5. Odgovaraj na ISTOM JEZIKU kojim korisnik pise.\n\nZahtev korisnika: ' + text;
+        togglePlanMode(false);
+      }
+
       vscode.postMessage({
         type: 'sendMessage',
-        text,
+        text: sendText,
         images: pendingImages.map(i => ({ base64: i.base64, mimeType: i.type })),
       });
 
@@ -1411,10 +1807,17 @@
           }
           if (msg.apiUrl) settingsApiUrl.value = msg.apiUrl;
           if (msg.hasApiKey) {
-            apiKeyStatus.textContent = 'Kljuc sacuvan';
-            apiKeyStatus.style.color = '#4CAF50';
-            settingsApiKey.placeholder = '••••••••••••••••';
+            showApiKeySaved();
+          } else {
+            showApiKeyEdit();
+            const hint = document.getElementById('welcomeApiHint');
+            if (hint) hint.style.display = 'block';
           }
+          renderMcpStatus(msg.mcpServers, msg.mcpTotalTools, false);
+          break;
+
+        case 'mcpStatus':
+          renderMcpStatus(msg.servers, msg.totalTools, msg.loading || false);
           break;
 
         case 'newSession': {
@@ -1486,7 +1889,14 @@
               case 'search_files':    return { label: 'Pretrazujem', detail: parsedArgs.pattern ? '"' + parsedArgs.pattern + '"' : '' };
               case 'execute_command': return { label: 'Pokrecem', detail: (parsedArgs.command || '').substring(0, 60) };
               case 'fetch_url':       return { label: 'Ucitavam', detail: (parsedArgs.url || '').substring(0, 50) };
-              default:                return { label: msg.name, detail: '' };
+              case 'web_search':     return { label: 'Pretrazujem web', detail: parsedArgs.query ? '"' + parsedArgs.query + '"' : '' };
+              default: {
+                if (msg.name && msg.name.startsWith('mcp_')) {
+                  const parts = msg.name.match(/^mcp_([^_]+)_(.+)$/);
+                  if (parts) return { label: 'MCP: ' + parts[1], detail: parts[2] };
+                }
+                return { label: msg.name, detail: '' };
+              }
             }
           })();
           const statusLabel = toolDetail.detail
@@ -1803,8 +2213,13 @@
       html = html.replace(/^_{3,}$/gm, '<hr>');
       html = html.replace(/^\*{3,}$/gm, '<hr>');
 
-      // Inline code
-      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+      // Inline code — make file paths clickable
+      html = html.replace(/`([^`]+)`/g, function(match, content) {
+        if (/^[.\w\-\/\\]+\.\w{1,10}$/.test(content) || /^\.?[\w\-]+\//.test(content)) {
+          return '<code class="file-link" data-path="' + content + '">' + content + '</code>';
+        }
+        return '<code>' + content + '</code>';
+      });
 
       // Headers (order matters — longest prefix first)
       html = html.replace(/^##### (.+)$/gm, '<h5>$1</h5>');
@@ -1865,6 +2280,11 @@
           setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
         });
         header.appendChild(btn);
+      });
+      container.querySelectorAll('code.file-link').forEach(el => {
+        el.addEventListener('click', () => {
+          vscode.postMessage({ type: 'openFile', path: el.dataset.path });
+        });
       });
     }
 

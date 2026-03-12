@@ -3,6 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { exec } from 'child_process';
 import { getAutoApprove } from './settings';
+import https from 'https';
+import http from 'http';
 
 export interface ToolCallResult {
   success: boolean;
@@ -13,9 +15,14 @@ type ApprovalCallback = (accepted: boolean) => void;
 let _postMessage: ((msg: unknown) => void) | null = null;
 let _pendingDiffResolve: ApprovalCallback | null = null;
 let _pendingCommandResolve: ApprovalCallback | null = null;
+let _apiCredentials: { apiUrl: string; apiKey: string } | null = null;
 
 export function setPostMessage(fn: (msg: unknown) => void) {
   _postMessage = fn;
+}
+
+export function setApiCredentials(apiUrl: string, apiKey: string) {
+  _apiCredentials = { apiUrl, apiKey };
 }
 
 export function handleDiffResponse(accepted: boolean) {
@@ -185,6 +192,21 @@ export const TOOL_DEFINITIONS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'web_search',
+      description: 'Search the internet for current information. Use for latest docs, library versions, error messages, APIs, news, or anything that may have changed after your training. Returns a summary answer and top search results with URLs.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'The search query' },
+          max_results: { type: 'integer', description: 'Max number of results (1-10, default 5)' },
+        },
+        required: ['query'],
+      },
+    },
+  },
 ];
 
 export async function executeTool(
@@ -206,6 +228,8 @@ export async function executeTool(
       return toolExecuteCommand(args);
     case 'fetch_url':
       return toolFetchUrl(args);
+    case 'web_search':
+      return toolWebSearch(args);
     default:
       return { success: false, output: `Unknown tool: ${name}` };
   }
@@ -521,5 +545,99 @@ async function toolFetchUrl(args: Record<string, unknown>): Promise<ToolCallResu
     });
   } catch (err: unknown) {
     return { success: false, output: `Invalid URL or fetch error: ${(err as Error).message}` };
+  }
+}
+
+// ── web_search ──
+async function toolWebSearch(args: Record<string, unknown>): Promise<ToolCallResult> {
+  const query = args.query as string;
+  const maxResults = args.max_results as number | undefined;
+
+  if (!query || query.trim().length < 2) {
+    return { success: false, output: 'Search query is required (min 2 characters).' };
+  }
+
+  if (!_apiCredentials) {
+    return { success: false, output: 'API credentials not configured for web search.' };
+  }
+
+  const { apiUrl, apiKey } = _apiCredentials;
+
+  try {
+    const body = JSON.stringify({
+      query: query.trim(),
+      max_results: maxResults || 5,
+      include_answer: true,
+    });
+
+    const url = new URL(`${apiUrl}/v1/web-search`);
+    const isHttps = url.protocol === 'https:';
+    const transport = isHttps ? https : http;
+
+    const result = await new Promise<string>((resolve, reject) => {
+      const req = transport.request(
+        {
+          hostname: url.hostname,
+          port: url.port || (isHttps ? 443 : 80),
+          path: url.pathname,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          timeout: 20000,
+        },
+        (res) => {
+          let data = '';
+          res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+          res.on('end', () => {
+            if (res.statusCode && res.statusCode >= 400) {
+              try {
+                const err = JSON.parse(data);
+                reject(new Error(err.error?.message || `HTTP ${res.statusCode}`));
+              } catch {
+                reject(new Error(`HTTP ${res.statusCode}`));
+              }
+              return;
+            }
+            resolve(data);
+          });
+        }
+      );
+
+      req.on('error', (err: Error) => reject(err));
+      req.on('timeout', () => { req.destroy(); reject(new Error('Search request timed out')); });
+      req.write(body);
+      req.end();
+    });
+
+    const parsed = JSON.parse(result);
+    const lines: string[] = [];
+
+    lines.push(`Search: "${parsed.query}"`);
+    lines.push('');
+
+    if (parsed.answer) {
+      lines.push('## Answer');
+      lines.push(parsed.answer);
+      lines.push('');
+    }
+
+    if (parsed.results && parsed.results.length > 0) {
+      lines.push(`## Results (${parsed.results.length})`);
+      lines.push('');
+      for (const r of parsed.results) {
+        lines.push(`### ${r.title}`);
+        lines.push(`URL: ${r.url}`);
+        if (r.content) {
+          lines.push(r.content);
+        }
+        lines.push('');
+      }
+    }
+
+    return { success: true, output: lines.join('\n') };
+  } catch (err: unknown) {
+    return { success: false, output: `Web search error: ${(err as Error).message}` };
   }
 }

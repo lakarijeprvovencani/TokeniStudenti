@@ -2,7 +2,7 @@
   "name": "vajbagent",
   "displayName": "VajbAgent",
   "description": "AI coding assistant za studente — koristi native tool calling za minimalan overhead",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "publisher": "vajbagent",
   "engines": {
     "vscode": "^1.85.0"
