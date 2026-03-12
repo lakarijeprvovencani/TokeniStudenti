@@ -149,9 +149,6 @@ export async function addStudent(name, email) {
   if (students.some(s => s.email && s.email.toLowerCase() === cleanEmail)) {
     return { error: 'Nalog sa ovim emailom već postoji.' };
   }
-  if (students.some(s => s.name.toLowerCase() === trimmed.toLowerCase())) {
-    return { error: `Student "${trimmed}" već postoji.` };
-  }
 
   const key = generateKey(trimmed);
   const student = {
