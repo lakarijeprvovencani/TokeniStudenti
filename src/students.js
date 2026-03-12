@@ -117,18 +117,37 @@ export async function findByKey(key) {
   return students.find(s => s.key === key) || null;
 }
 
-export async function addStudent(name) {
+export async function findByEmail(email) {
+  if (!email) return null;
+  const students = await readStudents();
+  return students.find(s => s.email && s.email.toLowerCase() === email.toLowerCase()) || null;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export async function addStudent(name, email) {
   if (!name || typeof name !== 'string' || name.trim().length < 2) {
     return { error: 'Ime mora imati najmanje 2 karaktera.' };
   }
   if (name.length > 100) {
     return { error: 'Ime ne može biti duže od 100 karaktera.' };
   }
+  if (!email || typeof email !== 'string' || !EMAIL_RE.test(email.trim())) {
+    return { error: 'Unesite ispravnu email adresu.' };
+  }
+  if (email.length > 100) {
+    return { error: 'Email ne može biti duži od 100 karaktera.' };
+  }
+
+  const cleanEmail = email.trim().toLowerCase().replace(/[<>"'&;]/g, '');
   const students = await readStudents();
   const trimmed = name.trim().replace(/[<>"'&;]/g, '');
 
   if (students.length >= MAX_STUDENTS) {
     return { error: `Maksimalan broj korisnika dostignut (${MAX_STUDENTS}).` };
+  }
+  if (students.some(s => s.email && s.email.toLowerCase() === cleanEmail)) {
+    return { error: 'Nalog sa ovim emailom već postoji.' };
   }
   if (students.some(s => s.name.toLowerCase() === trimmed.toLowerCase())) {
     return { error: `Student "${trimmed}" već postoji.` };
@@ -137,6 +156,7 @@ export async function addStudent(name) {
   const key = generateKey(trimmed);
   const student = {
     name: trimmed,
+    email: cleanEmail,
     key,
     created: new Date().toISOString(),
     active: true,

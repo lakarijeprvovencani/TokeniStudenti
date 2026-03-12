@@ -203,7 +203,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <input type="password" id="keyIn" placeholder="Tvoj API ključ" autocomplete="off">
       <button onclick="doLogin()">Pristupi</button>
       <div class="login-err" id="loginErr">Neispravan ključ</div>
-      <div style="text-align:center;margin-top:16px"><button type="button" class="link-btn" onclick="openKeyModal()">Zaboravio si ključ?</button></div>
+      <div style="text-align:center;margin-top:16px"><a href="#" onclick="openKeyModal();return false" style="font-size:.78rem;color:var(--text3);text-decoration:underline;text-underline-offset:3px;cursor:pointer;">Zaboravio si ključ?</a></div>
     </div>
     <div id="registerForm" style="display:none">
       <div style="text-align:center">
@@ -214,6 +214,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
         <input type="text" id="regFirstName" placeholder="Ime" autocomplete="given-name">
         <input type="text" id="regLastName" placeholder="Prezime" autocomplete="family-name">
       </div>
+      <input type="email" id="regEmail" placeholder="Email adresa" autocomplete="email" style="width:100%;padding:10px 14px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:rgba(255,255,255,0.05);color:#fff;font-size:14px;margin-top:2px;box-sizing:border-box;">
       <input type="text" name="website" id="regHoneypot" class="reg-hp" tabindex="-1" autocomplete="off">
       <button id="regBtn" onclick="doRegister()" disabled>Napravi nalog</button>
       <div class="login-err" id="regErr"></div>
@@ -225,9 +226,14 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 <!-- Modal: Zaboravio si ključ? -->
 <div class="modal-overlay" id="keyModal" onclick="if(event.target===this) closeKeyModal()">
   <div class="modal-box">
-    <p>Ukoliko ti je potreban tvoj API ključ, kontaktiraj nas putem emaila. Odgovaramo u roku od nekoliko sati.</p>
-    <p><a href="mailto:info@vajbkodiranje.com">info@vajbkodiranje.com</a></p>
-    <button type="button" class="modal-close" onclick="closeKeyModal()">U redu</button>
+    <p style="margin-bottom:12px"><strong>Zaboravio si API ključ?</strong></p>
+    <p style="font-size:13px;color:#999;margin-bottom:14px;">Unesite email koji ste koristili pri registraciji. Poslaćemo vam ključ na tu adresu.</p>
+    <input type="email" id="recoveryEmail" placeholder="Tvoj email" autocomplete="email" style="width:100%;padding:10px 14px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:rgba(255,255,255,0.05);color:#fff;font-size:14px;box-sizing:border-box;">
+    <div id="recoveryMsg" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:13px;"></div>
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button type="button" onclick="doRecoverKey()" id="recoveryBtn" style="flex:1;padding:10px;border:none;border-radius:8px;background:#FA7315;color:#fff;font-weight:600;cursor:pointer;">Pošalji mi ključ</button>
+      <button type="button" class="modal-close" onclick="closeKeyModal()" style="flex:0;padding:10px 18px;">Zatvori</button>
+    </div>
   </div>
 </div>
 
@@ -513,8 +519,9 @@ function resetRegBtn(){
 function onRegFieldInput(){
   const fn=$('regFirstName').value.trim();
   const ln=$('regLastName').value.trim();
+  const em=$('regEmail').value.trim();
   const btn=$('regBtn');
-  if(fn.length<2||ln.length<2){
+  if(fn.length<2||ln.length<2||!em||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){
     clearInterval(regCountdownTimer);regCountdownTimer=null;regBtnReady=false;
     btn.disabled=true;btn.textContent='Napravi nalog';
     return;
@@ -530,19 +537,22 @@ function onRegFieldInput(){
 }
 $('regFirstName').addEventListener('input',onRegFieldInput);
 $('regLastName').addEventListener('input',onRegFieldInput);
+$('regEmail').addEventListener('input',onRegFieldInput);
 
 function doRegister(){
   if(!regBtnReady)return;
   const fn=$('regFirstName').value.trim();
   const ln=$('regLastName').value.trim();
+  const em=$('regEmail').value.trim();
   const hp=$('regHoneypot').value;
   const err=$('regErr');
   const btn=$('regBtn');
   err.style.display='none';
   if(!fn||fn.length<2){err.textContent='Ime mora imati najmanje 2 karaktera.';err.style.display='block';return}
   if(!ln||ln.length<2){err.textContent='Prezime mora imati najmanje 2 karaktera.';err.style.display='block';return}
+  if(!em||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){err.textContent='Unesite ispravnu email adresu.';err.style.display='block';return}
   btn.disabled=true;btn.textContent='Kreiranje...';
-  fetch('/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({first_name:fn,last_name:ln,honeypot:hp,token:regToken})})
+  fetch('/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({first_name:fn,last_name:ln,email:em,honeypot:hp,token:regToken})})
     .then(r=>r.json().then(d=>({ok:r.ok,data:d})))
     .then(({ok,data})=>{
       if(!ok){
@@ -561,7 +571,8 @@ function doRegister(){
     });
 }
 $('regFirstName').addEventListener('keydown',e=>{if(e.key==='Enter')$('regLastName').focus()});
-$('regLastName').addEventListener('keydown',e=>{if(e.key==='Enter'&&regBtnReady)doRegister()});
+$('regLastName').addEventListener('keydown',e=>{if(e.key==='Enter')$('regEmail').focus()});
+$('regEmail').addEventListener('keydown',e=>{if(e.key==='Enter'&&regBtnReady)doRegister()});
 
 function doLogout(){localStorage.removeItem('vajb_key');apiKey='';showLogin();$('keyIn').value='';$('loginErr').style.display='none'}
 
@@ -628,9 +639,21 @@ function render(d){
 }
 
 function closeBanner(id){$(id).style.display='none';history.replaceState(null,'','/dashboard')}
-function openKeyModal(){$('keyModal').classList.add('show');document.body.style.overflow='hidden'}
+function openKeyModal(){$('keyModal').classList.add('show');document.body.style.overflow='hidden';$('recoveryEmail').value='';$('recoveryMsg').style.display='none';$('recoveryBtn').disabled=false;$('recoveryBtn').textContent='Pošalji mi ključ'}
 function closeKeyModal(){$('keyModal').classList.remove('show');document.body.style.overflow=''}
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeKeyModal()});
+function doRecoverKey(){
+  const em=$('recoveryEmail').value.trim();
+  const msg=$('recoveryMsg');
+  const btn=$('recoveryBtn');
+  if(!em||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){msg.textContent='Unesite ispravnu email adresu.';msg.style.display='block';msg.style.background='rgba(239,68,68,0.1)';msg.style.color='#ef4444';return}
+  btn.disabled=true;btn.textContent='Slanje...';
+  fetch('/recover-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:em})})
+    .then(r=>r.json())
+    .then(data=>{msg.textContent=data.message||'Proverite inbox.';msg.style.display='block';msg.style.background='rgba(34,197,94,0.1)';msg.style.color='#22c55e';btn.textContent='Poslato!'})
+    .catch(()=>{msg.textContent='Greška. Pokušajte ponovo.';msg.style.display='block';msg.style.background='rgba(239,68,68,0.1)';msg.style.color='#ef4444';btn.disabled=false;btn.textContent='Pošalji mi ključ'});
+}
+$('recoveryEmail').addEventListener('keydown',function(e){if(e.key==='Enter')doRecoverKey()});
 (function(){
   const p=new URLSearchParams(location.search);
   if(p.get('status')==='success'||p.get('paid')==='1')$('payOk').style.display='flex';

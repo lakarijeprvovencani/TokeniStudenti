@@ -21,7 +21,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { logUsage, getUsageSummary, getUsageForKey, getModelStats } from './usage.js';
 import { getBalance, deductBalance, costUsd, addBalance, getTotalDeposited, loadStudentMarkupFlags, setStudentNoMarkup, getStudentMarkup, providerCostUsd } from './balance.js';
-import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, toggleStudentMarkup, findByKey, canRegisterFromIP, trackRegistrationIP } from './students.js';
+import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP } from './students.js';
+import { sendWelcomeEmail, sendRecoveryEmail, isEmailConfigured } from './email.js';
 
 await seedFromEnv();
 
@@ -562,7 +563,7 @@ app.get('/register/token', registerLimiter, (_req, res) => {
 });
 
 app.post('/register', registerLimiter, async (req, res) => {
-  const { first_name, last_name, honeypot, token } = req.body || {};
+  const { first_name, last_name, email, honeypot, token } = req.body || {};
 
   if (honeypot) {
     return res.status(400).json({ error: 'Neispravan zahtev.' });
@@ -595,9 +596,15 @@ app.post('/register', registerLimiter, async (req, res) => {
   if (first_name.length > 50 || last_name.length > 50) {
     return res.status(400).json({ error: 'Ime i prezime ne mogu biti duži od 50 karaktera.' });
   }
+  if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    return res.status(400).json({ error: 'Unesite ispravnu email adresu.' });
+  }
+  if (email.length > 100) {
+    return res.status(400).json({ error: 'Email ne može biti duži od 100 karaktera.' });
+  }
 
   const fullName = first_name.trim() + ' ' + last_name.trim();
-  const result = await addStudent(fullName);
+  const result = await addStudent(fullName, email.trim());
   if (result.error) {
     return res.status(400).json({ error: result.error });
   }
@@ -607,10 +614,14 @@ app.post('/register', registerLimiter, async (req, res) => {
   }
 
   await trackRegistrationIP(clientIP);
-  console.log(`Self-registration: "${fullName}" → key ${result.student.key.slice(0, 12)}... [IP: ${clientIP}]`);
+  console.log(`Self-registration: "${fullName}" <${result.student.email}> → key ${result.student.key.slice(0, 12)}... [IP: ${clientIP}]`);
+
+  // Send welcome email with API key (async, don't block response)
+  sendWelcomeEmail(result.student).catch(err => console.error('Welcome email failed:', err.message));
 
   res.json({
     name: result.student.name,
+    email: result.student.email,
     key: result.student.key,
     balance_usd: await getBalance(result.student.key),
   });
@@ -1133,6 +1144,38 @@ app.post('/create-checkout', authLimiter, requireStudentAuth, async (req, res) =
   }
 });
 
+// ---- Key recovery via email ----
+const recoveryLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { trustProxy: false },
+  handler: (_req, res) => res.status(429).json({ error: 'Previše zahteva. Pokušaj ponovo za sat vremena.' }),
+});
+
+app.post('/recover-key', recoveryLimiter, async (req, res) => {
+  const { email } = req.body || {};
+  if (!email || typeof email !== 'string' || email.trim().length < 5) {
+    return res.status(400).json({ error: 'Unesite email adresu.' });
+  }
+
+  const genericMsg = 'Ako ovaj email postoji u sistemu, poslali smo API ključ na tu adresu. Proveri inbox i spam folder.';
+
+  if (!isEmailConfigured()) {
+    console.warn('Recovery requested but RESEND_API_KEY not configured');
+    return res.json({ message: genericMsg });
+  }
+
+  const student = await findByEmail(email.trim());
+  if (student) {
+    sendRecoveryEmail(student).catch(err => console.error('Recovery email failed:', err.message));
+    console.log(`Key recovery sent to ${email.trim().slice(0, 3)}***`);
+  }
+
+  res.json({ message: genericMsg });
+});
+
 // ---- Admin: add credits ----
 app.post('/admin/add-credits', adminLimiter, async (req, res) => {
   const secret = req.headers['x-admin-secret'] || req.body?.admin_secret;
@@ -1170,8 +1213,8 @@ app.get('/admin/students', adminLimiter, requireAdmin, async (_req, res) => {
 });
 
 app.post('/admin/students', adminLimiter, requireAdmin, async (req, res) => {
-  const { name, initial_balance } = req.body || {};
-  const result = await addStudent(name);
+  const { name, email, initial_balance } = req.body || {};
+  const result = await addStudent(name, email || `admin-${Date.now()}@internal`);
   if (result.error) return res.status(400).json({ error: result.error });
   const bal = Number(initial_balance);
   if (Number.isFinite(bal) && bal > 0) {
@@ -1212,6 +1255,15 @@ app.patch('/admin/students/:key/markup', adminLimiter, requireAdmin, async (req,
   setStudentNoMarkup(req.params.key, noMarkup);
   
   res.json(result.student);
+});
+
+// ---- Admin: email list export ----
+app.get('/admin/emails', adminLimiter, requireAdmin, async (_req, res) => {
+  const allStudents = await getAllStudents();
+  const emails = allStudents
+    .filter(s => s.email && s.active)
+    .map(s => ({ name: s.name, email: s.email }));
+  res.json({ count: emails.length, emails });
 });
 
 // ---- Admin usage ----
