@@ -212,7 +212,14 @@ export function providerCostUsd(inputTokens, outputTokens, model) {
 
 export const anthropicCostUsd = providerCostUsd;
 
-export function getStudentMarkup() {
+export function getStudentMarkup(model) {
+  if (model && (model.includes('claude') || model.includes('anthropic'))) {
+    const a = parseFloat(process.env.ANTHROPIC_MARKUP);
+    if (Number.isFinite(a) && a >= 1) return a;
+  } else if (model) {
+    const o = parseFloat(process.env.OPENAI_MARKUP);
+    if (Number.isFinite(o) && o >= 1) return o;
+  }
   const v = parseFloat(process.env.STUDENT_MARKUP);
   return Number.isFinite(v) && v >= 1 ? v : 1;
 }
@@ -239,9 +246,8 @@ export function loadStudentMarkupFlags(students) {
 
 export function costUsd(inputTokens, outputTokens, model, keyId = null) {
   const raw = providerCostUsd(inputTokens, outputTokens, model);
-  // If student has noMarkup flag, charge only provider cost
   if (keyId && getStudentNoMarkup(keyId)) {
     return Math.round(raw * 1e6) / 1e6;
   }
-  return Math.round(raw * getStudentMarkup() * 1e6) / 1e6;
+  return Math.round(raw * getStudentMarkup(model) * 1e6) / 1e6;
 }

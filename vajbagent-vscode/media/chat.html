@@ -166,37 +166,88 @@
 
     .welcome-msg {
       text-align: center;
-      padding: 20px;
+      padding: 24px 16px 16px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 12px;
+      gap: 0;
       flex: 1;
       min-height: 0;
     }
-    .welcome-logo {
-      width: 120px;
-      height: auto;
-      opacity: 0.85;
-      margin-bottom: 4px;
+    .welcome-brand {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
     }
+    .welcome-brand .v { color: #FA7315; }
     .welcome-msg h3 {
-      font-size: 14px;
-      font-weight: 600;
-      opacity: 0.7;
-      margin: 0;
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0.5;
+      margin: 0 0 20px;
     }
-    .welcome-msg p {
-      font-size: 12px;
-      line-height: 1.4;
-      opacity: 0.45;
-      margin: 0;
+    .welcome-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      width: 100%;
+      max-width: 340px;
+      margin-bottom: 14px;
+    }
+    .welcome-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+      padding: 12px 10px;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .welcome-card:hover {
+      border-color: rgba(250,115,21,0.3);
+      background: rgba(250,115,21,0.04);
+    }
+    .welcome-card-icon {
+      font-size: 16px;
+      margin-bottom: 6px;
+    }
+    .welcome-card-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--vscode-foreground);
+      margin-bottom: 2px;
+    }
+    .welcome-card-desc {
+      font-size: 10px;
+      opacity: 0.4;
+      line-height: 1.35;
+    }
+    .welcome-hint {
+      width: 100%;
+      max-width: 340px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 11px;
+      line-height: 1.5;
+      text-align: left;
+    }
+    .welcome-hint-api {
+      background: rgba(250,115,21,0.06);
+      border: 1px solid rgba(250,115,21,0.2);
+      color: var(--vscode-foreground);
+    }
+    .welcome-hint-tip {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+      color: var(--vscode-descriptionForeground);
+      margin-top: 8px;
     }
     .welcome-powered {
       font-size: 10px;
-      opacity: 0.3;
-      margin-top: 8px;
+      opacity: 0.25;
+      margin-top: 16px;
       line-height: 1.5;
     }
     .welcome-powered strong {
@@ -284,7 +335,6 @@
     }
     .tool-body.open { display: block; }
 
-    /* Typing indicator */
     /* Status indicator */
     .status-indicator {
       align-self: flex-start;
@@ -296,18 +346,30 @@
       color: var(--vscode-foreground);
       opacity: 0.7;
       flex-shrink: 0;
+      transition: opacity 0.2s;
     }
-    .status-spinner {
-      width: 14px;
-      height: 14px;
-      border: 2px solid #FA7315;
-      border-top-color: transparent;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+    .status-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
       flex-shrink: 0;
+      font-size: 13px;
+      line-height: 1;
+    }
+    .status-icon.spin svg {
+      animation: spin 0.8s linear infinite;
+    }
+    .status-icon.pulse {
+      animation: pulse 1.5s ease-in-out infinite;
     }
     @keyframes spin {
       to { transform: rotate(360deg); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
     }
     .status-text {
       white-space: nowrap;
@@ -1005,6 +1067,72 @@
     .history-item-delete:hover { opacity: 1 !important; background: rgba(255,255,255,0.06); }
     .history-item-delete svg { width: 14px; height: 14px; }
 
+    /* Usage guide overlay */
+    .guide-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--vscode-sideBar-background);
+      z-index: 200;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .guide-overlay.visible { display: flex; }
+    .guide-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      flex-shrink: 0;
+    }
+    .guide-header-title {
+      font-weight: 700;
+      font-size: 12px;
+      opacity: 0.85;
+    }
+    .guide-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 12px;
+    }
+    .guide-content::-webkit-scrollbar { width: 5px; }
+    .guide-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+    .guide-section {
+      display: flex;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .guide-section:last-of-type { border-bottom: none; }
+    .guide-section-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+      width: 28px;
+      text-align: center;
+      padding-top: 1px;
+    }
+    .guide-section-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--vscode-foreground);
+      margin-bottom: 3px;
+    }
+    .guide-section-desc {
+      font-size: 11px;
+      opacity: 0.6;
+      line-height: 1.5;
+    }
+    .guide-section-desc strong {
+      opacity: 1;
+      color: var(--vscode-foreground);
+    }
+    .guide-footer {
+      text-align: center;
+      padding: 14px 0 6px;
+      font-size: 10px;
+    }
+
     /* MCP Guide overlay */
     .mcp-guide-overlay {
       display: none;
@@ -1123,6 +1251,9 @@
     <div class="header-actions">
       <button class="icon-btn" id="settingsBtn" title="Podesavanja">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </button>
+      <button class="icon-btn" id="guideBtn" title="Vodic za koriscenje">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       </button>
       <button class="icon-btn" id="historyBtn" title="Istorija chatova">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -1333,6 +1464,89 @@
     </div>
   </div>
 
+  <!-- Usage guide overlay -->
+  <div class="guide-overlay" id="guideOverlay">
+    <div class="guide-header">
+      <span class="guide-header-title">Kako koristiti VajbAgent</span>
+      <button class="history-close" id="guideClose">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="guide-content">
+
+      <div class="guide-section">
+        <div class="guide-section-icon">🎯</div>
+        <div>
+          <div class="guide-section-title">Budi konkretan</div>
+          <div class="guide-section-desc">Umesto "napravi mi sajt", reci "napravi mi landing page sa hero sekcijom, tamnom temom i kontakt formom". Sto preciznije opises — bolji rezultat dobijes.</div>
+        </div>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-section-icon">📋</div>
+        <div>
+          <div class="guide-section-title">Plan Mode za velike zadatke</div>
+          <div class="guide-section-desc">Kad imas kompleksan zadatak (cela aplikacija, refaktor, integracija), ukljuci <strong style="color:#FA7315;">Plan Mode</strong> (dugme dole levo). Agent ce prvo napraviti detaljan plan i sacekati tvoje odobrenje pre nego sto menja kod.</div>
+        </div>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-section-icon">🧠</div>
+        <div>
+          <div class="guide-section-title">Izbor modela</div>
+          <div class="guide-section-desc">
+            <strong style="color:#4FC3F7;">Lite</strong> — brz i jeftin, idealan za svakodnevno kodiranje i brza pitanja.<br>
+            <strong style="color:#4FC3F7;">Turbo</strong> — reasoning model, odlican za logiku, debugging i matematiku.<br>
+            <strong style="color:#81C784;">Pro</strong> — jak i pametan, za ozbiljnije projekte i kompleksniji kod.<br>
+            <strong style="color:#FA7315;">Max</strong> — kompleksni zadaci, planiranje, refaktor. Preporucen za Plan Mode.<br>
+            <strong style="color:#CE93D8;">Power</strong> — najjaci OpenAI model, za flagship kvalitet.<br>
+            <strong style="color:#CE93D8;">Ultra</strong> — premium Anthropic model, za najzahtevnije zadatke.<br>
+            <strong style="color:#FF7043;">Architect</strong> — full-stack arhitekta, za cele aplikacije od nule.
+          </div>
+        </div>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-section-icon">💬</div>
+        <div>
+          <div class="guide-section-title">Iterativno radi</div>
+          <div class="guide-section-desc">Ne moras sve odjednom. Pocni sa osnovom, testiraj, pa trazi poboljsanja korak po korak. Agent pamti kontekst unutar sesije.</div>
+        </div>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-section-icon">🔌</div>
+        <div>
+          <div class="guide-section-title">Povezi eksterne servise (MCP)</div>
+          <div class="guide-section-desc">Preko MCP mozes povezati Supabase, GitHub, Netlify, Vercel i druge servise. Otvori <strong>Podesavanja → Kako dodati?</strong> za detaljan vodic.</div>
+        </div>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-section-icon">⚡</div>
+        <div>
+          <div class="guide-section-title">Saveti za uštedu tokena</div>
+          <div class="guide-section-desc">
+            Koristi <strong>novu sesiju</strong> (+) kad prelazis na potpuno novi zadatak — stara sesija trosi kontekst.<br>
+            Auto-Approve ukljuci za brzi rad bez stalnih potvrda.
+          </div>
+        </div>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-section-icon">📸</div>
+        <div>
+          <div class="guide-section-title">Slike kao kontekst</div>
+          <div class="guide-section-desc">Mozes poslati screenshot dizajna ili greske — klikni ikonicu za sliku pored input polja. Agent razume slike i moze na osnovu njih pisati kod.</div>
+        </div>
+      </div>
+
+      <div class="guide-footer">
+        <span style="opacity:0.4;">VajbAgent — AI coding assistant za studente</span>
+      </div>
+    </div>
+  </div>
+
   <div class="context-bar" id="contextBar">
     <div class="context-progress"><div class="context-fill" id="contextFill"></div></div>
     <span class="context-label" id="contextLabel">0K / 128K</span>
@@ -1340,20 +1554,42 @@
   </div>
   <div class="messages" id="messages">
     <div class="welcome-msg" id="welcome">
-      <img class="welcome-logo" src="{{logoUri}}" alt="VajbAgent">
-      <h3>Pitaj me bilo sta o kodu</h3>
-      <p>Citam, pisem, menjam fajlove i pokrecem komande.</p>
-      <div id="welcomeApiHint" style="display:none;margin-top:6px;padding:8px 14px;background:rgba(250,115,21,0.08);border:1px solid rgba(250,115,21,0.25);border-radius:8px;font-size:11px;line-height:1.5;color:var(--vscode-foreground);">
+      <div class="welcome-brand"><span class="v">&lt;</span>Vajb<span class="v">Agent/&gt;</span></div>
+      <h3>Tvoj AI coding assistant</h3>
+
+      <div class="welcome-cards">
+        <div class="welcome-card" data-prompt="Napravi mi novu web aplikaciju">
+          <div class="welcome-card-icon">🚀</div>
+          <div class="welcome-card-title">Nova aplikacija</div>
+          <div class="welcome-card-desc">Kreiraj projekat od nule</div>
+        </div>
+        <div class="welcome-card" data-prompt="Pogledaj moj kod i predlozi poboljsanja">
+          <div class="welcome-card-icon">🔍</div>
+          <div class="welcome-card-title">Analiziraj kod</div>
+          <div class="welcome-card-desc">Review i poboljsanja</div>
+        </div>
+        <div class="welcome-card" data-prompt="Imam bug u kodu, pomozi mi da ga popravim">
+          <div class="welcome-card-icon">🐛</div>
+          <div class="welcome-card-title">Popravi bug</div>
+          <div class="welcome-card-desc">Debug i resavanje gresaka</div>
+        </div>
+        <div class="welcome-card" data-prompt="Objasni mi kako radi ovaj deo koda">
+          <div class="welcome-card-icon">💡</div>
+          <div class="welcome-card-title">Objasni kod</div>
+          <div class="welcome-card-desc">Razumevanje i ucenje</div>
+        </div>
+      </div>
+
+      <div id="welcomeApiHint" class="welcome-hint welcome-hint-api" style="display:none;">
         <strong style="color:#FA7315;">Prvo podesi API kljuc</strong><br>
         Klikni na ⚙️ gore desno → unesi svoj API kljuc i sacuvaj.
       </div>
-      <div style="margin-top:10px;padding:8px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;font-size:11px;line-height:1.5;color:var(--vscode-descriptionForeground);">
-        <strong style="color:var(--vscode-foreground);font-size:11px;">💡 Preporuka</strong><br>
-        Za vece zadatke, ukljuci <strong style="color:#FA7315;">Plan Mode</strong> <span style="opacity:0.5;">(📋 dugme dole)</span> — agent ce prvo napraviti plan i pitati te za odobrenje pre nego sto menja kod.
+      <div class="welcome-hint welcome-hint-tip">
+        💡 Za vece zadatke, ukljuci <strong style="color:#FA7315;">Plan Mode</strong> <span style="opacity:0.4;">(📋 dole)</span> — agent pravi plan pre izmena. Klikni <strong style="color:var(--vscode-foreground);">?</strong> gore za vodic.
       </div>
+
       <div class="welcome-powered">
-        Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski<br>
-        Kreirao <strong>Nemanja Lakic</strong>
+        Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski · Kreirao <strong>Nemanja Lakic</strong>
       </div>
     </div>
   </div>
@@ -1434,6 +1670,7 @@
     const imagePickerBtn = document.getElementById('imagePickerBtn');
     const imageFileInput = document.getElementById('imageFileInput');
     let statusIndicator = null;
+    let statusPhase = 'idle';
     const settingsBtn = document.getElementById('settingsBtn');
     const settingsPanel = document.getElementById('settingsPanel');
     const settingsApiKey = document.getElementById('settingsApiKey');
@@ -1454,6 +1691,9 @@
     const mcpGuideBtn = document.getElementById('mcpGuideBtn');
     const mcpGuideOverlay = document.getElementById('mcpGuideOverlay');
     const mcpGuideClose = document.getElementById('mcpGuideClose');
+    const guideBtn = document.getElementById('guideBtn');
+    const guideOverlay = document.getElementById('guideOverlay');
+    const guideClose = document.getElementById('guideClose');
     const planModeBtn = document.getElementById('planModeBtn');
     const planModeBar = document.getElementById('planModeBar');
     const planModeOff = document.getElementById('planModeOff');
@@ -1461,6 +1701,16 @@
 
     let isStreaming = false;
     let pendingImages = [];
+
+    document.querySelectorAll('.welcome-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const prompt = card.getAttribute('data-prompt');
+        if (prompt && !isStreaming) {
+          userInput.value = prompt;
+          userInput.focus();
+        }
+      });
+    });
 
     // Auto-resize textarea
     userInput.addEventListener('input', () => {
@@ -1565,6 +1815,14 @@
     };
     mcpGuideClose.onclick = function() {
       mcpGuideOverlay.classList.remove('visible');
+    };
+
+    guideBtn.addEventListener('click', () => {
+      settingsPanel.classList.remove('open');
+      guideOverlay.classList.add('visible');
+    });
+    guideClose.onclick = function() {
+      guideOverlay.classList.remove('visible');
     };
 
     function togglePlanMode(on) {
@@ -1739,7 +1997,7 @@
       pendingImages = [];
       renderImagePreviews();
       setStreaming(true);
-      showStatus('Razmisljam...');
+      showStatus('Razmisljam...', 'thinking');
     }
 
     function addMessageBubble(role, text) {
@@ -1767,12 +2025,31 @@
       if (!on) hideStatus();
     }
 
-    function showStatus(text) {
+    const STATUS_ICONS = {
+      thinking: '<svg class="spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FA7315" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-dasharray="31.4 31.4" stroke-linecap="round"/></svg>',
+      reading: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4FC3F7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>',
+      writing: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81C784" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
+      command: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFB74D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>',
+      searching: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#CE93D8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+      web: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4DD0E1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>',
+      streaming: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FA7315" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
+      mcp: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A5D6A7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>'
+    };
+
+    function getStatusIcon(phase) {
+      return STATUS_ICONS[phase] || STATUS_ICONS.thinking;
+    }
+
+    function showStatus(text, phase) {
+      if (phase) statusPhase = phase;
       if (!statusIndicator) {
         statusIndicator = document.createElement('div');
         statusIndicator.className = 'status-indicator visible';
-        statusIndicator.innerHTML = '<div class="status-spinner"></div><span class="status-text"></span>';
+        statusIndicator.innerHTML = '<div class="status-icon"></div><span class="status-text"></span>';
       }
+      const iconEl = statusIndicator.querySelector('.status-icon');
+      iconEl.innerHTML = getStatusIcon(statusPhase);
+      iconEl.className = 'status-icon' + (statusPhase === 'thinking' ? ' spin' : ' pulse');
       statusIndicator.querySelector('.status-text').textContent = text;
       statusIndicator.classList.add('visible');
       messagesEl.appendChild(statusIndicator);
@@ -1824,7 +2101,13 @@
           messagesEl.innerHTML = '';
           const w = document.createElement('div');
           w.className = 'welcome-msg';
-          w.innerHTML = '<img class="welcome-logo" src="{{logoUri}}" alt="VajbAgent"><h3>Pitaj me bilo sta o kodu</h3><p>Citam, pisem, menjam fajlove i pokrecem komande.</p><div class="welcome-powered">Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski<br>Kreirao <strong>Nemanja Lakic</strong></div>';
+          w.innerHTML = '<div class="welcome-brand"><span class="v">&lt;</span>VajbAgent<span class="v">/&gt;</span></div><h3>Tvoj AI coding assistant</h3><div class="welcome-cards"><div class="welcome-card" data-prompt="Napravi mi novu web aplikaciju"><div class="welcome-card-icon">🚀</div><div class="welcome-card-title">Nova aplikacija</div><div class="welcome-card-desc">Kreiraj projekat od nule</div></div><div class="welcome-card" data-prompt="Pogledaj moj kod i predlozi poboljsanja"><div class="welcome-card-icon">🔍</div><div class="welcome-card-title">Analiziraj kod</div><div class="welcome-card-desc">Review i poboljsanja</div></div><div class="welcome-card" data-prompt="Imam bug u kodu, pomozi mi da ga popravim"><div class="welcome-card-icon">🐛</div><div class="welcome-card-title">Popravi bug</div><div class="welcome-card-desc">Debug i resavanje gresaka</div></div><div class="welcome-card" data-prompt="Objasni mi kako radi ovaj deo koda"><div class="welcome-card-icon">💡</div><div class="welcome-card-title">Objasni kod</div><div class="welcome-card-desc">Razumevanje i ucenje</div></div></div><div class="welcome-hint welcome-hint-tip">💡 Za vece zadatke, ukljuci <strong style="color:#FA7315;">Plan Mode</strong> <span style="opacity:0.4;">(📋 dole)</span> — agent pravi plan pre izmena.</div><div class="welcome-powered">Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski · Kreirao <strong>Nemanja Lakic</strong></div>';
+          w.querySelectorAll('.welcome-card').forEach(card => {
+            card.addEventListener('click', () => {
+              const prompt = card.getAttribute('data-prompt');
+              if (prompt && !isStreaming) { userInput.value = prompt; userInput.focus(); }
+            });
+          });
           messagesEl.appendChild(w);
           currentAssistantEl = null;
           currentAssistantRawText = '';
@@ -1836,7 +2119,7 @@
 
         case 'streamStart': {
           hideStatus();
-          showStatus('Pisem odgovor...');
+          showStatus('Pisem odgovor...', 'streaming');
           currentAssistantRawText = '';
           const div = document.createElement('div');
           div.className = 'msg msg-assistant streaming';
@@ -1882,27 +2165,27 @@
             const p = parsedArgs.path || '';
             const short = p ? p.split('/').slice(-2).join('/') : '';
             switch (msg.name) {
-              case 'read_file':       return { label: 'Citam', detail: short };
-              case 'write_file':      return { label: 'Pisem', detail: short };
-              case 'replace_in_file': return { label: 'Menjam', detail: short };
-              case 'list_files':      return { label: 'Listajem', detail: short || parsedArgs.path || '' };
-              case 'search_files':    return { label: 'Pretrazujem', detail: parsedArgs.pattern ? '"' + parsedArgs.pattern + '"' : '' };
-              case 'execute_command': return { label: 'Pokrecem', detail: (parsedArgs.command || '').substring(0, 60) };
-              case 'fetch_url':       return { label: 'Ucitavam', detail: (parsedArgs.url || '').substring(0, 50) };
-              case 'web_search':     return { label: 'Pretrazujem web', detail: parsedArgs.query ? '"' + parsedArgs.query + '"' : '' };
+              case 'read_file':       return { label: 'Citam fajl', detail: short, phase: 'reading' };
+              case 'write_file':      return { label: 'Pisem fajl', detail: short, phase: 'writing' };
+              case 'replace_in_file': return { label: 'Menjam fajl', detail: short, phase: 'writing' };
+              case 'list_files':      return { label: 'Listajem fajlove', detail: short || parsedArgs.path || '', phase: 'searching' };
+              case 'search_files':    return { label: 'Pretrazujem kod', detail: parsedArgs.pattern ? '"' + parsedArgs.pattern + '"' : '', phase: 'searching' };
+              case 'execute_command': return { label: 'Izvrsavam komandu', detail: (parsedArgs.command || '').substring(0, 60), phase: 'command' };
+              case 'fetch_url':       return { label: 'Ucitavam stranicu', detail: (parsedArgs.url || '').substring(0, 50), phase: 'web' };
+              case 'web_search':      return { label: 'Pretrazujem web', detail: parsedArgs.query ? '"' + parsedArgs.query + '"' : '', phase: 'web' };
               default: {
                 if (msg.name && msg.name.startsWith('mcp_')) {
                   const parts = msg.name.match(/^mcp_([^_]+)_(.+)$/);
-                  if (parts) return { label: 'MCP: ' + parts[1], detail: parts[2] };
+                  if (parts) return { label: 'MCP: ' + parts[1], detail: parts[2], phase: 'mcp' };
                 }
-                return { label: msg.name, detail: '' };
+                return { label: msg.name, detail: '', phase: 'thinking' };
               }
             }
           })();
           const statusLabel = toolDetail.detail
             ? toolDetail.label + ': ' + toolDetail.detail + '...'
             : toolDetail.label + '...';
-          showStatus(statusLabel);
+          showStatus(statusLabel, toolDetail.phase);
 
           const detailSpan = toolDetail.detail
             ? ' <span class="tool-detail">' + escapeHtml(toolDetail.detail) + '</span>'
@@ -1929,7 +2212,7 @@
         }
 
         case 'toolResult': {
-          showStatus('Razmisljam...');
+          showStatus('Analiziram rezultat...', 'thinking');
           const blocks = messagesEl.querySelectorAll('.tool-block');
           for (const b of blocks) {
             if (b.dataset.toolCallId === msg.id) {

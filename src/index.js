@@ -1278,14 +1278,12 @@ app.get('/admin/api/overview', adminLimiter, async (req, res) => {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   const allUsage = await getUsageSummary();
-  const markup = getStudentMarkup();
   const users = [];
   let totalProviderCost = 0;
   let totalCharged = 0;
   let openaiCost = 0;
   let anthropicCost = 0;
   
-  // Map backend models to providers
   const modelToProvider = {};
   VAJB_MODELS.forEach(m => { modelToProvider[m.backendModel] = m.backend; });
   
@@ -1294,17 +1292,14 @@ app.get('/admin/api/overview', adminLimiter, async (req, res) => {
     const student = await findByKey(keyId);
     const noMarkup = student?.noMarkup || false;
     
-    // Calculate provider cost and charged amount for this user
     let userProviderCost = 0;
     let userCharged = 0;
     if (data.by_model) {
       for (const [model, stats] of Object.entries(data.by_model)) {
         const pCost = providerCostUsd(stats.input_tokens, stats.output_tokens, model);
         userProviderCost += pCost;
-        // If user has noMarkup, they were charged provider cost, otherwise with markup
-        userCharged += noMarkup ? pCost : pCost * markup;
+        userCharged += noMarkup ? pCost : pCost * getStudentMarkup(model);
         
-        // Track by provider
         const provider = modelToProvider[model] || (model.startsWith('gpt') ? 'openai' : 'anthropic');
         if (provider === 'openai') {
           openaiCost += pCost;
@@ -1336,7 +1331,11 @@ app.get('/admin/api/overview', adminLimiter, async (req, res) => {
       id: m.id, name: m.name, backend: m.backend, backendModel: m.backendModel, desc: m.desc,
     })),
     users,
-    markup,
+    markup: {
+      openai: getStudentMarkup('gpt-5'),
+      anthropic: getStudentMarkup('claude-sonnet-4-6'),
+      fallback: getStudentMarkup(),
+    },
     totals: {
       provider_cost_usd: Math.round(totalProviderCost * 1e6) / 1e6,
       charged_usd: Math.round(totalCharged * 1e6) / 1e6,

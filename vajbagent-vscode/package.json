@@ -19,6 +19,7 @@
     "agent",
     "vajbagent"
   ],
+  "icon": "media/icon.png",
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
