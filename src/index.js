@@ -813,7 +813,7 @@ async function handleOpenAIStream(res, keyId, resolved, payload) {
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders?.();
 
-  const STREAM_TIMEOUT = 5 * 60 * 1000;
+  const STREAM_TIMEOUT = 2 * 60 * 1000;
   const KEEPALIVE_INTERVAL = 15000;
   let lastChunkTime = Date.now();
 
@@ -973,7 +973,7 @@ async function handleAnthropicStream(res, keyId, resolved, payload) {
   const toolCalls = [];
   let currentToolIndex = -1;
 
-  const STREAM_TIMEOUT = 5 * 60 * 1000;
+  const STREAM_TIMEOUT = 2 * 60 * 1000;
   const KEEPALIVE_INTERVAL = 15000;
   let lastChunkTime = Date.now();
 
