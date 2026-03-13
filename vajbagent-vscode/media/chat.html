@@ -284,6 +284,23 @@
       border-top-left-radius: 3px;
       padding: 10px 14px;
     }
+    .msg-assistant .credits-cta {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 8px 14px;
+      background: #FA7315;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .msg-assistant .credits-cta:hover {
+      background: #e5670f;
+    }
 
     /* Tool call blocks */
     .tool-block {
@@ -473,21 +490,24 @@
 
     .stop-btn {
       display: none;
-      background: var(--vscode-errorForeground);
+      background: #e53935;
       color: #fff;
       border: none;
       border-radius: 8px;
-      width: 32px;
       height: 28px;
+      padding: 0 12px;
       cursor: pointer;
       align-items: center;
       justify-content: center;
+      gap: 5px;
       flex-shrink: 0;
+      font-size: 11px;
+      font-weight: 600;
       transition: background 0.15s;
     }
-    .stop-btn:hover { opacity: 0.85; }
+    .stop-btn:hover { background: #c62828; }
     .stop-btn.visible { display: flex; }
-    .stop-btn svg { width: 12px; height: 12px; }
+    .stop-btn svg { width: 10px; height: 10px; }
 
     /* Image previews */
     .image-previews {
@@ -1269,7 +1289,10 @@
           <span style="font-size:11px;color:#4CAF50;display:flex;align-items:center;gap:4px;">
             <span style="font-size:13px;">✓</span> Kljuc sacuvan
           </span>
-          <button id="apiKeyChangeBtn" style="font-size:10px;padding:2px 10px;cursor:pointer;background:transparent;color:var(--vscode-foreground);border:1px solid var(--vscode-panel-border);border-radius:4px;opacity:0.6;">Promeni</button>
+          <div style="display:flex;gap:6px;">
+            <button id="apiKeyChangeBtn" style="font-size:10px;padding:2px 10px;cursor:pointer;background:transparent;color:var(--vscode-foreground);border:1px solid var(--vscode-panel-border);border-radius:4px;opacity:0.6;">Promeni</button>
+            <button id="apiKeyDeleteBtn" style="font-size:10px;padding:2px 8px;cursor:pointer;background:transparent;color:#e57373;border:1px solid rgba(229,115,115,0.3);border-radius:4px;opacity:0.6;">Obrisi</button>
+          </div>
         </div>
       </div>
       <div id="apiKeyEditState">
@@ -1557,37 +1580,38 @@
       <div class="welcome-brand"><span class="v">&lt;</span>Vajb<span class="v">Agent/&gt;</span></div>
       <h3>Tvoj AI coding asistent</h3>
 
-      <div class="welcome-cards">
-        <div class="welcome-card" data-prompt="Napravi mi novu web aplikaciju">
-          <div class="welcome-card-icon">🚀</div>
-          <div class="welcome-card-title">Nova aplikacija</div>
-          <div class="welcome-card-desc">Kreiraj projekat od nule</div>
-        </div>
-        <div class="welcome-card" data-prompt="Pogledaj moj kod i predlozi poboljsanja">
-          <div class="welcome-card-icon">🔍</div>
-          <div class="welcome-card-title">Analiziraj kod</div>
-          <div class="welcome-card-desc">Review i poboljsanja</div>
-        </div>
-        <div class="welcome-card" data-prompt="Imam bug u kodu, pomozi mi da ga popravim">
-          <div class="welcome-card-icon">🐛</div>
-          <div class="welcome-card-title">Popravi bug</div>
-          <div class="welcome-card-desc">Debug i resavanje gresaka</div>
-        </div>
-        <div class="welcome-card" data-prompt="Objasni mi kako radi ovaj deo koda">
-          <div class="welcome-card-icon">💡</div>
-          <div class="welcome-card-title">Objasni kod</div>
-          <div class="welcome-card-desc">Razumevanje i ucenje</div>
-        </div>
-      </div>
-
       <div id="welcomeApiHint" class="welcome-hint welcome-hint-api" style="display:none;">
         <strong style="color:#FA7315;">Prvo ti treba API kljuc</strong><br>
-        1. Napravi nalog na <a href="https://vajbagent.com/dashboard" style="color:#FA7315;text-decoration:underline;" target="_blank">vajbagent.com/dashboard</a> (dobijes $2 na poklon)<br>
+        1. Napravi nalog na <a href="https://vajbagent.com" style="color:#FA7315;text-decoration:underline;" target="_blank">vajbagent.com</a> (dobijes $2 na poklon)<br>
         2. Kopiraj API kljuc iz emaila ili dashboarda<br>
         3. Klikni na ⚙️ gore desno → nalepi kljuc i sacuvaj
       </div>
-      <div class="welcome-hint welcome-hint-tip">
-        💡 Za vece zadatke, ukljuci <strong style="color:#FA7315;">Plan Mode</strong> <span style="opacity:0.4;">(📋 dole)</span> — agent pravi plan pre izmena. Klikni <strong style="color:var(--vscode-foreground);">?</strong> gore za vodic.
+      <div id="welcomeCardsSection">
+        <div class="welcome-cards">
+          <div class="welcome-card" data-prompt="Napravi mi novu web aplikaciju">
+            <div class="welcome-card-icon">🚀</div>
+            <div class="welcome-card-title">Nova aplikacija</div>
+            <div class="welcome-card-desc">Kreiraj projekat od nule</div>
+          </div>
+          <div class="welcome-card" data-prompt="Pogledaj moj kod i predlozi poboljsanja">
+            <div class="welcome-card-icon">🔍</div>
+            <div class="welcome-card-title">Analiziraj kod</div>
+            <div class="welcome-card-desc">Review i poboljsanja</div>
+          </div>
+          <div class="welcome-card" data-prompt="Imam bug u kodu, pomozi mi da ga popravim">
+            <div class="welcome-card-icon">🐛</div>
+            <div class="welcome-card-title">Popravi bug</div>
+            <div class="welcome-card-desc">Debug i resavanje gresaka</div>
+          </div>
+          <div class="welcome-card" data-prompt="Objasni mi kako radi ovaj deo koda">
+            <div class="welcome-card-icon">💡</div>
+            <div class="welcome-card-title">Objasni kod</div>
+            <div class="welcome-card-desc">Razumevanje i ucenje</div>
+          </div>
+        </div>
+        <div class="welcome-hint welcome-hint-tip">
+          💡 Za vece zadatke, ukljuci <strong style="color:#FA7315;">Plan Mode</strong> <span style="opacity:0.4;">(📋 dole)</span> — agent pravi plan pre izmena. Klikni <strong style="color:var(--vscode-foreground);">?</strong> gore za vodic.
+        </div>
       </div>
 
       <div class="welcome-powered">
@@ -1625,6 +1649,7 @@
         <div class="input-toolbar-right">
           <button class="stop-btn" id="stopBtn" title="Zaustavi">
             <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+            Stop
           </button>
           <button class="send-btn" id="sendBtn" title="Posalji (Enter)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
@@ -1874,8 +1899,28 @@
       settingsApiKey.focus();
     }
 
+    const apiKeyDeleteBtn = document.getElementById('apiKeyDeleteBtn');
+    const welcomeSettingsLink = document.getElementById('welcomeSettingsLink');
+    if (welcomeSettingsLink) {
+      welcomeSettingsLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        settingsPanel.classList.add('open');
+        settingsApiKey.focus();
+      });
+    }
     apiKeyChangeBtn.addEventListener('click', showApiKeyEdit);
     apiKeyCancelBtn.addEventListener('click', showApiKeySaved);
+    apiKeyDeleteBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'setApiKey', key: '' });
+      hadSavedKey = false;
+      showApiKeyEdit();
+      apiKeyStatus.textContent = 'Kljuc obrisan';
+      apiKeyStatus.style.color = '#e57373';
+      const hint = document.getElementById('welcomeApiHint');
+      if (hint) hint.style.display = 'block';
+      const cards = document.getElementById('welcomeCardsSection');
+      if (cards) cards.style.display = 'none';
+    });
 
     settingsApiKeySave.addEventListener('click', () => {
       const key = settingsApiKey.value.trim();
@@ -1883,6 +1928,10 @@
       vscode.postMessage({ type: 'setApiKey', key });
       settingsApiKey.value = '';
       showApiKeySaved();
+      const hint = document.getElementById('welcomeApiHint');
+      if (hint) hint.style.display = 'none';
+      const cards = document.getElementById('welcomeCardsSection');
+      if (cards) cards.style.display = '';
     });
 
     settingsApiUrlSave.addEventListener('click', () => {
@@ -2091,6 +2140,8 @@
             showApiKeyEdit();
             const hint = document.getElementById('welcomeApiHint');
             if (hint) hint.style.display = 'block';
+            const cards = document.getElementById('welcomeCardsSection');
+            if (cards) cards.style.display = 'none';
           }
           renderMcpStatus(msg.mcpServers, msg.mcpTotalTools, false);
           break;
@@ -2234,10 +2285,8 @@
           hideStatus();
           const diffEl = createDiffBlock(msg.filePath, msg.oldContent, msg.newContent);
           messagesEl.appendChild(diffEl);
-          setTimeout(() => {
-            const actions = diffEl.querySelector('.diff-actions');
-            if (actions) actions.scrollIntoView({ behavior: 'smooth', block: 'end' });
-          }, 50);
+          setTimeout(() => { messagesEl.scrollTop = messagesEl.scrollHeight; }, 50);
+          setTimeout(() => { messagesEl.scrollTop = messagesEl.scrollHeight; }, 200);
           break;
         }
 
@@ -2264,10 +2313,8 @@
             cmdBlock.querySelector('.cmd-actions').innerHTML = '<span style="color:#f14c4c;font-size:12px;padding:4px;">&#10007; Odbijeno</span>';
           });
           messagesEl.appendChild(cmdBlock);
-          setTimeout(() => {
-            const actions = cmdBlock.querySelector('.cmd-actions');
-            if (actions) actions.scrollIntoView({ behavior: 'smooth', block: 'end' });
-          }, 50);
+          setTimeout(() => { messagesEl.scrollTop = messagesEl.scrollHeight; }, 50);
+          setTimeout(() => { messagesEl.scrollTop = messagesEl.scrollHeight; }, 200);
           break;
         }
 
@@ -2348,6 +2395,18 @@
           addMessageBubble('assistant', 'Greska: ' + msg.text);
           setStreaming(false);
           break;
+
+        case 'creditsError': {
+          const div = document.createElement('div');
+          div.className = 'msg msg-assistant';
+          const text = escapeHtml(msg.text || 'Nedovoljno kredita.');
+          const url = (msg.dashboardUrl || 'https://vajbagent.com/dashboard').replace(/"/g, '&quot;');
+          div.innerHTML = '<p>' + text + '</p><a class="credits-cta" href="' + url + '" target="_blank" rel="noopener">Dopuni na dashboardu</a>';
+          messagesEl.appendChild(div);
+          scrollToBottom();
+          setStreaming(false);
+          break;
+        }
       }
     });
 

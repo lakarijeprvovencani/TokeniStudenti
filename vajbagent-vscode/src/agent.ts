@@ -652,7 +652,16 @@ export class Agent {
           return;
         }
         const errorMsg = err instanceof Error ? err.message : String(err);
-        this._provider.postMessage({ type: 'error', text: errorMsg });
+        const errWithMeta = err as Error & { code?: string; dashboardUrl?: string };
+        if (errWithMeta.code === 'insufficient_credits' && errWithMeta.dashboardUrl) {
+          this._provider.postMessage({
+            type: 'creditsError',
+            text: errorMsg,
+            dashboardUrl: errWithMeta.dashboardUrl,
+          });
+        } else {
+          this._provider.postMessage({ type: 'error', text: errorMsg });
+        }
         return;
       }
 
@@ -800,11 +809,20 @@ export class Agent {
             res.on('data', (chunk: Buffer) => { body += chunk.toString(); });
             res.on('end', () => {
               let msg = `API error ${res.statusCode}`;
+              let code: string | undefined;
+              let dashboardUrl: string | undefined;
               try {
                 const parsed = JSON.parse(body);
                 msg = parsed.error?.message || parsed.message || msg;
+                code = parsed.error?.code;
+                dashboardUrl = parsed.error?.dashboard_url;
               } catch { /* use default */ }
-              reject(new Error(msg));
+              const err = new Error(msg) as Error & { code?: string; dashboardUrl?: string };
+              if (res.statusCode === 402 && code === 'insufficient_credits' && dashboardUrl) {
+                err.code = code;
+                err.dashboardUrl = dashboardUrl;
+              }
+              reject(err);
             });
             return;
           }

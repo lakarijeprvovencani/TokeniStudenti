@@ -2,7 +2,7 @@
   "name": "vajbagent",
   "displayName": "VajbAgent",
   "description": "AI coding asistent — cita, pise i menja kod umesto tebe. 7 modela, Plan Mode, MCP podrska.",
-  "version": "0.3.2",
+  "version": "0.7.0",
   "publisher": "VajbAgent",
   "engines": {
     "vscode": "^1.85.0"
@@ -104,9 +104,11 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src --ext ts",
+    "build:icon": "node scripts/build-icon.mjs"
   },
   "devDependencies": {
+    "sharp": "^0.33.5",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.7.1",

@@ -681,11 +681,13 @@ const chatCompletionsHandler = [
     const keyId = req.studentKeyId;
     const balance = await getBalance(keyId);
     if (balance <= 0) {
+      const baseUrl = process.env.BASE_URL || 'https://vajbagent.com';
       return res.status(402).json({
         error: {
-          message: `Nedovoljno kredita (stanje: ${balance.toFixed(2)} USD). Dopuni nalog na dashboardu ili kontaktiraj administratora.`,
+          message: `Nedovoljno kredita (stanje: ${balance.toFixed(2)} USD). Dopuni nalog da nastaviš.`,
           code: 'insufficient_credits',
           balance_usd: balance,
+          dashboard_url: `${baseUrl.replace(/\/$/, '')}/dashboard`,
         },
       });
     }
@@ -708,15 +710,29 @@ const chatCompletionsHandler = [
       let userMsg = msg;
       let code = 'api_error';
 
+      const msgLower = msg.toLowerCase();
+
       if (status === 429) {
         userMsg = 'API rate limit dostignut. Sačekaj par sekundi i pokušaj ponovo.';
         code = 'rate_limit';
-      } else if (status === 529 || msg.includes('overloaded')) {
+      } else if (status === 529 || msgLower.includes('overloaded')) {
         userMsg = 'Backend model je trenutno preopterećen. Pokušaj ponovo za minut ili probaj jeftiniji model.';
         code = 'overloaded';
-      } else if (msg.includes('context') || msg.includes('token') || msg.includes('too long') || msg.includes('maximum')) {
+      } else if (
+        msgLower.includes('context length') ||
+        msgLower.includes('context window') ||
+        msgLower.includes('too many tokens') ||
+        msgLower.includes('maximum context') ||
+        msgLower.includes('token limit') ||
+        msgLower.includes('too long') ||
+        msgLower.includes('input too large') ||
+        msgLower.includes('prompt is too long')
+      ) {
         userMsg = 'Kontekst je prevelik čak i posle trimovanja. Pokušaj sa kraćim promptom ili zatvori nepotrebne fajlove u Cursor-u.';
         code = 'context_too_large';
+      } else if (status === 401 || status === 403) {
+        userMsg = 'Problem sa autentifikacijom prema AI provajderu. Kontaktiraj podršku.';
+        code = 'auth_error';
       }
 
       res.status(status).json({
