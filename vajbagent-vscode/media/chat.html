@@ -146,8 +146,8 @@
     .context-new-session.visible { display: block; }
     .undo-btn {
       background: none;
-      border: 1px solid #ff6b6b55;
-      color: #ff6b6b;
+      border: 1px solid rgba(250, 115, 21, 0.4);
+      color: #FA7315;
       border-radius: 4px;
       padding: 2px 8px;
       font-size: 10px;
@@ -155,7 +155,27 @@
       opacity: 0.7;
       transition: opacity 0.15s, background 0.15s;
     }
-    .undo-btn:hover { opacity: 1; background: #ff6b6b18; }
+    .undo-btn:hover { opacity: 1; background: rgba(250, 115, 21, 0.12); }
+    .followup-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 4px 0;
+    }
+    .followup-btn {
+      background: rgba(250, 115, 21, 0.08);
+      color: #FA7315;
+      border: 1px solid rgba(250, 115, 21, 0.25);
+      border-radius: 14px;
+      padding: 4px 12px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .followup-btn:hover {
+      background: rgba(250, 115, 21, 0.18);
+      border-color: #FA7315;
+    }
 
     /* Messages area */
     .messages {
@@ -2225,6 +2245,37 @@
       showStatus('Razmisljam...', 'thinking');
     }
 
+    function showFollowUpSuggestions(responseText) {
+      document.querySelectorAll('.followup-bar').forEach(el => el.remove());
+
+      const hasCode = /```/.test(responseText);
+      const hasError = /error|gresk|problem/i.test(responseText);
+      const isLong = responseText.length > 1500;
+
+      const suggestions = [];
+      if (hasCode) suggestions.push({ label: 'Objasni detaljnije', text: 'Objasni detaljnije ovaj kod i zasto si to uradio.' });
+      if (hasError) suggestions.push({ label: 'Popravi greske', text: 'Popravi sve greske u projektu.' });
+      if (isLong) suggestions.push({ label: 'Nastavi', text: 'Nastavi gde si stao.' });
+      suggestions.push({ label: 'Popravi ako treba', text: 'Proveri da li sve radi ispravno i popravi ako ima gresaka.' });
+
+      if (suggestions.length === 0) return;
+
+      const bar = document.createElement('div');
+      bar.className = 'followup-bar';
+      for (const s of suggestions.slice(0, 3)) {
+        const btn = document.createElement('button');
+        btn.className = 'followup-btn';
+        btn.textContent = s.label;
+        btn.addEventListener('click', () => {
+          bar.remove();
+          userInput.value = s.text;
+          sendMessage();
+        });
+        bar.appendChild(btn);
+      }
+      messagesEl.appendChild(bar);
+    }
+
     let _lastUserText = '';
     function retryLastMessage() {
       if (!_lastUserText || isStreaming) return;
@@ -2397,6 +2448,11 @@
           currentAssistantEl = null;
           currentAssistantRawText = '';
           setStreaming(false);
+
+          if (planText && !wasPlanModeMessage) {
+            showFollowUpSuggestions(planText);
+          }
+
           scrollToBottom();
           break;
         }
@@ -2586,9 +2642,9 @@
         case 'error': {
           const errDiv = document.createElement('div');
           errDiv.className = 'msg msg-assistant error-msg';
-          let errHtml = '<p style="color:#ff6b6b">⚠ ' + escapeHtml(msg.text || 'Doslo je do greske.') + '</p>';
+          let errHtml = '<p style="color:#FA7315">⚠ ' + escapeHtml(msg.text || 'Doslo je do greske.') + '</p>';
           if (msg.retryable) {
-            errHtml += '<button class="retry-btn" onclick="retryLastMessage()" style="margin-top:8px;padding:6px 16px;background:var(--accent,#6c63ff);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem">Pokusaj ponovo</button>';
+            errHtml += '<button class="retry-btn" onclick="retryLastMessage()" style="margin-top:8px;padding:6px 16px;background:#FA7315;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem">Pokusaj ponovo</button>';
           }
           errDiv.innerHTML = errHtml;
           messagesEl.appendChild(errDiv);

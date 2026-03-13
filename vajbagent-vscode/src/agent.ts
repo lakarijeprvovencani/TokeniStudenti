@@ -7,6 +7,7 @@ import { ChatViewProvider } from './webview';
 import { McpManager } from './mcp';
 import https from 'https';
 import http from 'http';
+import { execSync } from 'child_process';
 
 const MAX_ITERATIONS = 25;
 
@@ -639,6 +640,36 @@ export class Agent {
     return parts.length > 1 ? parts.join('\n') : null;
   }
 
+  private _getGitContext(): string | null {
+    const root = this._getWorkspaceRoot();
+    if (!root) return null;
+
+    const git = (cmd: string): string => {
+      try { return execSync(cmd, { cwd: root, timeout: 3000, encoding: 'utf-8' }).trim(); }
+      catch { return ''; }
+    };
+
+    const branch = git('git rev-parse --abbrev-ref HEAD');
+    if (!branch) return null;
+
+    const lines: string[] = [`Branch: ${branch}`];
+
+    const status = git('git status --porcelain -uno');
+    if (status) {
+      const changed = status.split('\n').slice(0, 10);
+      lines.push(`Uncommitted (${changed.length}):`);
+      for (const c of changed) lines.push('  ' + c);
+    }
+
+    const log = git('git log --oneline -3 2>/dev/null');
+    if (log) {
+      lines.push('Recent commits:');
+      for (const l of log.split('\n')) lines.push('  ' + l);
+    }
+
+    return lines.join('\n');
+  }
+
   private _getDiagnosticsContext(): string | null {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) return null;
@@ -939,10 +970,38 @@ export class Agent {
     if (diagCtx) {
       systemPrompt += '\n\n<diagnostics>\n' + diagCtx + '\n</diagnostics>';
     }
+    const gitCtx = this._getGitContext();
+    if (gitCtx) {
+      systemPrompt += '\n\n<git_status>\n' + gitCtx + '\n</git_status>';
+    }
+    const trimmed = this._trimHistory();
     return [
       { role: 'system', content: systemPrompt },
-      ...this._history,
+      ...trimmed,
     ];
+  }
+
+  private _trimHistory(): Message[] {
+    const limit = this._getContextLimit();
+    const threshold = limit * 0.65;
+    const estimated = this._estimateTokens();
+    if (estimated < threshold) return this._history;
+
+    const history = [...this._history];
+    const keepRecent = Math.min(10, history.length);
+    const trimZone = history.length - keepRecent;
+
+    for (let i = 0; i < trimZone; i++) {
+      const msg = history[i];
+      if (msg.role === 'tool' && typeof msg.content === 'string' && msg.content.length > 500) {
+        history[i] = { ...msg, content: msg.content.substring(0, 200) + '\n... (trimmed)' };
+      }
+      if (msg.role === 'assistant' && typeof msg.content === 'string' && msg.content.length > 2000) {
+        history[i] = { ...msg, content: msg.content.substring(0, 800) + '\n... (trimmed)' };
+      }
+    }
+
+    return history;
   }
 
   private _readContextMemory(): string | null {

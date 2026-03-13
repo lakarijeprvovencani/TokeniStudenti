@@ -2,7 +2,7 @@
   "name": "vajbagent",
   "displayName": "VajbAgent",
   "description": "AI coding asistent — cita, pise i menja kod umesto tebe. 7 modela, Plan Mode, MCP podrska.",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "publisher": "VajbAgent",
   "engines": {
     "vscode": "^1.85.0"
