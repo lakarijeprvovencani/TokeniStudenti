@@ -437,6 +437,9 @@ export class Agent {
   private _mcpManager: McpManager;
   private _abortController: AbortController | null = null;
   private _currentSessionId: string | null = null;
+  private _workspaceIndex: string | null = null;
+  private _workspaceIndexTime = 0;
+  private static readonly INDEX_TTL = 120_000; // refresh every 2 min
 
   constructor(provider: ChatViewProvider, context: vscode.ExtensionContext, mcpManager: McpManager) {
     this._provider = provider;
@@ -636,6 +639,78 @@ export class Agent {
     return parts.length > 1 ? parts.join('\n') : null;
   }
 
+  private _buildWorkspaceIndex(): string | null {
+    if (this._workspaceIndex && (Date.now() - this._workspaceIndexTime < Agent.INDEX_TTL)) {
+      return this._workspaceIndex;
+    }
+
+    const root = this._getWorkspaceRoot();
+    if (!root) return null;
+
+    const EXCLUDE = new Set([
+      'node_modules', '.git', 'dist', 'build', 'out', '.next', '__pycache__',
+      '.vscode', '.idea', 'coverage', '.cache', '.turbo', 'vendor',
+      '.vajbagent', 'tmp', 'temp', '.svn', 'bower_components', '.nuxt',
+    ]);
+    const CODE_EXT = new Set([
+      '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.py', '.java', '.go',
+      '.rs', '.rb', '.php', '.html', '.css', '.scss', '.vue', '.svelte',
+      '.astro', '.json', '.yaml', '.yml', '.md', '.sql', '.graphql',
+      '.sh', '.c', '.cpp', '.h', '.cs', '.swift', '.kt', '.prisma', '.proto',
+    ]);
+    const MAX_FILES = 300;
+    const PREVIEW_LINES = 8;
+    const MAX_CHARS = 5000;
+
+    const files: { rel: string; preview: string }[] = [];
+
+    const scan = (dir: string, rel: string) => {
+      if (files.length >= MAX_FILES) return;
+      let entries: fs.Dirent[];
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        if (files.length >= MAX_FILES) break;
+        if (e.isDirectory()) {
+          if (EXCLUDE.has(e.name) || e.name.startsWith('.')) continue;
+          scan(path.join(dir, e.name), rel ? `${rel}/${e.name}` : e.name);
+        } else if (e.isFile()) {
+          const ext = path.extname(e.name).toLowerCase();
+          if (!CODE_EXT.has(ext)) continue;
+          if (e.name.endsWith('.lock') || e.name.endsWith('.min.js') || e.name.endsWith('.min.css')) continue;
+          const filePath = rel ? `${rel}/${e.name}` : e.name;
+          let preview = '';
+          try {
+            const raw = fs.readFileSync(path.join(dir, e.name), 'utf-8');
+            preview = raw.split('\n').slice(0, PREVIEW_LINES).join('\n').substring(0, 400);
+          } catch { /* skip */ }
+          files.push({ rel: filePath, preview });
+        }
+      }
+    };
+
+    scan(root, '');
+    if (files.length === 0) return null;
+
+    let result = `[Workspace index: ${files.length} files]\n`;
+    let chars = result.length;
+
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const entry = f.preview ? `--- ${f.rel}\n${f.preview}\n` : `--- ${f.rel}\n`;
+      if (chars + entry.length > MAX_CHARS) {
+        const rest = files.slice(i).map(ff => ff.rel).join(', ');
+        result += `\n(+${files.length - i} more: ${rest.substring(0, 500)})`;
+        break;
+      }
+      result += entry;
+      chars += entry.length;
+    }
+
+    this._workspaceIndex = result;
+    this._workspaceIndexTime = Date.now();
+    return this._workspaceIndex;
+  }
+
   private _expandFileMentions(text: string): string {
     const root = this._getWorkspaceRoot();
     if (!root) return text;
@@ -778,6 +853,10 @@ export class Agent {
     const contextMd = this._readContextMemory();
     if (contextMd) {
       systemPrompt += '\n\n<project_memory>\nThe following is the project memory from .vajbagent/CONTEXT.md:\n\n' + contextMd + '\n</project_memory>';
+    }
+    const wsIndex = this._buildWorkspaceIndex();
+    if (wsIndex) {
+      systemPrompt += '\n\n<workspace_index>\n' + wsIndex + '\n</workspace_index>';
     }
     return [
       { role: 'system', content: systemPrompt },
