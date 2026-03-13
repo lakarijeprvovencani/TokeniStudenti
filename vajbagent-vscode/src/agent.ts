@@ -463,6 +463,7 @@ export class Agent {
   private _workspaceIndex: string | null = null;
   private _workspaceIndexTime = 0;
   private static readonly INDEX_TTL = 120_000; // refresh every 2 min
+  private _loopContextCache: { git: string | null; diag: string | null; tabs: string | null; proj: string | null } | null = null;
 
   constructor(provider: ChatViewProvider, context: vscode.ExtensionContext, mcpManager: McpManager) {
     this._provider = provider;
@@ -914,6 +915,12 @@ export class Agent {
   }
 
   private async _runLoop(apiKey: string) {
+    this._loopContextCache = {
+      git: this._getGitContext(),
+      diag: this._getDiagnosticsContext(),
+      tabs: this._getOpenTabsContext(),
+      proj: this._detectProjectType(),
+    };
     for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
       const messages = this._buildMessages();
 
@@ -928,6 +935,7 @@ export class Agent {
         toolCalls = result.toolCalls;
       } catch (err: unknown) {
         if ((err as Error).name === 'AbortError') {
+          this._loopContextCache = null;
           this._provider.postMessage({ type: 'streamEnd' });
           return;
         }
@@ -962,6 +970,7 @@ export class Agent {
         if (assistantContent) {
           this._provider.postMessage({ type: 'streamEnd' });
         }
+        this._loopContextCache = null;
         this._autoSaveSession();
         return;
       }
@@ -1018,6 +1027,7 @@ export class Agent {
       // streamStart will be sent from _streamRequest when text actually arrives
     }
 
+    this._loopContextCache = null;
     this._provider.postMessage({
       type: 'error',
       text: `Dostignut limit od ${MAX_ITERATIONS} tool poziva. Pokusaj ponovo sa manjim zahtevom.`,
@@ -1042,16 +1052,17 @@ export class Agent {
     if (editorCtx) {
       systemPrompt += '\n\n<active_editor>\n' + editorCtx + '\n</active_editor>';
     }
-    const diagCtx = this._getDiagnosticsContext();
+    const c = this._loopContextCache;
+    const diagCtx = c ? c.diag : this._getDiagnosticsContext();
     if (diagCtx) {
       systemPrompt += '\n\n<diagnostics>\n' + diagCtx + '\n</diagnostics>';
     }
-    const gitCtx = this._getGitContext();
+    const gitCtx = c ? c.git : this._getGitContext();
     if (gitCtx) {
       systemPrompt += '\n\n<git_status>\n' + gitCtx + '\n</git_status>';
     }
-    const tabsCtx = this._getOpenTabsContext();
-    const projType = this._detectProjectType();
+    const tabsCtx = c ? c.tabs : this._getOpenTabsContext();
+    const projType = c ? c.proj : this._detectProjectType();
     if (tabsCtx || projType) {
       const extra = [tabsCtx, projType].filter(Boolean).join('\n');
       systemPrompt += '\n\n<editor_state>\n' + extra + '\n</editor_state>';
@@ -1069,21 +1080,20 @@ export class Agent {
     const estimated = this._estimateTokens();
     if (estimated < threshold) return this._history;
 
-    const history = [...this._history];
-    const keepRecent = Math.min(10, history.length);
-    const trimZone = history.length - keepRecent;
+    const keepRecent = Math.min(10, this._history.length);
+    const trimZone = this._history.length - keepRecent;
 
     for (let i = 0; i < trimZone; i++) {
-      const msg = history[i];
+      const msg = this._history[i];
       if (msg.role === 'tool' && typeof msg.content === 'string' && msg.content.length > 500) {
-        history[i] = { ...msg, content: msg.content.substring(0, 200) + '\n... (trimmed)' };
+        this._history[i] = { ...msg, content: msg.content.substring(0, 200) + '\n... (trimmed)' };
       }
       if (msg.role === 'assistant' && typeof msg.content === 'string' && msg.content.length > 2000) {
-        history[i] = { ...msg, content: msg.content.substring(0, 800) + '\n... (trimmed)' };
+        this._history[i] = { ...msg, content: msg.content.substring(0, 800) + '\n... (trimmed)' };
       }
     }
 
-    return history;
+    return this._history;
   }
 
   private _readContextMemory(): string | null {

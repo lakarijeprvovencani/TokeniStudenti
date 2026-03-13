@@ -137,11 +137,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           const fp = message.fullPath as string;
           const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
           const abs = root && !path.isAbsolute(fp) ? path.join(root, fp) : fp;
-          try {
-            vscode.workspace.openTextDocument(abs).then(doc => {
-              vscode.window.showTextDocument(doc, { preview: false });
-            });
-          } catch { /* file may not exist yet until tool finishes */ }
+          vscode.workspace.openTextDocument(abs).then(
+            doc => vscode.window.showTextDocument(doc, { preview: false }),
+            () => { /* file may not exist yet */ }
+          );
         }
         break;
       case 'commandResponse':

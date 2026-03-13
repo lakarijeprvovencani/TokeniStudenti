@@ -470,7 +470,7 @@ async function toolSearchFiles(args: Record<string, unknown>): Promise<ToolCallR
           searchDir(full);
         } else {
           if (fileGlob) {
-            const globRegex = new RegExp('^' + fileGlob.replace(/\*/g, '.*').replace(/\?/g, '.') + '$');
+            const globRegex = new RegExp('^' + fileGlob.replace(/\./g, '\\.').replace(/\*/g, '.*').replace(/\?/g, '.') + '$');
             if (!globRegex.test(entry.name)) continue;
           }
 
@@ -537,11 +537,11 @@ async function toolExecuteCommand(args: Record<string, unknown>): Promise<ToolCa
   }
 
   return new Promise((resolve) => {
-    exec(command, { cwd, timeout: 30000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    exec(command, { cwd, timeout: 120000, maxBuffer: 2 * 1024 * 1024 }, (error, stdout, stderr) => {
       const parts: string[] = [];
       if (stdout) parts.push(`stdout:\n${stdout}`);
       if (stderr) parts.push(`stderr:\n${stderr}`);
-      if (error?.killed) parts.push('Command timed out after 30s');
+      if (error?.killed) parts.push('Command timed out after 120s');
       else if (error) parts.push(`exit code: ${error.code}`);
       const output = parts.length > 0 ? parts.join('\n') : '(no output)';
       const failed = !!error;
@@ -558,11 +558,15 @@ async function toolExecuteCommand(args: Record<string, unknown>): Promise<ToolCa
 }
 
 // ── fetch_url ──
-async function toolFetchUrl(args: Record<string, unknown>): Promise<ToolCallResult> {
+async function toolFetchUrl(args: Record<string, unknown>, redirectCount = 0): Promise<ToolCallResult> {
   const url = args.url as string;
   const method = (args.method as string) || 'GET';
   const customHeaders = (args.headers as Record<string, string>) || {};
   const body = args.body as string | undefined;
+
+  if (redirectCount > 5) {
+    return { success: false, output: 'Too many redirects (>5)' };
+  }
 
   try {
     const urlObj = new URL(url);
@@ -584,6 +588,13 @@ async function toolFetchUrl(args: Record<string, unknown>): Promise<ToolCallResu
       };
 
       const req = transport.request(options, (res) => {
+        if (res.statusCode && [301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+          const newUrl = new URL(res.headers.location, url).href;
+          res.resume();
+          resolve(toolFetchUrl({ ...args, url: newUrl }, redirectCount + 1));
+          return;
+        }
+
         let data = '';
         res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
         res.on('end', () => {
