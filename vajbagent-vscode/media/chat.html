@@ -2639,6 +2639,10 @@
           scrollToBottom();
           break;
         }
+
+        case 'generationStopped':
+          setStreaming(false);
+          break;
       }
     });
 

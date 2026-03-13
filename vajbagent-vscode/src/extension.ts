@@ -34,6 +34,12 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand('vajbagent.stopGeneration', () => {
+      provider.stopGeneration();
+    })
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand('vajbagent.explainSelection', () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) return;

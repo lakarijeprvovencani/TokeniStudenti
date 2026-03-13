@@ -639,6 +639,44 @@ export class Agent {
     return parts.length > 1 ? parts.join('\n') : null;
   }
 
+  private _getDiagnosticsContext(): string | null {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) return null;
+
+    const root = folders[0].uri.fsPath;
+    const diagnostics = vscode.languages.getDiagnostics();
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    for (const [uri, diags] of diagnostics) {
+      const rel = path.relative(root, uri.fsPath);
+      if (rel.startsWith('..') || rel.includes('node_modules')) continue;
+      for (const d of diags) {
+        const line = d.range.start.line + 1;
+        const entry = `${rel}:${line}: ${d.message}`;
+        if (d.severity === vscode.DiagnosticSeverity.Error) {
+          errors.push(entry);
+        } else if (d.severity === vscode.DiagnosticSeverity.Warning && warnings.length < 5) {
+          warnings.push(entry);
+        }
+      }
+    }
+
+    if (errors.length === 0 && warnings.length === 0) return null;
+
+    const lines: string[] = [];
+    if (errors.length > 0) {
+      lines.push(`Errors (${errors.length}):`);
+      for (const e of errors.slice(0, 15)) lines.push('  ' + e);
+      if (errors.length > 15) lines.push(`  ... (+${errors.length - 15} more)`);
+    }
+    if (warnings.length > 0) {
+      lines.push(`Warnings:`);
+      for (const w of warnings) lines.push('  ' + w);
+    }
+    return lines.join('\n');
+  }
+
   private _getActiveEditorContext(): string | null {
     const editor = vscode.window.activeTextEditor;
     if (!editor) return null;
@@ -896,6 +934,10 @@ export class Agent {
     const editorCtx = this._getActiveEditorContext();
     if (editorCtx) {
       systemPrompt += '\n\n<active_editor>\n' + editorCtx + '\n</active_editor>';
+    }
+    const diagCtx = this._getDiagnosticsContext();
+    if (diagCtx) {
+      systemPrompt += '\n\n<diagnostics>\n' + diagCtx + '\n</diagnostics>';
     }
     return [
       { role: 'system', content: systemPrompt },

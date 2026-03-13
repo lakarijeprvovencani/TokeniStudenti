@@ -52,6 +52,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage({ type: 'newSession' });
   }
 
+  public stopGeneration() {
+    this._agent.abort();
+    this._view?.webview.postMessage({ type: 'generationStopped' });
+  }
+
   private _sendMcpStatus() {
     const status = this._mcpManager.getStatus();
     const totalTools = status.reduce((s, c) => s + c.toolCount, 0);
