@@ -2311,15 +2311,16 @@
     function showFollowUpSuggestions(responseText) {
       document.querySelectorAll('.followup-bar').forEach(el => el.remove());
 
-      const hasCode = /```/.test(responseText);
-      const hasError = /error|gresk|problem/i.test(responseText);
-      const isLong = responseText.length > 1500;
+      const hasCode = /```[\w]*\n/.test(responseText);
+      const madeChanges = /write_file|replace_in_file|naprav|izmeni|dodao|promenio|kreirao|azurirao/i.test(responseText);
+      const hasError = /error|gresk|problem|ne radi|puklo/i.test(responseText);
+      const seemsTruncated = /\.{3}$|nastavic|nastavi|sledeć/i.test(responseText.slice(-200));
 
       const suggestions = [];
-      if (hasCode) suggestions.push({ label: 'Objasni detaljnije', text: 'Objasni detaljnije ovaj kod i zasto si to uradio.' });
+      if (hasCode && madeChanges) suggestions.push({ label: 'Objasni detaljnije', text: 'Objasni detaljnije sta si promenio i zasto.' });
       if (hasError) suggestions.push({ label: 'Popravi greske', text: 'Popravi sve greske u projektu.' });
-      if (isLong) suggestions.push({ label: 'Nastavi', text: 'Nastavi gde si stao.' });
-      suggestions.push({ label: 'Popravi ako treba', text: 'Proveri da li sve radi ispravno i popravi ako ima gresaka.' });
+      if (seemsTruncated) suggestions.push({ label: 'Nastavi', text: 'Nastavi gde si stao.' });
+      if (madeChanges) suggestions.push({ label: 'Proveri', text: 'Proveri da li sve radi ispravno i popravi ako ima gresaka.' });
 
       if (suggestions.length === 0) return;
 
