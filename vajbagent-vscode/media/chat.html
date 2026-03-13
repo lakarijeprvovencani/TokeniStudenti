@@ -1946,6 +1946,7 @@
       html += '<div class="plan-actions-buttons">';
       html += '<button class="plan-btn plan-btn-primary plan-exec-all">Izvrsi ceo plan</button>';
       html += '<button class="plan-btn plan-btn-secondary plan-exec-phase" data-phase="1">Faza 1 ▶</button>';
+      html += '<button class="plan-btn plan-btn-ghost plan-dismiss">Otkazi</button>';
       html += '</div>';
       html += '<div class="plan-phases">';
       phases.forEach((p, i) => {
@@ -1971,6 +1972,13 @@
 
       bar.querySelector('.plan-exec-phase').addEventListener('click', function() {
         startPhaseExecution(1, phases.length, bar);
+      });
+
+      bar.querySelector('.plan-dismiss').addEventListener('click', function() {
+        bar.querySelector('.plan-actions-buttons').innerHTML =
+          '<span style="color:var(--vscode-foreground);font-size:11px;opacity:0.5;">Plan otkazan</span>';
+        activePlanBar = null;
+        activePlanPhase = 0;
       });
 
       return bar;
