@@ -738,6 +738,60 @@ export class Agent {
     ].join('\n');
   }
 
+  private _getOpenTabsContext(): string | null {
+    const tabs: string[] = [];
+    for (const group of vscode.window.tabGroups.all) {
+      for (const tab of group.tabs) {
+        if (tab.input && typeof (tab.input as { uri?: vscode.Uri }).uri !== 'undefined') {
+          const uri = (tab.input as { uri: vscode.Uri }).uri;
+          if (uri.scheme === 'file') {
+            tabs.push(vscode.workspace.asRelativePath(uri, false));
+          }
+        }
+      }
+    }
+    if (tabs.length === 0) return null;
+    const unique = [...new Set(tabs)];
+    return `Open tabs (${unique.length}): ${unique.slice(0, 15).join(', ')}${unique.length > 15 ? ' ...' : ''}`;
+  }
+
+  private _detectProjectType(): string | null {
+    const root = this._getWorkspaceRoot();
+    if (!root) return null;
+
+    const has = (f: string) => fs.existsSync(path.join(root, f));
+    const types: string[] = [];
+
+    if (has('next.config.js') || has('next.config.mjs') || has('next.config.ts')) types.push('Next.js');
+    else if (has('nuxt.config.ts') || has('nuxt.config.js')) types.push('Nuxt');
+    else if (has('svelte.config.js')) types.push('SvelteKit');
+    else if (has('astro.config.mjs')) types.push('Astro');
+    else if (has('vite.config.ts') || has('vite.config.js')) types.push('Vite');
+
+    if (has('angular.json')) types.push('Angular');
+    if (has('tailwind.config.js') || has('tailwind.config.ts')) types.push('Tailwind CSS');
+    if (has('prisma/schema.prisma')) types.push('Prisma');
+    if (has('docker-compose.yml') || has('Dockerfile')) types.push('Docker');
+    if (has('requirements.txt') || has('pyproject.toml')) types.push('Python');
+    if (has('Cargo.toml')) types.push('Rust');
+    if (has('go.mod')) types.push('Go');
+
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf-8'));
+      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+      if (deps['react']) types.push('React');
+      if (deps['vue']) types.push('Vue');
+      if (deps['express']) types.push('Express');
+      if (deps['fastify']) types.push('Fastify');
+      if (deps['typescript']) types.push('TypeScript');
+      if (deps['mongoose'] || deps['mongodb']) types.push('MongoDB');
+      if (deps['pg'] || deps['sequelize'] || deps['knex']) types.push('SQL/PostgreSQL');
+    } catch { /* no package.json */ }
+
+    if (types.length === 0) return null;
+    return `Project stack: ${[...new Set(types)].join(', ')}`;
+  }
+
   private _buildWorkspaceIndex(): string | null {
     if (this._workspaceIndex && (Date.now() - this._workspaceIndexTime < Agent.INDEX_TTL)) {
       return this._workspaceIndex;
@@ -973,6 +1027,12 @@ export class Agent {
     const gitCtx = this._getGitContext();
     if (gitCtx) {
       systemPrompt += '\n\n<git_status>\n' + gitCtx + '\n</git_status>';
+    }
+    const tabsCtx = this._getOpenTabsContext();
+    const projType = this._detectProjectType();
+    if (tabsCtx || projType) {
+      const extra = [tabsCtx, projType].filter(Boolean).join('\n');
+      systemPrompt += '\n\n<editor_state>\n' + extra + '\n</editor_state>';
     }
     const trimmed = this._trimHistory();
     return [
