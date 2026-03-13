@@ -32,6 +32,38 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  context.subscriptions.push(
+    vscode.commands.registerCommand('vajbagent.explainSelection', () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) return;
+      const sel = editor.document.getText(editor.selection);
+      if (!sel.trim()) {
+        vscode.window.showWarningMessage('Selektuj kod koji zelis da objasnim.');
+        return;
+      }
+      const fileName = editor.document.fileName.split(/[\\/]/).pop() || '';
+      const lang = editor.document.languageId || '';
+      const text = `Objasni mi ovaj kod iz fajla \`${fileName}\`:\n\n\`\`\`${lang}\n${sel}\n\`\`\``;
+      provider.sendMessageFromCommand(text);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('vajbagent.refactorSelection', () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) return;
+      const sel = editor.document.getText(editor.selection);
+      if (!sel.trim()) {
+        vscode.window.showWarningMessage('Selektuj kod koji zelis da refaktorisem.');
+        return;
+      }
+      const fileName = editor.document.fileName.split(/[\\/]/).pop() || '';
+      const lang = editor.document.languageId || '';
+      const text = `Refaktorisi i poboljsaj ovaj kod iz fajla \`${fileName}\`. Objasni sta si promenio i zasto:\n\n\`\`\`${lang}\n${sel}\n\`\`\``;
+      provider.sendMessageFromCommand(text);
+    })
+  );
+
   mcpManager.startFromConfig().catch(err => {
     console.error('[MCP] Auto-start failed:', err.message);
   });

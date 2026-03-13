@@ -2,7 +2,7 @@
   "name": "vajbagent",
   "displayName": "VajbAgent",
   "description": "AI coding asistent — cita, pise i menja kod umesto tebe. 7 modela, Plan Mode, MCP podrska.",
-  "version": "0.7.0",
+  "version": "0.9.0",
   "publisher": "VajbAgent",
   "engines": {
     "vscode": "^1.85.0"
@@ -49,8 +49,30 @@
       {
         "command": "vajbagent.setApiKey",
         "title": "VajbAgent: Set API Key"
+      },
+      {
+        "command": "vajbagent.explainSelection",
+        "title": "VajbAgent: Objasni selektovani kod"
+      },
+      {
+        "command": "vajbagent.refactorSelection",
+        "title": "VajbAgent: Refaktorisi selekciju"
       }
     ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "vajbagent.explainSelection",
+          "when": "editorHasSelection",
+          "group": "vajbagent@1"
+        },
+        {
+          "command": "vajbagent.refactorSelection",
+          "when": "editorHasSelection",
+          "group": "vajbagent@2"
+        }
+      ]
+    },
     "configuration": {
       "title": "VajbAgent",
       "properties": {

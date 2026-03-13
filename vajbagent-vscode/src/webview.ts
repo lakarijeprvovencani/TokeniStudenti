@@ -72,6 +72,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage(message);
   }
 
+  public async sendMessageFromCommand(text: string) {
+    if (this._view) {
+      this._view.show?.(true);
+    }
+    this._view?.webview.postMessage({ type: 'commandMessage', text });
+    await this._agent.sendMessage(text);
+  }
+
   private async _handleMessage(message: { type: string; [key: string]: unknown }) {
     switch (message.type) {
       case 'ready': {
@@ -119,6 +127,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       case 'diffResponse':
         handleDiffResponse(message.accepted as boolean);
+        if (message.accepted && message.fullPath) {
+          const fp = message.fullPath as string;
+          const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+          const abs = root && !path.isAbsolute(fp) ? path.join(root, fp) : fp;
+          try {
+            vscode.workspace.openTextDocument(abs).then(doc => {
+              vscode.window.showTextDocument(doc, { preview: false });
+            });
+          } catch { /* file may not exist yet until tool finishes */ }
+        }
         break;
       case 'commandResponse':
         handleCommandResponse(message.accepted as boolean);
