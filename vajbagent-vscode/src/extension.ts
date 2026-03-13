@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ChatViewProvider } from './webview';
 import { promptForApiKey } from './settings';
 import { McpManager } from './mcp';
+import { revertAllCheckpoints, getCheckpoints, clearCheckpoints } from './tools';
 
 let mcpManager: McpManager | null = null;
 
@@ -61,6 +62,26 @@ export function activate(context: vscode.ExtensionContext) {
       const lang = editor.document.languageId || '';
       const text = `Refaktorisi i poboljsaj ovaj kod iz fajla \`${fileName}\`. Objasni sta si promenio i zasto:\n\n\`\`\`${lang}\n${sel}\n\`\`\``;
       provider.sendMessageFromCommand(text);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('vajbagent.revertAll', async () => {
+      const cps = getCheckpoints();
+      if (cps.length === 0) {
+        vscode.window.showInformationMessage('Nema promena za vracanje.');
+        return;
+      }
+      const choice = await vscode.window.showWarningMessage(
+        `Vratiti ${cps.length} fajl(ova) na originale pre izmena agenta?`,
+        { modal: true },
+        'Da, vrati sve'
+      );
+      if (choice === 'Da, vrati sve') {
+        const count = revertAllCheckpoints();
+        vscode.window.showInformationMessage(`Vraceno ${count} fajl(ova) na originale.`);
+        provider.postMessage({ type: 'checkpointSaved', count: 0 });
+      }
     })
   );
 

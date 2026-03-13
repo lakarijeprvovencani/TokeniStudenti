@@ -11,11 +11,57 @@ export interface ToolCallResult {
   output: string;
 }
 
+export interface FileCheckpoint {
+  filePath: string;
+  originalContent: string;
+  timestamp: number;
+}
+
 type ApprovalCallback = (accepted: boolean) => void;
 let _postMessage: ((msg: unknown) => void) | null = null;
 let _pendingDiffResolve: ApprovalCallback | null = null;
 let _pendingCommandResolve: ApprovalCallback | null = null;
 let _apiCredentials: { apiUrl: string; apiKey: string } | null = null;
+const _checkpoints: Map<string, FileCheckpoint> = new Map();
+
+export function getCheckpoints(): FileCheckpoint[] {
+  return Array.from(_checkpoints.values()).sort((a, b) => a.timestamp - b.timestamp);
+}
+
+export function revertCheckpoint(filePath: string): boolean {
+  const cp = _checkpoints.get(filePath);
+  if (!cp) return false;
+  try {
+    if (cp.originalContent === '') {
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    } else {
+      fs.writeFileSync(filePath, cp.originalContent, 'utf-8');
+    }
+    _checkpoints.delete(filePath);
+    return true;
+  } catch { return false; }
+}
+
+export function revertAllCheckpoints(): number {
+  let count = 0;
+  for (const [fp] of _checkpoints) {
+    if (revertCheckpoint(fp)) count++;
+  }
+  return count;
+}
+
+export function clearCheckpoints() {
+  _checkpoints.clear();
+}
+
+function saveCheckpoint(filePath: string) {
+  if (_checkpoints.has(filePath)) return;
+  const original = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : '';
+  _checkpoints.set(filePath, { filePath, originalContent: original, timestamp: Date.now() });
+  if (_postMessage) {
+    _postMessage({ type: 'checkpointSaved', count: _checkpoints.size });
+  }
+}
 
 export function setPostMessage(fn: (msg: unknown) => void) {
   _postMessage = fn;
@@ -278,6 +324,7 @@ async function toolWriteFile(args: Record<string, unknown>): Promise<ToolCallRes
     const accepted = await requestDiffApproval('write_file', filePath, oldContent, newContent);
 
     if (accepted) {
+      saveCheckpoint(filePath);
       fs.writeFileSync(filePath, newContent, 'utf-8');
       return { success: true, output: `File written: ${filePath}` };
     } else {
@@ -308,6 +355,7 @@ async function toolReplaceInFile(args: Record<string, unknown>): Promise<ToolCal
     const accepted = await requestDiffApproval('replace_in_file', filePath, content, newContent);
 
     if (accepted) {
+      saveCheckpoint(filePath);
       fs.writeFileSync(filePath, newContent, 'utf-8');
       return { success: true, output: `File updated: ${filePath}` };
     } else {

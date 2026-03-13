@@ -144,6 +144,18 @@
     }
     .context-new-session:hover { opacity: 1; }
     .context-new-session.visible { display: block; }
+    .undo-btn {
+      background: none;
+      border: 1px solid #ff6b6b55;
+      color: #ff6b6b;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 10px;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: opacity 0.15s, background 0.15s;
+    }
+    .undo-btn:hover { opacity: 1; background: #ff6b6b18; }
 
     /* Messages area */
     .messages {
@@ -1656,6 +1668,7 @@
   <div class="context-bar" id="contextBar">
     <div class="context-progress"><div class="context-fill" id="contextFill"></div></div>
     <span class="context-label" id="contextLabel">0K / 128K</span>
+    <button class="undo-btn" id="undoBtn" title="Vrati sve promene agenta" style="display:none" onclick="vscode.postMessage({type:'revertAll'})">↩ Undo</button>
     <button class="context-new-session" id="contextNewSession">Novi chat</button>
   </div>
   <div class="messages" id="messages">
@@ -2190,6 +2203,7 @@
         messagesEl.appendChild(el);
       });
 
+      _lastUserText = text;
       let sendText = text;
       if (planModeActive) {
         sendText = '[PLAN MODE] Korisnik zeli SAMO plan. NE menjaj kod, NE koristi write_file ili replace_in_file za kod. Umesto toga:\n1. Istrazi projekat sa list_files i read_file da razumes trenutno stanje.\n2. Napravi detaljan plan sa NUMERISANIM FAZAMA (1. ..., 2. ..., 3. ...) — svaka faza jedan jasan korak.\n3. Sacuvaj plan u .vajbagent/PLAN.md koristeci write_file.\n4. Prikazi plan korisniku — faze ce biti prikazane sa dugmadima za izvrsavanje.\n5. Odgovaraj na ISTOM JEZIKU kojim korisnik pise.\n\nZahtev korisnika: ' + text;
@@ -2209,6 +2223,15 @@
       renderImagePreviews();
       setStreaming(true);
       showStatus('Razmisljam...', 'thinking');
+    }
+
+    let _lastUserText = '';
+    function retryLastMessage() {
+      if (!_lastUserText || isStreaming) return;
+      document.querySelectorAll('.error-msg').forEach(el => el.remove());
+      vscode.postMessage({ type: 'sendMessage', text: _lastUserText, images: [] });
+      setStreaming(true);
+      showStatus('Pokusavam ponovo...', 'thinking');
     }
 
     function addMessageBubble(role, text) {
@@ -2560,10 +2583,19 @@
           break;
         }
 
-        case 'error':
-          addMessageBubble('assistant', 'Greska: ' + msg.text);
+        case 'error': {
+          const errDiv = document.createElement('div');
+          errDiv.className = 'msg msg-assistant error-msg';
+          let errHtml = '<p style="color:#ff6b6b">⚠ ' + escapeHtml(msg.text || 'Doslo je do greske.') + '</p>';
+          if (msg.retryable) {
+            errHtml += '<button class="retry-btn" onclick="retryLastMessage()" style="margin-top:8px;padding:6px 16px;background:var(--accent,#6c63ff);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem">Pokusaj ponovo</button>';
+          }
+          errDiv.innerHTML = errHtml;
+          messagesEl.appendChild(errDiv);
+          scrollToBottom();
           setStreaming(false);
           break;
+        }
 
         case 'commandMessage': {
           document.querySelectorAll('.welcome-msg').forEach(el => el.remove());
@@ -2583,6 +2615,28 @@
           messagesEl.appendChild(div);
           scrollToBottom();
           setStreaming(false);
+          break;
+        }
+
+        case 'checkpointSaved': {
+          const undoBtn = document.getElementById('undoBtn');
+          if (undoBtn) {
+            undoBtn.style.display = msg.count > 0 ? 'inline-block' : 'none';
+            undoBtn.title = msg.count > 0 ? ('Vrati ' + msg.count + ' fajl(ova) na originale') : '';
+            undoBtn.textContent = '↩ Undo (' + msg.count + ')';
+          }
+          break;
+        }
+
+        case 'revertResult': {
+          const undoBtn2 = document.getElementById('undoBtn');
+          if (undoBtn2) { undoBtn2.style.display = 'none'; }
+          if (msg.count > 0) {
+            addMessageBubble('assistant', '✅ ' + msg.msg);
+          } else {
+            addMessageBubble('assistant', msg.msg);
+          }
+          scrollToBottom();
           break;
         }
       }

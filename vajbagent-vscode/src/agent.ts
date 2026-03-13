@@ -639,6 +639,36 @@ export class Agent {
     return parts.length > 1 ? parts.join('\n') : null;
   }
 
+  private _getActiveEditorContext(): string | null {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return null;
+
+    const doc = editor.document;
+    if (doc.uri.scheme !== 'file') return null;
+
+    const relPath = vscode.workspace.asRelativePath(doc.uri, false);
+    const lang = doc.languageId;
+    const totalLines = doc.lineCount;
+    const cursorLine = editor.selection.active.line + 1;
+
+    const visRange = editor.visibleRanges[0];
+    if (!visRange) return `File: ${relPath} (${lang}, ${totalLines} lines)\nCursor: line ${cursorLine}`;
+
+    const startL = visRange.start.line;
+    const endL = Math.min(visRange.end.line, startL + 60);
+    const visibleLines: string[] = [];
+    for (let i = startL; i <= endL; i++) {
+      visibleLines.push(`${i + 1}|${doc.lineAt(i).text}`);
+    }
+
+    return [
+      `File: ${relPath} (${lang}, ${totalLines} lines)`,
+      `Cursor: line ${cursorLine}`,
+      `Visible (lines ${startL + 1}-${endL + 1}):`,
+      visibleLines.join('\n'),
+    ].join('\n');
+  }
+
   private _buildWorkspaceIndex(): string | null {
     if (this._workspaceIndex && (Date.now() - this._workspaceIndexTime < Agent.INDEX_TTL)) {
       return this._workspaceIndex;
@@ -758,6 +788,7 @@ export class Agent {
         }
         const errorMsg = err instanceof Error ? err.message : String(err);
         const errWithMeta = err as Error & { code?: string; dashboardUrl?: string };
+        const isRetryable = /timeout|ECONNRESET|ENOTFOUND|socket hang up|502|503|529|rate.limit/i.test(errorMsg);
         if (errWithMeta.code === 'insufficient_credits' && errWithMeta.dashboardUrl) {
           this._provider.postMessage({
             type: 'creditsError',
@@ -765,7 +796,11 @@ export class Agent {
             dashboardUrl: errWithMeta.dashboardUrl,
           });
         } else {
-          this._provider.postMessage({ type: 'error', text: errorMsg });
+          this._provider.postMessage({
+            type: 'error',
+            text: errorMsg,
+            retryable: isRetryable,
+          });
         }
         return;
       }
@@ -857,6 +892,10 @@ export class Agent {
     const wsIndex = this._buildWorkspaceIndex();
     if (wsIndex) {
       systemPrompt += '\n\n<workspace_index>\n' + wsIndex + '\n</workspace_index>';
+    }
+    const editorCtx = this._getActiveEditorContext();
+    if (editorCtx) {
+      systemPrompt += '\n\n<active_editor>\n' + editorCtx + '\n</active_editor>';
     }
     return [
       { role: 'system', content: systemPrompt },

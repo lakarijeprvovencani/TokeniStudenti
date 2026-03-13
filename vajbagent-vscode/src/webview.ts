@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { getModel, setModel, getApiKey, setApiKey, getApiUrl, setApiUrl, promptForApiKey, MODEL_INFO, getAutoApprove, setAutoApprove, AutoApproveSettings } from './settings';
 import { Agent } from './agent';
-import { setPostMessage, handleDiffResponse, handleCommandResponse } from './tools';
+import { setPostMessage, handleDiffResponse, handleCommandResponse, clearCheckpoints, getCheckpoints, revertAllCheckpoints } from './tools';
 import { McpManager, McpServerConfig } from './mcp';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
@@ -48,6 +48,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   public newSession() {
     this._agent.abort();
     this._agent.clearHistory();
+    clearCheckpoints();
     this._view?.webview.postMessage({ type: 'newSession' });
   }
 
@@ -195,6 +196,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         } else {
           vscode.window.showWarningMessage('Otvori folder u editoru da bi konfigurisao MCP servere.');
         }
+        break;
+      }
+      case 'revertAll': {
+        const cps = getCheckpoints();
+        if (cps.length === 0) {
+          this._view?.webview.postMessage({ type: 'revertResult', count: 0, msg: 'Nema promena za vracanje.' });
+          break;
+        }
+        const count = revertAllCheckpoints();
+        this._view?.webview.postMessage({ type: 'revertResult', count, msg: `Vraceno ${count} fajl(ova) na originale.` });
         break;
       }
       case 'openFile': {
