@@ -281,6 +281,16 @@ export async function executeTool(
   }
 }
 
+async function getFileDiagnostics(filePath: string): Promise<string> {
+  const uri = vscode.Uri.file(filePath);
+  await new Promise(r => setTimeout(r, 600));
+  const diags = vscode.languages.getDiagnostics(uri);
+  const errors = diags.filter(d => d.severity === vscode.DiagnosticSeverity.Error);
+  if (errors.length === 0) return '';
+  const lines = errors.slice(0, 8).map(d => `  Line ${d.range.start.line + 1}: ${d.message}`);
+  return `\n⚠ ${errors.length} error(s) detected after writing:\n${lines.join('\n')}`;
+}
+
 function resolveWorkspacePath(filePath: string): string {
   if (path.isAbsolute(filePath)) return filePath;
   const folders = vscode.workspace.workspaceFolders;
@@ -326,7 +336,8 @@ async function toolWriteFile(args: Record<string, unknown>): Promise<ToolCallRes
     if (accepted) {
       saveCheckpoint(filePath);
       fs.writeFileSync(filePath, newContent, 'utf-8');
-      return { success: true, output: `File written: ${filePath}` };
+      const diag = await getFileDiagnostics(filePath);
+      return { success: true, output: `File written: ${filePath}${diag}` };
     } else {
       return { success: false, output: 'User rejected the change.' };
     }
@@ -357,7 +368,8 @@ async function toolReplaceInFile(args: Record<string, unknown>): Promise<ToolCal
     if (accepted) {
       saveCheckpoint(filePath);
       fs.writeFileSync(filePath, newContent, 'utf-8');
-      return { success: true, output: `File updated: ${filePath}` };
+      const diag = await getFileDiagnostics(filePath);
+      return { success: true, output: `File updated: ${filePath}${diag}` };
     } else {
       return { success: false, output: 'User rejected the change.' };
     }
@@ -511,6 +523,9 @@ function requestCommandApproval(command: string): Promise<boolean> {
   });
 }
 
+let _lastCommandOutput = '';
+export function getLastCommandOutput(): string { return _lastCommandOutput; }
+
 async function toolExecuteCommand(args: Record<string, unknown>): Promise<ToolCallResult> {
   const command = args.command as string;
   const folders = vscode.workspace.workspaceFolders;
@@ -523,17 +538,21 @@ async function toolExecuteCommand(args: Record<string, unknown>): Promise<ToolCa
 
   return new Promise((resolve) => {
     exec(command, { cwd, timeout: 30000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
-      const output = [
-        stdout ? `stdout:\n${stdout}` : '',
-        stderr ? `stderr:\n${stderr}` : '',
-        error && error.killed ? 'Command timed out after 30s' : '',
-        error && !error.killed ? `exit code: ${error.code}` : '',
-      ].filter(Boolean).join('\n');
+      const parts: string[] = [];
+      if (stdout) parts.push(`stdout:\n${stdout}`);
+      if (stderr) parts.push(`stderr:\n${stderr}`);
+      if (error?.killed) parts.push('Command timed out after 30s');
+      else if (error) parts.push(`exit code: ${error.code}`);
+      const output = parts.length > 0 ? parts.join('\n') : '(no output)';
+      const failed = !!error;
 
-      resolve({
-        success: !error,
-        output: output || '(no output)',
-      });
+      _lastCommandOutput = output.substring(0, 5000);
+
+      if (failed && _postMessage) {
+        _postMessage({ type: 'terminalError', command, output: output.substring(0, 2000) });
+      }
+
+      resolve({ success: !failed, output });
     });
   });
 }

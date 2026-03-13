@@ -2699,6 +2699,16 @@
         case 'generationStopped':
           setStreaming(false);
           break;
+
+        case 'terminalError': {
+          const termDiv = document.createElement('div');
+          termDiv.className = 'msg msg-assistant';
+          termDiv.innerHTML = '<div style="font-size:11px;color:#FA7315;font-weight:600;margin-bottom:4px;">⚠ Komanda nije uspela: <code>' + escapeHtml(msg.command || '') + '</code></div>' +
+            '<pre style="background:var(--vscode-textCodeBlock-background);padding:8px;border-radius:4px;font-size:11px;max-height:150px;overflow:auto;margin:0;">' + escapeHtml(msg.output || '') + '</pre>';
+          messagesEl.appendChild(termDiv);
+          scrollToBottom();
+          break;
+        }
       }
     });
 
