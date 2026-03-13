@@ -1221,9 +1221,12 @@ function requireAdmin(req, res, next) {
 
 app.get('/admin/students', adminLimiter, requireAdmin, async (_req, res) => {
   const allStudents = await getAllStudents();
+  const usage = await getUsageSummary();
   const students = [];
   for (const s of allStudents) {
-    students.push({ ...s, balance_usd: await getBalance(s.key) });
+    const balance_usd = await getBalance(s.key);
+    const last_used = usage[s.key]?.last_used || null;
+    students.push({ ...s, balance_usd, last_used });
   }
   res.json(students);
 });

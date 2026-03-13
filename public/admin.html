@@ -241,7 +241,7 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
       </div>
       <div class="card">
         <div class="card-title">Svi studenti</div>
-        <table><thead><tr><th>Ime</th><th>API ključ</th><th>Balans</th><th>Status</th><th>Marža</th><th>Kreiran</th><th>Akcije</th></tr></thead>
+        <table><thead><tr><th>Ime</th><th>API ključ</th><th>Balans</th><th>Status</th><th>Marža</th><th>Kreiran</th><th>Poslednja aktivnost</th><th>Akcije</th></tr></thead>
         <tbody id="stuBody"></tbody></table>
         <div id="stuEmpty" style="display:none;text-align:center;padding:28px;color:var(--text);font-size:.85rem">Nema studenata. Dodaj prvog iznad.</div>
       </div>
@@ -366,7 +366,14 @@ function renderOverview(){
   const ms=DATA.model_stats||{};
 
   $('sUsers').textContent=activeSts.length;
-  $('sUsersD').textContent=sts.length+' ukupno, '+(sts.length-activeSts.length)+' neaktivnih';
+    const INACTIVE_DAYS = 30;
+  const msPerDay = 24*60*60*1000;
+  const inactiveByUsage = sts.filter(s=>{
+    const lu = s.last_used;
+    if(!lu) return true;
+    return (Date.now() - new Date(lu)) > INACTIVE_DAYS * msPerDay;
+  }).length;
+  $('sUsersD').textContent=sts.length+' ukupno, '+inactiveByUsage+' neaktivnih ('+INACTIVE_DAYS+'+ dana bez zahteva)';
   $('sReqs').textContent=fmt(totalReqs);
   const avgIn=totalReqs>0?Math.round((totalIn/totalReqs)/1000):0;
   const avgOut=totalReqs>0?Math.round((totalOut/totalReqs)/1000):0;
@@ -480,6 +487,7 @@ function renderStudents(){
         </button>
       </td>
       <td style="color:var(--text)">${fmtD(s.created)}</td>
+      <td style="color:var(--text);font-size:.85rem">${s.last_used ? fmtD(s.last_used) : 'Nikad'}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-sm btn-y" onclick="openCredit('${esc(s.key)}','${esc(s.name)}',${s.balance_usd||0})">Krediti</button>
         <button class="btn btn-sm ${s.active?'btn-ghost':'btn-g'}" onclick="toggleStu('${esc(s.key)}',${!s.active})">${s.active?'Deaktiviraj':'Aktiviraj'}</button>
