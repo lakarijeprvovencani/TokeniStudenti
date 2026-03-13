@@ -156,6 +156,57 @@
       transition: opacity 0.15s, background 0.15s;
     }
     .undo-btn:hover { opacity: 1; background: rgba(250, 115, 21, 0.12); }
+    .checkpoint-list {
+      background: rgba(250, 115, 21, 0.04);
+      border: 1px solid rgba(250, 115, 21, 0.15);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 11px;
+    }
+    .checkpoint-header {
+      color: #FA7315;
+      font-weight: 600;
+      margin-bottom: 6px;
+      font-size: 11px;
+    }
+    .checkpoint-file {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(250, 115, 21, 0.08);
+    }
+    .checkpoint-file:last-of-type { border-bottom: none; }
+    .checkpoint-filename {
+      color: var(--vscode-foreground);
+      cursor: pointer;
+      opacity: 0.85;
+    }
+    .checkpoint-filename:hover { color: #FA7315; opacity: 1; }
+    .checkpoint-revert-btn {
+      background: none;
+      border: 1px solid rgba(250, 115, 21, 0.3);
+      color: #FA7315;
+      border-radius: 3px;
+      padding: 1px 6px;
+      font-size: 10px;
+      cursor: pointer;
+      opacity: 0.6;
+    }
+    .checkpoint-revert-btn:hover { opacity: 1; background: rgba(250, 115, 21, 0.1); }
+    .checkpoint-revert-all {
+      display: block;
+      width: 100%;
+      margin-top: 6px;
+      background: rgba(250, 115, 21, 0.1);
+      color: #FA7315;
+      border: 1px solid rgba(250, 115, 21, 0.25);
+      border-radius: 4px;
+      padding: 4px;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .checkpoint-revert-all:hover { background: rgba(250, 115, 21, 0.2); }
     .followup-bar {
       display: flex;
       flex-wrap: wrap;
@@ -646,6 +697,18 @@
       color: #FA7315;
       opacity: 1;
     }
+    .apply-btn {
+      background: #FA7315;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      padding: 2px 8px;
+      font-size: 10px;
+      cursor: pointer;
+      opacity: 0.85;
+      margin-right: 4px;
+    }
+    .apply-btn:hover { opacity: 1; }
     .copy-btn {
       background: rgba(250, 115, 21, 0.15);
       color: #FA7315;
@@ -2276,6 +2339,10 @@
       messagesEl.appendChild(bar);
     }
 
+    function revertSingleFile(filePath) {
+      vscode.postMessage({ type: 'revertFile', filePath: filePath });
+    }
+
     let _lastUserText = '';
     function retryLastMessage() {
       if (!_lastUserText || isStreaming) return;
@@ -2678,8 +2745,26 @@
           const undoBtn = document.getElementById('undoBtn');
           if (undoBtn) {
             undoBtn.style.display = msg.count > 0 ? 'inline-block' : 'none';
-            undoBtn.title = msg.count > 0 ? ('Vrati ' + msg.count + ' fajl(ova) na originale') : '';
             undoBtn.textContent = '↩ Undo (' + msg.count + ')';
+          }
+          if (msg.files && msg.files.length > 0) {
+            let existing = document.getElementById('checkpointList');
+            if (!existing) {
+              existing = document.createElement('div');
+              existing.id = 'checkpointList';
+              existing.className = 'checkpoint-list';
+              messagesEl.appendChild(existing);
+            }
+            let html = '<div class="checkpoint-header">Izmenjeni fajlovi (' + msg.files.length + ')</div>';
+            for (const f of msg.files) {
+              html += '<div class="checkpoint-file" data-path="' + escapeHtml(f.full) + '">' +
+                '<span class="checkpoint-filename" onclick="vscode.postMessage({type:\'openFile\',path:\'' + escapeHtml(f.full).replace(/'/g, "\\'") + '\'})">' + escapeHtml(f.short) + '</span>' +
+                '<button class="checkpoint-revert-btn" onclick="revertSingleFile(\'' + escapeHtml(f.full).replace(/'/g, "\\'") + '\')">↩</button>' +
+                '</div>';
+            }
+            html += '<button class="checkpoint-revert-all" onclick="vscode.postMessage({type:\'revertAll\'})">↩ Vrati sve</button>';
+            existing.innerHTML = html;
+            scrollToBottom();
           }
           break;
         }
@@ -2699,6 +2784,21 @@
         case 'generationStopped':
           setStreaming(false);
           break;
+
+        case 'fileReverted': {
+          const cpList = document.getElementById('checkpointList');
+          if (cpList) {
+            const row = cpList.querySelector('[data-path="' + CSS.escape(msg.filePath) + '"]');
+            if (row) row.remove();
+            if (msg.remaining === 0) cpList.remove();
+          }
+          if (msg.success) {
+            const short = msg.filePath.replace(/\\/g, '/').split('/').slice(-2).join('/');
+            addMessageBubble('assistant', '↩ Vracen: ' + short);
+            scrollToBottom();
+          }
+          break;
+        }
 
         case 'terminalError': {
           const termDiv = document.createElement('div');
@@ -2923,6 +3023,19 @@
         const header = wrapper.querySelector('.code-block-header');
         const code = wrapper.querySelector('code');
         if (!header || !code) return;
+
+        const applyBtn = document.createElement('button');
+        applyBtn.className = 'apply-btn';
+        applyBtn.textContent = 'Primeni';
+        applyBtn.addEventListener('click', () => {
+          const content = code.textContent || '';
+          navigator.clipboard.writeText(content);
+          vscode.postMessage({ type: 'applyCode', code: content });
+          applyBtn.textContent = 'Primenjen!';
+          setTimeout(() => { applyBtn.textContent = 'Primeni'; }, 1500);
+        });
+        header.appendChild(applyBtn);
+
         const btn = document.createElement('button');
         btn.className = 'copy-btn';
         btn.textContent = 'Copy';

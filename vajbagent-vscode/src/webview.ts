@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { getModel, setModel, getApiKey, setApiKey, getApiUrl, setApiUrl, promptForApiKey, MODEL_INFO, getAutoApprove, setAutoApprove, AutoApproveSettings } from './settings';
 import { Agent } from './agent';
-import { setPostMessage, handleDiffResponse, handleCommandResponse, clearCheckpoints, getCheckpoints, revertAllCheckpoints } from './tools';
+import { setPostMessage, handleDiffResponse, handleCommandResponse, clearCheckpoints, getCheckpoints, revertAllCheckpoints, revertCheckpoint } from './tools';
 import { McpManager, McpServerConfig } from './mcp';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
@@ -210,6 +210,43 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
         const count = revertAllCheckpoints();
         this._view?.webview.postMessage({ type: 'revertResult', count, msg: `Vraceno ${count} fajl(ova) na originale.` });
+        break;
+      }
+      case 'revertFile': {
+        const fp = message.filePath as string;
+        if (!fp) break;
+        const ok = revertCheckpoint(fp);
+        const remaining = getCheckpoints();
+        this._view?.webview.postMessage({
+          type: 'fileReverted',
+          filePath: fp,
+          success: ok,
+          remaining: remaining.length,
+        });
+        if (remaining.length === 0) {
+          this._view?.webview.postMessage({ type: 'checkpointSaved', count: 0 });
+        } else {
+          this._view?.webview.postMessage({ type: 'checkpointSaved', count: remaining.length });
+        }
+        break;
+      }
+      case 'applyCode': {
+        const code = message.code as string;
+        if (!code) break;
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+          editor.edit(editBuilder => {
+            if (editor.selection.isEmpty) {
+              editBuilder.insert(editor.selection.active, code);
+            } else {
+              editBuilder.replace(editor.selection, code);
+            }
+          });
+        } else {
+          vscode.workspace.openTextDocument({ content: code }).then(doc => {
+            vscode.window.showTextDocument(doc);
+          });
+        }
         break;
       }
       case 'openFile': {

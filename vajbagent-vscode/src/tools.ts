@@ -59,7 +59,11 @@ function saveCheckpoint(filePath: string) {
   const original = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : '';
   _checkpoints.set(filePath, { filePath, originalContent: original, timestamp: Date.now() });
   if (_postMessage) {
-    _postMessage({ type: 'checkpointSaved', count: _checkpoints.size });
+    const files = Array.from(_checkpoints.keys()).map(f => {
+      const parts = f.replace(/\\/g, '/').split('/');
+      return { full: f, short: parts.slice(-2).join('/') };
+    });
+    _postMessage({ type: 'checkpointSaved', count: _checkpoints.size, files });
   }
 }
 
