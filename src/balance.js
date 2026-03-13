@@ -188,6 +188,11 @@ const PRICES = {
 
 const DEFAULT_PRICE = { in: 3, out: 15 };
 
+/** Public copy for admin UI (single source of truth with providerCostUsd). */
+export function getPrices() {
+  return { ...PRICES };
+}
+
 function getPrice(model) {
   if (model && PRICES[model]) return PRICES[model];
   const m = (model || '').toLowerCase();

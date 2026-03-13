@@ -20,7 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { logUsage, getUsageSummary, getUsageForKey, getModelStats } from './usage.js';
-import { getBalance, deductBalance, costUsd, addBalance, getTotalDeposited, loadStudentMarkupFlags, setStudentNoMarkup, getStudentMarkup, providerCostUsd } from './balance.js';
+import { getBalance, deductBalance, costUsd, addBalance, getTotalDeposited, loadStudentMarkupFlags, setStudentNoMarkup, getStudentMarkup, providerCostUsd, getPrices } from './balance.js';
 import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP } from './students.js';
 import { sendWelcomeEmail, sendRecoveryEmail, isEmailConfigured } from './email.js';
 
@@ -1349,6 +1349,7 @@ app.get('/admin/api/overview', adminLimiter, async (req, res) => {
     models: VAJB_MODELS.map((m) => ({
       id: m.id, name: m.name, backend: m.backend, backendModel: m.backendModel, desc: m.desc,
     })),
+    prices: getPrices(),
     users,
     markup: {
       openai: getStudentMarkup('gpt-5'),

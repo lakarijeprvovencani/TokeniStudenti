@@ -289,16 +289,17 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
 
 <script>
 let secret='';
-let DATA={models:[],users:[],markup:1,students:[],model_stats:{},first_use:null,totals:{provider_cost_usd:0,charged_usd:0,profit_usd:0}};
+let DATA={models:[],users:[],markup:1,students:[],model_stats:{},first_use:null,totals:{provider_cost_usd:0,charged_usd:0,profit_usd:0},prices:null};
 let lastKey='';
-const PRICES={
+// Fallback ako overview još nije učitan (koristi se DATA.prices iz backend-a)
+const PRICES_FALLBACK={
   'gpt-5-mini':{in:0.25,out:2},'o4-mini':{in:1.1,out:4.4},'gpt-5':{in:1.25,out:10},'gpt-5.4':{in:2.5,out:15},
   'claude-sonnet-4-6':{in:3,out:15},'claude-opus-4-6':{in:5,out:25},
   'gpt-4.1-mini':{in:.4,out:1.6},'gpt-4.1':{in:2,out:8},
   'gpt-4o-mini':{in:.15,out:.6},'gpt-4o':{in:2.5,out:10},
   'claude-haiku-4-5':{in:1,out:5},
-  'gpt-5-nano':{in:.05,out:.4},'MiniMax-M2.5':{in:.5,out:2},'MiniMax-M2.1':{in:.5,out:2}
 };
+function PRICES(){ return DATA.prices||PRICES_FALLBACK; }
 const AVG_IN=8000,AVG_OUT=1200;
 
 function $(id){return document.getElementById(id)}
@@ -321,7 +322,7 @@ function doLogin(){
   secret=$('secretIn').value.trim();
   if(!secret)return;
   api('GET','/admin/api/overview?secret='+encodeURIComponent(secret))
-    .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;DATA.totals=d.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0};return api('GET','/admin/students?secret='+encodeURIComponent(secret))})
+    .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.prices=d.prices||null;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;DATA.totals=d.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0};return api('GET','/admin/students?secret='+encodeURIComponent(secret))})
     .then(s=>{if(s.error)throw s;DATA.students=s;localStorage.setItem('vajb_admin',secret);showApp();renderAll()})
     .catch(()=>{showLogin();$('loginErr').style.display='block'});
 }
@@ -343,7 +344,7 @@ function refresh(){
     api('GET','/admin/api/overview?secret='+encodeURIComponent(secret)),
     api('GET','/admin/students?secret='+encodeURIComponent(secret))
   ]).then(([ov,st])=>{
-    if(!ov.error){DATA.models=ov.models;DATA.users=ov.users;DATA.markup=ov.markup;DATA.model_stats=ov.model_stats||{};DATA.first_use=ov.first_use||null;DATA.totals=ov.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0}}
+    if(!ov.error){DATA.models=ov.models;DATA.users=ov.users;DATA.markup=ov.markup;DATA.prices=ov.prices||null;DATA.model_stats=ov.model_stats||{};DATA.first_use=ov.first_use||null;DATA.totals=ov.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0}}
     if(!st.error)DATA.students=st;
     renderAll();
   });
@@ -392,7 +393,7 @@ function renderOverview(){
 
   let inCost=0,outCost=0;
   for(const m of DATA.models){
-    const p=PRICES[m.backendModel]||{in:3,out:15};
+    const p=PRICES()[m.backendModel]||{in:3,out:15};
     const st=ms[m.backendModel]||{input_tokens:0,output_tokens:0};
     inCost+=(st.input_tokens/1e6)*p.in;outCost+=(st.output_tokens/1e6)*p.out;
   }
@@ -408,7 +409,7 @@ function renderOverview(){
   const colors=['var(--orange)','var(--orange2)','var(--orange)','var(--orange2)','var(--orange)'];
   let maxCost=0;
   const modelData=DATA.models.map((m,i)=>{
-    const p=PRICES[m.backendModel]||{in:3,out:15};
+    const p=PRICES()[m.backendModel]||{in:3,out:15};
     const st=ms[m.backendModel]||{input_tokens:0,output_tokens:0,requests:0};
     const cost=(st.input_tokens/1e6)*p.in+(st.output_tokens/1e6)*p.out;
     const perReq=st.requests>0?cost/st.requests:0;
@@ -560,7 +561,7 @@ function creditAction(sign){
 function renderModels(){
   const tb=$('modBody');tb.innerHTML='';
   DATA.models.forEach(m=>{
-    const p=PRICES[m.backendModel]||{in:0,out:0};
+    const p=PRICES()[m.backendModel]||{in:0,out:0};
     const cost=(AVG_IN/1e6)*p.in+(AVG_OUT/1e6)*p.out;
     const tag=m.backend==='openai'?'tag-openai':'tag-anthropic';
     tb.innerHTML+=`<tr>
@@ -582,7 +583,7 @@ function renderEarnings(){
     const earn=budget-real;
     let html=`<div class="earn-block"><div class="earn-block-title">Student dopuni $${budget} → tvoja zarada <span class="earn-amt">$${earn.toFixed(2)}</span></div><div class="earn-grid">`;
     DATA.models.forEach(m=>{
-      const p=PRICES[m.backendModel]||{in:3,out:15};
+      const p=PRICES()[m.backendModel]||{in:3,out:15};
       const cost=(AVG_IN/1e6)*p.in+(AVG_OUT/1e6)*p.out;
       const reqs=cost>0?Math.floor(real/cost):0;
       const hrs=reqs>0?(reqs*2.5/60).toFixed(0):'0';
@@ -603,7 +604,7 @@ function doAdminLogout(){localStorage.removeItem('vajb_admin');secret='';showLog
     let retries=0;
     const tryLogin=()=>{
       api('GET','/admin/api/overview?secret='+encodeURIComponent(secret))
-        .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;DATA.totals=d.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0};return api('GET','/admin/students?secret='+encodeURIComponent(secret))})
+        .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.prices=d.prices||null;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;DATA.totals=d.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0};return api('GET','/admin/students?secret='+encodeURIComponent(secret))})
         .then(s2=>{if(s2.error)throw s2;DATA.students=s2;showApp();renderAll()})
         .catch(()=>{
           if(retries<2){retries++;setTimeout(tryLogin,2000)}
