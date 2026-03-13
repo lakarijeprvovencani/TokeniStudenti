@@ -100,17 +100,17 @@ section{max-width:1100px;margin:0 auto;padding:80px 24px}
 .price-table .ctx{font-size:.72rem;color:var(--text3)}
 
 .cmp{background:var(--surface);border:1px solid var(--border2);border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.2);overflow-x:auto;-webkit-overflow-scrolling:touch}
-.cmp-head{display:grid;grid-template-columns:1.8fr 1fr 1fr 1fr;border-bottom:2px solid var(--border2);background:var(--surface2)}
+.cmp-head{display:grid;grid-template-columns:1.8fr 1fr 1fr;border-bottom:2px solid var(--border2);background:var(--surface2)}
 .cmp-head div{padding:16px 20px;font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);font-weight:700}
 .cmp-head .col-va{color:var(--orange);text-align:center;background:rgba(249,115,22,.12);border-left:1px solid rgba(249,115,22,.25);border-right:1px solid rgba(249,115,22,.25);font-weight:800}
 .cmp-head .col-cp{text-align:center;border-left:1px solid var(--border2);color:var(--text2)}
-.cmp-row{display:grid;grid-template-columns:1.8fr 1fr 1fr 1fr;border-bottom:1px solid var(--border2);min-height:52px}
+.cmp-row{display:grid;grid-template-columns:1.8fr 1fr 1fr;border-bottom:1px solid var(--border2);min-height:52px}
 .cmp-row:nth-child(even){background:rgba(255,255,255,.02)}
 .cmp-row:last-child{border-bottom:none}
 .cmp-row div{padding:14px 16px;font-size:.85rem;display:flex;align-items:center}
 .cmp-row div:first-child{color:var(--text2);font-weight:500;border-right:1px solid var(--border2)}
 .cmp-row div:nth-child(2){justify-content:center;text-align:center;background:rgba(249,115,22,.08);border-left:1px solid rgba(249,115,22,.2);border-right:1px solid rgba(249,115,22,.2);font-weight:700;color:var(--orange);font-size:.85rem}
-.cmp-row div:nth-child(3),.cmp-row div:nth-child(4){justify-content:center;text-align:center;color:var(--text);border-left:1px solid var(--border2);font-size:.85rem;font-weight:500}
+.cmp-row div:nth-child(3){justify-content:center;text-align:center;color:var(--text);border-left:1px solid var(--border2);font-size:.85rem;font-weight:500}
 .cmp-row .win{color:var(--orange)}
 
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
@@ -150,6 +150,39 @@ section{max-width:1100px;margin:0 auto;padding:80px 24px}
 .mini-cta a{display:inline-block;padding:12px 26px;background:var(--orange);color:#000;border-radius:10px;font-size:.9rem;font-weight:700;transition:all .2s}
 .mini-cta a:hover{opacity:.9;transform:translateY(-1px)}
 
+.demo-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.demo-card{background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:0;overflow:hidden;transition:all .25s}
+.demo-card:hover{border-color:rgba(249,115,22,.4);box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.demo-label{padding:14px 20px 10px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--orange);display:flex;align-items:center;gap:8px}
+.demo-dot{width:8px;height:8px;border-radius:50%;background:var(--orange);animation:pulse 2s infinite}
+.demo-mock{background:#0d0d0d;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:8px;font-size:.82rem;min-height:220px}
+.dm-header{display:flex;justify-content:space-between;align-items:center;padding:4px 0 8px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:4px}
+.dm-brand{font-size:.82rem;font-weight:800;color:var(--text)}.dm-brand b{color:var(--orange)}
+.dm-tokens{font-size:.65rem;color:var(--text3);font-family:'SF Mono',monospace}
+.dm-plan{font-size:.65rem;background:rgba(249,115,22,.15);color:var(--orange);padding:3px 8px;border-radius:4px;font-weight:700}
+.dm-undo{font-size:.65rem;background:rgba(249,115,22,.15);color:var(--orange);padding:3px 8px;border-radius:4px;font-weight:700}
+.dm-bubble{padding:10px 14px;border-radius:10px;line-height:1.55;max-width:92%}
+.dm-user{background:var(--orange);color:#000;font-weight:600;align-self:flex-end;border-radius:10px 10px 3px 10px;font-size:.82rem}
+.dm-agent{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:10px 10px 10px 3px;font-size:.82rem}
+.dm-tool{font-size:.72rem;color:var(--text3);background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:6px 10px;display:flex;align-items:center;gap:6px}
+.dm-tool em{color:var(--text2);font-style:normal;flex:1}
+.dm-done{color:#4ec9b0;font-size:.65rem;font-weight:600}
+.dm-files{font-size:.72rem;color:var(--text2);background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.15);border-radius:8px;padding:8px 12px;line-height:1.7}
+.dm-files span{color:var(--orange);font-weight:600;cursor:default}
+.dm-files b{color:var(--text);display:block;margin-bottom:2px}
+.dm-revert{color:var(--orange);font-style:normal;cursor:default;margin-left:4px}
+.dm-plan-box{background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.2);border-radius:10px;padding:12px 14px}
+.dm-plan-title{font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:8px}
+.dm-plan-btns{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.dm-btn-exec{background:var(--orange);color:#000;padding:5px 12px;border-radius:6px;font-size:.7rem;font-weight:700}
+.dm-btn-phase{background:rgba(255,255,255,.08);color:var(--text);padding:5px 12px;border-radius:6px;font-size:.7rem;font-weight:600;border:1px solid rgba(255,255,255,.1)}
+.dm-btn-cancel{color:var(--text3);font-size:.7rem;padding:5px 10px}
+.dm-phase{font-size:.78rem;color:var(--text2);padding:3px 0;display:flex;align-items:center;gap:6px}
+.dm-pn{color:var(--orange);font-weight:700;min-width:18px}
+.dm-path{color:var(--orange);font-family:'SF Mono',monospace;font-size:.75rem}
+.demo-desc{padding:14px 20px 18px;font-size:.85rem;color:var(--text2);line-height:1.6}
+@media(max-width:800px){.demo-grid{grid-template-columns:1fr}}
+
 .cta{text-align:center;padding:80px 24px 100px;position:relative}
 .cta::before{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,.05),transparent 65%);pointer-events:none}
 .cta h2{font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;letter-spacing:-.03em;margin-bottom:10px}
@@ -175,7 +208,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
   .tiers{grid-template-columns:repeat(4,1fr);max-width:100%}
   .sum-grid{grid-template-columns:1fr}
   .cursor-intro{grid-template-columns:1fr}
-  .cmp-head,.cmp-row{grid-template-columns:1.4fr 1fr 1fr 1fr}
+  .cmp-head,.cmp-row{grid-template-columns:1.4fr 1fr 1fr}
 }
 @media(max-width:700px){
   .tiers{grid-template-columns:repeat(3,1fr)}
@@ -192,7 +225,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
   .pathway::before{display:none}
   .pathway-step{flex-direction:row;gap:16px;padding:20px}
   .pathway-step .p-num{width:42px;height:42px;font-size:1rem}
-  .cmp-head,.cmp-row{grid-template-columns:1.4fr 1fr 1fr 1fr}
+  .cmp-head,.cmp-row{grid-template-columns:1.4fr 1fr 1fr}
   .cmp-row div{padding:10px 10px;font-size:.72rem}
   .hero h1{font-size:2rem}
   .hero p{font-size:.92rem}
@@ -303,9 +336,6 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     </div>
   </div>
 
-  <div class="pathway-note">
-    <p><strong>Već koristiš Cline ili drugi alat?</strong> VajbAgent može da se koristi i kao API provider za Cline ili Cursor Models — uneseš Base URL i API ključ u podešavanjima. Ali preporučujemo VajbAgent ekstenziju jer koristi native tool calling i troši manje tokena.</p>
-  </div>
 </section>
 
 <section id="modeli">
@@ -377,7 +407,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 
 <section id="uporedi">
   <div class="stag">Uporedi</div>
-  <div class="stitle">VajbAgent vs Cursor vs Cline: <em>realna poređenja</em></div>
+  <div class="stitle">VajbAgent vs Cursor: <em>realna poređenja</em></div>
   <div class="ssub">Koliko sati kodiranja dobiješ za isti budžet? Bazirano na realnim podacima.</div>
 
   <div class="cmp">
@@ -385,18 +415,17 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
       <div>Karakteristika</div>
       <div class="col-va">VajbAgent</div>
       <div class="col-cp">Cursor Pro</div>
-      <div class="col-cp">Cline</div>
     </div>
-    <div class="cmp-row"><div>Mesečna cena</div><div class="win">$0 — plati koliko koristiš</div><div>$20/mesec fiksno</div><div>$0 + API troškovi</div></div>
-    <div class="cmp-row"><div>Sati kodiranja za $15</div><div class="win">~63h (Lite)</div><div>~7.5h</div><div>~57h (GPT-5 Mini)</div></div>
-    <div class="cmp-row"><div>Sati kodiranja za $15 (Sonnet)</div><div class="win">~8h</div><div>~7.5h</div><div>~5h</div></div>
-    <div class="cmp-row"><div>Tool calling</div><div class="win">Native JSON</div><div>Interno</div><div>XML → native (v3.35)</div></div>
-    <div class="cmp-row"><div>Token overhead</div><div class="win">Minimalan</div><div>Nizak</div><div>Visok (context bloat)</div></div>
-    <div class="cmp-row"><div>Radi u Cursoru (free)</div><div class="win">Da</div><div>—</div><div>Ne (treba Pro)</div></div>
-    <div class="cmp-row"><div>Radi u VS Code-u</div><div class="win">Da</div><div>—</div><div>Da</div></div>
-    <div class="cmp-row"><div>Broj modela</div><div class="win">7 nivoa</div><div>Ograničen</div><div>Svi (tvoj API)</div></div>
-    <div class="cmp-row"><div>Pretplata</div><div class="win">Bez obaveze</div><div>Mesečna</div><div>Bez obaveze</div></div>
-    <div class="cmp-row"><div>Kontekst GPT-5.4</div><div class="win">1.05M tokena</div><div>—</div><div>1.05M tokena</div></div>
+    <div class="cmp-row"><div>Mesečna cena</div><div class="win">$0 — plati koliko koristiš</div><div>$20/mesec fiksno</div></div>
+    <div class="cmp-row"><div>Sati kodiranja za $15</div><div class="win">~63h (Lite)</div><div>~7.5h</div></div>
+    <div class="cmp-row"><div>Sati kodiranja za $15 (Sonnet)</div><div class="win">~8h</div><div>~7.5h</div></div>
+    <div class="cmp-row"><div>Tool calling</div><div class="win">Native JSON</div><div>Interno</div></div>
+    <div class="cmp-row"><div>Token overhead</div><div class="win">Minimalan</div><div>Nizak</div></div>
+    <div class="cmp-row"><div>Radi u Cursoru (free)</div><div class="win">Da</div><div>—</div></div>
+    <div class="cmp-row"><div>Radi u VS Code-u</div><div class="win">Da</div><div>—</div></div>
+    <div class="cmp-row"><div>Broj modela</div><div class="win">7 nivoa</div><div>Ograničen</div></div>
+    <div class="cmp-row"><div>Pretplata</div><div class="win">Bez obaveze</div><div>Mesečna</div></div>
+    <div class="cmp-row"><div>Kontekst GPT-5.4</div><div class="win">1.05M tokena</div><div>—</div></div>
   </div>
   <div class="mini-cta">
     <p>Probaj besplatno uz $2 na poklon, bez kartice.</p>
@@ -438,6 +467,74 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
       <div class="bcard-icon">⚡</div>
       <h3>Ultra / Architect</h3>
       <p>"Napravi backend sa autentikacijom." "Proveri security." Claude Opus 4.6 — premium AI.</p>
+    </div>
+  </div>
+</section>
+
+<section id="u-akciji">
+  <div class="stag">Mogućnosti</div>
+  <div class="stitle">Pogledaj VajbAgent <em>u akciji</em></div>
+  <div class="ssub">Evo šta sve radi — direktno u tvom editoru, bez napuštanja koda.</div>
+
+  <div class="demo-grid">
+    <div class="demo-card">
+      <div class="demo-label"><span class="demo-dot"></span> Chat sa AI agentom</div>
+      <div class="demo-mock">
+        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-tokens">2.1K / 400K</span></div>
+        <div class="dm-bubble dm-user">Napravi mi login stranicu sa formom</div>
+        <div class="dm-tool"><span>▶</span> write_file <em>public/login.html</em> <span class="dm-done">done</span></div>
+        <div class="dm-tool"><span>▶</span> write_file <em>public/login.css</em> <span class="dm-done">done</span></div>
+        <div class="dm-bubble dm-agent">Napravio sam login stranicu sa:<br>• Responzivna forma (email + password)<br>• Validacija polja<br>• Dark tema sa narandžastim akcentom<br>• Animirana "Prijavi se" dugmad</div>
+        <div class="dm-files"><b>Izmenjeni fajlovi (2)</b><br><span>public/login.html</span> · <span>public/login.css</span></div>
+      </div>
+      <p class="demo-desc">Opiši šta želiš — agent čita, piše i menja fajlove za tebe. Sve vidiš u chatu, ništa se ne dešava iza scene.</p>
+    </div>
+
+    <div class="demo-card">
+      <div class="demo-label"><span class="demo-dot"></span> Plan Mode — faze</div>
+      <div class="demo-mock">
+        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-plan">📋 Plan</span></div>
+        <div class="dm-bubble dm-user">[Plan] Napravi todo app sa dodavanjem i brisanjem</div>
+        <div class="dm-plan-box">
+          <div class="dm-plan-title">Plan spreman — 4 faze</div>
+          <div class="dm-plan-btns"><span class="dm-btn-exec">Izvrši ceo plan</span><span class="dm-btn-phase">Faza 1 ▶</span><span class="dm-btn-cancel">Otkaži</span></div>
+          <div class="dm-phase"><span class="dm-pn">1.</span> Priprema projekta i fajlova</div>
+          <div class="dm-phase"><span class="dm-pn">2.</span> Backend: API rute i logika</div>
+          <div class="dm-phase"><span class="dm-pn">3.</span> Frontend: UI komponente</div>
+          <div class="dm-phase"><span class="dm-pn">4.</span> Testiranje i clean-up</div>
+        </div>
+      </div>
+      <p class="demo-desc">Složene projekte razbija na faze. Ti kontrolišeš tempo — izvršavaš jednu po jednu ili sve odjednom.</p>
+    </div>
+
+    <div class="demo-card">
+      <div class="demo-label"><span class="demo-dot"></span> Automatski popravlja greške</div>
+      <div class="demo-mock">
+        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-undo">↩ Undo (1)</span></div>
+        <div class="dm-bubble dm-user">Imam li neke greške u projektu?</div>
+        <div class="dm-tool"><span>▶</span> read_file <em>src/app.ts</em> <span class="dm-done">done</span></div>
+        <div class="dm-tool"><span>▶</span> replace_in_file <em>src/app.ts</em> <span class="dm-done">done</span></div>
+        <div class="dm-bubble dm-agent">Pronašao sam i popravio <b>2 greške</b>:<br>• Nedostajao import za Router<br>• Pogrešan tip u handleError()<br>Sve je sada čisto ✓</div>
+        <div class="dm-files"><b>Izmenjeni fajlovi (1)</b><br><span>src/app.ts</span> <em class="dm-revert">↩</em></div>
+      </div>
+      <p class="demo-desc">Vidi greške iz VS Code dijagnostike, čita fajl, popravlja problem i nudi ti Undo ako želiš da vratiš.</p>
+    </div>
+
+    <div class="demo-card">
+      <div class="demo-label"><span class="demo-dot"></span> Razume tvoj projekat</div>
+      <div class="demo-mock">
+        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-tokens">0.7K / 400K</span></div>
+        <div class="dm-bubble dm-user">Koja je struktura projekta?</div>
+        <div class="dm-bubble dm-agent" style="font-size:.78rem;line-height:1.7">
+          <b>Struktura:</b><br>
+          <span class="dm-path">📂 src/</span> — backend (Express)<br>
+          <span class="dm-path">📂 public/</span> — frontend stranice<br>
+          <span class="dm-path">📄 package.json</span> — Node.js<br>
+          <span class="dm-path">📄 .env</span> — konfiguracija<br><br>
+          <em style="color:#999">Odgovor bez tool poziva — već zna strukturu</em>
+        </div>
+      </div>
+      <p class="demo-desc">Automatski indeksira tvoj workspace. Zna strukturu, tehnologije, Git stanje i koji fajl gledaš — pre nego što ga ista pitaš.</p>
     </div>
   </div>
 </section>
