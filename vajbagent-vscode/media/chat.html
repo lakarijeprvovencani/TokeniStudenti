@@ -1669,30 +1669,8 @@
         3. Klikni na ⚙️ gore desno → nalepi kljuc i sacuvaj
       </div>
       <div id="welcomeCardsSection">
-        <div class="welcome-cards">
-          <div class="welcome-card" data-prompt="Napravi mi novu web aplikaciju">
-            <div class="welcome-card-icon">🚀</div>
-            <div class="welcome-card-title">Nova aplikacija</div>
-            <div class="welcome-card-desc">Kreiraj projekat od nule</div>
-          </div>
-          <div class="welcome-card" data-prompt="Pogledaj moj kod i predlozi poboljsanja">
-            <div class="welcome-card-icon">🔍</div>
-            <div class="welcome-card-title">Analiziraj kod</div>
-            <div class="welcome-card-desc">Review i poboljsanja</div>
-          </div>
-          <div class="welcome-card" data-prompt="Imam bug u kodu, pomozi mi da ga popravim">
-            <div class="welcome-card-icon">🐛</div>
-            <div class="welcome-card-title">Popravi bug</div>
-            <div class="welcome-card-desc">Debug i resavanje gresaka</div>
-          </div>
-          <div class="welcome-card" data-prompt="Objasni mi kako radi ovaj deo koda">
-            <div class="welcome-card-icon">💡</div>
-            <div class="welcome-card-title">Objasni kod</div>
-            <div class="welcome-card-desc">Razumevanje i ucenje</div>
-          </div>
-        </div>
         <div class="welcome-hint welcome-hint-tip">
-          💡 Za vece zadatke, ukljuci <strong style="color:#FA7315;">Plan Mode</strong> <span style="opacity:0.4;">(📋 dole)</span> — agent pravi plan pre izmena. Klikni <strong style="color:var(--vscode-foreground);">?</strong> gore za vodic.
+          💡 Za vece zadatke, ukljuci <strong style="color:#FA7315;">Plan Mode</strong> <span style="opacity:0.4;">(📋 dole)</span> — agent pravi plan sa fazama pre izmena. Klikni <strong style="color:var(--vscode-foreground);">?</strong> gore za vodic.
         </div>
       </div>
 
@@ -1810,16 +1788,6 @@
 
     let isStreaming = false;
     let pendingImages = [];
-
-    document.querySelectorAll('.welcome-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const prompt = card.getAttribute('data-prompt');
-        if (prompt && !isStreaming) {
-          userInput.value = prompt;
-          userInput.focus();
-        }
-      });
-    });
 
     // Auto-resize textarea
     userInput.addEventListener('input', () => {
@@ -2337,13 +2305,7 @@
           messagesEl.innerHTML = '';
           const w = document.createElement('div');
           w.className = 'welcome-msg';
-          w.innerHTML = '<div class="welcome-brand"><span class="v">&lt;</span>VajbAgent<span class="v">/&gt;</span></div><h3>Tvoj AI coding asistent</h3><div class="welcome-cards"><div class="welcome-card" data-prompt="Napravi mi novu web aplikaciju"><div class="welcome-card-icon">🚀</div><div class="welcome-card-title">Nova aplikacija</div><div class="welcome-card-desc">Kreiraj projekat od nule</div></div><div class="welcome-card" data-prompt="Pogledaj moj kod i predlozi poboljsanja"><div class="welcome-card-icon">🔍</div><div class="welcome-card-title">Analiziraj kod</div><div class="welcome-card-desc">Review i poboljsanja</div></div><div class="welcome-card" data-prompt="Imam bug u kodu, pomozi mi da ga popravim"><div class="welcome-card-icon">🐛</div><div class="welcome-card-title">Popravi bug</div><div class="welcome-card-desc">Debug i resavanje gresaka</div></div><div class="welcome-card" data-prompt="Objasni mi kako radi ovaj deo koda"><div class="welcome-card-icon">💡</div><div class="welcome-card-title">Objasni kod</div><div class="welcome-card-desc">Razumevanje i ucenje</div></div></div><div class="welcome-hint welcome-hint-tip">💡 Za vece zadatke, ukljuci <strong style="color:#FA7315;">Plan Mode</strong> <span style="opacity:0.4;">(📋 dole)</span> — agent pravi plan pre izmena.</div><div class="welcome-powered">Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski · Kreirao <strong>Nemanja Lakic</strong></div>';
-          w.querySelectorAll('.welcome-card').forEach(card => {
-            card.addEventListener('click', () => {
-              const prompt = card.getAttribute('data-prompt');
-              if (prompt && !isStreaming) { userInput.value = prompt; userInput.focus(); }
-            });
-          });
+          w.innerHTML = '<div class="welcome-brand"><span class="v">&lt;</span>VajbAgent<span class="v">/&gt;</span></div><h3>Tvoj AI coding asistent</h3><div class="welcome-hint welcome-hint-tip">💡 Za vece zadatke, ukljuci <strong style="color:#FA7315;">Plan Mode</strong> <span style="opacity:0.4;">(📋 dole)</span> — agent pravi plan sa fazama pre izmena.</div><div class="welcome-powered">Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski · Kreirao <strong>Nemanja Lakic</strong></div>';
           messagesEl.appendChild(w);
           currentAssistantEl = null;
           currentAssistantRawText = '';
