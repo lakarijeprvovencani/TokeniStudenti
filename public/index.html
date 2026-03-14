@@ -99,19 +99,6 @@ section{max-width:1100px;margin:0 auto;padding:80px 24px}
 .price-table .highlight{color:var(--orange);font-weight:700}
 .price-table .ctx{font-size:.72rem;color:var(--text3)}
 
-.cmp{background:var(--surface);border:1px solid var(--border2);border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.2);overflow-x:auto;-webkit-overflow-scrolling:touch}
-.cmp-head{display:grid;grid-template-columns:1.8fr 1fr 1fr;border-bottom:2px solid var(--border2);background:var(--surface2)}
-.cmp-head div{padding:16px 20px;font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);font-weight:700}
-.cmp-head .col-va{color:var(--orange);text-align:center;background:rgba(249,115,22,.12);border-left:1px solid rgba(249,115,22,.25);border-right:1px solid rgba(249,115,22,.25);font-weight:800}
-.cmp-head .col-cp{text-align:center;border-left:1px solid var(--border2);color:var(--text2)}
-.cmp-row{display:grid;grid-template-columns:1.8fr 1fr 1fr;border-bottom:1px solid var(--border2);min-height:52px}
-.cmp-row:nth-child(even){background:rgba(255,255,255,.02)}
-.cmp-row:last-child{border-bottom:none}
-.cmp-row div{padding:14px 16px;font-size:.85rem;display:flex;align-items:center}
-.cmp-row div:first-child{color:var(--text2);font-weight:500;border-right:1px solid var(--border2)}
-.cmp-row div:nth-child(2){justify-content:center;text-align:center;background:rgba(249,115,22,.08);border-left:1px solid rgba(249,115,22,.2);border-right:1px solid rgba(249,115,22,.2);font-weight:700;color:var(--orange);font-size:.85rem}
-.cmp-row div:nth-child(3){justify-content:center;text-align:center;color:var(--text);border-left:1px solid var(--border2);font-size:.85rem;font-weight:500}
-.cmp-row .win{color:var(--orange)}
 
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .step-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;text-align:center;transition:border-color .2s}
@@ -208,7 +195,6 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
   .tiers{grid-template-columns:repeat(4,1fr);max-width:100%}
   .sum-grid{grid-template-columns:1fr}
   .cursor-intro{grid-template-columns:1fr}
-  .cmp-head,.cmp-row{grid-template-columns:1.4fr 1fr 1fr}
 }
 @media(max-width:700px){
   .tiers{grid-template-columns:repeat(3,1fr)}
@@ -225,8 +211,6 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
   .pathway::before{display:none}
   .pathway-step{flex-direction:row;gap:16px;padding:20px}
   .pathway-step .p-num{width:42px;height:42px;font-size:1rem}
-  .cmp-head,.cmp-row{grid-template-columns:1.4fr 1fr 1fr}
-  .cmp-row div{padding:10px 10px;font-size:.72rem}
   .hero h1{font-size:2rem}
   .hero p{font-size:.92rem}
   section{padding:60px 20px}
@@ -246,12 +230,12 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     <span>Plati samo kad koristiš</span>
     <span>7 nivoa AI modela</span>
     <span>Bez mesečne obaveze</span>
-    <span>~63 sata kodiranja za $15</span>
+    <span>~50 sati kodiranja za $15</span>
     <span>Radi u Cursoru, VS Code-u i svuda</span>
     <span>Plati samo kad koristiš</span>
     <span>7 nivoa AI modela</span>
     <span>Bez mesečne obaveze</span>
-    <span>~63 sata kodiranja za $15</span>
+    <span>~50 sati kodiranja za $15</span>
   </div>
 </div>
 
@@ -261,7 +245,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     <div class="nav-links">
       <a href="#kako-funkcionise">Kako radi?</a>
       <a href="#modeli">Nivoi</a>
-      <a href="#uporedi">Uporedi</a>
+      <a href="#primeri">Primeri</a>
       <a href="/dashboard" class="btn-nav-login">Uloguj se</a>
       <a href="/dashboard?tab=register" class="btn-login">Počni besplatno</a>
     </div>
@@ -296,7 +280,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     <div class="intro-card">
       <span class="num">3</span>
       <h3>Platiš koliko koristiš</h3>
-      <p>Bez mesečne pretplate. Dopuniš kredit kad hoćeš, koristiš dok traje. $15 na Lite modelu = ~63 sata kodiranja.</p>
+      <p>Bez mesečne pretplate. Dopuniš kredit kad hoćeš, koristiš dok traje. $15 na Lite nivou = ~50 sati kodiranja.</p>
     </div>
   </div>
 </section>
@@ -331,7 +315,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
       <div class="p-wrap"><span class="p-num">🎁</span></div>
       <div>
         <h3>$2 na poklon kad napraviš nalog</h3>
-        <p>Dobijaš $2 kredita besplatno. To je ~250 zahteva na Lite, ili ~50 na Pro. Dovoljno da probaš sve bez kartice.</p>
+        <p>Dobijaš $2 kredita besplatno. To je ~200 zahteva na Lite, ili ~40 na Pro. Dovoljno da probaš sve bez kartice.</p>
       </div>
     </div>
   </div>
@@ -341,97 +325,70 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 <section id="modeli">
   <div class="stag">Nivoi</div>
   <div class="stitle">7 nivoa snage: <em>biraj po potrebi projekta</em></div>
-  <div class="ssub">Svaki nivo = drugi AI model = druga cena. Svi podaci su realni, bazirani na zvaničnim cenama provajdera.</div>
+  <div class="ssub">Svaki nivo = druga snaga = druga cena. Biraj po složenosti zadatka.</div>
   <div class="tiers">
     <div class="tier pop">
       <span class="tier-badge" aria-hidden="true">BEST VALUE</span>
       <div class="t-name">Lite</div>
       <div class="t-desc">Svakodnevno</div>
-      <div class="t-model">GPT-5 Mini · 400K kontekst</div>
-      <div class="t-val t-val-wide">~1.900</div>
+      <div class="t-model">Brz i efikasan · 400K kontekst</div>
+      <div class="t-val t-val-wide">~1.500</div>
       <div class="t-val-sub">zahteva za $15</div>
-      <div class="t-detail">~$0.008/req · ~63h kodiranja</div>
+      <div class="t-detail">~$0.010/req · ~50h kodiranja</div>
     </div>
     <div class="tier">
       <div class="t-name">Turbo</div>
       <div class="t-desc">Reasoning</div>
-      <div class="t-model">o4 Mini · 200K kontekst</div>
-      <div class="t-val">~590</div>
+      <div class="t-model">Razmišlja korak po korak · 200K kontekst</div>
+      <div class="t-val">~475</div>
       <div class="t-val-sub">zahteva za $15</div>
-      <div class="t-detail">~$0.025/req · ~20h kodiranja</div>
+      <div class="t-detail">~$0.032/req · ~16h kodiranja</div>
     </div>
     <div class="tier">
       <div class="t-name">Pro</div>
       <div class="t-desc">Jači projekti</div>
-      <div class="t-model">GPT-5 · 400K kontekst</div>
-      <div class="t-val">~380</div>
+      <div class="t-model">Jak generalist · 400K kontekst</div>
+      <div class="t-val">~295</div>
       <div class="t-val-sub">zahteva za $15</div>
-      <div class="t-detail">~$0.040/req · ~13h kodiranja</div>
+      <div class="t-detail">~$0.051/req · ~10h kodiranja</div>
     </div>
     <div class="tier">
       <div class="t-name">Power</div>
       <div class="t-desc">Flagship</div>
-      <div class="t-model">GPT-5.4 · 1.05M kontekst</div>
-      <div class="t-val">~220</div>
+      <div class="t-model">Najjači nivo · 1M+ kontekst</div>
+      <div class="t-val">~175</div>
       <div class="t-val-sub">zahteva za $15</div>
-      <div class="t-detail">~$0.068/req · ~7h kodiranja</div>
+      <div class="t-detail">~$0.086/req · ~6h kodiranja</div>
     </div>
     <div class="tier">
       <div class="t-name">Max</div>
       <div class="t-desc">Kompleksno</div>
-      <div class="t-model">Claude Sonnet 4.6 · 200K</div>
-      <div class="t-val">~245</div>
+      <div class="t-model">Balansiran premium · 200K kontekst</div>
+      <div class="t-val">~205</div>
       <div class="t-val-sub">zahteva za $15</div>
-      <div class="t-detail">~$0.061/req · ~8h kodiranja</div>
+      <div class="t-detail">~$0.073/req · ~7h kodiranja</div>
     </div>
     <div class="tier">
       <div class="t-name">Ultra</div>
       <div class="t-desc">Premium</div>
-      <div class="t-model">Claude Opus 4.6 · 200K</div>
-      <div class="t-val">~150</div>
+      <div class="t-model">Vrhunski AI · 200K kontekst</div>
+      <div class="t-val">~120</div>
       <div class="t-val-sub">zahteva za $15</div>
-      <div class="t-detail">~$0.101/req · ~5h kodiranja</div>
+      <div class="t-detail">~$0.125/req · ~4h kodiranja</div>
     </div>
     <div class="tier">
       <div class="t-name">Architect</div>
       <div class="t-desc">Arhitekta</div>
-      <div class="t-model">Opus 4.6 + prompt</div>
-      <div class="t-val">~150</div>
+      <div class="t-model">Premium + architect prompt</div>
+      <div class="t-val">~120</div>
       <div class="t-val-sub">zahteva za $15</div>
-      <div class="t-detail">~$0.101/req · ~5h kodiranja</div>
+      <div class="t-detail">~$0.125/req · ~4h kodiranja</div>
     </div>
   </div>
-  <p style="text-align:center;font-size:.78rem;color:var(--text2);margin-top:20px;max-width:700px;margin-left:auto;margin-right:auto;">Procena za aktivno kodiranje (~8K input + ~1.2K output tokena po zahtevu, ~30 req/sat). Kraća pitanja troše manje.</p>
+  <p style="text-align:center;font-size:.78rem;color:var(--text2);margin-top:20px;max-width:700px;margin-left:auto;margin-right:auto;">Procena za aktivno kodiranje (~30 zahteva/sat). Kraća pitanja troše manje tokena.</p>
 </section>
 
 
-<section id="uporedi">
-  <div class="stag">Uporedi</div>
-  <div class="stitle">VajbAgent vs Cursor: <em>realna poređenja</em></div>
-  <div class="ssub">Koliko sati kodiranja dobiješ za isti budžet? Bazirano na realnim podacima.</div>
-
-  <div class="cmp">
-    <div class="cmp-head">
-      <div>Karakteristika</div>
-      <div class="col-va">VajbAgent</div>
-      <div class="col-cp">Cursor Pro</div>
-    </div>
-    <div class="cmp-row"><div>Mesečna cena</div><div class="win">$0 — plati koliko koristiš</div><div>$20/mesec fiksno</div></div>
-    <div class="cmp-row"><div>Sati kodiranja za $15</div><div class="win">~63h (Lite)</div><div>~7.5h</div></div>
-    <div class="cmp-row"><div>Sati kodiranja za $15 (Sonnet)</div><div class="win">~8h</div><div>~7.5h</div></div>
-    <div class="cmp-row"><div>Tool calling</div><div class="win">Native JSON</div><div>Interno</div></div>
-    <div class="cmp-row"><div>Token overhead</div><div class="win">Minimalan</div><div>Nizak</div></div>
-    <div class="cmp-row"><div>Radi u Cursoru (free)</div><div class="win">Da</div><div>—</div></div>
-    <div class="cmp-row"><div>Radi u VS Code-u</div><div class="win">Da</div><div>—</div></div>
-    <div class="cmp-row"><div>Broj modela</div><div class="win">7 nivoa</div><div>Ograničen</div></div>
-    <div class="cmp-row"><div>Pretplata</div><div class="win">Bez obaveze</div><div>Mesečna</div></div>
-    <div class="cmp-row"><div>Kontekst GPT-5.4</div><div class="win">1.05M tokena</div><div>—</div></div>
-  </div>
-  <div class="mini-cta">
-    <p>Probaj besplatno uz $2 na poklon, bez kartice.</p>
-    <a href="/dashboard?tab=register">Napravi nalog</a>
-  </div>
-</section>
 
 <section id="primeri">
   <div class="stag">Primeri</div>
@@ -451,22 +408,22 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     <div class="bcard">
       <div class="bcard-icon">📝</div>
       <h3>Pro — jači projekti</h3>
-      <p>"Sredi mi ceo fajl." "Dodaj dark mode." "Napravi mi navbar." Kad Lite nije dovoljan, GPT-5 flagship.</p>
+      <p>"Sredi mi ceo fajl." "Dodaj dark mode." "Napravi mi navbar." Kad Lite nije dovoljan — jači generalist.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon">🚀</div>
-      <h3>Power — najjači OpenAI</h3>
-      <p>"Napravi mi celu aplikaciju." GPT-5.4, 1.05M kontekst. Za kad ti treba najjača mašina.</p>
+      <h3>Power — najjači nivo</h3>
+      <p>"Napravi mi celu aplikaciju." 1M+ kontekst. Za kad ti treba najjača mašina.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon">🏗️</div>
-      <h3>Max — Claude Sonnet</h3>
-      <p>"Zašto mi app puca?" "Pomozi da sredim strukturu." Anthropic-ov najjači balansiran model.</p>
+      <h3>Max — balansiran premium</h3>
+      <p>"Zašto mi app puca?" "Pomozi da sredim strukturu." Najjači balansiran nivo za kompleksne zadatke.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon">⚡</div>
       <h3>Ultra / Architect</h3>
-      <p>"Napravi backend sa autentikacijom." "Proveri security." Claude Opus 4.6 — premium AI.</p>
+      <p>"Napravi backend sa autentikacijom." "Proveri security." Vrhunski AI za najzahtevnije projekte.</p>
     </div>
   </div>
 </section>
@@ -577,7 +534,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
         <span class="win-line">Besplatna ekstenzija za Cursor i VS Code</span><br>
         <span class="win-line">Čita, piše i menja fajlove za tebe</span><br>
         <span class="win-line">Pokreće komande u terminalu</span><br>
-        <span class="win-line">7 nivoa AI modela (GPT-5, Claude, o4)</span><br>
+        <span class="win-line">7 nivoa AI modela — od Lite do Ultra</span><br>
         <span class="win-line">Platiš samo koliko potrošiš, bez pretplate</span>
       </p>
     </div>
@@ -594,29 +551,29 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
   </div>
 </section>
 
-<section id="cursor-cene">
-  <div class="stag">Uporedi cene</div>
+<section id="koliko-kosta">
+  <div class="stag">Cene</div>
   <div class="stitle">Koliko košta <em>AI kodiranje?</em></div>
-  <div class="ssub">VajbAgent nema mesečnu pretplatu. Platiš samo koliko koristiš.</div>
+  <div class="ssub">Bez mesečne pretplate. Dopuni kredit kad hoćeš, koristiš dok traje.</div>
   <div class="sum-grid">
     <div class="sum-card">
-      <h3>VajbAgent (plati koliko koristiš)</h3>
+      <h3>Preporučeni iznosi</h3>
       <p>
-        <span class="win-line"><b>$2</b> poklon za početak</span><br>
+        <span class="win-line"><b>$2</b> poklon za početak (besplatno)</span><br>
         <span class="win-line"><b>$5</b> za povremeno kodiranje</span><br>
         <span class="win-line"><b>$10–15</b> za redovno kodiranje</span><br>
         <span class="win-line"><b>$20–30</b> za intenzivno korišćenje</span><br>
         <span class="win-line"><b>Bez obaveze</b>, dopuni kad hoćeš</span>
       </p>
     </div>
-    <div class="sum-card sum-muted">
-      <h3>Cursor (mesečna pretplata)</h3>
+    <div class="sum-card">
+      <h3>Šta dobijaš za $15?</h3>
       <p>
-        <span class="win-line"><b>Free</b> $0 — ograničeni zahtevi</span><br>
-        <span class="win-line"><b>Pro</b> $20/mes — ~225 premium req</span><br>
-        <span class="win-line"><b>Pro+</b> $60/mes — 3x kredita</span><br>
-        <span class="win-line"><b>Ultra</b> $200/mes — enterprise</span><br>
-        <span class="win-line"><b>Mesečna obaveza</b></span>
+        <span class="win-line"><b>Lite</b> ~1.500 zahteva · ~50h kodiranja</span><br>
+        <span class="win-line"><b>Pro</b> ~295 zahteva · ~10h kodiranja</span><br>
+        <span class="win-line"><b>Max</b> ~205 zahteva · ~7h kodiranja</span><br>
+        <span class="win-line"><b>Ultra</b> ~120 zahteva · ~4h kodiranja</span><br>
+        <span class="win-line"><b>Kombinuj nivoe</b> kako hoćeš</span>
       </p>
     </div>
   </div>
@@ -625,12 +582,12 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 <section id="zasto-vajb">
   <div class="stag">Česta pitanja</div>
   <div class="stitle">Zašto VajbAgent ako mogu <em>sam da napravim API ključ?</em></div>
-  <div class="ssub">Da, možeš otići direktno na OpenAI ili Anthropic. Ali evo zašto ljudi biraju VajbAgent.</div>
+  <div class="ssub">Da, možeš sam da praviš API ključeve kod provajdera. Ali evo zašto ljudi biraju VajbAgent.</div>
   <div class="benefits" style="grid-template-columns:repeat(3,1fr);max-width:1000px;margin:0 auto">
     <div class="bcard">
       <div class="bcard-icon">🔑</div>
       <h3>Jedan ključ, svi modeli</h3>
-      <p>Umesto da praviš naloge na OpenAI, Anthropic, Google — dobijaš pristup svim modelima kroz jedan VajbAgent ključ.</p>
+      <p>Umesto da praviš naloge kod više provajdera — dobijaš pristup svim modelima kroz jedan VajbAgent ključ.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon">⚡</div>

@@ -330,15 +330,9 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     <div class="page" id="pg-setup">
       <div class="page-title">Podešavanja</div>
       
-      <div class="setup-tabs">
-        <button class="setup-tab active" onclick="showSetupTab('extension')">VajbAgent Ekstenzija <span class="tab-badge">Preporučeno</span></button>
-        <button class="setup-tab" onclick="showSetupTab('vscode')">Cline (alternativa)</button>
-        <button class="setup-tab" onclick="showSetupTab('cursor')">Cursor Models</button>
-      </div>
-
       <!-- VajbAgent Extension -->
-      <div class="card setup-panel active" id="setup-extension">
-        <div class="card-title">VajbAgent Ekstenzija (Preporučeno)</div>
+      <div class="card" id="setup-extension">
+        <div class="card-title">VajbAgent ekstenzija</div>
         <p class="setup-intro">Naša ekstenzija radi u <strong>Cursoru</strong> (čak i besplatna verzija!), <strong>VS Code-u</strong> i svim kompatibilnim editorima. Native tool calling, čita i menja fajlove, pokreće komande.</p>
 
         <div class="setup-step"><div class="step-num">1</div><div class="step-text">U editoru otvori <strong>Extensions</strong> (Ctrl+Shift+X / Cmd+Shift+X) ili direktno: <a href="https://marketplace.visualstudio.com/items?itemName=VajbAgent.vajbagent" target="_blank" rel="noopener" class="link-orange">VajbAgent na Marketplace-u</a> — klikni <strong>Install</strong> (otvara se Cursor ili VS Code i instalira).</div></div>
@@ -350,87 +344,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
         <div class="setup-step"><div class="step-num">4</div><div class="step-text">Izaberi model u footeru ekstenzije (Lite, Pro, Max...) i počni da kodiraš!</div></div>
 
-        <p class="setup-intro" style="margin-top:20px;padding:16px;background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.2);border-radius:10px;">Ekstenzija automatski koristi naš server — ne treba ti Base URL ni model ID. Samo API ključ i gotovo. <strong>Link za instalaciju:</strong> <a href="https://marketplace.visualstudio.com/items?itemName=VajbAgent.vajbagent" target="_blank" rel="noopener" class="link-orange">marketplace.visualstudio.com → VajbAgent</a></p>
-      </div>
-
-      <!-- VS Code + Cline (alternativa) -->
-      <div class="card setup-panel" id="setup-vscode">
-        <div class="card-title">Cline (Alternativa)</div>
-        <p class="setup-intro">Ako preferirate Cline ekstenziju umesto VajbAgent-a. VS Code je besplatan editor, Cline je besplatna AI ekstenzija.</p>
-
-        <div class="setup-step"><div class="step-num">1</div><div class="step-text">Ako nemaš VS Code, preuzmi ga sa <a href="https://code.visualstudio.com" target="_blank" class="link-orange">code.visualstudio.com</a></div></div>
-
-        <div class="setup-step"><div class="step-num">2</div><div class="step-text">U VS Code-u idi na <strong>Extensions</strong> (Ctrl+Shift+X), traži <strong>"Cline"</strong> i klikni <strong>Install</strong></div></div>
-
-        <div class="setup-step"><div class="step-num">3</div><div class="step-text">Otvori Cline panel → klikni na ⚙️ <strong>Settings</strong> → izaberi <strong>"OpenAI Compatible"</strong></div></div>
-
-        <div class="setup-step"><div class="step-num">4</div><div class="step-text">Unesi <strong>Base URL</strong>:</div></div>
-        <div class="copy-box"><code id="setupUrlVS">-</code><button onclick="copyEl('setupUrlVS')">Kopiraj</button></div>
-
-        <div class="setup-step"><div class="step-num">5</div><div class="step-text">Unesi <strong>API Key</strong>:</div></div>
-        <div class="copy-box"><code id="setupKeyVS">-</code><button onclick="copyEl('setupKeyVS')">Kopiraj</button></div>
-
-        <div class="setup-step"><div class="step-num">6</div><div class="step-text">U <strong>Model ID</strong> unesi model (npr. vajb-agent-lite) i klikni <strong>Save</strong></div></div>
-      </div>
-
-      <!-- Cursor -->
-      <div class="card setup-panel" id="setup-cursor">
-        <div class="card-title">Cursor IDE</div>
-        <p class="setup-intro">Cursor je odličan AI editor. Za korišćenje VajbAgenta potreban ti je <strong>Cursor Pro plan ($20/mes)</strong> jer besplatna verzija ne podržava eksterne API-je.</p>
-        
-        <div class="setup-step"><div class="step-num">1</div><div class="step-text">Otvori <strong>Cursor</strong> → Settings → <strong>Models</strong></div></div>
-        
-        <div class="setup-step"><div class="step-num">2</div><div class="step-text">Proširi <strong>OpenAI API Key</strong> sekciju i unesi svoj API ključ:</div></div>
-        <div class="copy-box"><code id="setupKey">-</code><button onclick="copyEl('setupKey')">Kopiraj</button></div>
-        
-        <div class="setup-step"><div class="step-num">3</div><div class="step-text">Uključi <strong>Override OpenAI Base URL</strong> i unesi:</div></div>
-        <div class="copy-box"><code id="setupUrl">-</code><button onclick="copyEl('setupUrl')">Kopiraj</button></div>
-        
-        <div class="setup-step"><div class="step-num">4</div><div class="step-text">Klikni <strong>+ Add Custom Model</strong> i dodaj model:</div></div>
-        <div style="margin-left:44px">
-          <div class="copy-box"><code>vajb-agent-lite</code><button onclick="copyText('vajb-agent-lite')">Kopiraj</button></div>
-          <div class="copy-box"><code>vajb-agent-turbo</code><button onclick="copyText('vajb-agent-turbo')">Kopiraj</button></div>
-          <div class="copy-box"><code>vajb-agent-pro</code><button onclick="copyText('vajb-agent-pro')">Kopiraj</button></div>
-          <div class="copy-box"><code>vajb-agent-max</code><button onclick="copyText('vajb-agent-max')">Kopiraj</button></div>
-          <div class="copy-box"><code>vajb-agent-power</code><button onclick="copyText('vajb-agent-power')">Kopiraj</button></div>
-          <div class="copy-box"><code>vajb-agent-ultra</code><button onclick="copyText('vajb-agent-ultra')">Kopiraj</button></div>
-          <div class="copy-box"><code>vajb-agent-architect</code><button onclick="copyText('vajb-agent-architect')">Kopiraj</button></div>
-        </div>
-        
-        <div class="setup-step"><div class="step-num">5</div><div class="step-text">Pošalji poruku. Ako dobiješ odgovor, sve radi!</div></div>
-      </div>
-
-      <!-- Web pretraga MCP -->
-      <div class="card" style="margin-top:24px;border:1px solid rgba(249,115,22,.25)">
-        <div class="card-title" style="display:flex;align-items:center;gap:10px">🌐 Web pretraga za agenta (besplatno)</div>
-        <p class="setup-intro">Dodaj web pretragu svom agentu u Cline-u. Potpuno besplatno — bez API ključa, bez naloga. Agent će moći da pretražuje internet kad mu zatreba.</p>
-
-        <div class="setup-step"><div class="step-num">1</div><div class="step-text">U VS Code-u mora da ti bude instaliran <strong>Node.js</strong> (proveri sa <code style="color:var(--orange)">node -v</code> u terminalu). Ako nemaš, preuzmi sa <a href="https://nodejs.org" target="_blank" class="link-orange">nodejs.org</a></div></div>
-
-        <div class="setup-step"><div class="step-num">2</div><div class="step-text">Otvori <strong>Cline</strong> panel → ⚙️ Settings → skroluj do <strong>MCP Servers</strong> → klikni <strong>"Configure"</strong> (ili "Edit MCP Settings")</div></div>
-
-        <div class="setup-step"><div class="step-num">3</div><div class="step-text">Otvoriće se fajl <code style="color:var(--orange)">cline_mcp_settings.json</code>. Zameni <strong>ceo sadržaj</strong> ovim:</div></div>
-        <div class="copy-box" style="flex-direction:column;align-items:stretch;gap:8px">
-          <pre style="font-family:'SF Mono','Fira Code',ui-monospace,monospace;font-size:.82rem;color:var(--orange);white-space:pre;overflow-x:auto;margin:0;line-height:1.6">{
-  "mcpServers": {
-    "web-search": {
-      "command": "npx",
-      "args": ["open-websearch@latest"],
-      "env": {
-        "MODE": "stdio",
-        "DEFAULT_SEARCH_ENGINE": "duckduckgo"
-      }
-    }
-  }
-}</pre>
-          <button onclick="copyMcpConfig()" class="copy-btn-full">Kopiraj JSON</button>
-        </div>
-
-        <div class="setup-step"><div class="step-num">4</div><div class="step-text">Sačuvaj fajl (Ctrl+S). Cline će automatski pokrenuti MCP server.</div></div>
-
-        <div class="setup-step"><div class="step-num">5</div><div class="step-text">Testiranje: u chatu pitaj agenta nešto što zahteva internet, npr. <em>"Pretraži šta je novo u React 19"</em>. Cline će ponuditi <strong>web_search</strong> alat — odobri ga i agent pretražuje!</div></div>
-
-        <div class="note" style="margin-top:16px"><strong>Napomena:</strong> Ako već imaš nešto u <code>cline_mcp_settings.json</code>, samo dodaj <code>"web-search"</code> objekat unutar postojećeg <code>mcpServers</code>. Na Windows-u koristi <code>"command": "cmd"</code> i <code>"args": ["/c", "npx", "open-websearch@latest"]</code>.</div>
+        <p class="setup-intro" style="margin-top:20px;padding:16px;background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.2);border-radius:10px;">Ekstenzija automatski koristi naš server — ne treba ti Base URL ni model ID. U ekstenziji su ugrađeni <strong>web pretraga</strong> i podrška za <strong>MCP</strong> (Supabase, GitHub, itd.). Samo API ključ i gotovo. <strong>Link za instalaciju:</strong> <a href="https://marketplace.visualstudio.com/items?itemName=VajbAgent.vajbagent" target="_blank" rel="noopener" class="link-orange">marketplace.visualstudio.com → VajbAgent</a></p>
       </div>
     </div>
   </main>
@@ -442,13 +356,13 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 let apiKey='';
 // Realna procena zahteva za $15 (~8K in + ~1.2K out tokena po zahtevu, sa markup-om)
 const MODELS=[
-  {id:'vajb-agent-lite',name:'Lite',tier:'GPT-5 Mini · 400K',per15:1900},
-  {id:'vajb-agent-turbo',name:'Turbo',tier:'o4-mini · 200K',per15:590},
-  {id:'vajb-agent-pro',name:'Pro',tier:'GPT-5 · 400K',per15:380},
-  {id:'vajb-agent-power',name:'Power',tier:'GPT-5.4 · 1.05M',per15:220},
-  {id:'vajb-agent-max',name:'Max',tier:'Sonnet 4.6 · 200K',per15:245},
-  {id:'vajb-agent-ultra',name:'Ultra',tier:'Opus 4.6 · 200K',per15:150},
-  {id:'vajb-agent-architect',name:'Architect',tier:'Opus 4.6 + prompt',per15:150},
+  {id:'vajb-agent-lite',name:'Lite',tier:'Brz i efikasan · 400K',per15:1500},
+  {id:'vajb-agent-turbo',name:'Turbo',tier:'Reasoning · 200K',per15:475},
+  {id:'vajb-agent-pro',name:'Pro',tier:'Jak generalist · 400K',per15:295},
+  {id:'vajb-agent-power',name:'Power',tier:'Najjači nivo · 1M+',per15:175},
+  {id:'vajb-agent-max',name:'Max',tier:'Balansiran premium · 200K',per15:205},
+  {id:'vajb-agent-ultra',name:'Ultra',tier:'Vrhunski AI · 200K',per15:120},
+  {id:'vajb-agent-architect',name:'Architect',tier:'Premium + architect · 200K',per15:120},
 ];
 
 function $(id){return document.getElementById(id)}
@@ -467,7 +381,7 @@ function showSetupTab(tab){
 function downloadKey(){
   const key=apiKey;
   if(!key){toast('Nema ključa za preuzimanje');return}
-  const content=`VajbAgent API Ključ\n==================\n\nTvoj API ključ: ${key}\n\nBase URL: ${location.origin}/v1\n\nOvaj ključ koristiš za:\n- Logovanje na dashboard\n- VajbAgent ekstenzija (Cursor / VS Code)\n- Cline ekstenzija (alternativa)\n- Cursor Models (alternativa)\n\nČuvaj ovaj fajl na sigurnom mestu!\n`;
+  const content=`VajbAgent API Ključ\n==================\n\nTvoj API ključ: ${key}\n\nOvaj ključ koristiš za:\n- Logovanje na dashboard\n- VajbAgent ekstenzija (Cursor / VS Code)\n\nČuvaj ovaj fajl na sigurnom mestu!\n`;
   const blob=new Blob([content],{type:'text/plain'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -618,10 +532,6 @@ function render(d){
   $('vTotal').textContent=fmt((d.input_tokens||0)+(d.output_tokens||0));
   $('topBal').textContent='$'+(d.balance_usd??0).toFixed(2);
   $('dashKey').textContent=apiKey;
-  $('setupKey').textContent=apiKey;
-  $('setupUrl').textContent=location.origin;
-  $('setupKeyVS').textContent=apiKey;
-  $('setupUrlVS').textContent=location.origin+'/v1';
   $('setupKeyExt').textContent=apiKey;
 
   const mx=Math.max(d.input_tokens||1,d.output_tokens||1,1);

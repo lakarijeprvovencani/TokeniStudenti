@@ -92,6 +92,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const existingKey = await getApiKey(this._context.secrets);
         const mcpStatus = this._mcpManager.getStatus();
         const mcpTotalTools = mcpStatus.reduce((s, c) => s + c.toolCount, 0);
+        let userName: string | undefined;
+        if (existingKey) {
+          try {
+            const resp = await fetch(`${getApiUrl()}/me`, { headers: { 'Authorization': `Bearer ${existingKey}` } });
+            if (resp.ok) {
+              const data = await resp.json() as { name?: string };
+              userName = data.name;
+            }
+          } catch { /* ignore network errors */ }
+        }
         this._view?.webview.postMessage({
           type: 'init',
           model: getModel(),
@@ -99,10 +109,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           autoApprove: getAutoApprove(),
           apiUrl: getApiUrl(),
           hasApiKey: !!existingKey,
+          userName,
           mcpServers: mcpStatus,
           mcpTotalTools,
         });
         this._agent.sendContextUpdate();
+
+        const lastSession = this._agent.getSessions()[0];
+        if (lastSession && this._agent.getHistory().length === 0) {
+          this._agent.loadSession(lastSession.id);
+          const msgs = this._agent.getSessionMessages(lastSession.id);
+          if (msgs) {
+            this._view?.webview.postMessage({ type: 'sessionLoaded', messages: msgs });
+          }
+        }
         break;
       }
       case 'setModel':
@@ -146,9 +166,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'commandResponse':
         handleCommandResponse(message.accepted as boolean);
         break;
-      case 'setApiKey':
-        await setApiKey(this._context.secrets, message.key as string);
+      case 'setApiKey': {
+        const newKey = message.key as string;
+        await setApiKey(this._context.secrets, newKey);
+        if (newKey) {
+          try {
+            const resp = await fetch(`${getApiUrl()}/me`, { headers: { 'Authorization': `Bearer ${newKey}` } });
+            if (resp.ok) {
+              const data = await resp.json() as { name?: string };
+              if (data.name) {
+                this._view?.webview.postMessage({ type: 'userInfo', name: data.name });
+              }
+            }
+          } catch { /* ignore */ }
+        }
         break;
+      }
+      case 'getFileList': {
+        const files = this._agent.getFileList();
+        this._view?.webview.postMessage({ type: 'fileList', files });
+        break;
+      }
       case 'setApiUrl':
         await setApiUrl(message.url as string);
         break;

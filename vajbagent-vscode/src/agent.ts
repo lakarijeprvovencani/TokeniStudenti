@@ -37,19 +37,23 @@ You are pair programming with the user to help them with coding tasks — writin
 You receive rich auto-context with every message. USE IT to work faster and smarter:
 
 - <workspace_index>: File tree + first lines of every file. You already KNOW the project structure — use this instead of calling list_files on the root. Only call list_files for subdirectories you need deeper detail on.
-- <active_editor>: The file the user is currently looking at, their cursor position, and the visible code. When the user says "fix this", "what does this do", or "change this" without specifying a file — they mean THIS file. Read it if you need more context beyond what's visible.
+- <active_editor>: The file the user is currently looking at, their cursor position, any selected text, and the visible code. When the user says "this function", "this code", "fix this", "what does this do", or "change this" — they mean the code at the CURSOR POSITION or the SELECTED TEXT. Look at the cursor line number and the selected text to determine EXACTLY what they're referring to. NEVER ask "which function?" if the cursor or selection tells you. Read the file if you need more context beyond what's visible.
 - <diagnostics>: Current errors and warnings from VS Code. If you see errors, PROACTIVELY mention them and offer to fix. After you edit a file, errors may appear in the tool result — fix them in the next step without being asked.
 - <git_status>: Current branch, uncommitted changes, recent commits. Use this for git operations instead of running git status/log.
 - <editor_state>: Open tabs and detected project stack (React, Next.js, Express, etc.). The open tabs tell you what the user has been working on. The project stack tells you which frameworks/libraries to use — follow their conventions.
 - <project_memory>: The .vajbagent/CONTEXT.md contents. This has project history and decisions — respect them.
 
 EFFICIENCY RULES:
+- If the user asks about project structure, technologies, or general overview — answer DIRECTLY from <workspace_index> and <project_memory> WITHOUT any tool calls. You already have all the info.
+- NEVER mention internal sources in your response. Do NOT say "from workspace_index", "from CONTEXT.md", "from project_memory", or "from active_editor". Just present the information naturally as if you know it.
+- Do NOT list .vajbagent/ directory or CONTEXT.md when describing project structure — those are internal VajbAgent files, not part of the user's project.
 - Do NOT call list_files on the project root if <workspace_index> already shows you the structure.
 - Do NOT call read_file on the active editor file just to see what the user sees — it's already in <active_editor>.
+- Do NOT call read_file on CONTEXT.md — its content is already in <project_memory>.
 - Do NOT run git status/log if <git_status> already has the info you need.
 - DO call read_file when you need the FULL content of a file (workspace_index only shows first ~8 lines).
 - DO call list_files when you need to explore a specific subdirectory in detail.
-- SAVE tool calls. Every unnecessary tool call wastes the user's time and money.
+- SAVE tool calls. Every unnecessary tool call wastes the user's time and money. Each tool call costs tokens.
 </context_awareness>
 
 <explore_before_edit>
@@ -126,14 +130,23 @@ AFTER making changes, ALWAYS verify:
 </making_code_changes>
 
 <task_completion>
-When you finish a task:
+CRITICAL RULE — After your last tool call is done and you have no more tools to call, you MUST ALWAYS write a final text response. NEVER end with silence.
 
-1. Provide a clear summary of what was done, in simple language the user can understand.
-2. If you created or modified files, list them.
-3. If the user needs to do something next (restart server, install extension, etc.), tell them exactly what to do step by step.
-4. Do NOT keep asking "do you want me to do anything else?" — just finish and let the user ask if they need more.
-5. Do NOT repeat work you already did or re-explain things unnecessarily.
-6. If the task had multiple steps, give a brief numbered recap at the end.
+Your final response must:
+1. Summarize what you did in 2-4 sentences. Be specific: mention file names, what was created/changed, and why.
+2. If you created or modified files, list them with bullet points.
+3. If the user needs to do something next (restart server, open browser, install something), tell them step by step.
+4. Do NOT keep asking "do you want me to do anything else?" — just finish and let the user ask.
+5. Do NOT repeat work or over-explain. Keep it concise but complete.
+
+Example good final response:
+"Napravio sam portfolio sajt sa dva fajla:
+- **index.html** — struktura sa hero, about i kontakt sekcijama
+- **styles.css** — tamna tema, responzivan dizajn, moderna tipografija
+
+Otvori index.html u browseru da vidiš rezultat."
+
+NEVER return an empty response after tool calls. This is the #1 most important UX rule.
 </task_completion>
 
 <git_workflow>
@@ -464,11 +477,16 @@ export class Agent {
   private _workspaceIndexTime = 0;
   private static readonly INDEX_TTL = 120_000; // refresh every 2 min
   private _loopContextCache: { git: string | null; diag: string | null; tabs: string | null; proj: string | null } | null = null;
+  private _savedEditorContext: string | null = null;
 
   constructor(provider: ChatViewProvider, context: vscode.ExtensionContext, mcpManager: McpManager) {
     this._provider = provider;
     this._context = context;
     this._mcpManager = mcpManager;
+  }
+
+  public getHistory(): Message[] {
+    return this._history;
   }
 
   public clearHistory() {
@@ -599,7 +617,40 @@ export class Agent {
     this._abortController = null;
   }
 
+  public getFileList(): string[] {
+    const root = this._getWorkspaceRoot();
+    if (!root) return [];
+
+    const EXCLUDE = new Set([
+      'node_modules', '.git', 'dist', 'build', 'out', '.next', '__pycache__',
+      '.vscode', '.idea', 'coverage', '.cache', '.turbo', 'vendor',
+      '.vajbagent', 'tmp', 'temp', '.svn', 'bower_components', '.nuxt',
+    ]);
+    const MAX = 500;
+    const result: string[] = [];
+
+    const scan = (dir: string, rel: string) => {
+      if (result.length >= MAX) return;
+      let entries: fs.Dirent[];
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        if (result.length >= MAX) break;
+        if (e.isDirectory()) {
+          if (EXCLUDE.has(e.name) || e.name.startsWith('.')) continue;
+          scan(path.join(dir, e.name), rel ? `${rel}/${e.name}` : e.name);
+        } else if (e.isFile()) {
+          result.push(rel ? `${rel}/${e.name}` : e.name);
+        }
+      }
+    };
+
+    scan(root, '');
+    return result;
+  }
+
   public async sendMessage(text: string, images: Array<{ base64: string; mimeType: string }> = []) {
+    this._savedEditorContext = this._getActiveEditorContext();
+
     const apiKey = await getApiKey(this._context.secrets);
     if (!apiKey) {
       this._provider.postMessage({ type: 'error', text: 'API key nije podesen. Koristi komandu "VajbAgent: Set API Key".' });
@@ -742,6 +793,7 @@ export class Agent {
     const lang = doc.languageId;
     const totalLines = doc.lineCount;
     const cursorLine = editor.selection.active.line + 1;
+    const selectedText = !editor.selection.isEmpty ? doc.getText(editor.selection) : '';
 
     const visRange = editor.visibleRanges[0];
     if (!visRange) return `File: ${relPath} (${lang}, ${totalLines} lines)\nCursor: line ${cursorLine}`;
@@ -753,12 +805,16 @@ export class Agent {
       visibleLines.push(`${i + 1}|${doc.lineAt(i).text}`);
     }
 
-    return [
+    const parts = [
       `File: ${relPath} (${lang}, ${totalLines} lines)`,
       `Cursor: line ${cursorLine}`,
-      `Visible (lines ${startL + 1}-${endL + 1}):`,
-      visibleLines.join('\n'),
-    ].join('\n');
+    ];
+    if (selectedText) {
+      parts.push(`Selected text:\n\`\`\`\n${selectedText.substring(0, 2000)}\n\`\`\``);
+    }
+    parts.push(`Visible (lines ${startL + 1}-${endL + 1}):`);
+    parts.push(visibleLines.join('\n'));
+    return parts.join('\n');
   }
 
   private _getOpenTabsContext(): string | null {
@@ -921,117 +977,160 @@ export class Agent {
       tabs: this._getOpenTabsContext(),
       proj: this._detectProjectType(),
     };
-    for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-      const messages = this._buildMessages();
 
-      this._abortController = new AbortController();
+    try {
+      for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+        const messages = this._buildMessages();
 
-      let assistantContent = '';
-      let toolCalls: ToolCall[] = [];
+        this._abortController = new AbortController();
 
-      try {
-        const result = await this._streamRequest(apiKey, messages);
-        assistantContent = result.content;
-        toolCalls = result.toolCalls;
-      } catch (err: unknown) {
-        if ((err as Error).name === 'AbortError') {
-          this._loopContextCache = null;
-          this._provider.postMessage({ type: 'streamEnd' });
+        let assistantContent = '';
+        let toolCalls: ToolCall[] = [];
+
+        try {
+          const result = await this._streamRequest(apiKey, messages);
+          assistantContent = result.content;
+          toolCalls = result.toolCalls;
+        } catch (err: unknown) {
+          if ((err as Error).name === 'AbortError') {
+            return;
+          }
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          const errWithMeta = err as Error & { code?: string; dashboardUrl?: string };
+          const isRetryable = /timeout|ECONNRESET|ENOTFOUND|socket hang up|502|503|529|rate.limit/i.test(errorMsg);
+          if (errWithMeta.code === 'insufficient_credits' && errWithMeta.dashboardUrl) {
+            this._provider.postMessage({
+              type: 'creditsError',
+              text: errorMsg,
+              dashboardUrl: errWithMeta.dashboardUrl,
+            });
+          } else {
+            this._provider.postMessage({
+              type: 'error',
+              text: errorMsg,
+              retryable: isRetryable,
+            });
+          }
           return;
         }
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        const errWithMeta = err as Error & { code?: string; dashboardUrl?: string };
-        const isRetryable = /timeout|ECONNRESET|ENOTFOUND|socket hang up|502|503|529|rate.limit/i.test(errorMsg);
-        if (errWithMeta.code === 'insufficient_credits' && errWithMeta.dashboardUrl) {
-          this._provider.postMessage({
-            type: 'creditsError',
-            text: errorMsg,
-            dashboardUrl: errWithMeta.dashboardUrl,
-          });
-        } else {
-          this._provider.postMessage({
-            type: 'error',
-            text: errorMsg,
-            retryable: isRetryable,
-          });
+
+        const assistantMsg: Message = { role: 'assistant', content: assistantContent };
+        if (toolCalls.length > 0) {
+          assistantMsg.tool_calls = toolCalls;
         }
-        return;
-      }
+        this._history.push(assistantMsg);
 
-      const assistantMsg: Message = { role: 'assistant', content: assistantContent };
-      if (toolCalls.length > 0) {
-        assistantMsg.tool_calls = toolCalls;
-      }
-      this._history.push(assistantMsg);
+        this._sendContextUpdate();
 
-      this._sendContextUpdate();
+        if (toolCalls.length === 0) {
+          if (!assistantContent.trim() && this._history.some(m => m.role === 'tool')) {
+            const summary = this._buildFallbackSummary();
+            this._provider.postMessage({ type: 'streamStart' });
+            this._provider.postMessage({ type: 'streamDelta', text: summary });
+          }
+          return;
+        }
 
-      if (toolCalls.length === 0) {
+        // Had tool calls — close text stream if it was open
         if (assistantContent) {
           this._provider.postMessage({ type: 'streamEnd' });
         }
-        this._loopContextCache = null;
-        this._autoSaveSession();
-        return;
-      }
 
-      // Had tool calls — close text stream if it was open
-      if (assistantContent) {
-        this._provider.postMessage({ type: 'streamEnd' });
-      }
-
-      // Execute each tool call
-      for (const tc of toolCalls) {
-        let args: Record<string, unknown> = {};
-        try {
-          args = JSON.parse(tc.function.arguments);
-        } catch {
-          args = {};
-        }
-
-        this._provider.postMessage({
-          type: 'toolCall',
-          id: tc.id,
-          name: tc.function.name,
-          args: JSON.stringify(args, null, 2),
-          status: 'running...',
-        });
-
-        let result: ToolCallResult;
-        try {
-          if (this._mcpManager.isMcpTool(tc.function.name)) {
-            const output = await this._mcpManager.callTool(tc.function.name, args);
-            result = { success: true, output };
-          } else {
-            result = await executeTool(tc.function.name, args);
+        // Execute each tool call
+        for (const tc of toolCalls) {
+          let args: Record<string, unknown> = {};
+          try {
+            args = JSON.parse(tc.function.arguments);
+          } catch {
+            args = {};
           }
-        } catch (err: unknown) {
-          result = { success: false, output: `Error: ${err instanceof Error ? err.message : String(err)}` };
+
+          this._provider.postMessage({
+            type: 'toolCall',
+            id: tc.id,
+            name: tc.function.name,
+            args: JSON.stringify(args, null, 2),
+            status: 'running...',
+          });
+
+          let result: ToolCallResult;
+          try {
+            if (this._mcpManager.isMcpTool(tc.function.name)) {
+              const output = await this._mcpManager.callTool(tc.function.name, args);
+              result = { success: true, output };
+            } else {
+              result = await executeTool(tc.function.name, args);
+            }
+          } catch (err: unknown) {
+            result = { success: false, output: `Error: ${err instanceof Error ? err.message : String(err)}` };
+          }
+
+          this._provider.postMessage({
+            type: 'toolResult',
+            id: tc.id,
+            status: result.success ? 'done' : 'error',
+            result: result.output.substring(0, 3000),
+          });
+
+          this._history.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: result.output.substring(0, 15000),
+          });
         }
-
-        this._provider.postMessage({
-          type: 'toolResult',
-          id: tc.id,
-          status: result.success ? 'done' : 'error',
-          result: result.output.substring(0, 3000),
-        });
-
-        this._history.push({
-          role: 'tool',
-          tool_call_id: tc.id,
-          content: result.output.substring(0, 15000),
-        });
       }
 
-      // Next iteration will stream the model's response after tool results
-      // streamStart will be sent from _streamRequest when text actually arrives
+      this._provider.postMessage({
+        type: 'error',
+        text: `Dostignut limit od ${MAX_ITERATIONS} tool poziva. Pokusaj ponovo sa manjim zahtevom.`,
+      });
+    } finally {
+      this._loopContextCache = null;
+      this._provider.postMessage({ type: 'streamEnd' });
+      this._autoSaveSession();
+    }
+  }
+
+  private _buildFallbackSummary(): string {
+    const created: string[] = [];
+    const modified: string[] = [];
+    const commands: string[] = [];
+
+    for (const msg of this._history) {
+      if (msg.role === 'assistant' && msg.tool_calls) {
+        for (const tc of msg.tool_calls) {
+          try {
+            const args = JSON.parse(tc.function.arguments);
+            const fname = path.basename(args.path || '');
+            if (tc.function.name === 'write_file' && fname) {
+              created.push(fname);
+            } else if (tc.function.name === 'replace_in_file' && fname) {
+              if (!modified.includes(fname)) modified.push(fname);
+            } else if (tc.function.name === 'execute_command' && args.command) {
+              commands.push(args.command);
+            }
+          } catch { /* skip */ }
+        }
+      }
     }
 
-    this._loopContextCache = null;
-    this._provider.postMessage({
-      type: 'error',
-      text: `Dostignut limit od ${MAX_ITERATIONS} tool poziva. Pokusaj ponovo sa manjim zahtevom.`,
-    });
+    const parts: string[] = ['Gotovo!'];
+    if (created.length > 0) {
+      parts.push(`Kreiran${created.length > 1 ? 'i su' : ' je'}:`);
+      for (const f of created) parts.push(`- **${f}**`);
+    }
+    if (modified.length > 0) {
+      parts.push(`Izmenjen${modified.length > 1 ? 'i su' : ' je'}:`);
+      for (const f of modified) parts.push(`- **${f}**`);
+    }
+    if (commands.length > 0) {
+      parts.push(`Pokrenuto: \`${commands.join('`, `')}\``);
+    }
+    if (created.length === 0 && modified.length === 0 && commands.length === 0) {
+      return 'Izgleda da odgovor nije stigao u potpunosti. Probaj ponovo ili preformuliši zahtev.';
+    }
+
+    return parts.join('\n');
   }
 
   private _buildMessages(): Message[] {
@@ -1048,7 +1147,7 @@ export class Agent {
     if (wsIndex) {
       systemPrompt += '\n\n<workspace_index>\n' + wsIndex + '\n</workspace_index>';
     }
-    const editorCtx = this._getActiveEditorContext();
+    const editorCtx = this._savedEditorContext || this._getActiveEditorContext();
     if (editorCtx) {
       systemPrompt += '\n\n<active_editor>\n' + editorCtx + '\n</active_editor>';
     }
@@ -1121,7 +1220,7 @@ export class Agent {
     const mcpToolDefs = this._mcpManager.getToolDefinitions();
     const allTools = [...TOOL_DEFINITIONS, ...mcpToolDefs];
 
-    const body = JSON.stringify({
+    const reqBody = JSON.stringify({
       model,
       messages,
       tools: allTools,
@@ -1129,6 +1228,19 @@ export class Agent {
     });
 
     return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (fn: typeof resolve | typeof reject, val: unknown) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(hardTimer);
+        (fn as (v: unknown) => void)(val);
+      };
+
+      const hardTimer = setTimeout(() => {
+        finish(reject, new Error('Odgovor traje predugo (60s). Probaj ponovo.'));
+        try { req.destroy(); } catch { /* */ }
+      }, 60_000);
+
       const url = new URL(`${apiUrl}/v1/chat/completions`);
       const isHttps = url.protocol === 'https:';
       const transport = isHttps ? https : http;
@@ -1146,14 +1258,14 @@ export class Agent {
         },
         (res) => {
           if (res.statusCode && res.statusCode >= 400) {
-            let body = '';
-            res.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+            let errBody = '';
+            res.on('data', (chunk: Buffer) => { errBody += chunk.toString(); });
             res.on('end', () => {
               let msg = `API error ${res.statusCode}`;
               let code: string | undefined;
               let dashboardUrl: string | undefined;
               try {
-                const parsed = JSON.parse(body);
+                const parsed = JSON.parse(errBody);
                 msg = parsed.error?.message || parsed.message || msg;
                 code = parsed.error?.code;
                 dashboardUrl = parsed.error?.dashboard_url;
@@ -1163,7 +1275,7 @@ export class Agent {
                 err.code = code;
                 err.dashboardUrl = dashboardUrl;
               }
-              reject(err);
+              finish(reject, err);
             });
             return;
           }
@@ -1174,6 +1286,7 @@ export class Agent {
           let streamStartSent = false;
 
           res.on('data', (chunk: Buffer) => {
+            if (settled) return;
             buffer += chunk.toString();
             const lines = buffer.split('\n');
             buffer = lines.pop() || '';
@@ -1224,23 +1337,23 @@ export class Agent {
 
           res.on('end', () => {
             const toolCalls = Array.from(toolCallsMap.values());
-            resolve({ content, toolCalls });
+            finish(resolve, { content, toolCalls });
           });
 
-          res.on('error', reject);
+          res.on('error', (err) => { finish(reject, err); });
         }
       );
 
-      req.on('error', reject);
+      req.on('error', (err) => { finish(reject, err); });
 
       if (this._abortController) {
         this._abortController.signal.addEventListener('abort', () => {
-          req.destroy();
-          reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+          finish(reject, Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+          try { req.destroy(); } catch { /* */ }
         });
       }
 
-      req.write(body);
+      req.write(reqBody);
       req.end();
     });
   }
