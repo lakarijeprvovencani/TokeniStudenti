@@ -2,7 +2,7 @@
   "name": "vajbagent",
   "displayName": "VajbAgent",
   "description": "AI coding asistent sa 7 modela — razume projekat, pise i menja kod, pokrece komande, Plan Mode, MCP, auto-fix, checkpoint/undo. Bez pretplate.",
-  "version": "0.30.1",
+  "version": "0.33.0",
   "publisher": "VajbAgent",
   "engines": {
     "vscode": "^1.85.0"
@@ -20,7 +20,9 @@
     "vajbagent"
   ],
   "icon": "media/icon.png",
-  "activationEvents": ["onView:vajbagent.chatView"],
+  "activationEvents": [
+    "onView:vajbagent.chatView"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -150,10 +152,10 @@
     "build:icon": "node scripts/build-icon.mjs"
   },
   "devDependencies": {
-    "sharp": "^0.33.5",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.7.1",
+    "sharp": "^0.33.5",
     "typescript": "^5.3.0"
   },
   "dependencies": {

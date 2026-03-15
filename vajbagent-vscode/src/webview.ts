@@ -192,6 +192,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this._view?.webview.postMessage({ type: 'fileList', files });
         break;
       }
+      case 'parsePdf': {
+        const base64Data = (message.base64 as string || '').replace(/^data:[^;]+;base64,/, '');
+        const fileName = message.name as string || 'document.pdf';
+        const os = await import('os');
+        const tmpPath = require('path').join(os.tmpdir(), 'vajb_' + Date.now() + '.pdf');
+        try {
+          require('fs').writeFileSync(tmpPath, Buffer.from(base64Data, 'base64'));
+          const { exec } = require('child_process');
+          exec(`pdftotext "${tmpPath}" -`, { timeout: 15000 }, (err: Error | null, stdout: string) => {
+            try { require('fs').unlinkSync(tmpPath); } catch { /* */ }
+            if (err) {
+              this._view?.webview.postMessage({ type: 'pdfParsed', name: fileName, content: '', error: 'Za citanje PDF-a potreban je pdftotext.\nmacOS: brew install poppler\nLinux: sudo apt install poppler-utils' });
+            } else {
+              this._view?.webview.postMessage({ type: 'pdfParsed', name: fileName, content: stdout.substring(0, 10000), pages: 0 });
+            }
+          });
+        } catch (err: unknown) {
+          try { require('fs').unlinkSync(tmpPath); } catch { /* */ }
+          this._view?.webview.postMessage({ type: 'pdfParsed', name: fileName, content: '', error: err instanceof Error ? err.message : 'PDF parsing failed' });
+        }
+        break;
+      }
       case 'setApiUrl':
         await setApiUrl(message.url as string);
         break;
@@ -220,13 +242,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case 'deleteSession': {
-        this._agent.deleteSession(message.sessionId as string);
+        const wasActive = this._agent.deleteSession(message.sessionId as string);
         const updatedSessions = this._agent.getSessions().map(s => ({
           id: s.id,
           title: s.title,
           updatedAt: s.updatedAt,
         }));
         this._view?.webview.postMessage({ type: 'historyList', sessions: updatedSessions });
+        if (wasActive) {
+          this._view?.webview.postMessage({ type: 'newSession' });
+        }
         break;
       }
       case 'getMcpStatus':
@@ -243,6 +268,41 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         } else {
           vscode.window.showWarningMessage('Otvori folder u editoru da bi konfigurisao MCP servere.');
         }
+        break;
+      }
+      case 'getRulesStatus': {
+        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (root) {
+          const fs = require('fs');
+          const path = require('path');
+          const candidates = ['.vajbagentrules', '.vajbagent/rules.md'];
+          let found: string | null = null;
+          for (const name of candidates) {
+            if (fs.existsSync(path.join(root, name))) { found = name; break; }
+          }
+          this._view?.webview.postMessage({ type: 'rulesStatus', exists: !!found, file: found || '.vajbagentrules' });
+        }
+        break;
+      }
+      case 'openRules': {
+        const rootDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!rootDir) {
+          vscode.window.showWarningMessage('Otvori folder u editoru da bi koristio pravila.');
+          break;
+        }
+        const fs = require('fs');
+        const path = require('path');
+        const rulesCandidates = ['.vajbagentrules', '.vajbagent/rules.md'];
+        let rulesFile: string = path.join(rootDir, '.vajbagentrules');
+        for (const name of rulesCandidates) {
+          const p = path.join(rootDir, name);
+          if (fs.existsSync(p)) { rulesFile = p; break; }
+        }
+        if (!fs.existsSync(rulesFile)) {
+          fs.writeFileSync(rulesFile, '# Pravila za VajbAgent\n# Agent ce pratiti ova pravila u svakom odgovoru.\n# Primeri:\n#   - Koristi TypeScript strict mode\n#   - Pisi komentare na srpskom\n#   - Koristi pnpm umesto npm\n#   - Svi API odgovori moraju imati error handling\n\n', 'utf-8');
+        }
+        const rulesDoc = await vscode.workspace.openTextDocument(rulesFile);
+        await vscode.window.showTextDocument(rulesDoc);
         break;
       }
       case 'revertAll': {

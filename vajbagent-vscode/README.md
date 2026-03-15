@@ -22,15 +22,31 @@ Tvoj licni AI partner za kodiranje, direktno u VS Code-u. Pise, menja, debuguje 
 ### Kodiranje
 - Cita, pise i menja fajlove sa pregledom promena pre primene
 - Pretrazuje kod po regex patternima i pronalazi fajlove
-- Pokrece shell komande (npm install, git, build, test...)
+- Pokrece shell komande (npm install, git, build, test...) — output vidljiv u VajbAgent terminalu
 - Preuzima sadrzaj sa URL-ova i pretrazuje internet za aktuelne informacije
+- URL-ovi u odgovorima su klikabilni — localhost, deploy linkovi, dokumentacija
 
 ### Razumevanje projekta
 - Automatski zna strukturu tvog projekta — fajlove, importove, zavisnosti
-- Vidi koji fajl trenutno gledas, gde ti je kursor, i kod na ekranu
+- Vidi koji fajl trenutno gledas, gde ti je kursor, i selektovani kod
 - Detektuje tehnologije u projektu (React, Next.js, Express, Tailwind, Prisma...)
 - Vidi otvorene tabove — zna na cemu radis
 - Cita git status — branch, commitove, izmenjene fajlove
+
+### @ Kontekst sistem
+- **@fajl** — taguj fajl iz projekta sa autocomplete dropdown-om, agent ga cita kao kontekst
+- **@folder/** — taguj folder, agent vidi listu fajlova unutar njega
+- **@terminal** — agent cita poslednji output iz terminala (greske, logovi, build rezultati)
+- **Attach File (📎)** — dodaj fajl kao kontekst direktno iz file picker-a
+- **PDF podrska** — attach PDF dokument, agent izvlaci tekst i koristi kao kontekst
+
+### Slash komande
+- **/test** — generisi testove za trenutni fajl
+- **/fix** — pronadji i popravi greske
+- **/doc** — dodaj dokumentaciju (JSDoc/docstring)
+- **/commit** — predlog commit poruke na osnovu git diff-a
+- **/explain** — objasni kako kod radi
+- **/refactor** — refaktorisi i poboljsaj kod
 
 ### Kvalitet koda
 - Automatski proverava greske posle svake izmene i sam ih popravlja
@@ -44,10 +60,15 @@ Tvoj licni AI partner za kodiranje, direktno u VS Code-u. Pise, menja, debuguje 
 - Mozes da pokrenes jednu fazu ili ceo plan odjednom
 - Plan se cuva u projektu za referencu
 
+### Custom Instructions (Pravila projekta)
+- Kreiraj `.vajbagentrules` fajl u root projekta (ili koristi dugme u Settings)
+- Agent prati tvoja pravila u svakom odgovoru
+- Primeri: "koristi TypeScript strict", "pnpm umesto npm", "komentari na srpskom"
+
 ### Checkpoint / Undo
 - Svaka izmena se cuva — original fajl je sacuvan pre nego agent promeni bilo sta
 - "Undo" dugme u chatu vraca SVE fajlove na stanje pre agentovih promena
-- Nova sesija = cist pocetalo, bez ostataka od prethodnog rada
+- Nova sesija = cist pocetak, bez ostataka od prethodnog rada
 
 ### Pametni kontekst
 - Pamti vazne informacije o projektu izmedju sesija (.vajbagent/CONTEXT.md)
@@ -64,10 +85,13 @@ Tvoj licni AI partner za kodiranje, direktno u VS Code-u. Pise, menja, debuguje 
 - Desni klik → "Objasni kod" ili "Refaktorisi" za selektovani kod
 - Copy dugme na svakom bloku koda
 - Klikabilne putanje fajlova — klik otvara fajl u editoru
-- Predlozi posle svakog odgovora (Nastavi, Popravi, Objasni...)
+- Klikabilni URL-ovi — localhost, deploy linkovi, dokumentacija
+- Auto-Approve — checkbox za automatsko odobrenje u toku rada
+- VajbAgent terminal — komande vidljive u realnom vremenu
 - Retry dugme kad dodje do greske
 - Istorija sesija — sacuvaj i vrati se na prethodne razgovore
-- **Cmd+L** novi chat | **Escape** zaustavi generisanje
+- Vodic za koriscenje — klikni ❓ u headeru
+- **Cmd+Shift+I** novi chat | **Escape** zaustavi generisanje
 
 ## Modeli
 
