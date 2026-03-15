@@ -551,6 +551,30 @@
       cursor: pointer;
     }
     .approval-bar .btn-reject:hover { background: rgba(255,255,255,0.05); }
+    .auto-approve-inline {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      margin-right: 4px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--vscode-panel-border);
+      font-size: 11px;
+      color: var(--vscode-foreground);
+      opacity: 0.7;
+      transition: opacity 0.15s, border-color 0.15s;
+      user-select: none;
+    }
+    .auto-approve-inline:hover { opacity: 1; }
+    .auto-approve-inline input[type="checkbox"] {
+      accent-color: #FA7315;
+      width: 13px;
+      height: 13px;
+      cursor: pointer;
+      margin: 0;
+    }
+    .auto-approve-inline .auto-label { font-weight: 500; }
 
     /* Input area — Cursor-inspired design */
     .input-area {
@@ -1110,14 +1134,15 @@
       position: absolute;
       top: 100%;
       right: 0;
-      z-index: 100;
-      min-width: 240px;
-      background: rgba(30, 30, 30, 0.85);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      z-index: 9999;
+      min-width: 260px;
+      max-width: 320px;
+      max-height: 80vh;
+      overflow-y: auto;
+      background: #1e1e1e;
+      border: 1px solid #444;
       border-radius: 10px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.3);
       padding: 10px 0;
       margin-top: 4px;
     }
@@ -1301,7 +1326,7 @@
       opacity: 0.7;
     }
 
-    .header { position: relative; }
+    .header { position: relative; z-index: 1000; }
 
     /* History panel */
     .history-overlay {
@@ -1923,6 +1948,10 @@
   <div id="approvalBar" class="approval-bar">
     <span class="approval-file">📄 <strong id="approvalFileName">file</strong> čeka odobrenje</span>
     <div class="approval-btns">
+      <label class="auto-approve-inline" id="autoApproveInline" title="Automatski prihvati sve naredne">
+        <input type="checkbox" id="autoApproveToggle">
+        <span class="auto-label">Auto</span>
+      </label>
       <button class="btn-approve" id="approvalAccept">✓ Prihvati</button>
       <button class="btn-reject" id="approvalReject">✗ Odbij</button>
     </div>
@@ -2736,13 +2765,30 @@
     const approvalFileName = document.getElementById('approvalFileName');
     const approvalAccept = document.getElementById('approvalAccept');
     const approvalReject = document.getElementById('approvalReject');
+    const autoApproveToggle = document.getElementById('autoApproveToggle');
 
     let _approvalMode = 'diff';
+
+    autoApproveToggle.addEventListener('change', () => {
+      if (autoApproveToggle.checked) {
+        if (_approvalMode === 'cmd') {
+          autoExecuteCommand.checked = true;
+          vscode.postMessage({ type: 'setAutoApprove', key: 'executeCommand', value: true });
+        } else {
+          autoWriteFile.checked = true;
+          autoReplaceInFile.checked = true;
+          vscode.postMessage({ type: 'setAutoApprove', key: 'writeFile', value: true });
+          vscode.postMessage({ type: 'setAutoApprove', key: 'replaceInFile', value: true });
+        }
+        approvalAccept.click();
+      }
+    });
 
     function showApprovalBar(label, extra, mode) {
       _approvalMode = mode || 'diff';
       approvalFileName.textContent = label;
       approvalAccept.textContent = _approvalMode === 'cmd' ? '▶ Pokreni' : '✓ Prihvati';
+      autoApproveToggle.checked = false;
       approvalBar.style.display = 'flex';
 
       approvalAccept.onclick = () => {
@@ -3173,9 +3219,18 @@
           break;
         }
 
-        case 'generationStopped':
+        case 'generationStopped': {
           setStreaming(false);
+          hideApprovalBar();
+          hideStatus();
+          const stoppedDiv = document.createElement('div');
+          stoppedDiv.className = 'msg-assistant';
+          stoppedDiv.style.cssText = 'font-size:0.85rem;opacity:0.7;font-style:italic;';
+          stoppedDiv.textContent = 'Generisanje zaustavljeno.';
+          messagesEl.appendChild(stoppedDiv);
+          scrollToBottom();
           break;
+        }
 
         case 'fileReverted': {
           const cpList = document.getElementById('checkpointList');

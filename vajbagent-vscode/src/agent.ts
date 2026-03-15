@@ -94,14 +94,19 @@ Tool selection guide:
 - Fetching a specific URL: fetch_url
 
 MINIMIZE TOOL CALLS. The fewer tools you call to accomplish the task, the faster and cheaper for the user. Combine knowledge from auto-context with targeted tool use.
+
+IMPORTANT: When execute_command runs, the output is ALREADY VISIBLE to the user in the VS Code "VajbAgent" terminal tab. Do NOT repeat or paste raw command output in the chat. Instead:
+- Summarize the result briefly ("Instalacija uspesna", "Server pokrenut na portu 3000", "Build prosao bez gresaka")
+- Only mention specific lines from the output if there's an error or something the user needs to act on
+- If the command failed, explain the error and what to do — but don't dump the full log
 </tool_usage>
 
 <replace_in_file_guide>
 replace_in_file is powerful but error-prone. Follow these rules strictly:
 
-1. The old_str MUST match the file content EXACTLY — including whitespace, indentation, and line breaks.
+1. The old_text MUST match the file content EXACTLY — including whitespace, indentation, and line breaks.
 2. Always read_file FIRST to see the exact current content before attempting replace_in_file.
-3. Keep old_str as short as possible while still being UNIQUE in the file. Include just enough surrounding context.
+3. Keep old_text as short as possible while still being UNIQUE in the file. Include just enough surrounding context.
 4. If replace_in_file fails, re-read the file — the content may have changed from a previous edit.
 5. For large changes across many lines, prefer write_file over multiple replace_in_file calls.
 6. NEVER guess at indentation. Copy it exactly from what you read.
@@ -335,7 +340,7 @@ Apply these to YOUR use of tools and decisions, not just to code you write:
 Retry logic:
 - Transient failures (timeout, network, "ECONNREFUSED", "rate limit"): retry once after a short moment; if it fails again, try a fallback or report clearly.
 - Command not found (e.g. npm, npx, tsc): try with full path, npx, or suggest the user installs the tool; don't stop after one failure.
-- replace_in_file fails (e.g. "old_str not found"): re-read the file to get exact content, then retry with correct old_str; do not retry the same wrong string.
+- replace_in_file fails (e.g. "old_text not found"): re-read the file to get exact content, then retry with correct old_text; do not retry the same wrong string.
 
 Fallbacks:
 - If write_file fails (permission, path): offer to show the content so the user can paste manually, or suggest a different path.
@@ -478,11 +483,21 @@ export class Agent {
   private static readonly INDEX_TTL = 120_000; // refresh every 2 min
   private _loopContextCache: { git: string | null; diag: string | null; tabs: string | null; proj: string | null } | null = null;
   private _savedEditorContext: string | null = null;
+  private _loopId = 0;
+  private _loopPromise: Promise<void> | null = null;
 
   constructor(provider: ChatViewProvider, context: vscode.ExtensionContext, mcpManager: McpManager) {
     this._provider = provider;
     this._context = context;
     this._mcpManager = mcpManager;
+  }
+
+  public dispose() {
+    this.abort();
+    this._autoSaveSession();
+    this._loopContextCache = null;
+    this._workspaceIndex = null;
+    this._loopPromise = null;
   }
 
   public getHistory(): Message[] {
@@ -497,6 +512,11 @@ export class Agent {
   }
 
   private _getSessionsStorageKey(): string {
+    const root = this._getWorkspaceRoot();
+    if (root) {
+      const hash = root.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 60);
+      return `vajbagent.chatSessions.${hash}`;
+    }
     return 'vajbagent.chatSessions';
   }
 
@@ -525,7 +545,7 @@ export class Agent {
 
     const maxSessions = 50;
     const trimmed = sessions.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, maxSessions);
-    this._context.globalState.update(this._getSessionsStorageKey(), trimmed);
+    void this._context.globalState.update(this._getSessionsStorageKey(), trimmed);
   }
 
   private _extractTitle(): string {
@@ -545,7 +565,7 @@ export class Agent {
     const sessions = this.getSessions();
     const session = sessions.find(s => s.id === sessionId);
     if (!session) return;
-    this._history = session.messages;
+    this._history = JSON.parse(JSON.stringify(session.messages));
     this._currentSessionId = session.id;
     this._sendContextUpdate();
   }
@@ -553,7 +573,7 @@ export class Agent {
   public deleteSession(sessionId: string) {
     const sessions = this._context.globalState.get<ChatSession[]>(this._getSessionsStorageKey(), []);
     const filtered = sessions.filter(s => s.id !== sessionId);
-    this._context.globalState.update(this._getSessionsStorageKey(), filtered);
+    void this._context.globalState.update(this._getSessionsStorageKey(), filtered);
     if (this._currentSessionId === sessionId) {
       this._history = [];
       this._currentSessionId = null;
@@ -581,14 +601,19 @@ export class Agent {
   }
 
   private _estimateTokens(): number {
-    let chars = 0;
+    let chars = SYSTEM_PROMPT.length;
+    const ctxMem = this._readContextMemory();
+    if (ctxMem) chars += ctxMem.length;
+    if (this._workspaceIndex) chars += this._workspaceIndex.length;
+    chars += 2000; // estimated overhead for injected context (editor, git, diagnostics, tabs)
+
     for (const msg of this._history) {
       if (typeof msg.content === 'string') {
         chars += msg.content.length;
       } else if (Array.isArray(msg.content)) {
         for (const part of msg.content) {
           if (part.type === 'text' && part.text) chars += part.text.length;
-          else chars += 1000; // image placeholder
+          else chars += 1000;
         }
       }
       if (msg.tool_calls) {
@@ -651,6 +676,11 @@ export class Agent {
   public async sendMessage(text: string, images: Array<{ base64: string; mimeType: string }> = []) {
     this._savedEditorContext = this._getActiveEditorContext();
 
+    if (this._loopPromise) {
+      this.abort();
+      try { await this._loopPromise; } catch { /* old loop cleanup */ }
+    }
+
     const apiKey = await getApiKey(this._context.secrets);
     if (!apiKey) {
       this._provider.postMessage({ type: 'error', text: 'API key nije podesen. Koristi komandu "VajbAgent: Set API Key".' });
@@ -659,7 +689,6 @@ export class Agent {
 
     setApiCredentials(getApiUrl(), apiKey);
 
-    // Parse @file mentions and expand them
     const expandedText = this._expandFileMentions(text);
 
     const content: ContentPart[] = [];
@@ -680,7 +709,16 @@ export class Agent {
     this._history.push(userMsg);
     this._sendContextUpdate();
 
-    await this._runLoop(apiKey);
+    const myId = ++this._loopId;
+    const promise = this._runLoop(apiKey, myId);
+    this._loopPromise = promise;
+    try {
+      await promise;
+    } finally {
+      if (this._loopPromise === promise) {
+        this._loopPromise = null;
+      }
+    }
   }
 
   private _getWorkspaceRoot(): string | undefined {
@@ -703,14 +741,6 @@ export class Agent {
       } catch { /* skip */ }
     }
 
-    const ctxPath = path.join(root, 'CONTEXT.md');
-    if (fs.existsSync(ctxPath)) {
-      try {
-        const ctx = fs.readFileSync(ctxPath, 'utf-8').substring(0, 2000);
-        parts.push(`\nCONTEXT.md:\n${ctx}`);
-      } catch { /* skip */ }
-    }
-
     return parts.length > 1 ? parts.join('\n') : null;
   }
 
@@ -728,7 +758,7 @@ export class Agent {
 
     const lines: string[] = [`Branch: ${branch}`];
 
-    const status = git('git status --porcelain -uno');
+    const status = git('git status --porcelain');
     if (status) {
       const changed = status.split('\n').slice(0, 10);
       lines.push(`Uncommitted (${changed.length}):`);
@@ -970,7 +1000,7 @@ export class Agent {
     return expanded;
   }
 
-  private async _runLoop(apiKey: string) {
+  private async _runLoop(apiKey: string, loopId?: number) {
     this._loopContextCache = {
       git: this._getGitContext(),
       diag: this._getDiagnosticsContext(),
@@ -980,6 +1010,8 @@ export class Agent {
 
     try {
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+        if (this._abortController?.signal.aborted) return;
+
         const messages = this._buildMessages();
 
         this._abortController = new AbortController();
@@ -987,31 +1019,47 @@ export class Agent {
         let assistantContent = '';
         let toolCalls: ToolCall[] = [];
 
-        try {
-          const result = await this._streamRequest(apiKey, messages);
-          assistantContent = result.content;
-          toolCalls = result.toolCalls;
-        } catch (err: unknown) {
-          if ((err as Error).name === 'AbortError') {
-            return;
+        const MAX_RETRIES = 2;
+        const RETRY_PATTERN = /timeout|predugo|ECONNRESET|ENOTFOUND|socket hang up|502|503|529|rate.limit|ETIMEDOUT|ECONNREFUSED/i;
+        let lastErr: unknown = null;
+
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            if (attempt > 0) {
+              const delay = Math.min(2000 * Math.pow(2, attempt - 1), 8000);
+              this._provider.postMessage({ type: 'status', phase: 'thinking', text: `Pokušavam ponovo (${attempt}/${MAX_RETRIES})...` });
+              await new Promise(r => setTimeout(r, delay));
+            }
+            const result = await this._streamRequest(apiKey, messages);
+            assistantContent = result.content;
+            toolCalls = result.toolCalls;
+            lastErr = null;
+            break;
+          } catch (err: unknown) {
+            lastErr = err;
+            if ((err as Error).name === 'AbortError') {
+              return;
+            }
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            const errWithMeta = err as Error & { code?: string; dashboardUrl?: string };
+            if (errWithMeta.code === 'insufficient_credits') {
+              this._provider.postMessage({
+                type: 'creditsError',
+                text: errorMsg,
+                dashboardUrl: errWithMeta.dashboardUrl,
+              });
+              return;
+            }
+            const isRetryable = RETRY_PATTERN.test(errorMsg);
+            if (!isRetryable || attempt >= MAX_RETRIES) {
+              this._provider.postMessage({
+                type: 'error',
+                text: errorMsg,
+                retryable: isRetryable,
+              });
+              return;
+            }
           }
-          const errorMsg = err instanceof Error ? err.message : String(err);
-          const errWithMeta = err as Error & { code?: string; dashboardUrl?: string };
-          const isRetryable = /timeout|ECONNRESET|ENOTFOUND|socket hang up|502|503|529|rate.limit/i.test(errorMsg);
-          if (errWithMeta.code === 'insufficient_credits' && errWithMeta.dashboardUrl) {
-            this._provider.postMessage({
-              type: 'creditsError',
-              text: errorMsg,
-              dashboardUrl: errWithMeta.dashboardUrl,
-            });
-          } else {
-            this._provider.postMessage({
-              type: 'error',
-              text: errorMsg,
-              retryable: isRetryable,
-            });
-          }
-          return;
         }
 
         const assistantMsg: Message = { role: 'assistant', content: assistantContent };
@@ -1038,32 +1086,41 @@ export class Agent {
 
         // Execute each tool call
         for (const tc of toolCalls) {
+          if (this._abortController?.signal.aborted) return;
+
           let args: Record<string, unknown> = {};
+          let argsParseFailed = false;
           try {
             args = JSON.parse(tc.function.arguments);
           } catch {
-            args = {};
+            argsParseFailed = true;
           }
 
           this._provider.postMessage({
             type: 'toolCall',
             id: tc.id,
             name: tc.function.name,
-            args: JSON.stringify(args, null, 2),
-            status: 'running...',
+            args: argsParseFailed ? tc.function.arguments : JSON.stringify(args, null, 2),
+            status: argsParseFailed ? 'error' : 'running...',
           });
 
           let result: ToolCallResult;
-          try {
-            if (this._mcpManager.isMcpTool(tc.function.name)) {
-              const output = await this._mcpManager.callTool(tc.function.name, args);
-              result = { success: true, output };
-            } else {
-              result = await executeTool(tc.function.name, args);
+          if (argsParseFailed) {
+            result = { success: false, output: `Error: Invalid JSON arguments for ${tc.function.name}. The model produced malformed tool call arguments.` };
+          } else {
+            try {
+              if (this._mcpManager.isMcpTool(tc.function.name)) {
+                const output = await this._mcpManager.callTool(tc.function.name, args);
+                result = { success: true, output };
+              } else {
+                result = await executeTool(tc.function.name, args);
+              }
+            } catch (err: unknown) {
+              result = { success: false, output: `Error: ${err instanceof Error ? err.message : String(err)}` };
             }
-          } catch (err: unknown) {
-            result = { success: false, output: `Error: ${err instanceof Error ? err.message : String(err)}` };
           }
+
+          if (this._abortController?.signal.aborted) return;
 
           this._provider.postMessage({
             type: 'toolResult',
@@ -1078,6 +1135,11 @@ export class Agent {
             content: result.output.substring(0, 15000),
           });
         }
+
+        if (this._loopContextCache) {
+          this._loopContextCache.diag = this._getDiagnosticsContext();
+          this._loopContextCache.git = this._getGitContext();
+        }
       }
 
       this._provider.postMessage({
@@ -1086,8 +1148,11 @@ export class Agent {
       });
     } finally {
       this._loopContextCache = null;
-      this._provider.postMessage({ type: 'streamEnd' });
-      this._autoSaveSession();
+      const isActiveLoop = loopId === undefined || loopId === this._loopId;
+      if (isActiveLoop) {
+        this._provider.postMessage({ type: 'streamEnd' });
+        this._autoSaveSession();
+      }
     }
   }
 
@@ -1237,9 +1302,9 @@ export class Agent {
       };
 
       const hardTimer = setTimeout(() => {
-        finish(reject, new Error('Odgovor traje predugo (60s). Probaj ponovo.'));
+        finish(reject, new Error('Odgovor traje predugo (90s). Probaj ponovo.'));
         try { req.destroy(); } catch { /* */ }
-      }, 60_000);
+      }, 90_000);
 
       const url = new URL(`${apiUrl}/v1/chat/completions`);
       const isHttps = url.protocol === 'https:';
@@ -1285,6 +1350,8 @@ export class Agent {
           let buffer = '';
           let streamStartSent = false;
 
+          let streamDone = false;
+
           res.on('data', (chunk: Buffer) => {
             if (settled) return;
             buffer += chunk.toString();
@@ -1295,7 +1362,7 @@ export class Agent {
               const trimmed = line.trim();
               if (!trimmed || !trimmed.startsWith('data: ')) continue;
               const data = trimmed.slice(6);
-              if (data === '[DONE]') continue;
+              if (data === '[DONE]') { streamDone = true; continue; }
 
               let parsed: StreamChunk;
               try {
@@ -1337,6 +1404,10 @@ export class Agent {
 
           res.on('end', () => {
             const toolCalls = Array.from(toolCallsMap.values());
+            if (!streamDone && !content && toolCalls.length === 0) {
+              finish(reject, new Error('Stream prekinut pre nego sto je odgovor stigao. Probaj ponovo.'));
+              return;
+            }
             finish(resolve, { content, toolCalls });
           });
 

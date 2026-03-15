@@ -78,6 +78,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this._view?.webview.postMessage(message);
   }
 
+  public dispose() {
+    this._agent.dispose();
+  }
+
   public async sendMessageFromCommand(text: string) {
     if (this._view) {
       this._view.show?.(true);
@@ -145,6 +149,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
       case 'stopGeneration':
         this._agent.abort();
+        this._view?.webview.postMessage({ type: 'generationStopped' });
         break;
       case 'newSession':
         this._agent.abort();

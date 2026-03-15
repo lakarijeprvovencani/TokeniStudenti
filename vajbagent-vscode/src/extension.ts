@@ -14,6 +14,7 @@ export function activate(context: vscode.ExtensionContext) {
   mcpManager = new McpManager();
 
   const provider = new ChatViewProvider(context, mcpManager);
+  chatProvider = provider;
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('vajbagent.chatView', provider, {
@@ -112,7 +113,11 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(mcpWatcher);
 }
 
+let chatProvider: ChatViewProvider | null = null;
+
 export function deactivate() {
+  chatProvider?.dispose();
+  chatProvider = null;
   mcpManager?.stopAll();
   mcpManager = null;
 }

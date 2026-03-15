@@ -24,6 +24,54 @@ let _pendingCommandResolve: ApprovalCallback | null = null;
 let _apiCredentials: { apiUrl: string; apiKey: string } | null = null;
 const _checkpoints: Map<string, FileCheckpoint> = new Map();
 
+let _vajbTerminal: vscode.Terminal | null = null;
+let _vajbWriteEmitter: vscode.EventEmitter<string> | null = null;
+let _vajbTerminalReady = false;
+let _vajbWriteBuffer: string[] = [];
+
+function _vajbWrite(text: string) {
+  if (_vajbTerminalReady && _vajbWriteEmitter) {
+    _vajbWriteEmitter.fire(text);
+  } else {
+    _vajbWriteBuffer.push(text);
+  }
+}
+
+function getOrCreateTerminal(): (text: string) => void {
+  if (_vajbTerminal && !_vajbTerminal.exitStatus) {
+    return _vajbWrite;
+  }
+
+  _vajbTerminalReady = false;
+  _vajbWriteBuffer = [];
+
+  const writeEmitter = new vscode.EventEmitter<string>();
+  const closeEmitter = new vscode.EventEmitter<number | void>();
+
+  const pty: vscode.Pseudoterminal = {
+    onDidWrite: writeEmitter.event,
+    onDidClose: closeEmitter.event,
+    open: () => {
+      _vajbTerminalReady = true;
+      for (const buffered of _vajbWriteBuffer) {
+        writeEmitter.fire(buffered);
+      }
+      _vajbWriteBuffer = [];
+    },
+    close: () => {
+      _vajbTerminal = null;
+      _vajbWriteEmitter = null;
+      _vajbTerminalReady = false;
+      _vajbWriteBuffer = [];
+    },
+  };
+
+  _vajbTerminal = vscode.window.createTerminal({ name: 'VajbAgent', pty });
+  _vajbWriteEmitter = writeEmitter;
+
+  return _vajbWrite;
+}
+
 export function getCheckpoints(): FileCheckpoint[] {
   return Array.from(_checkpoints.values()).sort((a, b) => a.timestamp - b.timestamp);
 }
@@ -296,10 +344,17 @@ async function getFileDiagnostics(filePath: string): Promise<string> {
 }
 
 function resolveWorkspacePath(filePath: string): string {
-  if (path.isAbsolute(filePath)) return filePath;
   const folders = vscode.workspace.workspaceFolders;
-  if (!folders || folders.length === 0) return filePath;
-  return path.join(folders[0].uri.fsPath, filePath);
+  if (!folders || folders.length === 0) {
+    return path.isAbsolute(filePath) ? filePath : filePath;
+  }
+  const root = folders[0].uri.fsPath;
+  const resolved = path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
+  const normalized = path.resolve(resolved);
+  if (!normalized.startsWith(root + path.sep) && normalized !== root) {
+    throw new Error(`Access denied: path "${filePath}" is outside the workspace.`);
+  }
+  return normalized;
 }
 
 // ── read_file ──
@@ -540,23 +595,89 @@ async function toolExecuteCommand(args: Record<string, unknown>): Promise<ToolCa
     return { success: false, output: 'User rejected the command.' };
   }
 
+  const isLikelyServer = /\b(node|nodemon|npm\s+start|npm\s+run\s+(dev|start|serve)|python.*app|flask|uvicorn|php\s+-S|ruby.*server|cargo\s+run)\b/i.test(command);
+  const SERVER_READY_TIMEOUT = 8000;
+  const NORMAL_TIMEOUT = 120000;
+
+  const termWrite = getOrCreateTerminal();
+  _vajbTerminal?.show(false);
+  termWrite(`\r\n\x1b[90m${'─'.repeat(50)}\x1b[0m\r\n`);
+  termWrite(`\x1b[1;33m❯ ${command}\x1b[0m\r\n`);
+  termWrite(`\x1b[90m${cwd}\x1b[0m\r\n\r\n`);
+
   return new Promise((resolve) => {
-    exec(command, { cwd, timeout: 120000, maxBuffer: 2 * 1024 * 1024 }, (error, stdout, stderr) => {
+    let stdout = '';
+    let stderr = '';
+    let done = false;
+
+    const proc = exec(command, { cwd, timeout: NORMAL_TIMEOUT, maxBuffer: 2 * 1024 * 1024 });
+
+    const finishEarly = (msg: string) => {
+      if (done) return;
+      done = true;
+      _lastCommandOutput = msg.substring(0, 5000);
+      termWrite(`\r\n\x1b[1;32m[Server running in background]\x1b[0m\r\n`);
+      resolve({ success: true, output: msg });
+    };
+
+    const serverPatterns = /listening|server.*running|started.*on|http:\/\/localhost|ready on|serving|0\.0\.0\.0:|127\.0\.0\.1:/i;
+
+    proc.stdout?.on('data', (chunk: string) => {
+      stdout += chunk;
+      termWrite(chunk.replace(/\r?\n/g, '\r\n'));
+      if (isLikelyServer && serverPatterns.test(stdout)) {
+        finishEarly(`stdout:\n${stdout.trim()}\n\n(Server is running — command continues in background)`);
+      }
+    });
+
+    proc.stderr?.on('data', (chunk: string) => {
+      stderr += chunk;
+      termWrite(`\x1b[31m${chunk.replace(/\r?\n/g, '\r\n')}\x1b[0m`);
+      if (isLikelyServer && serverPatterns.test(stderr)) {
+        finishEarly(`stderr:\n${stderr.trim()}\n\n(Server is running — command continues in background)`);
+      }
+    });
+
+    if (isLikelyServer) {
+      setTimeout(() => {
+        if (!done) {
+          const parts: string[] = [];
+          if (stdout) parts.push(`stdout:\n${stdout.trim()}`);
+          if (stderr) parts.push(`stderr:\n${stderr.trim()}`);
+          parts.push('(Server process started — running in background)');
+          finishEarly(parts.join('\n'));
+        }
+      }, SERVER_READY_TIMEOUT);
+    }
+
+    proc.on('close', (code) => {
+      if (done) return;
+      done = true;
       const parts: string[] = [];
       if (stdout) parts.push(`stdout:\n${stdout}`);
       if (stderr) parts.push(`stderr:\n${stderr}`);
-      if (error?.killed) parts.push('Command timed out after 120s');
-      else if (error) parts.push(`exit code: ${error.code}`);
+      if (code !== 0 && code !== null) parts.push(`exit code: ${code}`);
       const output = parts.length > 0 ? parts.join('\n') : '(no output)';
-      const failed = !!error;
+      const failed = code !== 0 && code !== null;
 
       _lastCommandOutput = output.substring(0, 5000);
+
+      termWrite(`\r\n\x1b[1;${failed ? '31' : '32'}m[Exit: ${code ?? 0}]\x1b[0m\r\n`);
 
       if (failed && _postMessage) {
         _postMessage({ type: 'terminalError', command, output: output.substring(0, 2000) });
       }
 
       resolve({ success: !failed, output });
+    });
+
+    proc.on('error', (err) => {
+      if (done) return;
+      done = true;
+      const output = `Error: ${err.message}`;
+      _lastCommandOutput = output;
+      termWrite(`\r\n\x1b[1;31m${err.message}\x1b[0m\r\n`);
+      resolve({ success: false, output });
     });
   });
 }
