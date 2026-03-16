@@ -847,6 +847,24 @@
     .tree-folder-link {
       color: #e8a86e;
     }
+    .checklist-item {
+      list-style: none;
+      padding: 4px 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .checklist-item .check-icon {
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .checklist-item.done .check-text {
+      color: rgba(255, 255, 255, 0.7);
+    }
+    .checklist-item.pending .check-text {
+      color: rgba(255, 255, 255, 0.95);
+      font-weight: 500;
+    }
     .msg-assistant a, .msg-assistant a.auto-link {
       color: #FA7315;
       text-decoration: underline;
@@ -3776,6 +3794,10 @@
       html = html.replace(/((?:<oli[^>]*>.*<\/oli>\n?)+)/g, (block) => {
         return '<ol>' + block.replace(/<oli data-n="\d+">/g, '<li>').replace(/<\/oli>/g, '</li>') + '</ol>';
       });
+
+      // Checklist items (- [x] done, - [ ] pending)
+      html = html.replace(/^- \[x\] (.+)$/gm, '<li class="checklist-item done"><span class="check-icon">✅</span> <span class="check-text">$1</span></li>');
+      html = html.replace(/^- \[ \] (.+)$/gm, '<li class="checklist-item pending"><span class="check-icon">⬜</span> <span class="check-text">$1</span></li>');
 
       // Unordered lists
       html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
