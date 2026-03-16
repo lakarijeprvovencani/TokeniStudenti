@@ -9,7 +9,7 @@ import https from 'https';
 import http from 'http';
 import { execSync } from 'child_process';
 
-const MAX_ITERATIONS = 25;
+const MAX_ITERATIONS = 50;
 
 const SYSTEM_PROMPT = `You are VajbAgent, an AI coding assistant operating inside VS Code.
 You are pair programming with the user to help them with coding tasks — writing, debugging, refactoring, understanding, and deploying code.
@@ -95,11 +95,18 @@ Tool selection guide:
 - Fetching a specific URL: fetch_url
 
 MINIMIZE TOOL CALLS. The fewer tools you call to accomplish the task, the faster and cheaper for the user. Combine knowledge from auto-context with targeted tool use.
+NEVER do 5+ replace_in_file on the same file — use one write_file instead. Plan your changes BEFORE starting: think about what needs to change, then execute with minimal tool calls.
 
 IMPORTANT: When execute_command runs, the output is ALREADY VISIBLE to the user in the VS Code "VajbAgent" terminal tab. Do NOT repeat or paste raw command output in the chat. Instead:
 - Summarize the result briefly ("Instalacija uspesna", "Server pokrenut na portu 3000", "Build prosao bez gresaka")
 - Only mention specific lines from the output if there's an error or something the user needs to act on
 - If the command failed, explain the error and what to do — but don't dump the full log
+
+SERVER VERIFICATION: After starting a dev server (npm run dev, node server.js, etc.):
+1. First start the server as a SEPARATE command: execute_command("npm run dev") — wait for it to resolve (it auto-detects background servers).
+2. THEN in a SECOND execute_command, verify: curl -s -o /dev/null -w "%{http_code}" http://localhost:PORT
+3. If curl returns 200, confirm to user. If it fails, check terminal for errors and fix them.
+CRITICAL: Do NOT chain server start + curl in a single command. Always use two separate execute_command calls.
 </tool_usage>
 
 <replace_in_file_guide>
@@ -109,7 +116,7 @@ replace_in_file is powerful but error-prone. Follow these rules strictly:
 2. Always read_file FIRST to see the exact current content before attempting replace_in_file.
 3. Keep old_text as short as possible while still being UNIQUE in the file. Include just enough surrounding context.
 4. If replace_in_file fails, re-read the file — the content may have changed from a previous edit.
-5. For large changes across many lines, prefer write_file over multiple replace_in_file calls.
+5. EFFICIENCY RULE: If you need 3+ replace_in_file calls on the SAME file, STOP and use write_file instead to rewrite the entire file in one call. This saves tool calls and is more reliable.
 6. NEVER guess at indentation. Copy it exactly from what you read.
 </replace_in_file_guide>
 
@@ -144,6 +151,7 @@ Your final response must:
 3. If the user needs to do something next (restart server, open browser, install something), tell them step by step.
 4. Do NOT keep asking "do you want me to do anything else?" — just finish and let the user ask.
 5. Do NOT repeat work or over-explain. Keep it concise but complete.
+6. NEVER paste or show the full file content at the end. Your changes were already applied via tools — the user can see them in the editor. Just summarize what you changed.
 
 Example good final response:
 "Napravio sam portfolio sajt sa dva fajla:
@@ -369,15 +377,16 @@ You may have access to external MCP (Model Context Protocol) tools. These appear
 A file called .vajbagent/CONTEXT.md may exist in the project root. This is the project's memory file.
 
 At the START of every conversation:
-1. Check if .vajbagent/CONTEXT.md exists using list_files or read_file.
-2. If it exists, read it. It contains important context: project description, tech stack, previous decisions, known issues.
-3. Use this context to give better, more informed answers without re-exploring everything from scratch.
+1. Check <project_memory> — if it has content, you already know the project context.
+2. If <project_memory> is empty or missing, that's fine — you'll create it after your first significant work.
 
-At the END of a conversation where you made significant changes:
-1. Update .vajbagent/CONTEXT.md with what was done, decisions made, and any issues to be aware of.
-2. Keep it concise — bullet points, not essays. Max ~50 lines.
-3. Structure: ## Project, ## Tech Stack, ## Recent Changes, ## Known Issues, ## Notes
-4. If the file doesn't exist yet, create it after your first significant interaction.
+IMPORTANT — After completing a significant task (creating files, building features, fixing bugs, refactoring):
+1. Ask the user: "Da li da azuriram CONTEXT.md sa ovim izmenama?" (Do NOT silently skip this)
+2. If the user agrees (or if it's clearly a big task), update .vajbagent/CONTEXT.md using write_file
+3. Keep it concise — bullet points, max ~50 lines
+4. Structure: ## Project, ## Tech Stack, ## Recent Changes, ## Known Issues, ## Notes
+5. If the file doesn't exist yet, create it
+6. Do NOT update CONTEXT.md for trivial questions or small edits
 </context_memory>
 
 <proactive_execution>
@@ -1032,6 +1041,17 @@ export class Agent {
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
         if (this._abortController?.signal.aborted) return;
 
+        if (iteration === MAX_ITERATIONS - 10) {
+          this._history.push({
+            role: 'user',
+            content: '[SYSTEM] You are approaching the tool call limit. Wrap up your current work — summarize what you did and what remains, then STOP calling tools.',
+          });
+        }
+
+        if (iteration > 0) {
+          this._provider.postMessage({ type: 'status', phase: 'thinking', text: 'Razmišljam o sledećem koraku...' });
+        }
+
         const messages = this._buildMessages();
 
         this._abortController = new AbortController();
@@ -1039,14 +1059,18 @@ export class Agent {
         let assistantContent = '';
         let toolCalls: ToolCall[] = [];
 
-        const MAX_RETRIES = 2;
-        const RETRY_PATTERN = /timeout|predugo|ECONNRESET|ENOTFOUND|socket hang up|502|503|529|rate.limit|ETIMEDOUT|ECONNREFUSED/i;
+        const MAX_RETRIES = 3;
+        const RETRY_PATTERN = /timeout|predugo|idle|ECONNRESET|ENOTFOUND|socket hang up|403|429|502|503|529|rate.limit|ETIMEDOUT|ECONNREFUSED/i;
         let lastErr: unknown = null;
 
         for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
           try {
             if (attempt > 0) {
-              const delay = Math.min(2000 * Math.pow(2, attempt - 1), 8000);
+              const errMsg = lastErr instanceof Error ? lastErr.message : '';
+              const isRateLimit = /403|429|rate.limit/i.test(errMsg);
+              const delay = isRateLimit
+                ? Math.min(4000 * Math.pow(2, attempt - 1), 15000)
+                : Math.min(2000 * Math.pow(2, attempt - 1), 8000);
               this._provider.postMessage({ type: 'status', phase: 'thinking', text: `Pokušavam ponovo (${attempt}/${MAX_RETRIES})...` });
               await new Promise(r => setTimeout(r, delay));
             }
@@ -1162,10 +1186,16 @@ export class Agent {
         }
       }
 
-      this._provider.postMessage({
-        type: 'error',
-        text: `Dostignut limit od ${MAX_ITERATIONS} tool poziva. Pokusaj ponovo sa manjim zahtevom.`,
-      });
+      const summary = this._buildFallbackSummary();
+      if (summary) {
+        this._provider.postMessage({ type: 'streamStart' });
+        this._provider.postMessage({ type: 'streamDelta', text: summary + '\n\n---\n⚠️ Dostignut je limit od ' + MAX_ITERATIONS + ' koraka. Posalji novu poruku da nastavim odatle gde sam stao.' });
+      } else {
+        this._provider.postMessage({
+          type: 'error',
+          text: `Dostignut limit od ${MAX_ITERATIONS} koraka. Posalji novu poruku da nastavim odatle gde sam stao.`,
+        });
+      }
     } finally {
       this._loopContextCache = null;
       const isActiveLoop = loopId === undefined || loopId === this._loopId;
@@ -1311,7 +1341,10 @@ export class Agent {
       const p = path.join(root, name);
       try {
         if (fs.existsSync(p)) {
-          const content = fs.readFileSync(p, 'utf-8').trim();
+          const raw = fs.readFileSync(p, 'utf-8');
+          const content = raw.split('\n')
+            .filter(line => !line.trimStart().startsWith('#'))
+            .join('\n').trim();
           if (content.length > 0 && content.length < 8000) {
             return content;
           }
@@ -1344,13 +1377,24 @@ export class Agent {
         if (settled) return;
         settled = true;
         clearTimeout(hardTimer);
+        if (idleTimer) clearTimeout(idleTimer);
         (fn as (v: unknown) => void)(val);
       };
 
       const hardTimer = setTimeout(() => {
-        finish(reject, new Error('Odgovor traje predugo (90s). Probaj ponovo.'));
+        finish(reject, new Error('Odgovor traje predugo (60s). Probaj ponovo.'));
         try { req.destroy(); } catch { /* */ }
-      }, 90_000);
+      }, 60_000);
+
+      let idleTimer: ReturnType<typeof setTimeout> | null = null;
+      const resetIdle = () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          finish(reject, new Error('Nema odgovora od servera (30s idle). Probaj ponovo.'));
+          try { req.destroy(); } catch { /* */ }
+        }, 30_000);
+      };
+      resetIdle();
 
       const url = new URL(`${apiUrl}/v1/chat/completions`);
       const isHttps = url.protocol === 'https:';
@@ -1400,6 +1444,7 @@ export class Agent {
 
           res.on('data', (chunk: Buffer) => {
             if (settled) return;
+            resetIdle();
             buffer += chunk.toString();
             const lines = buffer.split('\n');
             buffer = lines.pop() || '';

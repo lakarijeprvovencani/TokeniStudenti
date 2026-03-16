@@ -2,7 +2,7 @@
   "name": "vajbagent",
   "displayName": "VajbAgent",
   "description": "AI coding asistent sa 7 modela — razume projekat, pise i menja kod, pokrece komande, Plan Mode, MCP, auto-fix, checkpoint/undo. Bez pretplate.",
-  "version": "0.33.0",
+  "version": "0.37.0",
   "publisher": "VajbAgent",
   "engines": {
     "vscode": "^1.85.0"

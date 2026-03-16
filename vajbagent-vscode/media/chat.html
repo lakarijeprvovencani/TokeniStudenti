@@ -868,18 +868,6 @@
       color: #FA7315;
       opacity: 1;
     }
-    .apply-btn {
-      background: #FA7315;
-      color: #fff;
-      border: none;
-      border-radius: 3px;
-      padding: 2px 8px;
-      font-size: 10px;
-      cursor: pointer;
-      opacity: 0.85;
-      margin-right: 4px;
-    }
-    .apply-btn:hover { opacity: 1; }
     .copy-btn {
       background: rgba(250, 115, 21, 0.15);
       color: #FA7315;
@@ -1146,8 +1134,8 @@
       top: 100%;
       right: 0;
       z-index: 9999;
-      min-width: 260px;
-      max-width: 320px;
+      min-width: 280px;
+      max-width: 340px;
       max-height: 80vh;
       overflow-y: auto;
       background: #1e1e1e;
@@ -1159,36 +1147,38 @@
     }
     .settings-panel.open { display: block; }
     .settings-title {
-      padding: 0 12px 8px;
-      font-size: 11px;
-      font-weight: 600;
+      padding: 10px 14px 6px;
+      font-size: 10px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      opacity: 0.5;
-      border-bottom: 1px solid var(--vscode-panel-border);
-      margin-bottom: 4px;
+      letter-spacing: 0.8px;
+      color: #FA7315;
+      opacity: 0.7;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      margin-top: 2px;
     }
+    .settings-title:first-child { border-top: none; margin-top: 0; }
     .settings-item {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 6px 12px;
+      padding: 8px 14px;
       font-size: 12px;
       cursor: pointer;
       user-select: none;
     }
-    .settings-item:hover { background: var(--vscode-list-hoverBackground); }
+    .settings-item:hover { background: rgba(255,255,255,0.04); }
     .settings-label {
       display: flex;
       flex-direction: column;
-      gap: 1px;
+      gap: 2px;
     }
-    .settings-label-main { font-weight: 500; }
-    .settings-label-desc { font-size: 10px; opacity: 0.5; }
+    .settings-label-main { font-weight: 500; font-size: 12px; }
+    .settings-label-desc { font-size: 10px; opacity: 0.45; }
     .settings-field {
       display: flex;
-      gap: 4px;
-      padding: 4px 10px 8px;
+      gap: 6px;
+      padding: 4px 14px 10px;
     }
     .settings-field input {
       flex: 1;
@@ -1296,6 +1286,42 @@
       word-break: break-all;
       color: var(--vscode-foreground);
     }
+    .cmd-output {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.25s ease;
+      background: #0d0d0d;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    .cmd-output.open { max-height: 200px; }
+    .cmd-output-inner {
+      padding: 8px 10px;
+      font-family: var(--vscode-editor-font-family, monospace);
+      font-size: 11px;
+      line-height: 1.5;
+      color: #ccc;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .cmd-output-inner::-webkit-scrollbar { width: 4px; }
+    .cmd-output-inner::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+    .cmd-output-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      font-size: 10px;
+      opacity: 0.6;
+      cursor: pointer;
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+    .cmd-output-bar:hover { opacity: 0.9; background: rgba(255,255,255,0.03); }
+    .cmd-output-bar .cmd-toggle-icon { transition: transform 0.2s; font-size: 8px; }
+    .cmd-output-bar.open .cmd-toggle-icon { transform: rotate(90deg); }
+    .cmd-exit-ok { color: #4ec9b0; }
+    .cmd-exit-fail { color: #f14c4c; }
     .cmd-actions {
       display: flex;
       gap: 8px;
@@ -1635,8 +1661,8 @@
       </button>
     </div>
     <div class="settings-panel" id="settingsPanel">
-      <div id="userInfoBar" style="display:none;padding:6px 12px 8px;font-size:11px;color:var(--vscode-foreground);border-bottom:1px solid var(--vscode-panel-border);margin-bottom:4px;">
-        <span style="opacity:0.5;">Ulogovan:</span> <strong id="userDisplayName"></strong>
+      <div id="userInfoBar" style="display:none;padding:10px 14px;font-size:12px;color:var(--vscode-foreground);border-bottom:1px solid rgba(255,255,255,0.06);">
+        <span style="opacity:0.45;font-size:10px;">Ulogovan:</span> <strong id="userDisplayName" style="margin-left:4px;"></strong>
       </div>
       <div class="settings-title">API kljuc</div>
       <div id="apiKeySavedState" style="display:none;padding:4px 12px 8px;">
@@ -1693,20 +1719,20 @@
         </div>
       </label>
 
-      <div class="settings-title" style="margin-top:8px">MCP Serveri</div>
-      <div id="mcpStatusArea" style="padding:0 12px 6px;font-size:11px;opacity:0.7;">Nema konfigurisanih servera</div>
-      <div style="padding:0 12px 6px;display:flex;gap:6px;flex-wrap:wrap;">
-        <button id="mcpRestartBtn" style="font-size:11px;padding:3px 10px;cursor:pointer;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:4px;">Restartuj</button>
-        <button id="mcpConfigBtn" style="font-size:11px;padding:3px 10px;cursor:pointer;background:transparent;color:#FA7315;border:1px solid #FA7315;border-radius:4px;">Konfiguriši</button>
-        <button id="mcpGuideBtn" style="font-size:11px;padding:3px 10px;cursor:pointer;background:transparent;color:var(--vscode-foreground);border:1px solid var(--vscode-panel-border);border-radius:4px;opacity:0.7;">Kako dodati?</button>
+      <div class="settings-title" style="margin-top:4px">MCP Serveri</div>
+      <div id="mcpStatusArea" style="padding:2px 14px 8px;font-size:11px;opacity:0.65;line-height:1.6;">Nema konfigurisanih servera</div>
+      <div style="padding:0 14px 10px;display:flex;gap:6px;flex-wrap:wrap;">
+        <button id="mcpRestartBtn" style="font-size:11px;padding:4px 12px;cursor:pointer;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:5px;">Restartuj</button>
+        <button id="mcpConfigBtn" style="font-size:11px;padding:4px 12px;cursor:pointer;background:transparent;color:#FA7315;border:1px solid rgba(250,115,21,0.4);border-radius:5px;">Konfiguriši</button>
+        <button id="mcpGuideBtn" style="font-size:11px;padding:4px 12px;cursor:pointer;background:transparent;color:var(--vscode-foreground);border:1px solid rgba(255,255,255,0.12);border-radius:5px;opacity:0.6;">Kako dodati?</button>
       </div>
-      <div class="settings-title" style="margin-top:8px">Pravila projekta</div>
-      <div style="padding:0 12px 4px;font-size:11px;opacity:0.55;line-height:1.5;">
+      <div class="settings-title" style="margin-top:4px">Pravila projekta</div>
+      <div style="padding:2px 14px 6px;font-size:11px;opacity:0.45;line-height:1.5;">
         Definisi pravila za ovaj projekat — agent ce ih pratiti u svakom odgovoru.
       </div>
-      <div id="rulesStatus" style="padding:2px 12px 4px;font-size:11px;display:none;"></div>
-      <div style="padding:0 12px 6px;display:flex;gap:6px;">
-        <button id="rulesEditBtn" style="font-size:11px;padding:3px 10px;cursor:pointer;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:4px;">Uredi pravila</button>
+      <div id="rulesStatus" style="padding:2px 14px 4px;font-size:11px;display:none;"></div>
+      <div style="padding:0 14px 10px;display:flex;gap:6px;">
+        <button id="rulesEditBtn" style="font-size:11px;padding:4px 12px;cursor:pointer;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:5px;">Uredi pravila</button>
       </div>
 
       <input type="hidden" id="settingsApiUrl">
@@ -1747,13 +1773,15 @@
       <div class="mcp-guide-section">
         <div class="mcp-guide-section-title">📁 File System (pristup fajlovima)</div>
         <div class="mcp-guide-desc">Daje agentu pristup fajlovima na tvom racunaru. Zameni putanju sa folderom koji zelis.</div>
-        <div class="mcp-guide-code" id="guideFs">"filesystem": {
-  "command": "npx",
-  "args": [
-    "-y",
-    "@modelcontextprotocol/server-filesystem",
-    "TVOJ_FOLDER_PUTANJA"
-  ]
+        <div class="mcp-guide-code" id="guideFs">{
+  "filesystem": {
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "TVOJ_FOLDER_PUTANJA"
+    ]
+  }
 }<button class="copy-guide-btn" data-target="guideFs">Copy</button></div>
         <div class="mcp-guide-note">Primer putanje: <code>/Users/ime/Documents</code> ili <code>C:\\Users\\ime\\Documents</code></div>
       </div>
@@ -1768,16 +1796,18 @@
           <li>Klikni <strong>Generate new token</strong> i kopiraj token</li>
           <li>Project Ref nadjes u URL-u dashboarda: <code>supabase.com/dashboard/project/<strong>TVOJ_REF</strong></code></li>
         </ol>
-        <div class="mcp-guide-code" id="guideSupabase">"supabase": {
-  "command": "npx",
-  "args": [
-    "-y",
-    "@supabase/mcp-server-supabase",
-    "--project-ref",
-    "TVOJ_PROJECT_REF"
-  ],
-  "env": {
-    "SUPABASE_ACCESS_TOKEN": "TVOJ_ACCESS_TOKEN"
+        <div class="mcp-guide-code" id="guideSupabase">{
+  "supabase": {
+    "command": "npx",
+    "args": [
+      "-y",
+      "@supabase/mcp-server-supabase",
+      "--project-ref",
+      "TVOJ_PROJECT_REF"
+    ],
+    "env": {
+      "SUPABASE_ACCESS_TOKEN": "TVOJ_ACCESS_TOKEN"
+    }
   }
 }<button class="copy-guide-btn" data-target="guideSupabase">Copy</button></div>
         <div class="mcp-guide-note">Dodaj <code>"--read-only"</code> u args ako zelis samo citanje (bez menjanja baze).</div>
@@ -1793,14 +1823,16 @@
           <li>Klikni <strong>Generate new token (classic)</strong></li>
           <li>Ukljuci permisije: <code>repo</code>, <code>read:org</code></li>
         </ol>
-        <div class="mcp-guide-code" id="guideGithub">"github": {
-  "command": "npx",
-  "args": [
-    "-y",
-    "@modelcontextprotocol/server-github"
-  ],
-  "env": {
-    "GITHUB_PERSONAL_ACCESS_TOKEN": "TVOJ_GITHUB_TOKEN"
+        <div class="mcp-guide-code" id="guideGithub">{
+  "github": {
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-github"
+    ],
+    "env": {
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "TVOJ_GITHUB_TOKEN"
+    }
   }
 }<button class="copy-guide-btn" data-target="guideGithub">Copy</button></div>
       </div>
@@ -1814,11 +1846,13 @@
           <li>Idi na <a href="https://app.netlify.com/user/applications#personal-access-tokens" target="_blank">app.netlify.com → User Settings → Applications</a></li>
           <li>Kreiraj <strong>Personal Access Token</strong></li>
         </ol>
-        <div class="mcp-guide-code" id="guideNetlify">"netlify": {
-  "command": "npx",
-  "args": ["-y", "@netlify/mcp"],
-  "env": {
-    "NETLIFY_PERSONAL_ACCESS_TOKEN": "TVOJ_NETLIFY_TOKEN"
+        <div class="mcp-guide-code" id="guideNetlify">{
+  "netlify": {
+    "command": "npx",
+    "args": ["-y", "@netlify/mcp"],
+    "env": {
+      "NETLIFY_PERSONAL_ACCESS_TOKEN": "TVOJ_NETLIFY_TOKEN"
+    }
   }
 }<button class="copy-guide-btn" data-target="guideNetlify">Copy</button></div>
       </div>
@@ -1832,11 +1866,13 @@
           <li>Idi na <a href="https://vercel.com/account/tokens" target="_blank">vercel.com/account/tokens</a></li>
           <li>Kreiraj novi token</li>
         </ol>
-        <div class="mcp-guide-code" id="guideVercel">"vercel": {
-  "command": "npx",
-  "args": ["-y", "vercel", "mcp", "start"],
-  "env": {
-    "VERCEL_TOKEN": "TVOJ_VERCEL_TOKEN"
+        <div class="mcp-guide-code" id="guideVercel">{
+  "vercel": {
+    "command": "npx",
+    "args": ["-y", "vercel", "mcp", "start"],
+    "env": {
+      "VERCEL_TOKEN": "TVOJ_VERCEL_TOKEN"
+    }
   }
 }<button class="copy-guide-btn" data-target="guideVercel">Copy</button></div>
       </div>
@@ -2400,22 +2436,34 @@
     function renderMcpStatus(servers, totalTools, loading) {
       if (loading) {
         mcpStatusArea.textContent = 'Pokrecem MCP servere...';
+        mcpStatusArea.style.color = '';
         return;
       }
       if (!servers || servers.length === 0) {
         mcpStatusArea.textContent = 'Nema konfigurisanih servera';
+        mcpStatusArea.style.color = '';
         return;
       }
-      const lines = servers.map(s => {
+      const configError = servers.find(s => s.name === '_config');
+      const realServers = servers.filter(s => s.name !== '_config');
+      const lines = [];
+      if (configError) {
+        lines.push('⚠️ ' + configError.error);
+      }
+      realServers.forEach(s => {
         const dot = s.ready ? '🟢' : '🔴';
         let line = dot + ' ' + s.name;
         if (s.ready) line += ' (' + s.toolCount + ' tools)';
         if (s.error) line += ' — ' + s.error;
-        return line;
+        lines.push(line);
       });
       if (totalTools > 0) lines.push('Ukupno: ' + totalTools + ' MCP tools');
-      mcpStatusArea.textContent = lines.join('\n');
-      mcpStatusArea.style.whiteSpace = 'pre-line';
+      if (lines.length === 0) {
+        mcpStatusArea.textContent = 'Nema konfigurisanih servera';
+      } else {
+        mcpStatusArea.innerHTML = lines.map(l => '<div style="margin-bottom:3px;">' + l + '</div>').join('');
+      }
+      mcpStatusArea.style.whiteSpace = 'normal';
     }
 
     mcpRestartBtn.onclick = function() {
@@ -3119,6 +3167,11 @@
           break;
         }
 
+        case 'status': {
+          showStatus(msg.text || 'Razmisljam...', msg.phase || 'thinking');
+          break;
+        }
+
         case 'streamStart': {
           hideStatus();
           showStatus('Pisem odgovor...', 'streaming');
@@ -3292,6 +3345,32 @@
           });
           messagesEl.appendChild(cmdBlock);
           showApprovalBar(msg.command.substring(0, 40) + '...', '', 'cmd');
+          scrollToBottom();
+          break;
+        }
+
+        case 'commandDone': {
+          const cmdBlocks = document.querySelectorAll('.cmd-block');
+          const lastCmd = cmdBlocks[cmdBlocks.length - 1];
+          if (lastCmd && msg.output) {
+            const existing = lastCmd.querySelector('.cmd-output-bar');
+            if (!existing) {
+              const exitClass = msg.failed ? 'cmd-exit-fail' : 'cmd-exit-ok';
+              const exitText = msg.failed ? 'Exit: ' + msg.exitCode : 'Zavrseno';
+              const bar = document.createElement('div');
+              bar.className = 'cmd-output-bar';
+              bar.innerHTML = '<span class="cmd-toggle-icon">&#9654;</span> Terminal output <span class="' + exitClass + '" style="margin-left:auto;">' + exitText + '</span>';
+              const outputDiv = document.createElement('div');
+              outputDiv.className = 'cmd-output';
+              outputDiv.innerHTML = '<div class="cmd-output-inner">' + escapeHtml(msg.output) + '</div>';
+              bar.addEventListener('click', () => {
+                bar.classList.toggle('open');
+                outputDiv.classList.toggle('open');
+              });
+              lastCmd.appendChild(bar);
+              lastCmd.appendChild(outputDiv);
+            }
+          }
           scrollToBottom();
           break;
         }
@@ -3704,18 +3783,6 @@
         const header = wrapper.querySelector('.code-block-header');
         const code = wrapper.querySelector('code');
         if (!header || !code) return;
-
-        const applyBtn = document.createElement('button');
-        applyBtn.className = 'apply-btn';
-        applyBtn.textContent = 'Primeni';
-        applyBtn.addEventListener('click', () => {
-          const content = code.textContent || '';
-          navigator.clipboard.writeText(content);
-          vscode.postMessage({ type: 'applyCode', code: content });
-          applyBtn.textContent = 'Primenjen!';
-          setTimeout(() => { applyBtn.textContent = 'Primeni'; }, 1500);
-        });
-        header.appendChild(applyBtn);
 
         const btn = document.createElement('button');
         btn.className = 'copy-btn';

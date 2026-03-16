@@ -595,7 +595,7 @@ async function toolExecuteCommand(args: Record<string, unknown>): Promise<ToolCa
     return { success: false, output: 'User rejected the command.' };
   }
 
-  const isLikelyServer = /\b(node|nodemon|npm\s+start|npm\s+run\s+(dev|start|serve)|python.*app|flask|uvicorn|php\s+-S|ruby.*server|cargo\s+run)\b/i.test(command);
+  const isLikelyServer = /\b(node|nodemon|npm\s+start|npm\s+run\s+(dev|start|serve)|npx\s+(vite|next|nuxt|remix|astro)|vite\b|next\s+dev|python.*app|flask|uvicorn|php\s+-S|ruby.*server|cargo\s+run)\b/i.test(command);
   const SERVER_READY_TIMEOUT = 8000;
   const NORMAL_TIMEOUT = 120000;
 
@@ -617,6 +617,10 @@ async function toolExecuteCommand(args: Record<string, unknown>): Promise<ToolCa
       done = true;
       _lastCommandOutput = msg.substring(0, 5000);
       termWrite(`\r\n\x1b[1;32m[Server running in background]\x1b[0m\r\n`);
+      if (_postMessage) {
+        const lastLines = msg.trim().split('\n').slice(-6).join('\n');
+        _postMessage({ type: 'commandDone', command, exitCode: 0, failed: false, output: lastLines.substring(0, 1000) });
+      }
       resolve({ success: true, output: msg });
     };
 
@@ -664,8 +668,9 @@ async function toolExecuteCommand(args: Record<string, unknown>): Promise<ToolCa
 
       termWrite(`\r\n\x1b[1;${failed ? '31' : '32'}m[Exit: ${code ?? 0}]\x1b[0m\r\n`);
 
-      if (failed && _postMessage) {
-        _postMessage({ type: 'terminalError', command, output: output.substring(0, 2000) });
+      if (_postMessage) {
+        const lastLines = (stdout || stderr || '').trim().split('\n').slice(-8).join('\n');
+        _postMessage({ type: 'commandDone', command, exitCode: code ?? 0, failed, output: lastLines.substring(0, 1000) });
       }
 
       resolve({ success: !failed, output });

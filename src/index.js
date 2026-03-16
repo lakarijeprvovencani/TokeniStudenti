@@ -70,16 +70,27 @@ function resolveModel(requestedModel) {
   return VAJB_MODELS.find((m) => m.id === resolved) || null;
 }
 
-// ---- Clients ----
-if (!process.env.ANTHROPIC_API_KEY) {
-  console.warn('ANTHROPIC_API_KEY is not set; Anthropic models (Max/Ultra) will fail.');
-}
-if (!process.env.OPENAI_API_KEY) {
-  console.warn('OPENAI_API_KEY is not set; OpenAI models (Lite/Pro) will fail.');
+// ---- API Key Pools ----
+const openaiKeys = (process.env.OPENAI_API_KEYS || process.env.OPENAI_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean);
+const anthropicKeys = (process.env.ANTHROPIC_API_KEYS || process.env.ANTHROPIC_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean);
+
+if (openaiKeys.length === 0) console.warn('No OpenAI API keys configured; OpenAI models will fail.');
+if (anthropicKeys.length === 0) console.warn('No Anthropic API keys configured; Anthropic models will fail.');
+
+const openaiPool = openaiKeys.map(key => ({ client: new OpenAI({ apiKey: key }), active: 0 }));
+const anthropicPool = anthropicKeys.map(key => ({ client: new Anthropic({ apiKey: key }), active: 0 }));
+
+function acquireFromPool(pool, provider) {
+  if (pool.length === 0) throw Object.assign(new Error(`No ${provider} API keys configured`), { status: 503 });
+  if (pool.length === 1) { pool[0].active++; return pool[0]; }
+  const entry = pool.reduce((best, curr) => curr.active < best.active ? curr : best);
+  entry.active++;
+  return entry;
 }
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || 'dummy' });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || 'dummy' });
+function releaseFromPool(entry) {
+  entry.active = Math.max(0, entry.active - 1);
+}
 
 // ---- VajbAgent System Prompt ----
 const VAJB_SYSTEM_PROMPT = `# ROLE: VajbAgent - Autonomous Coding Assistant
@@ -286,7 +297,6 @@ async function withRetry(fn, { retries = 3, delayMs = 1500 } = {}) {
     try {
       const result = await fn();
       
-      // Check for empty response (common cause of "Invalid API Response")
       if (!result) {
         throw new Error('Empty response from model');
       }
@@ -296,9 +306,9 @@ async function withRetry(fn, { retries = 3, delayMs = 1500 } = {}) {
       const status = err.status || err.statusCode || 0;
       const msg = (err.message || '').toLowerCase();
       
-      // Retryable conditions: rate limit, overload, network issues, empty response
+      const isRateLimit = status === 429 || status === 403;
       const retryable = 
-        status === 429 || 
+        isRateLimit ||
         status === 529 || 
         status === 503 ||
         status === 502 ||
@@ -312,7 +322,8 @@ async function withRetry(fn, { retries = 3, delayMs = 1500 } = {}) {
       
       if (!retryable || attempt >= retries) throw err;
       
-      const wait = delayMs * Math.pow(1.5, attempt); // Exponential backoff
+      const baseDelay = isRateLimit ? 3000 : delayMs;
+      const wait = baseDelay * Math.pow(2, attempt);
       console.log(`Retrying after error: ${status || msg} (attempt ${attempt + 1}/${retries}, wait ${Math.round(wait)}ms)`);
       await new Promise(r => setTimeout(r, wait));
     }
@@ -640,6 +651,23 @@ async function getBalanceWarning(keyId, newBalance) {
   return null;
 }
 
+// ---- Per-user concurrency limit ----
+const userConcurrency = new Map();
+const MAX_CONCURRENT_PER_USER = 2;
+
+function acquireConcurrency(keyId) {
+  const current = userConcurrency.get(keyId) || 0;
+  if (current >= MAX_CONCURRENT_PER_USER) return false;
+  userConcurrency.set(keyId, current + 1);
+  return true;
+}
+
+function releaseConcurrency(keyId) {
+  const current = userConcurrency.get(keyId) || 0;
+  if (current <= 1) userConcurrency.delete(keyId);
+  else userConcurrency.set(keyId, current - 1);
+}
+
 // ---- Chat completions handler ----
 const chatCompletionsHandler = [
   authLimiter,
@@ -692,8 +720,16 @@ const chatCompletionsHandler = [
       });
     }
 
+    if (!acquireConcurrency(keyId)) {
+      return res.status(429).json({
+        error: {
+          message: 'Imaš već aktivne zahteve u toku. Sačekaj da se završe pre nego što pošalješ novi.',
+          code: 'concurrent_limit',
+        },
+      });
+    }
+
     try {
-      // Inject VajbAgent system prompt (Power gets special architect prompt)
       const enhancedMessages = injectSystemPrompt(messages, resolved.isPower === true);
 
       if (resolved.backend === 'openai') {
@@ -712,8 +748,8 @@ const chatCompletionsHandler = [
 
       const msgLower = msg.toLowerCase();
 
-      if (status === 429) {
-        userMsg = 'API rate limit dostignut. Sačekaj par sekundi i pokušaj ponovo.';
+      if (status === 429 || (status === 403 && (msgLower.includes('rate') || msgLower.includes('limit') || msgLower.includes('quota')))) {
+        userMsg = 'AI provajder je preopterećen (rate limit). Agent će automatski pokušati ponovo za par sekundi.';
         code = 'rate_limit';
       } else if (status === 529 || msgLower.includes('overloaded')) {
         userMsg = 'Backend model je trenutno preopterećen. Pokušaj ponovo za minut ili probaj jeftiniji model.';
@@ -730,14 +766,19 @@ const chatCompletionsHandler = [
       ) {
         userMsg = 'Kontekst je prevelik čak i posle trimovanja. Pokušaj sa kraćim promptom ili zatvori nepotrebne fajlove u Cursor-u.';
         code = 'context_too_large';
-      } else if (status === 401 || status === 403) {
+      } else if (status === 401) {
         userMsg = 'Problem sa autentifikacijom prema AI provajderu. Kontaktiraj podršku.';
         code = 'auth_error';
+      } else if (status === 403) {
+        userMsg = 'AI provajder je odbio zahtev (403). Pokušaj ponovo za par sekundi ili probaj drugi model.';
+        code = 'provider_rejected';
       }
 
       res.status(status).json({
         error: { message: userMsg, type: code, detail: msg },
       });
+    } finally {
+      releaseConcurrency(keyId);
     }
   },
 ];
@@ -764,17 +805,22 @@ async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, st
     ...(Array.isArray(openAITools) && openAITools.length > 0 && { tools: openAITools }),
   };
 
-  console.log(`OpenAI request: model=${resolved.backendModel}, msgs=${messages.length}→${trimmedMessages.length}, stream=${stream}`);
+  const poolEntry = acquireFromPool(openaiPool, 'OpenAI');
+  console.log(`OpenAI request: model=${resolved.backendModel}, msgs=${messages.length}→${trimmedMessages.length}, stream=${stream}, pool=${openaiPool.indexOf(poolEntry)+1}/${openaiPool.length}`);
 
-  if (stream) {
-    await handleOpenAIStream(res, keyId, resolved, payload);
-  } else {
-    await handleOpenAINonStream(res, keyId, resolved, payload);
+  try {
+    if (stream) {
+      await handleOpenAIStream(res, keyId, resolved, payload, poolEntry.client);
+    } else {
+      await handleOpenAINonStream(res, keyId, resolved, payload, poolEntry.client);
+    }
+  } finally {
+    releaseFromPool(poolEntry);
   }
 }
 
-async function handleOpenAINonStream(res, keyId, resolved, payload) {
-  const response = await withRetry(() => openai.chat.completions.create(payload));
+async function handleOpenAINonStream(res, keyId, resolved, payload, client) {
+  const response = await withRetry(() => client.chat.completions.create(payload));
 
   // Validate response has content
   if (!response?.choices?.[0]?.message) {
@@ -806,7 +852,7 @@ async function handleOpenAINonStream(res, keyId, resolved, payload) {
   res.json(response);
 }
 
-async function handleOpenAIStream(res, keyId, resolved, payload) {
+async function handleOpenAIStream(res, keyId, resolved, payload, client) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
@@ -837,7 +883,7 @@ async function handleOpenAIStream(res, keyId, resolved, payload) {
   res.write('data: ' + JSON.stringify(initChunk) + '\n\n');
   if (res.flush) res.flush();
 
-  const stream = await withRetry(() => openai.chat.completions.create(payload));
+  const stream = await withRetry(() => client.chat.completions.create(payload));
 
   let usage = { input_tokens: 0, output_tokens: 0 };
   let chunkCount = 0;
@@ -900,7 +946,6 @@ async function handleAnthropic(req, res, keyId, resolved, messages, openAITools,
 
   const ctxChars = (system || '').length + anthropicMessages.reduce((s, m) =>
     s + (typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content).length), 0);
-  console.log(`Anthropic request: ${originalMsgCount} msgs → ${anthropicMessages.length} msgs, ~${Math.round(ctxChars / 4000)}K tokens, model=${resolved.backendModel}`);
 
   const CURSOR_EDIT_HINT = [
     'Korisnik radi u Cursor IDE. Kad predlažeš izmene koda:',
@@ -922,15 +967,22 @@ async function handleAnthropic(req, res, keyId, resolved, messages, openAITools,
     ...(anthropicTools.length > 0 && { tools: anthropicTools }),
   };
 
-  if (stream) {
-    await handleAnthropicStream(res, keyId, resolved, payload);
-  } else {
-    await handleAnthropicNonStream(res, keyId, resolved, payload);
+  const poolEntry = acquireFromPool(anthropicPool, 'Anthropic');
+  console.log(`Anthropic request: ${originalMsgCount} msgs → ${anthropicMessages.length} msgs, ~${Math.round(ctxChars / 4000)}K tokens, model=${resolved.backendModel}, pool=${anthropicPool.indexOf(poolEntry)+1}/${anthropicPool.length}`);
+
+  try {
+    if (stream) {
+      await handleAnthropicStream(res, keyId, resolved, payload, poolEntry.client);
+    } else {
+      await handleAnthropicNonStream(res, keyId, resolved, payload, poolEntry.client);
+    }
+  } finally {
+    releaseFromPool(poolEntry);
   }
 }
 
-async function handleAnthropicNonStream(res, keyId, resolved, payload) {
-  const response = await withRetry(() => anthropic.messages.create({ ...payload, stream: false }));
+async function handleAnthropicNonStream(res, keyId, resolved, payload, client) {
+  const response = await withRetry(() => client.messages.create({ ...payload, stream: false }));
 
   // Validate response has content
   if (!response?.content || response.content.length === 0) {
@@ -961,7 +1013,7 @@ async function handleAnthropicNonStream(res, keyId, resolved, payload) {
   res.json(openAIResponse);
 }
 
-async function handleAnthropicStream(res, keyId, resolved, payload) {
+async function handleAnthropicStream(res, keyId, resolved, payload, client) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
@@ -997,7 +1049,7 @@ async function handleAnthropicStream(res, keyId, resolved, payload) {
   res.write('data: ' + JSON.stringify(initChunk) + '\n\n');
   if (res.flush) res.flush();
 
-  const stream = await withRetry(() => anthropic.messages.create({ ...payload, stream: true }));
+  const stream = await withRetry(() => client.messages.create({ ...payload, stream: true }));
 
   let isThinking = false;
   let thinkingIndicatorSent = false;
@@ -1481,6 +1533,8 @@ app.use((err, _req, res, _next) => {
 const server = app.listen(PORT, () => {
   console.log(`VajbAgent proxy listening on http://localhost:${PORT}`);
   console.log(`  Redis: ${process.env.UPSTASH_REDIS_REST_URL ? 'configured' : 'NOT configured (file fallback)'}`);
+  console.log(`  OpenAI keys: ${openaiPool.length} | Anthropic keys: ${anthropicPool.length}`);
+  console.log(`  Max concurrent per user: ${MAX_CONCURRENT_PER_USER}`);
   console.log(`  Models: ${VAJB_MODELS.map(m => m.id).join(', ')}`);
   console.log(`  GET  /v1/models`);
   console.log(`  POST /v1/chat/completions (Bearer token required)`);
