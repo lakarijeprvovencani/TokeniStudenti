@@ -349,7 +349,7 @@ async function getFileDiagnostics(filePath: string): Promise<string> {
 function resolveWorkspacePath(filePath: string): string {
   const folders = vscode.workspace.workspaceFolders;
   if (!folders || folders.length === 0) {
-    return path.isAbsolute(filePath) ? filePath : filePath;
+    throw new Error('Nema otvorenog foldera u VS Code-u. Otvori folder (File → Open Folder) pa probaj ponovo.');
   }
   const root = folders[0].uri.fsPath;
   const resolved = path.isAbsolute(filePath) ? filePath : path.join(root, filePath);

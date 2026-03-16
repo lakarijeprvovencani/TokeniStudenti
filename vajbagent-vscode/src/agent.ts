@@ -633,6 +633,8 @@ export class Agent {
   private static readonly INDEX_TTL = 120_000; // refresh every 2 min
   private _loopContextCache: { git: string | null; diag: string | null; tabs: string | null; proj: string | null } | null = null;
   private _savedEditorContext: string | null = null;
+  private _lastEditorContext: string | null = null;
+  private _editorTrackers: vscode.Disposable[] = [];
   private _loopId = 0;
   private _loopPromise: Promise<void> | null = null;
   private _sending = false;
@@ -641,11 +643,28 @@ export class Agent {
     this._provider = provider;
     this._context = context;
     this._mcpManager = mcpManager;
+
+    this._editorTrackers.push(
+      vscode.window.onDidChangeActiveTextEditor((editor) => {
+        if (editor && editor.document.uri.scheme === 'file') {
+          this._lastEditorContext = this._getActiveEditorContext();
+        }
+      }),
+      vscode.window.onDidChangeTextEditorSelection((e) => {
+        if (e.textEditor.document.uri.scheme === 'file') {
+          this._lastEditorContext = this._getActiveEditorContext();
+        }
+      }),
+    );
+    if (vscode.window.activeTextEditor) {
+      this._lastEditorContext = this._getActiveEditorContext();
+    }
   }
 
   public dispose() {
     this.abort();
     this._autoSaveSession();
+    this._editorTrackers.forEach(d => d.dispose());
     this._loopContextCache = null;
     this._workspaceIndex = null;
     this._loopPromise = null;
@@ -832,7 +851,7 @@ export class Agent {
     this._sending = true;
 
     try {
-    this._savedEditorContext = this._getActiveEditorContext();
+    this._savedEditorContext = this._getActiveEditorContext() || this._lastEditorContext;
 
     if (this._loopPromise) {
       this.abort();
@@ -846,6 +865,18 @@ export class Agent {
     }
 
     setApiCredentials(getApiUrl(), apiKey);
+
+    if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+      const lowerText = text.toLowerCase();
+      const wantsCode = /napravi|kreiraj|dodaj|fajl|sajt|projekat|aplikacij|kod|write|create|build|make|file|project|app/i.test(lowerText);
+      if (wantsCode) {
+        this._provider.postMessage({
+          type: 'error',
+          text: 'Nema otvorenog foldera. Da bih mogao da pravim fajlove, otvori folder: File → Open Folder, pa probaj ponovo.',
+        });
+        return;
+      }
+    }
 
     const expandedText = this._expandFileMentions(text);
 
@@ -1195,9 +1226,11 @@ export class Agent {
           });
         }
 
-        if (iteration > 0) {
-          this._provider.postMessage({ type: 'status', phase: 'thinking', text: 'Razmišljam o sledećem koraku...' });
-        }
+        this._provider.postMessage({
+          type: 'status',
+          phase: 'thinking',
+          text: iteration === 0 ? 'Obradjujem zahtev...' : 'Razmišljam o sledećem koraku...',
+        });
 
         const messages = this._buildMessages();
 
@@ -1425,7 +1458,7 @@ export class Agent {
     if (wsIndex) {
       systemPrompt += '\n\n<workspace_index>\n' + wsIndex + '\n</workspace_index>';
     }
-    const editorCtx = this._savedEditorContext || this._getActiveEditorContext();
+    const editorCtx = this._savedEditorContext || this._getActiveEditorContext() || this._lastEditorContext;
     if (editorCtx) {
       systemPrompt += '\n\n<active_editor>\n' + editorCtx + '\n</active_editor>';
     }
