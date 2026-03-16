@@ -2016,7 +2016,7 @@
   <div class="context-bar" id="contextBar">
     <div class="context-progress"><div class="context-fill" id="contextFill"></div></div>
     <span class="context-label" id="contextLabel">0K / 128K</span>
-    <button class="undo-btn" id="undoBtn" title="Vrati sve promene agenta" style="display:none" onclick="vscode.postMessage({type:'revertAll'})">↩ Undo</button>
+    <button class="undo-btn" id="undoBtn" title="Vrati sve promene agenta na stanje pre izmena" style="display:none" data-count="0">↩ Undo</button>
     <button class="context-new-session" id="contextNewSession">Novi chat</button>
   </div>
   <div class="messages" id="messages">
@@ -2564,6 +2564,9 @@
       togglePlanMode(!planModeActive);
     };
 
+    var undoBtnEl = document.getElementById('undoBtn');
+    if (undoBtnEl) undoBtnEl.addEventListener('click', function() { window.confirmRevertAll(); });
+
     planModeOff.onclick = function() {
       togglePlanMode(false);
     };
@@ -2772,34 +2775,10 @@
       imageFileInput.value = '';
     });
 
-    // File attach
+    // File attach — uses VS Code native file picker
     const fileAttachBtn = document.getElementById('fileAttachBtn');
-    const fileAttachInput = document.getElementById('fileAttachInput');
-    fileAttachBtn.addEventListener('click', () => { fileAttachInput.click(); });
-    fileAttachInput.addEventListener('change', () => {
-      const files = fileAttachInput.files;
-      if (!files) return;
-      for (const file of files) {
-        if (file.name.toLowerCase().endsWith('.pdf')) {
-          const reader = new FileReader();
-          reader.onload = () => {
-            vscode.postMessage({ type: 'parsePdf', base64: reader.result, name: file.name });
-          };
-          reader.readAsDataURL(file);
-        } else {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const content = reader.result;
-            if (typeof content !== 'string') return;
-            const truncated = content.substring(0, 8000);
-            const suffix = content.length > 8000 ? '\n... (skraceno, ' + content.length + ' karaktera ukupno)' : '';
-            const ext = file.name.split('.').pop() || '';
-            insertFileContent(file.name, truncated + suffix, ext);
-          };
-          reader.readAsText(file);
-        }
-      }
-      fileAttachInput.value = '';
+    fileAttachBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'attachFile' });
     });
 
     function insertFileContent(name, content, ext) {
@@ -2964,9 +2943,13 @@
       messagesEl.appendChild(bar);
     }
 
-    function revertSingleFile(filePath) {
+    window.revertSingleFile = function(filePath) {
       vscode.postMessage({ type: 'revertFile', filePath: filePath });
-    }
+    };
+
+    window.confirmRevertAll = function() {
+      vscode.postMessage({ type: 'revertAll' });
+    };
 
     let _lastUserText = '';
     function retryLastMessage() {
@@ -3189,6 +3172,15 @@
             const pages = msg.pages ? ' (' + msg.pages + ' strana)' : '';
             insertFileContent(msg.name + pages, msg.content, 'txt');
           }
+          break;
+        }
+        case 'fileAttached': {
+          insertFileContent(msg.name, msg.content, msg.ext || 'txt');
+          break;
+        }
+        case 'imageAttached': {
+          pendingImages.push({ base64: msg.base64, type: msg.mimeType });
+          renderImagePreviews();
           break;
         }
 
@@ -3586,6 +3578,7 @@
           if (undoBtn) {
             undoBtn.style.display = msg.count > 0 ? 'inline-block' : 'none';
             undoBtn.textContent = '↩ Undo (' + msg.count + ')';
+            undoBtn.dataset.count = String(msg.count || 0);
           }
           if (msg.files && msg.files.length > 0) {
             let existing = document.getElementById('checkpointList');
@@ -3598,12 +3591,28 @@
             let html = '<div class="checkpoint-header">Izmenjeni fajlovi (' + msg.files.length + ')</div>';
             for (const f of msg.files) {
               html += '<div class="checkpoint-file" data-path="' + escapeHtml(f.full) + '">' +
-                '<span class="checkpoint-filename" onclick="vscode.postMessage({type:\'openFile\',path:\'' + escapeHtml(f.full).replace(/'/g, "\\'") + '\'})">' + escapeHtml(f.short) + '</span>' +
-                '<button class="checkpoint-revert-btn" onclick="revertSingleFile(\'' + escapeHtml(f.full).replace(/'/g, "\\'") + '\')">↩</button>' +
+                '<span class="checkpoint-filename" data-openpath="' + escapeHtml(f.full) + '">' + escapeHtml(f.short) + '</span>' +
+                '<button class="checkpoint-revert-btn" data-revertpath="' + escapeHtml(f.full) + '">↩</button>' +
                 '</div>';
             }
-            html += '<button class="checkpoint-revert-all" onclick="vscode.postMessage({type:\'revertAll\'})">↩ Vrati sve</button>';
+            html += '<button class="checkpoint-revert-all">↩ Vrati sve</button>';
             existing.innerHTML = html;
+            existing.querySelectorAll('.checkpoint-filename[data-openpath]').forEach(function(el) {
+              el.addEventListener('click', function() {
+                vscode.postMessage({ type: 'openFile', path: el.dataset.openpath });
+              });
+            });
+            existing.querySelectorAll('.checkpoint-revert-btn[data-revertpath]').forEach(function(el) {
+              el.addEventListener('click', function() {
+                vscode.postMessage({ type: 'revertFile', filePath: el.dataset.revertpath });
+              });
+            });
+            var revertAllBtn = existing.querySelector('.checkpoint-revert-all');
+            if (revertAllBtn) {
+              revertAllBtn.addEventListener('click', function() {
+                vscode.postMessage({ type: 'revertAll' });
+              });
+            }
             scrollToBottom();
           }
           break;

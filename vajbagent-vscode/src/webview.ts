@@ -192,6 +192,55 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this._view?.webview.postMessage({ type: 'fileList', files });
         break;
       }
+      case 'attachFile': {
+        const uris = await vscode.window.showOpenDialog({
+          canSelectMany: true,
+          openLabel: 'Dodaj fajl',
+        });
+        if (uris && uris.length > 0) {
+          for (const uri of uris) {
+            const fname = path.basename(uri.fsPath);
+            const ext = (fname.split('.').pop() || '').toLowerCase();
+            if (ext === 'pdf') {
+              const { execSync } = require('child_process');
+              let hasPdftotext = false;
+              try { execSync('which pdftotext', { timeout: 3000 }); hasPdftotext = true; } catch { /* */ }
+              if (hasPdftotext) {
+                try {
+                  const text = execSync(`pdftotext "${uri.fsPath}" -`, { timeout: 15000, encoding: 'utf-8' });
+                  const maxLen = 15000;
+                  const truncated = text.length > maxLen ? text.substring(0, maxLen) + '\n... (skraceno, ' + text.length + ' karaktera ukupno)' : text;
+                  this._view?.webview.postMessage({ type: 'fileAttached', name: fname, content: truncated, ext: 'txt' });
+                } catch {
+                  this._view?.webview.postMessage({ type: 'fileAttached', name: fname, content: '[Greska pri citanju PDF-a]', ext: 'txt' });
+                }
+              } else {
+                this._view?.webview.postMessage({ type: 'fileAttached', name: fname, content: '[PDF podrska zahteva pdftotext. Instaliraj: brew install poppler]', ext: 'txt' });
+              }
+            } else if (['png','jpg','jpeg','gif','webp','bmp','ico','svg'].includes(ext)) {
+              try {
+                const raw = fs.readFileSync(uri.fsPath);
+                const mimeTypes: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml', ico: 'image/x-icon' };
+                const mime = mimeTypes[ext] || 'image/png';
+                const b64 = `data:${mime};base64,${raw.toString('base64')}`;
+                this._view?.webview.postMessage({ type: 'imageAttached', name: fname, base64: b64, mimeType: mime });
+              } catch {
+                this._view?.webview.postMessage({ type: 'fileAttached', name: fname, content: '[Greska pri citanju slike]', ext: 'txt' });
+              }
+            } else {
+              try {
+                const content = fs.readFileSync(uri.fsPath, 'utf-8');
+                const maxLen = 15000;
+                const truncated = content.length > maxLen ? content.substring(0, maxLen) + '\n... (skraceno, ' + content.length + ' karaktera ukupno)' : content;
+                this._view?.webview.postMessage({ type: 'fileAttached', name: fname, content: truncated, ext });
+              } catch {
+                this._view?.webview.postMessage({ type: 'fileAttached', name: fname, content: '[Nije moguce procitati fajl — mozda je binarni format]', ext: 'txt' });
+              }
+            }
+          }
+        }
+        break;
+      }
       case 'parsePdf': {
         const base64Data = (message.base64 as string || '').replace(/^data:[^;]+;base64,/, '');
         const fileName = message.name as string || 'document.pdf';

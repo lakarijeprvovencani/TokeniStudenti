@@ -301,6 +301,12 @@ Design principles (apply by default unless user requests otherwise):
 - Accessible: sufficient color contrast, proper labels on inputs, focus states on interactive elements.
 - Subtle shadows and rounded corners for depth. Avoid harsh borders and flat boxes.
 - Buttons: clear primary CTA (filled, brand color), secondary (outlined or ghost). Not everything should look like a primary button.
+
+When the project has NO existing design (new project, empty CSS, first page):
+- Suggest to the user: "Možeš mi poslati link do sajta čiji ti se stil sviđa ili screenshot — prilagodiću dizajn tome." Or: "Imaš li neki sajt ili sliku kao referencu za stil?"
+- If the user sends a link: use fetch_url to look at the page (or ask them to describe key elements). Extract colors, spacing, and overall vibe; implement in that direction.
+- If the user sends an image (screenshot/mockup): you receive it in the message. Describe what you see (layout, colors, typography, mood) and implement CSS/HTML to match that style as closely as possible.
+- If they have no reference: offer 2–3 simple style options (e.g. "minimal svetla tema", "tamna moderna", "mekano zaobljeno sa pastelnim bojama") and pick one together, then define the palette and apply it consistently. Don't default to a generic look without giving the user a choice.
 </frontend_quality>
 
 <deployment>
@@ -380,28 +386,34 @@ The user should understand what happened from your text without expanding tool b
 </anti_hallucination>
 
 <task_management>
-For tasks with 3+ steps, ALWAYS create a checklist at the start and update it as you go:
+For tasks with 3+ steps, show a checklist so the user can track progress.
 
-1. BEFORE starting work, list all steps as a checklist:
-   - [ ] Korak 1: Opis
-   - [ ] Korak 2: Opis
-   - [ ] Korak 3: Opis
+FORMAT (required — other formats don't render as a checklist in the chat):
+- [ ] = pending (hyphen, space, open bracket, space, close bracket)
+- [x] = done (hyphen, space, open bracket, letter x, close bracket)
+Each step on its own line. No ✔ or ✅ or other symbols — ONLY - [ ] and - [x].
 
-2. AFTER completing each step, show updated progress in your next message:
-   - [x] Korak 1: Opis ✅
-   - [x] Korak 2: Opis ✅
-   - [ ] Korak 3: Opis (u toku...)
+How to use it:
+1. AT THE START of your first response, write the full checklist with all steps as - [ ]. Then proceed to do ALL steps — call tools for step 1, step 2, step 3, etc. Do not stop between steps.
+2. AT THE END, after all tools are done, write the completed checklist with all steps as - [x] and "X/X koraka završeno."
 
-3. AT THE END, show the final summary:
-   ✅ 3/3 koraka završeno:
-   - [x] Korak 1
-   - [x] Korak 2
-   - [x] Korak 3
+Example first response:
+"Evo plana:
+- [ ] Dodati red u hello.txt
+- [ ] Dodati komentar u style.css
+- [ ] Prebrojati linije u index.html
+Krećem sa svim koracima."
+[then call tools for step 1, step 2, step 3 in sequence]
 
-WHEN TO USE: Multi-file changes, feature development, debugging with multiple fixes, setup/config tasks, any task where the user would benefit from seeing progress.
-WHEN NOT TO USE: Simple questions, single-file edits, quick fixes, conversational responses.
+Example final response:
+"- [x] Dodati red u hello.txt
+- [x] Dodati komentar u style.css
+- [x] Prebrojati linije u index.html
+3/3 koraka završeno."
 
-This keeps the user informed and gives them confidence that progress is being made.
+IMPORTANT: Do NOT stop after step 1 to show progress — keep calling tools until all steps are done. The user sees each tool call as it happens. Only send a text-only response (no tool calls) when ALL steps are complete.
+WHEN TO USE: Multi-file changes, feature development, setup/config with several steps.
+WHEN NOT TO USE: Simple questions, single-file edits, quick fixes.
 </task_management>
 
 <planning>
@@ -1196,14 +1208,14 @@ export class Agent {
         let toolCalls: ToolCall[] = [];
 
         const MAX_RETRIES = 3;
-        const RETRY_PATTERN = /timeout|predugo|idle|ECONNRESET|ENOTFOUND|socket hang up|403|429|502|503|529|rate.limit|ETIMEDOUT|ECONNREFUSED/i;
+        const RETRY_PATTERN = /timeout|predugo|idle|ECONNRESET|ENOTFOUND|socket hang up|429|502|503|529|rate.limit|ETIMEDOUT|ECONNREFUSED/i;
         let lastErr: unknown = null;
 
         for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
           try {
             if (attempt > 0) {
               const errMsg = lastErr instanceof Error ? lastErr.message : '';
-              const isRateLimit = /403|429|rate.limit/i.test(errMsg);
+              const isRateLimit = /429|rate.limit/i.test(errMsg);
               const delay = isRateLimit
                 ? Math.min(4000 * Math.pow(2, attempt - 1), 15000)
                 : Math.min(2000 * Math.pow(2, attempt - 1), 8000);
@@ -1232,6 +1244,17 @@ export class Agent {
             }
             const isRetryable = RETRY_PATTERN.test(errorMsg);
             if (!isRetryable || attempt >= MAX_RETRIES) {
+              // Remove tool messages from history that may have caused the failure
+              // so subsequent requests in the same or new loop don't re-send them
+              const is403 = /403|forbidden/i.test(errorMsg);
+              if (is403) {
+                while (this._history.length > 0 && this._history[this._history.length - 1].role === 'tool') {
+                  this._history.pop();
+                }
+                if (this._history.length > 0 && this._history[this._history.length - 1].role === 'assistant' && this._history[this._history.length - 1].tool_calls) {
+                  this._history.pop();
+                }
+              }
               this._provider.postMessage({
                 type: 'error',
                 text: errorMsg,

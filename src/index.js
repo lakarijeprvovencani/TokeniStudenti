@@ -325,7 +325,7 @@ async function withRetry(fn, { retries = 3, delayMs = 1500 } = {}) {
       const status = err.status || err.statusCode || 0;
       const msg = (err.message || '').toLowerCase();
       
-      const isRateLimit = status === 429 || status === 403;
+      const isRateLimit = status === 429;
       const retryable = 
         isRateLimit ||
         status === 529 || 
@@ -659,12 +659,19 @@ app.post('/register', registerLimiter, asyncHandler(async (req, res) => {
 
 // ---- Balance warning (injected into AI response) ----
 const LOW_BALANCE_THRESHOLD = 1.0;
+const _balanceWarningSent = new Map();
 async function getBalanceWarning(keyId, newBalance) {
   if (newBalance <= LOW_BALANCE_THRESHOLD) {
+    const lastWarn = _balanceWarningSent.get(keyId + ':low') || 0;
+    if (Date.now() - lastWarn < 10 * 60 * 1000) return null;
+    _balanceWarningSent.set(keyId + ':low', Date.now());
     return `\n\n---\n⚠️ **Tvoj VajbAgent balans je nizak ($${newBalance.toFixed(2)}).** Dopuni kredite na https://vajbagent.com/dashboard → Dopuna`;
   }
   const deposited = await getTotalDeposited(keyId);
   if (deposited > 0 && newBalance < deposited * 0.5) {
+    const lastWarn = _balanceWarningSent.get(keyId + ':50pct') || 0;
+    if (Date.now() - lastWarn < 30 * 60 * 1000) return null;
+    _balanceWarningSent.set(keyId + ':50pct', Date.now());
     return `\n\n---\n📊 **Potrošio si više od 50% kredita** (preostalo: $${newBalance.toFixed(2)}). Dopuni kad ti odgovara na https://vajbagent.com/dashboard → Dopuna`;
   }
   return null;

@@ -707,7 +707,7 @@ async function toolFetchUrl(args: Record<string, unknown>, redirectCount = 0): P
     const transport = isHttps ? await import('https') : await import('http');
 
     return new Promise((resolve) => {
-      const options = {
+      const options: Record<string, unknown> = {
         hostname: urlObj.hostname,
         port: urlObj.port || (isHttps ? 443 : 80),
         path: urlObj.pathname + urlObj.search,
@@ -717,8 +717,10 @@ async function toolFetchUrl(args: Record<string, unknown>, redirectCount = 0): P
           'Accept': 'text/html,application/json,text/plain,*/*',
           ...customHeaders,
         },
-        timeout: 15000,
       };
+      if (isHttps) {
+        (options as import('https').RequestOptions).rejectUnauthorized = false;
+      }
 
       const req = transport.request(options, (res) => {
         if (res.statusCode && [301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
@@ -740,13 +742,13 @@ async function toolFetchUrl(args: Record<string, unknown>, redirectCount = 0): P
         });
       });
 
-      req.on('error', (err: Error) => {
-        resolve({ success: false, output: `Fetch error: ${err.message}` });
-      });
-
-      req.on('timeout', () => {
+      req.setTimeout(15000, () => {
         req.destroy();
         resolve({ success: false, output: 'Request timed out after 15s' });
+      });
+
+      req.on('error', (err: Error) => {
+        resolve({ success: false, output: `Fetch error: ${err.message}` });
       });
 
       if (body && (method === 'POST' || method === 'PUT')) {
@@ -847,7 +849,9 @@ async function toolWebSearch(args: Record<string, unknown>): Promise<ToolCallRes
       }
     }
 
-    return { success: true, output: lines.join('\n') };
+    const output = lines.join('\n');
+    const maxOutput = 5000;
+    return { success: true, output: output.length > maxOutput ? output.substring(0, maxOutput) + '\n... (truncated)' : output };
   } catch (err: unknown) {
     return { success: false, output: `Web search error: ${(err as Error).message}` };
   }
