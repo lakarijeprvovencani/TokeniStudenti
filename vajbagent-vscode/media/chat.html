@@ -791,6 +791,28 @@
     }
     .img-preview .remove-img:hover { background: rgba(220,50,50,0.8); }
 
+    .file-chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px 10px 0; }
+    .file-chips:empty { display: none; }
+    .file-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(250, 115, 21, 0.10);
+      border: 1px solid rgba(250, 115, 21, 0.25);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      color: var(--vscode-foreground);
+      max-width: 200px;
+    }
+    .file-chip-icon { opacity: 0.7; font-size: 12px; flex-shrink: 0; }
+    .file-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-chip-remove {
+      background: none; border: none; color: var(--vscode-foreground); opacity: 0.45;
+      cursor: pointer; font-size: 12px; padding: 0 1px; line-height: 1; flex-shrink: 0;
+    }
+    .file-chip-remove:hover { opacity: 1; color: #e74c3c; }
+
     .msg img.inline-img {
       max-width: 200px;
       max-height: 150px;
@@ -2062,6 +2084,7 @@
         <span style="font-size:12px;">📋</span> <strong>Plan mode</strong> — agent ce napraviti plan, nece menjati kod
         <button id="planModeOff" style="margin-left:auto;background:none;border:none;color:var(--vscode-foreground);opacity:0.5;cursor:pointer;font-size:12px;padding:0 4px;">✕</button>
       </div>
+      <div class="file-chips" id="filePreviews"></div>
       <div class="image-previews" id="imagePreviews"></div>
       <textarea id="userInput" rows="1" placeholder="Pitaj VajbAgent-a..."></textarea>
       <div class="input-toolbar">
@@ -2177,6 +2200,8 @@
 
     let isStreaming = false;
     let pendingImages = [];
+    let pendingFiles = [];
+    const filePreviewsEl = document.getElementById('filePreviews');
 
     // Auto-resize textarea
     userInput.addEventListener('input', () => {
@@ -2782,12 +2807,26 @@
     });
 
     function insertFileContent(name, content, ext) {
-      const insert = '@' + name + '\n```' + ext + '\n' + content + '\n```\n';
-      const pos = userInput.selectionStart || userInput.value.length;
-      userInput.value = userInput.value.substring(0, pos) + insert + userInput.value.substring(pos);
-      userInput.style.height = 'auto';
-      userInput.style.height = Math.min(userInput.scrollHeight, 200) + 'px';
+      pendingFiles.push({ name, content, ext });
+      renderFilePreviews();
       userInput.focus();
+    }
+
+    function renderFilePreviews() {
+      filePreviewsEl.innerHTML = '';
+      pendingFiles.forEach((f, idx) => {
+        const chip = document.createElement('div');
+        chip.className = 'file-chip';
+        const iconMap = { pdf: '📄', js: '📜', ts: '📜', py: '🐍', json: '{}', html: '🌐', css: '🎨', md: '📝' };
+        const icon = iconMap[f.ext] || '📎';
+        const sizeLabel = f.content.length > 1000 ? ' (' + Math.round(f.content.length / 1000) + 'k)' : '';
+        chip.innerHTML = '<span class="file-chip-icon">' + icon + '</span><span class="file-chip-name" title="' + f.name + sizeLabel + '">' + f.name + '</span><button class="file-chip-remove" data-idx="' + idx + '">✕</button>';
+        chip.querySelector('.file-chip-remove').addEventListener('click', () => {
+          pendingFiles.splice(idx, 1);
+          renderFilePreviews();
+        });
+        filePreviewsEl.appendChild(chip);
+      });
     }
 
     // Image paste
@@ -2852,11 +2891,22 @@
 
     function sendMessage() {
       const text = userInput.value.trim();
-      if (!text && pendingImages.length === 0) return;
+      if (!text && pendingImages.length === 0 && pendingFiles.length === 0) return;
       if (isStreaming) return;
 
       document.querySelectorAll('.welcome-msg').forEach(el => el.remove());
 
+      if (pendingFiles.length > 0) {
+        const filesHtml = pendingFiles.map(f => '<span class="file-chip" style="margin-right:4px;"><span class="file-chip-icon">📎</span><span class="file-chip-name">' + f.name + '</span></span>').join('');
+        const el = document.createElement('div');
+        el.className = 'msg msg-user';
+        el.style.display = 'flex';
+        el.style.flexWrap = 'wrap';
+        el.style.gap = '4px';
+        el.style.alignItems = 'center';
+        el.innerHTML = filesHtml;
+        messagesEl.appendChild(el);
+      }
       if (text) {
         addMessageBubble('user', planModeActive ? '📋 [Plan] ' + text : text);
       }
@@ -2869,6 +2919,11 @@
 
       _lastUserText = text;
       let sendText = text;
+
+      if (pendingFiles.length > 0) {
+        const fileContext = pendingFiles.map(f => '<attached_file name="' + f.name + '">\n' + f.content + '\n</attached_file>').join('\n\n');
+        sendText = fileContext + '\n\n' + sendText;
+      }
 
       const slashMatch = text.match(/^\/(\w+)\s*(.*)?$/);
       if (slashMatch) {
@@ -2902,7 +2957,9 @@
       userInput.value = '';
       userInput.style.height = 'auto';
       pendingImages = [];
+      pendingFiles = [];
       renderImagePreviews();
+      renderFilePreviews();
       setStreaming(true);
       showStatus('Razmisljam...', 'thinking');
     }
@@ -3197,7 +3254,9 @@
           currentAssistantEl = null;
           currentAssistantRawText = '';
           pendingImages = [];
+          pendingFiles = [];
           imagePreviewsEl.innerHTML = '';
+          filePreviewsEl.innerHTML = '';
           setStreaming(false);
           break;
         }

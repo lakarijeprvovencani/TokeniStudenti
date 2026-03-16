@@ -1,0 +1,15 @@
+/* Agent test — osnovni stil */
+body {
+  font-family: system-ui, sans-serif;
+  max-width: 600px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+h1 { font-size: 1.5rem; }
+
+/* checklist test */
+
+body { margin: 0; }
+p { color: #444; }
+
+/* Test 19 */

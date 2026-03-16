@@ -1,0 +1,1 @@
+Najnovija LTS verzija Node.js je 24 (objavljena u maju 2025).

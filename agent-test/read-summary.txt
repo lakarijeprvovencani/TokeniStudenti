@@ -1,0 +1,1 @@
+index.html: osnovna HTML stranica sa meta elementima i strukturom dokumenta; style.css: osnovni CSS stilovi za font tela, maksimalnu širinu stranice i margine.

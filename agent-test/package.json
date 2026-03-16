@@ -1,0 +1,10 @@
+{
+  "name": "agent-test",
+  "version": "1.0.0",
+  "description": "Test projekat za VajbAgent — ne koristi u produkciji",
+  "scripts": {
+    "start": "node server.js",
+    "build": "node -e \"console.log('Build OK')\"",
+    "test": "node -e \"console.log('Testovi OK'); process.exit(0)\""
+  }
+}

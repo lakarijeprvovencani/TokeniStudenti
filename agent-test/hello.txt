@@ -1,0 +1,97 @@
+# VajbAgent – testovi (agent-test-v2-v2/)
+
+## Već urađeno
+- Test 1: list_files + read_file
+- Test 2: write_file + replace_in_file
+- Test 3: execute_command + server (npm start, curl)
+- Test 4: search_files
+- Test 5: checklist (3 koraka, - [ ] / - [x])
+- Test 6: execute_command (npm run build, npm test)
+- Test 7: fetch_url (example.com, title → fetch-result.txt)
+- Test 8: list_files + read_file (index.html, style.css) + write_file (read-summary.txt)
+
+---
+
+## Test 9 – web_search
+Iskopiraj u chat:
+
+U folderu agent-test uradi: pozovi web_search sa upitom "Node.js latest LTS version 2025" (ili slično). U agent-test/web-search-result.txt napiši jednu kratku rečenicu sa rezultatom (npr. koja je trenutna LTS verzija). Koristi samo web_search i write_file. Ne menjaj druge fajlove.
+
+---
+
+## Test 10 – search_files + replace_in_file
+Iskopiraj u chat:
+
+U agent-test nađi search_files-om koji fajl sadrži reč "server" (ili "port", ako nema "server"). Otvori taj fajl read_file-om, pa replace_in_file zameni samo jednu liniju (npr. broj porta ili jednu reč) nekom drugom vrednošću. Sačuvaj. Ne dirati ostale fajlove.
+
+---
+
+## Test 11 – Plan Mode (ručno)
+1. Uključi Plan Mode (dugme 📋 dole u chatu).
+2. Pošalji: "U agent-test napravi about.html sa naslovom O nama i jednim paragrafom. Prvo napravi plan."
+3. Agent treba da napiše plan (npr. u .vajbagent/PLAN.md) i da NE menja kod dok ne odobriš. Proveri da plan ima numerisane faze.
+
+---
+
+## Test 12 – Checkpoint / Undo (ručno)
+1. Pošalji: "U agent-test/notes.txt dodaj na kraj jednu liniju: Test undo."
+2. Kad agent završi, proveri da se pojavilo dugme "↩ Undo" i lista izmenjenih fajlova.
+3. Klikni "Vrati sve" i proveri da je notes.txt ponovo bez te linije.
+
+---
+
+## Test 13 – MCP (opciono, ako imaš MCP server)
+Iskopiraj u chat:
+
+Ako imaš konfigurisane MCP alate (npr. Supabase, GitHub), pozovi jedan MCP alat i rezultat upiši u agent-test/mcp-result.txt. Ako nemaš MCP, u agent-test/mcp-result.txt napiši: Nema konfigurisanih MCP servera. Ne menjaj druge fajlove.
+
+---
+
+# Jači testovi (14+)
+
+## Test 14 – Više fajlova odjednom
+Iskopiraj u chat:
+
+U agent-test uradi tačno ovo: 1) U notes.txt dodaj na kraj liniju "Test 14". 2) U index.html promeni samo tekst unutar <title> u "Agent Test 14". 3) Kreiraj novi fajl agent-test/test14-done.txt sa sadržajem "Test 14 zavrsen." Koristi write_file ili replace_in_file kako treba. Na kraju napiši koliko fajlova si izmenio/kreirao. Ne dirati ostale fajlove osim ova tri.
+
+---
+
+## Test 15 – Lanac: search → read → replace u dva fajla
+Iskopiraj u chat:
+
+U agent-test: 1) search_files za "port" ili "listen". 2) Pročitaj sve fajlove koji sadrže tu reč. 3) U prvom takvom fajlu zameni broj porta (npr. 3999) sa 4100. 4) U drugom takvom fajlu (ako postoji) zameni broj porta sa 4101. Ako postoji samo jedan fajl sa portom, izmeni samo njega. Ne dirati druge fajlove. Na kraju napiši šta si promenio.
+
+---
+
+## Test 16 – Refaktor: ista promena na više mesta
+Iskopiraj u chat:
+
+U agent-test folderu: nađi sve fajlove koji sadrže reč "agent-test" (search_files). U svakom od tih fajlova (samo .html, .js, .css, .txt) zameni prvu pojavu "agent-test" sa "agent-test-v2". Maksimalno 5 fajlova. Ne dirati package.json, node_modules, ani fajlove izvan agent-test. Na kraju napiši listu izmenjenih fajlova.
+
+---
+
+## Test 17 – Greška i oporavak (ručno)
+1. Pošalji: "U agent-test/ne-postoji-fajl-xyz.txt dodaj liniju zdravo." (fajl ne postoji.)
+2. Agent treba da prepozna da fajl ne postoji i da ga kreira write_file-om ili da javi grešku i ponudi rešenje. Ne sme da ostane u beskonačnoj petlji.
+3. Proveri da je poruka jasna i da nema 5+ uzastopnih pokušaja iste stvari.
+
+---
+
+## Test 18 – execute_command + provera izlaza
+Iskopiraj u chat:
+
+U agent-test pokreni: node -e "console.log('OK')". Pročitaj izlaz komande. Ako izlaz sadrži "OK", u agent-test/command-ok.txt napiši "Komanda vratila OK." Ako ne, napiši "Komanda nije vratila OK." Koristi samo execute_command i write_file. Ne menjaj druge fajlove.
+
+---
+
+## Test 19 – Ograničen scope (samo jedan fajl)
+Iskopiraj u chat:
+
+Otvori SAMO agent-test/style.css. Pročitaj ga. Dodaj na kraj fajla jedan CSS komentar: /* Test 19 */. Ne otvaraj, ne čitaj i ne menjaj nijedan drugi fajl. Na kraju reci: "Izmenjen samo style.css."
+
+---
+
+## Test 20 – Kombinovano: fetch + write + execute
+Iskopiraj u chat:
+
+1) fetch_url za https://example.com. 2) Iz odgovora izvuci sadržaj <title> taga. 3) U agent-test/final-title.txt upiši tu vrednost. 4) Pokreni u agent-test: node -e "console.log(require('fs').readFileSync('final-title.txt','utf8').trim())" i proveri da li izlaz odgovara title-u. Koristi fetch_url, write_file, execute_command. Ne menjaj druge fajlove. Javi da li je provera uspela.
