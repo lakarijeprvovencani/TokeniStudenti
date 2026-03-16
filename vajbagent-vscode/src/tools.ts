@@ -263,7 +263,7 @@ export const TOOL_DEFINITIONS = [
     type: 'function' as const,
     function: {
       name: 'execute_command',
-      description: 'Execute a shell command in the workspace. Returns stdout and stderr.',
+      description: 'Execute a shell command in the workspace. Returns stdout and stderr. Use this to run code, start servers, install packages, check logs (tail, cat), run tests, and verify changes.',
       parameters: {
         type: 'object',
         properties: {
