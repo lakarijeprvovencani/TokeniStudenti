@@ -832,6 +832,21 @@
       background: rgba(250, 115, 21, 0.2);
       text-decoration-style: solid;
     }
+    .tree-file-link, .tree-folder-link {
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 2px;
+      color: #FA7315;
+    }
+    .tree-file-link:hover, .tree-folder-link:hover {
+      text-decoration-style: solid;
+      background: rgba(250, 115, 21, 0.15);
+      border-radius: 2px;
+    }
+    .tree-folder-link {
+      color: #e8a86e;
+    }
     .msg-assistant a, .msg-assistant a.auto-link {
       color: #FA7315;
       text-decoration: underline;
@@ -3680,14 +3695,30 @@
       if (!text) return '';
       let html = escapeHtml(text);
 
-      // Code blocks: ```lang\ncode\n```
-      html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+      // Code blocks: ```lang\ncode\n``` (tolerant of trailing spaces and optional newline variations)
+      html = html.replace(/```(\w*)[ \t]*\n([\s\S]*?)```/g, (_, lang, code) => {
         const langName = lang || 'code';
+        let inner = code.replace(/\n$/, '');
+        const isTree = /[├└│─]/.test(inner) || /^\s*(\/|\w+\/)\s*$/m.test(inner);
+        if (isTree) {
+          inner = inner.split('\n').map(function(line) {
+            var m = line.match(/^(.*?)([.\w\-]+(?:\/)?)\s*$/);
+            if (!m) return line;
+            var prefix = m[1], name = m[2];
+            if (name.endsWith('/')) {
+              return prefix + '<span class="tree-folder-link" data-path="' + name + '">' + name + '</span>';
+            }
+            if (name.includes('.')) {
+              return prefix + '<span class="tree-file-link" data-path="' + name + '">' + name + '</span>';
+            }
+            return line;
+          }).join('\n');
+        }
         return '<div class="code-block-wrapper">' +
           '<div class="code-block-header">' +
             '<span class="code-block-lang">' + langName + '</span>' +
           '</div>' +
-          '<pre><code>' + code.replace(/\n$/, '') + '</code></pre>' +
+          '<pre><code>' + inner + '</code></pre>' +
         '</div>';
       });
 
@@ -3795,6 +3826,16 @@
         header.appendChild(btn);
       });
       container.querySelectorAll('code.file-link').forEach(el => {
+        el.addEventListener('click', () => {
+          vscode.postMessage({ type: 'openFile', path: el.dataset.path });
+        });
+      });
+      container.querySelectorAll('.tree-file-link').forEach(el => {
+        el.addEventListener('click', () => {
+          vscode.postMessage({ type: 'openFile', path: el.dataset.path });
+        });
+      });
+      container.querySelectorAll('.tree-folder-link').forEach(el => {
         el.addEventListener('click', () => {
           vscode.postMessage({ type: 'openFile', path: el.dataset.path });
         });
