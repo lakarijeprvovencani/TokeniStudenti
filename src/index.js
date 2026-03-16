@@ -700,7 +700,7 @@ const chatCompletionsHandler = [
   requireStudentAuth,
   async (req, res) => {
     const body = req.body || {};
-    const { messages, stream = false, max_tokens = 4096, model, tools: openAITools } = body;
+    let { messages, stream = false, max_tokens = 4096, model, tools: openAITools } = body;
 
     // First: check model is valid (before balance, so user sees the right error)
     const resolved = resolveModel(model);
@@ -721,10 +721,14 @@ const chatCompletionsHandler = [
         error: { message: 'Missing or empty "messages" array.' },
       });
     }
-    if (messages.length > 500) {
-      return res.status(400).json({
-        error: { message: `Too many messages (${messages.length}). Max 500.`, code: 'too_many_messages' },
-      });
+    const MAX_MESSAGES = 500;
+    if (messages.length > MAX_MESSAGES) {
+      const systemMsgs = messages.filter(m => (m.role || '').toLowerCase() === 'system');
+      const nonSystem = messages.filter(m => (m.role || '').toLowerCase() !== 'system');
+      const keepCount = MAX_MESSAGES - systemMsgs.length;
+      const trimmed = [...systemMsgs, ...nonSystem.slice(-keepCount)];
+      console.log(`[context] Message limit: ${messages.length} → ${trimmed.length} (dropped ${messages.length - trimmed.length} oldest non-system messages)`);
+      messages = trimmed;
     }
     if (Array.isArray(openAITools) && openAITools.length > 128) {
       return res.status(400).json({
