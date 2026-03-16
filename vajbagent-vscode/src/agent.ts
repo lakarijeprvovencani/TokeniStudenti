@@ -495,6 +495,7 @@ export class Agent {
   private _savedEditorContext: string | null = null;
   private _loopId = 0;
   private _loopPromise: Promise<void> | null = null;
+  private _sending = false;
 
   constructor(provider: ChatViewProvider, context: vscode.ExtensionContext, mcpManager: McpManager) {
     this._provider = provider;
@@ -651,7 +652,6 @@ export class Agent {
 
   public abort() {
     this._abortController?.abort();
-    this._abortController = null;
   }
 
   public getFileList(): string[] {
@@ -688,6 +688,10 @@ export class Agent {
   }
 
   public async sendMessage(text: string, images: Array<{ base64: string; mimeType: string }> = []) {
+    if (this._sending) return;
+    this._sending = true;
+
+    try {
     this._savedEditorContext = this._getActiveEditorContext();
 
     if (this._loopPromise) {
@@ -732,6 +736,9 @@ export class Agent {
       if (this._loopPromise === promise) {
         this._loopPromise = null;
       }
+    }
+    } finally {
+      this._sending = false;
     }
   }
 
@@ -1054,6 +1061,7 @@ export class Agent {
 
         const messages = this._buildMessages();
 
+        if (this._abortController?.signal.aborted) return;
         this._abortController = new AbortController();
 
         let assistantContent = '';

@@ -299,7 +299,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           if (fs.existsSync(p)) { rulesFile = p; break; }
         }
         if (!fs.existsSync(rulesFile)) {
-          fs.writeFileSync(rulesFile, '# Pravila za VajbAgent\n# Agent ce pratiti ova pravila u svakom odgovoru.\n# Primeri:\n#   - Koristi TypeScript strict mode\n#   - Pisi komentare na srpskom\n#   - Koristi pnpm umesto npm\n#   - Svi API odgovori moraju imati error handling\n\n', 'utf-8');
+          fs.writeFileSync(rulesFile, '# Pravila za VajbAgent\n# Linije koje pocinju sa # su komentari i agent ih NE cita.\n# Pisi pravila BEZ # na pocetku — agent ce ih pratiti u svakom odgovoru.\n#\n# Primeri (obrisi # ispred onog sto zelis da aktiviras):\n# Koristi TypeScript strict mode\n# Pisi komentare na srpskom\n# Koristi pnpm umesto npm\n# Svi API odgovori moraju imati error handling\n# Koristi Tailwind CSS za stilizaciju\n\n', 'utf-8');
         }
         const rulesDoc = await vscode.workspace.openTextDocument(rulesFile);
         await vscode.window.showTextDocument(rulesDoc);

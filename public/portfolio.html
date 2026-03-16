@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Portfolio — Ime Prezime</title>
+  <link rel="stylesheet" href="/portfolio.css">
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav">
+      <a class="logo" href="#">Ime Prezime</a>
+      <ul class="nav-links">
+        <li><a href="#hero">Početna</a></li>
+        <li><a href="#about">O meni</a></li>
+        <li><a href="#contact">Kontakt</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section id="hero" class="hero">
+      <div class="container">
+        <h1>Zdravo, ja sam Ime Prezime</h1>
+        <p class="lead">Pravimo stvari koje ljudi vole — web sajtovi, web aplikacije i lep UX.
+        </p>
+        <p class="cta-row">
+          <a href="#contact" class="btn btn-primary">Kontaktiraj me</a>
+          <a href="#about" class="btn btn-ghost">Više o meni</a>
+        </p>
+      </div>
+    </section>
+
+    <section id="about" class="about">
+      <div class="container">
+        <h2>O meni</h2>
+        <p>
+          Ja sam frontend developer sa strašću za jednostavnim, brzим i dostupnim interfejsima. Radim
+          uglavnom sa HTML/CSS/JS i modernim alatima. Volim čistu tipografiju, optimizaciju performansi
+          i dobar dizajn koji rešava prave probleme.
+        </p>
+        <p>
+          Kada nisam za računarom, šetam, crtam ili učim novu biblioteku. Ako želiš saradnju,
+          pošalji poruku preko forme ispod.
+        </p>
+      </div>
+    </section>
+
+    <section id="contact" class="contact">
+      <div class="container">
+        <h2>Kontakt</h2>
+        <p>Pošalji kratku poruku. Odgovaram u roku od 48h.</p>
+
+        <form id="contactForm" novalidate>
+          <div class="form-row">
+            <label for="name">Ime</label>
+            <input id="name" name="name" type="text" required minlength="2" placeholder="Tvoje ime">
+          </div>
+
+          <div class="form-row">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" required placeholder="tvoj@primer.com">
+          </div>
+
+          <div class="form-row">
+            <label for="message">Poruka</label>
+            <textarea id="message" name="message" rows="5" required minlength="10" placeholder="Napiši poruku..."></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Pošalji</button>
+            <div id="formStatus" class="form-status" aria-live="polite"></div>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; <span id="year"></span> Ime Prezime — Sva prava zadržana</p>
+    </div>
+  </footer>
+
+  <script>
+    // Simple client-side validation + simulated send
+    const form = document.getElementById('contactForm');
+    const statusEl = document.getElementById('formStatus');
+    const yearEl = document.getElementById('year');
+    yearEl.textContent = new Date().getFullYear();
+
+    function showStatus(type, message) {
+      statusEl.textContent = message;
+      statusEl.className = 'form-status ' + type;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      statusEl.textContent = '';
+
+      const name = form.name.value.trim();
+      const email = form.email.value.trim();
+      const message = form.message.value.trim();
+
+      if (!name || name.length < 2) return showStatus('error', 'Ime mora imati najmanje 2 znaka.');
+      if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showStatus('error', 'Unesite važeći email.');
+      if (!message || message.length < 10) return showStatus('error', 'Poruka mora imati najmanje 10 karaktera.');
+
+      showStatus('loading', 'Šaljem...');
+
+      try {
+        // Simulate network request
+        await new Promise((res) => setTimeout(res, 900));
+
+        // In real app: send to server endpoint via fetch()
+        form.reset();
+        showStatus('success', 'Poruka uspešno poslata. Hvala!');
+      } catch (err) {
+        console.error(err);
+        showStatus('error', 'Došlo je do greške. Pokušajte ponovo.');
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,4 +1,12 @@
 import 'dotenv/config';
+
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled rejection:', err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+});
+
 import crypto from 'crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
@@ -24,11 +32,22 @@ import { getBalance, deductBalance, costUsd, addBalance, getTotalDeposited, load
 import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP } from './students.js';
 import { sendWelcomeEmail, sendRecoveryEmail, isEmailConfigured } from './email.js';
 
-await seedFromEnv();
+const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+try {
+  await seedFromEnv();
+} catch (err) {
+  console.error('FATAL: Failed to initialize:', err.message);
+  process.exit(1);
+}
 
 // Load student markup flags from storage
-const allStudentsInit = await getAllStudents();
-loadStudentMarkupFlags(allStudentsInit);
+try {
+  const allStudentsInit = await getAllStudents();
+  loadStudentMarkupFlags(allStudentsInit);
+} catch (err) {
+  console.error('WARNING: Failed to load students:', err.message);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -449,7 +468,7 @@ async function markStripeEventProcessed(eventId) {
   try { writeStripeEventsFile(events); } catch {}
 }
 
-app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), asyncHandler(async (req, res) => {
   console.log('Stripe webhook received:', { hasBody: !!req.body, bodyLen: req.body?.length, hasSig: !!req.headers['stripe-signature'] });
   const Stripe = (await import('stripe')).default;
   const sig = req.headers['stripe-signature'];
@@ -495,7 +514,7 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
   await addBalance(keyId.trim(), amountUsd);
   console.log('Credits added via Stripe', { key_id: keyId.slice(0, 8) + '...', amount_usd: amountUsd });
   res.status(200).send();
-});
+}));
 
 app.use(express.json({ limit: '10mb' }));
 app.use((err, _req, res, next) => {
@@ -573,7 +592,7 @@ app.get('/register/token', registerLimiter, (_req, res) => {
   res.json({ token: createRegisterToken() });
 });
 
-app.post('/register', registerLimiter, async (req, res) => {
+app.post('/register', registerLimiter, asyncHandler(async (req, res) => {
   const { first_name, last_name, email, honeypot, token } = req.body || {};
 
   if (honeypot) {
@@ -636,7 +655,7 @@ app.post('/register', registerLimiter, async (req, res) => {
     key: result.student.key,
     balance_usd: await getBalance(result.student.key),
   });
-});
+}));
 
 // ---- Balance warning (injected into AI response) ----
 const LOW_BALANCE_THRESHOLD = 1.0;
@@ -883,13 +902,21 @@ async function handleOpenAIStream(res, keyId, resolved, payload, client) {
   res.write('data: ' + JSON.stringify(initChunk) + '\n\n');
   if (res.flush) res.flush();
 
-  const stream = await withRetry(() => client.chat.completions.create(payload));
+  let stream;
+  try {
+    stream = await withRetry(() => client.chat.completions.create(payload));
+  } catch (err) {
+    clearInterval(timeoutCheck);
+    clearInterval(keepAlive);
+    throw err;
+  }
 
   let usage = { input_tokens: 0, output_tokens: 0 };
   let chunkCount = 0;
 
   try {
     for await (const chunk of stream) {
+      if (res.writableEnded) break;
       lastChunkTime = Date.now();
       if (chunk.usage) {
         usage.input_tokens = chunk.usage.prompt_tokens ?? usage.input_tokens;
@@ -917,15 +944,19 @@ async function handleOpenAIStream(res, keyId, resolved, payload, client) {
   if (usage.reasoning_tokens > 0) {
     console.log(`OpenAI stream reasoning tokens: ${usage.reasoning_tokens} (billed as output, total output=${usage.output_tokens})`);
   }
-  usage.model = resolved.backendModel;
-  const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel, keyId);
-  const newBal = await deductBalance(keyId, usd);
-  await logUsage(keyId, usage);
+  try {
+    usage.model = resolved.backendModel;
+    const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel, keyId);
+    const newBal = await deductBalance(keyId, usd);
+    await logUsage(keyId, usage);
 
-  const warning = await getBalanceWarning(keyId, newBal);
-  if (warning && !res.writableEnded) {
-    const warnChunk = { id: 'vajb-warn', object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { content: warning }, finish_reason: null }] };
-    res.write('data: ' + JSON.stringify(warnChunk) + '\n\n');
+    const warning = await getBalanceWarning(keyId, newBal);
+    if (warning && !res.writableEnded) {
+      const warnChunk = { id: 'vajb-warn', object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { content: warning }, finish_reason: null }] };
+      res.write('data: ' + JSON.stringify(warnChunk) + '\n\n');
+    }
+  } catch (billingErr) {
+    console.error('Post-stream billing error:', billingErr.message);
   }
   if (!res.writableEnded) {
     res.write('data: [DONE]\n\n');
@@ -1040,7 +1071,7 @@ async function handleAnthropicStream(res, keyId, resolved, payload, client) {
     if (Date.now() - lastChunkTime > STREAM_TIMEOUT) {
       clearInterval(timeoutCheck);
       clearInterval(keepAlive);
-      if (!res.writableEnded) { res.end(); }
+      if (!res.writableEnded) { res.write('data: [DONE]\n\n'); res.end(); }
     }
   }, 30000);
 
@@ -1049,7 +1080,14 @@ async function handleAnthropicStream(res, keyId, resolved, payload, client) {
   res.write('data: ' + JSON.stringify(initChunk) + '\n\n');
   if (res.flush) res.flush();
 
-  const stream = await withRetry(() => client.messages.create({ ...payload, stream: true }));
+  let stream;
+  try {
+    stream = await withRetry(() => client.messages.create({ ...payload, stream: true }));
+  } catch (err) {
+    clearInterval(timeoutCheck);
+    clearInterval(keepAlive);
+    throw err;
+  }
 
   let isThinking = false;
   let thinkingIndicatorSent = false;
@@ -1129,23 +1167,29 @@ async function handleAnthropicStream(res, keyId, resolved, payload, client) {
     if (res.flush) res.flush();
   }
 
-  usage.model = resolved.backendModel;
-  const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel, keyId);
-  const newBal = await deductBalance(keyId, usd);
-  await logUsage(keyId, usage);
+  try {
+    usage.model = resolved.backendModel;
+    const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel, keyId);
+    const newBal = await deductBalance(keyId, usd);
+    await logUsage(keyId, usage);
 
-  const warning = await getBalanceWarning(keyId, newBal);
-  if (warning && !res.writableEnded) {
-    const warnChunk = { id: streamId + '-warn', object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { content: warning }, finish_reason: null }] };
-    res.write('data: ' + JSON.stringify(warnChunk) + '\n\n');
+    const warning = await getBalanceWarning(keyId, newBal);
+    if (warning && !res.writableEnded) {
+      const warnChunk = { id: streamId + '-warn', object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { content: warning }, finish_reason: null }] };
+      res.write('data: ' + JSON.stringify(warnChunk) + '\n\n');
+    }
+  } catch (billingErr) {
+    console.error('Post-stream billing error:', billingErr.message);
   }
 
-  res.write(streamDone());
-  res.end();
+  if (!res.writableEnded) {
+    res.write(streamDone());
+    res.end();
+  }
 }
 
 // ---- Usage + balance for current key (dashboard) ----
-app.get('/me', authLimiter, requireStudentAuth, async (req, res) => {
+app.get('/me', authLimiter, requireStudentAuth, asyncHandler(async (req, res) => {
   const keyId = req.studentKeyId;
   const name = req.studentName || 'Unknown';
   const balanceUsd = await getBalance(keyId);
@@ -1166,10 +1210,10 @@ app.get('/me', authLimiter, requireStudentAuth, async (req, res) => {
     requests: data.requests || 0, last_used: data.last_used || null,
     estimated_cost_usd: Math.round(estimatedCost * 100) / 100,
   });
-});
+}));
 
 // ---- Stripe checkout ----
-app.post('/create-checkout', authLimiter, requireStudentAuth, async (req, res) => {
+app.post('/create-checkout', authLimiter, requireStudentAuth, asyncHandler(async (req, res) => {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) {
     return res.status(503).json({ error: 'Plaćanje nije konfigurisano.' });
@@ -1210,7 +1254,7 @@ app.post('/create-checkout', authLimiter, requireStudentAuth, async (req, res) =
     console.error('Stripe checkout error:', err.message);
     res.status(502).json({ error: 'Greška pri kreiranju sesije plaćanja. Pokušaj ponovo.' });
   }
-});
+}));
 
 // ---- Key recovery via email ----
 const recoveryLimiter = rateLimit({
@@ -1222,7 +1266,7 @@ const recoveryLimiter = rateLimit({
   handler: (_req, res) => res.status(429).json({ error: 'Previše zahteva. Pokušaj ponovo za sat vremena.' }),
 });
 
-app.post('/recover-key', recoveryLimiter, async (req, res) => {
+app.post('/recover-key', recoveryLimiter, asyncHandler(async (req, res) => {
   const { email } = req.body || {};
   if (!email || typeof email !== 'string' || email.trim().length < 5) {
     return res.status(400).json({ error: 'Unesite email adresu.' });
@@ -1242,10 +1286,10 @@ app.post('/recover-key', recoveryLimiter, async (req, res) => {
   }
 
   res.json({ message: genericMsg });
-});
+}));
 
 // ---- Admin: add credits ----
-app.post('/admin/add-credits', adminLimiter, async (req, res) => {
+app.post('/admin/add-credits', adminLimiter, asyncHandler(async (req, res) => {
   const secret = req.headers['x-admin-secret'] || req.body?.admin_secret;
   if (!safeEqual(secret, process.env.ADMIN_SECRET)) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -1260,7 +1304,7 @@ app.post('/admin/add-credits', adminLimiter, async (req, res) => {
   }
   const newBalance = await addBalance(key_id.trim(), amount);
   res.json({ key_id: key_id.trim(), added_usd: amount, balance_usd: newBalance });
-});
+}));
 
 // ---- Admin: student management ----
 function requireAdmin(req, res, next) {
@@ -1271,7 +1315,7 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-app.get('/admin/students', adminLimiter, requireAdmin, async (_req, res) => {
+app.get('/admin/students', adminLimiter, requireAdmin, asyncHandler(async (_req, res) => {
   const allStudents = await getAllStudents();
   const usage = await getUsageSummary();
   const students = [];
@@ -1281,9 +1325,9 @@ app.get('/admin/students', adminLimiter, requireAdmin, async (_req, res) => {
     students.push({ ...s, balance_usd, last_used });
   }
   res.json(students);
-});
+}));
 
-app.post('/admin/students', adminLimiter, requireAdmin, async (req, res) => {
+app.post('/admin/students', adminLimiter, requireAdmin, asyncHandler(async (req, res) => {
   const { name, email, initial_balance } = req.body || {};
   const result = await addStudent(name, email || `admin-${Date.now()}@internal`);
   if (result.error) return res.status(400).json({ error: result.error });
@@ -1295,15 +1339,15 @@ app.post('/admin/students', adminLimiter, requireAdmin, async (req, res) => {
     ...result.student,
     balance_usd: await getBalance(result.student.key),
   });
-});
+}));
 
-app.delete('/admin/students/:key', adminLimiter, requireAdmin, async (req, res) => {
+app.delete('/admin/students/:key', adminLimiter, requireAdmin, asyncHandler(async (req, res) => {
   const result = await removeStudent(req.params.key);
   if (result.error) return res.status(404).json({ error: result.error });
   res.json(result);
-});
+}));
 
-app.patch('/admin/students/:key', adminLimiter, requireAdmin, async (req, res) => {
+app.patch('/admin/students/:key', adminLimiter, requireAdmin, asyncHandler(async (req, res) => {
   const { active } = req.body || {};
   if (typeof active !== 'boolean') {
     return res.status(400).json({ error: 'Body: { "active": true/false }' });
@@ -1311,10 +1355,10 @@ app.patch('/admin/students/:key', adminLimiter, requireAdmin, async (req, res) =
   const result = await toggleStudent(req.params.key, active);
   if (result.error) return res.status(404).json({ error: result.error });
   res.json(result.student);
-});
+}));
 
 // Toggle markup for a student (noMarkup = true means they pay raw API cost)
-app.patch('/admin/students/:key/markup', adminLimiter, requireAdmin, async (req, res) => {
+app.patch('/admin/students/:key/markup', adminLimiter, requireAdmin, asyncHandler(async (req, res) => {
   const { noMarkup } = req.body || {};
   if (typeof noMarkup !== 'boolean') {
     return res.status(400).json({ error: 'Body: { "noMarkup": true/false }' });
@@ -1326,24 +1370,24 @@ app.patch('/admin/students/:key/markup', adminLimiter, requireAdmin, async (req,
   setStudentNoMarkup(req.params.key, noMarkup);
   
   res.json(result.student);
-});
+}));
 
 // ---- Admin: email list export ----
-app.get('/admin/emails', adminLimiter, requireAdmin, async (_req, res) => {
+app.get('/admin/emails', adminLimiter, requireAdmin, asyncHandler(async (_req, res) => {
   const allStudents = await getAllStudents();
   const emails = allStudents
     .filter(s => s.email && s.active)
     .map(s => ({ name: s.name, email: s.email }));
   res.json({ count: emails.length, emails });
-});
+}));
 
 // ---- Admin usage ----
-app.get('/usage', adminLimiter, requireAdmin, async (_req, res) => {
+app.get('/usage', adminLimiter, requireAdmin, asyncHandler(async (_req, res) => {
   res.json(await getUsageSummary());
-});
+}));
 
 // ---- Admin: full overview (all users, models, earnings) ----
-app.get('/admin/api/overview', adminLimiter, async (req, res) => {
+app.get('/admin/api/overview', adminLimiter, asyncHandler(async (req, res) => {
   const secret = req.headers['x-admin-secret'] || req.query.secret;
   if (!safeEqual(secret, process.env.ADMIN_SECRET)) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -1418,7 +1462,7 @@ app.get('/admin/api/overview', adminLimiter, async (req, res) => {
     model_stats: modelStats,
     first_use: firstUse,
   });
-});
+}));
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'vajb-agent' });
@@ -1442,7 +1486,7 @@ app.get('/admin', (_req, res) => {
 app.use(express.static(path.join(__dirname, '..', 'public'), { index: false }));
 
 // ---- Debug ----
-app.get('/debug/redis', adminLimiter, async (req, res) => {
+app.get('/debug/redis', adminLimiter, asyncHandler(async (req, res) => {
   const secret = req.headers['x-admin-secret'] || req.query.secret;
   if (!safeEqual(secret, process.env.ADMIN_SECRET)) return res.status(401).json({ error: 'Unauthorized' });
   const { getRedis, isRedisConfigured } = await import('./redis.js');
@@ -1464,10 +1508,10 @@ app.get('/debug/redis', adminLimiter, async (req, res) => {
     } catch (err) { ping = 'error: ' + err.message; }
   }
   res.json({ configured, ping, keys });
-});
+}));
 
 // ---- Web Search (Tavily) ----
-app.post('/v1/web-search', authLimiter, requireStudentAuth, async (req, res) => {
+app.post('/v1/web-search', authLimiter, requireStudentAuth, asyncHandler(async (req, res) => {
   const tavilyKey = process.env.TAVILY_API_KEY;
   if (!tavilyKey || tavilyKey === 'tvly-YOUR_KEY_HERE') {
     return res.status(503).json({ error: { message: 'Web search nije konfigurisan.', code: 'search_not_configured' } });
@@ -1516,7 +1560,7 @@ app.post('/v1/web-search', authLimiter, requireStudentAuth, async (req, res) => 
     console.error('Web search error:', err.message);
     res.status(502).json({ error: { message: 'Web search nedostupan. Pokušaj ponovo.', code: 'search_error' } });
   }
-});
+}));
 
 // ---- 404 ----
 app.use((req, res) => {

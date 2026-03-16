@@ -1,0 +1,3 @@
+z// Simple script that prints Hello World and the current date
+console.log("Hello World");
+console.log(new Date().toString());

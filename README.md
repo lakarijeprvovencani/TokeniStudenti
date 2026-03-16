@@ -9,7 +9,7 @@ Proxy koji prima zahteve u **OpenAI Chat Completions** formatu (kao Cursor IDE),
 ### Korak 1: Pokreni proxy na svom računaru
 
 1. U folderu projekta otvori terminal.
-2. Napiši: `cp .env.example .env`
+2. Napiši: `\e `
 3. Otvori fajl `.env` i unesi:
    - **ANTHROPIC_API_KEY** = tvoj Anthropic ključ (dobijaš na [console.anthropic.com](https://console.anthropic.com)); ti plaćaš Anthropic za tokene.
    - **STUDENT_API_KEYS** = bar jedan ključ za test, npr. `moj-test-kljuc` (bez razmaka, ako ih ima više razdvoji zarezom).

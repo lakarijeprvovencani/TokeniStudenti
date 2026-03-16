@@ -378,14 +378,20 @@ export class McpManager {
     try {
       const raw = fs.readFileSync(configPath, 'utf-8');
       const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object' && parsed.mcpServers) {
+      if (!parsed || typeof parsed !== 'object') {
+        return { servers: {}, parseError: 'mcp.json mora biti JSON objekat' };
+      }
+      if (parsed.mcpServers) {
         return { servers: parsed.mcpServers as Record<string, McpServerConfig> };
+      }
+      if (parsed.command && parsed.args) {
+        return { servers: {}, parseError: 'Pogresan format — server config mora biti unutar imenovanog objekta. Primer: { "mojServer": { "command": "npx", "args": [...] } }' };
       }
       return { servers: parsed as Record<string, McpServerConfig> };
     } catch (err) {
       const msg = (err as Error).message;
       log(`[MCP] Failed to parse mcp.json: ${msg}`);
-      return { servers: {}, parseError: msg };
+      return { servers: {}, parseError: `JSON greska: ${msg}` };
     }
   }
 

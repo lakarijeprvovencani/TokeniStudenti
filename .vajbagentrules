@@ -1,0 +1,8 @@
+# Pravila za VajbAgent
+# Agent ce pratiti ova pravila u svakom odgovoru.
+# Primeri:
+#   - Koristi TypeScript strict mode
+#   - Pisi komentare na srpskom
+#   - Koristi pnpm umesto npm
+#   - Svi API odgovori moraju imati error handling
+
