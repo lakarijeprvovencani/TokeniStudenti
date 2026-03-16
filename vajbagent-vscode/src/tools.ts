@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { exec } from 'child_process';
+import { exec, execFile, execSync } from 'child_process';
 import { getAutoApprove } from './settings';
 import https from 'https';
 import http from 'http';
@@ -308,6 +308,26 @@ export const TOOL_DEFINITIONS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'download_file',
+      description: 'Download a binary file (image, PDF, font, etc.) from a URL and save it to disk. Verifies the download is valid — checks file size, MIME type, and detects error pages. ALWAYS use this instead of execute_command+curl for downloading files. Returns honest success/failure with file size and type.',
+      parameters: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: 'Direct URL to the file to download' },
+          path: { type: 'string', description: 'Workspace-relative or absolute path to save the file' },
+          expected_type: {
+            type: 'string',
+            description: 'Expected file type prefix for verification',
+            enum: ['image', 'application/pdf', 'font', 'any'],
+          },
+        },
+        required: ['url', 'path'],
+      },
+    },
+  },
 ];
 
 export async function executeTool(
@@ -331,6 +351,8 @@ export async function executeTool(
       return toolFetchUrl(args);
     case 'web_search':
       return toolWebSearch(args);
+    case 'download_file':
+      return toolDownloadFile(args);
     default:
       return { success: false, output: `Unknown tool: ${name}` };
   }
@@ -855,4 +877,94 @@ async function toolWebSearch(args: Record<string, unknown>): Promise<ToolCallRes
   } catch (err: unknown) {
     return { success: false, output: `Web search error: ${(err as Error).message}` };
   }
+}
+
+// ── download_file ──
+async function toolDownloadFile(args: Record<string, unknown>): Promise<ToolCallResult> {
+  const url = args.url as string;
+  const filePath = resolveWorkspacePath(args.path as string);
+  const expectedType = (args.expected_type as string) || 'any';
+
+  if (!url || !url.startsWith('http')) {
+    return { success: false, output: 'Invalid URL. Must start with http:// or https://' };
+  }
+
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  if (fs.existsSync(filePath)) {
+    saveCheckpoint(filePath);
+  }
+
+  return new Promise((resolve) => {
+    execFile(
+      'curl',
+      ['-L', '-f', '-s', '-A', 'Mozilla/5.0 VajbAgent/1.0', '-o', filePath,
+       '--connect-timeout', '10', '--max-time', '30', '--max-redirs', '5', url],
+      { timeout: 35000 },
+      (error) => {
+        if (error) {
+          if (fs.existsSync(filePath)) {
+            try { fs.unlinkSync(filePath); } catch { /* */ }
+          }
+          const hint = /exit code: 22/i.test(error.message) || error.message.includes('22')
+            ? ' (HTTP 4xx/5xx — the URL returned an error)'
+            : '';
+          resolve({
+            success: false,
+            output: `Download FAILED from: ${url}\nError: ${error.message}${hint}\nThe URL may be invalid, the service may be down, or the file does not exist.`,
+          });
+          return;
+        }
+
+        if (!fs.existsSync(filePath)) {
+          resolve({ success: false, output: `Download FAILED: file was not created.\nURL: ${url}` });
+          return;
+        }
+
+        const stats = fs.statSync(filePath);
+        const sizeKB = (stats.size / 1024).toFixed(1);
+
+        if (stats.size < 1024) {
+          try {
+            const head = fs.readFileSync(filePath, 'utf-8').substring(0, 500);
+            if (/<html|<!doctype|application error|404|403|error/i.test(head)) {
+              fs.unlinkSync(filePath);
+              resolve({
+                success: false,
+                output: `Download FAILED: URL returned an HTML error page (${stats.size} bytes) instead of a real file.\nURL: ${url}\nContent: ${head.substring(0, 200)}\nThis means the URL is wrong or the service is down.`,
+              });
+              return;
+            }
+          } catch { /* binary file under 1KB — unusual but possible */ }
+        }
+
+        let mimeType = 'unknown';
+        try {
+          mimeType = execSync(`file --mime-type -b "${filePath}"`, { timeout: 5000, encoding: 'utf-8' }).trim();
+        } catch { /* file command not available */ }
+
+        if (expectedType !== 'any' && mimeType !== 'unknown' && !mimeType.startsWith(expectedType)) {
+          if (mimeType.includes('text/html') || mimeType.includes('text/plain')) {
+            try {
+              const head = fs.readFileSync(filePath, 'utf-8').substring(0, 300);
+              fs.unlinkSync(filePath);
+              resolve({
+                success: false,
+                output: `Download FAILED: expected ${expectedType} but got ${mimeType} (${sizeKB}KB).\nURL: ${url}\nContent: ${head.substring(0, 200)}\nThe URL does not point to a real ${expectedType} file.`,
+              });
+              return;
+            } catch { /* binary content with unexpected type — proceed */ }
+          }
+        }
+
+        resolve({
+          success: true,
+          output: `Downloaded OK: ${filePath}\nSize: ${sizeKB}KB | Type: ${mimeType}\nURL: ${url}`,
+        });
+      },
+    );
+  });
 }
