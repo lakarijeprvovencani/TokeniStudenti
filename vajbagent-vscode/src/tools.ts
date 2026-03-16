@@ -156,9 +156,12 @@ function requestDiffApproval(
   if (shouldAutoApprove(toolName)) {
     if (_postMessage) {
       _postMessage({
-        type: 'autoApproved',
+        type: 'autoApprovedDiff',
         filePath: path.basename(filePath),
+        fullPath: filePath,
         toolName,
+        oldContent,
+        newContent,
       });
     }
     return Promise.resolve(true);

@@ -1090,6 +1090,16 @@
     }
     .diff-header .diff-stats .added { color: #4ec9b0; }
     .diff-header .diff-stats .removed { color: #f14c4c; }
+    .diff-header-collapsible { cursor: pointer; }
+    .diff-header-collapsible:hover { background: var(--vscode-list-hoverBackground); }
+    .diff-collapsed { display: none; }
+    .auto-approved-badge {
+      font-size: 10px;
+      color: #4ec9b0;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+    .auto-approved-diff { border-color: rgba(78, 201, 176, 0.3); }
     .diff-lines {
       max-height: 300px;
       overflow-y: auto;
@@ -3414,6 +3424,61 @@
           const label = msg.toolName === 'execute_command' ? msg.filePath : msg.filePath;
           notice.innerHTML = '&#10003; Auto-approved: <strong>' + escapeHtml(label) + '</strong>';
           messagesEl.appendChild(notice);
+          scrollToBottom();
+          break;
+        }
+
+        case 'autoApprovedDiff': {
+          const hasChanges = msg.oldContent !== msg.newContent && (msg.oldContent || msg.newContent);
+          if (hasChanges) {
+            const diffLines = computeDiffLines(msg.oldContent || '', msg.newContent || '');
+            const added = diffLines.filter(l => l.type === 'added').length;
+            const removed = diffLines.filter(l => l.type === 'removed').length;
+
+            const diffBlock = document.createElement('div');
+            diffBlock.className = 'diff-block auto-approved-diff';
+
+            let linesHtml = '';
+            let shownLines = 0;
+            diffLines.forEach(line => {
+              if (line.type === 'context') {
+                if (shownLines > 0) return;
+              } else {
+                shownLines++;
+              }
+              const escaped = escapeHtml(line.text || ' ');
+              linesHtml += '<div class="diff-line ' + line.type + '">' + escaped + '</div>';
+            });
+
+            diffBlock.innerHTML =
+              '<div class="diff-header diff-header-collapsible">' +
+                '<span class="diff-icon">&#9998;</span>' +
+                '<span class="diff-filename" title="Otvori u editoru">' + escapeHtml(msg.filePath) + '</span>' +
+                '<span class="diff-stats">' +
+                  '<span class="added">+' + added + '</span> ' +
+                  '<span class="removed">-' + removed + '</span>' +
+                '</span>' +
+                '<span class="auto-approved-badge">&#10003; Primenjeno</span>' +
+              '</div>' +
+              '<div class="diff-lines diff-collapsed">' +
+                diffLines.map(l => '<div class="diff-line ' + l.type + '">' + escapeHtml(l.text || ' ') + '</div>').join('') +
+              '</div>';
+
+            diffBlock.querySelector('.diff-header').addEventListener('click', () => {
+              diffBlock.querySelector('.diff-lines').classList.toggle('diff-collapsed');
+            });
+            diffBlock.querySelector('.diff-filename').addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (msg.fullPath) vscode.postMessage({ type: 'openFile', path: msg.fullPath });
+            });
+
+            messagesEl.appendChild(diffBlock);
+          } else {
+            const notice = document.createElement('div');
+            notice.className = 'auto-approved-notice';
+            notice.innerHTML = '&#10003; Auto-approved: <strong>' + escapeHtml(msg.filePath) + '</strong>';
+            messagesEl.appendChild(notice);
+          }
           scrollToBottom();
           break;
         }
