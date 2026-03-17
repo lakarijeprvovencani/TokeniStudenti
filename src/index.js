@@ -1489,12 +1489,16 @@ app.get('/payment-status', (_req, res) => {
 app.get('/setup', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'setup.html'));
 });
+app.get('/testiranje', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'testiranje.html'));
+});
 app.get('/admin', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));
 });
 
 // ---- Static assets (favicon, etc.) ----
 app.use(express.static(path.join(__dirname, '..', 'public'), { index: false }));
+app.use('/docs', express.static(path.join(__dirname, '..', 'docs')));
 
 // ---- Debug ----
 app.get('/debug/redis', adminLimiter, asyncHandler(async (req, res) => {

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VajbAgent – Vodiči za testiranje</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0a;--surface:#161616;--surface2:#1c1c1c;--border:#222;--border2:#333;--text:#f5f5f5;--text2:#999;--text3:#666;--orange:#f97316;--orange2:#fb923c;--radius:12px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;padding:40px 20px}
+.container{max-width:720px;margin:0 auto}
+
+.brand{font-size:1.4rem;font-weight:900;letter-spacing:-.03em;margin-bottom:4px}
+.brand span{color:var(--orange)}
+.subtitle{color:var(--text2);margin-bottom:36px;font-size:.92rem}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;margin-bottom:20px}
+.card h2{font-size:1.05rem;font-weight:800;margin-bottom:16px;color:var(--orange)}
+
+.doc-link{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;text-decoration:none;color:var(--text);transition:all .15s}
+.doc-link:hover{border-color:var(--orange);color:var(--orange)}
+.doc-link strong{font-size:.95rem}
+.doc-link span{font-size:.82rem;color:var(--text2);margin-top:4px;display:block}
+.doc-link .arrow{color:var(--orange);font-size:1.2rem}
+
+.footer{text-align:center;margin-top:40px;color:var(--text3);font-size:.78rem}
+.footer a{color:var(--orange);text-decoration:none;font-weight:600}
+.footer a:hover{opacity:.8}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="brand">Vajb<span>Agent</span></div>
+  <p class="subtitle">Vodiči i materijali za testiranje ekstenzije.</p>
+
+  <div class="card">
+    <h2>Dokumenti</h2>
+    <a href="/docs/BRZI-VODIC.md" target="_blank" rel="noopener" class="doc-link">
+      <div>
+        <strong>Brzi vodič</strong>
+        <span>Registracija, dashboard, instalacija, sve na jednom mestu</span>
+      </div>
+      <span class="arrow">→</span>
+    </a>
+    <a href="/docs/FAZE-TESTIRANJA.md" target="_blank" rel="noopener" class="doc-link">
+      <div>
+        <strong>Faze testiranja</strong>
+        <span>8 faza od najlakših do najtežih + finalna aplikacija</span>
+      </div>
+      <span class="arrow">→</span>
+    </a>
+  </div>
+
+  <div class="footer">
+    Vajb<span style="color:var(--orange)">Agent</span> &mdash; <a href="/">Početna</a> &middot; <a href="/dashboard">Dashboard</a>
+  </div>
+</div>
+</body>
+</html>
