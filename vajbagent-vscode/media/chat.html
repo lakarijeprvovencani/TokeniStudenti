@@ -401,6 +401,31 @@
     .msg-assistant .credits-cta:hover {
       background: #e5670f;
     }
+    .thinking-block {
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      border-left: 3px solid #FA7315;
+    }
+    .thinking-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #FA7315;
+      opacity: 0.9;
+      margin-bottom: 6px;
+    }
+    .thinking-content {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--vscode-foreground);
+      opacity: 0.85;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
 
     /* Tool call blocks */
     .tool-block {
@@ -456,6 +481,17 @@
       overflow-y: auto;
     }
     .tool-body.open { display: block; }
+    .tool-body-line { white-space: pre; line-height: 1.55; }
+    .tool-body-stream { white-space: pre-wrap; opacity: 0.55; font-size: 11px; line-height: 1.5; }
+    .tool-body-result { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border); white-space: pre-wrap; }
+    .sh-tag { color: #e06c75; }
+    .sh-attr { color: #d19a66; }
+    .sh-string { color: #98c379; }
+    .sh-comment { color: #5c6370; font-style: italic; }
+    .sh-keyword { color: #c678dd; }
+    .sh-number { color: #d19a66; }
+    .sh-func { color: #61afef; }
+    .sh-punct { color: #abb2bf; opacity: 0.7; }
 
     /* Status indicator */
     .status-indicator {
@@ -3023,7 +3059,17 @@
       if (role === 'user') {
         div.textContent = text;
       } else {
-        div.innerHTML = renderMarkdown(text);
+        const { thinking, rest } = splitThinking(text);
+        if (thinking) {
+          div.innerHTML =
+            '<div class="thinking-block">' +
+              '<div class="thinking-label">Rezonovanje agenta</div>' +
+              '<div class="thinking-content">' + escapeHtml(thinking) + '</div>' +
+            '</div>' +
+            (rest ? '<div class="msg-body">' + renderMarkdown(rest) + '</div>' : '');
+        } else {
+          div.innerHTML = renderMarkdown(text);
+        }
         addCopyButtons(div);
       }
       messagesEl.appendChild(div);
@@ -3033,6 +3079,8 @@
 
     let currentAssistantEl = null;
     let currentAssistantRawText = '';
+    let obradjujemTimeoutId = null;
+    const OBRADJUJEM_UPGRADE_MS = 3000;
 
     function setStreaming(on) {
       isStreaming = on;
@@ -3074,6 +3122,7 @@
     }
 
     function hideStatus() {
+      if (obradjujemTimeoutId) { clearTimeout(obradjujemTimeoutId); obradjujemTimeoutId = null; }
       if (statusIndicator) {
         statusIndicator.classList.remove('visible');
         if (statusIndicator.parentNode) {
@@ -3262,11 +3311,27 @@
         }
 
         case 'status': {
-          showStatus(msg.text || 'Razmisljam...', msg.phase || 'thinking');
+          if (obradjujemTimeoutId) { clearTimeout(obradjujemTimeoutId); obradjujemTimeoutId = null; }
+          const statusText = msg.text || 'Razmisljam...';
+          showStatus(statusText, msg.phase || 'thinking');
+          if (statusText.indexOf('Obradjujem zahtev') !== -1) {
+            obradjujemTimeoutId = setTimeout(function() {
+              if (statusIndicator && statusIndicator.classList.contains('visible')) {
+                statusIndicator.querySelector('.status-text').textContent = 'Razmisljam...';
+              }
+              obradjujemTimeoutId = setTimeout(function() {
+                obradjujemTimeoutId = null;
+                if (statusIndicator && statusIndicator.classList.contains('visible')) {
+                  statusIndicator.querySelector('.status-text').textContent = 'Planiram korake...';
+                }
+              }, OBRADJUJEM_UPGRADE_MS);
+            }, OBRADJUJEM_UPGRADE_MS);
+          }
           break;
         }
 
         case 'streamStart': {
+          if (obradjujemTimeoutId) { clearTimeout(obradjujemTimeoutId); obradjujemTimeoutId = null; }
           hideStatus();
           showStatus('Pisem odgovor...', 'streaming');
           currentAssistantRawText = '';
@@ -3279,10 +3344,11 @@
         }
 
         case 'streamDelta':
+          if (obradjujemTimeoutId) { clearTimeout(obradjujemTimeoutId); obradjujemTimeoutId = null; }
           hideStatus();
           if (currentAssistantEl) {
             currentAssistantRawText += msg.text;
-            currentAssistantEl.textContent = currentAssistantRawText;
+            currentAssistantEl.textContent = streamingPreview(currentAssistantRawText);
             scrollToBottom();
           }
           break;
@@ -3291,10 +3357,21 @@
           hideApprovalBar();
           const planText = (currentAssistantRawText || '').trim();
           if (currentAssistantEl) {
-            const meaningful = planText.replace(/[-_*\s\n]/g, '');
-            if (planText && meaningful.length > 0) {
+            const { thinking, rest } = splitThinking(planText);
+            const bodyText = rest || (thinking ? '' : planText);
+            const meaningful = bodyText.replace(/[-_*\s\n]/g, '');
+            if (planText && (meaningful.length > 0 || thinking)) {
               currentAssistantEl.classList.remove('streaming');
-              currentAssistantEl.innerHTML = renderMarkdown(planText);
+              if (thinking) {
+                currentAssistantEl.innerHTML =
+                  '<div class="thinking-block">' +
+                    '<div class="thinking-label">Rezonovanje agenta</div>' +
+                    '<div class="thinking-content">' + escapeHtml(thinking) + '</div>' +
+                  '</div>' +
+                  (bodyText ? '<div class="msg-body">' + renderMarkdown(bodyText) + '</div>' : '');
+              } else {
+                currentAssistantEl.innerHTML = renderMarkdown(planText);
+              }
               addCopyButtons(currentAssistantEl);
             } else {
               currentAssistantEl.remove();
@@ -3325,19 +3402,94 @@
           break;
         }
 
-        case 'toolCall': {
+        case 'toolCallStart': {
+          if (obradjujemTimeoutId) { clearTimeout(obradjujemTimeoutId); obradjujemTimeoutId = null; }
           hideStatus();
+
+          var startLabel = (function(n) {
+            switch (n) {
+              case 'read_file':       return { label: 'Citam fajl', phase: 'reading' };
+              case 'write_file':      return { label: 'Pisem fajl', phase: 'writing' };
+              case 'replace_in_file': return { label: 'Menjam fajl', phase: 'writing' };
+              case 'list_files':      return { label: 'Listajem fajlove', phase: 'searching' };
+              case 'search_files':    return { label: 'Pretrazujem kod', phase: 'searching' };
+              case 'execute_command': return { label: 'Izvrsavam komandu', phase: 'command' };
+              case 'fetch_url':       return { label: 'Ucitavam stranicu', phase: 'web' };
+              case 'web_search':      return { label: 'Pretrazujem web', phase: 'web' };
+              default: {
+                if (n && n.startsWith('mcp_')) {
+                  var parts = n.match(/^mcp_([^_]+)_(.+)$/);
+                  if (parts) return { label: 'MCP: ' + parts[1], phase: 'mcp' };
+                }
+                return { label: n || 'Alat', phase: 'thinking' };
+              }
+            }
+          })(msg.name);
+          showStatus(startLabel.label + '...', startLabel.phase);
+
+          var block = document.createElement('div');
+          block.className = 'tool-block';
+          var bodyDiv = document.createElement('div');
+          bodyDiv.className = 'tool-body';
+          block.innerHTML =
+            '<div class="tool-header">' +
+              '<span class="tool-icon">&#9654;</span>' +
+              '<span class="tool-name">' + escapeHtml(msg.name) + '</span>' +
+              '<span class="tool-detail"></span>' +
+              '<span class="tool-status">running...</span>' +
+            '</div>';
+          block.appendChild(bodyDiv);
+          block.querySelector('.tool-header').addEventListener('click', function() {
+            block.querySelector('.tool-icon').classList.toggle('open');
+            bodyDiv.classList.toggle('open');
+          });
+          block.dataset.toolCallId = msg.id || '';
+
           if (msg.name === 'write_file' || msg.name === 'replace_in_file') {
-            let _toolPath = '';
+            bodyDiv.classList.add('open');
+            block.querySelector('.tool-icon').classList.add('open');
+          }
+
+          messagesEl.appendChild(block);
+          scrollToBottom();
+          break;
+        }
+
+        case 'toolCallDelta': {
+          if (obradjujemTimeoutId) { clearTimeout(obradjujemTimeoutId); obradjujemTimeoutId = null; }
+          var blocks = messagesEl.querySelectorAll('.tool-block');
+          for (var bi = blocks.length - 1; bi >= 0; bi--) {
+            if (blocks[bi].dataset.toolCallId === msg.id) {
+              var body = blocks[bi].querySelector('.tool-body');
+              if (!body._rawArgs) body._rawArgs = '';
+              body._rawArgs += (msg.argsDelta || '');
+
+              if (!body._streamEl) {
+                body._streamEl = document.createElement('div');
+                body._streamEl.className = 'tool-body-stream';
+                body.appendChild(body._streamEl);
+              }
+              body._streamEl.textContent = body._rawArgs;
+              scrollToBottom();
+              break;
+            }
+          }
+          break;
+        }
+
+        case 'toolCallReady': {
+          if (msg.name === 'write_file' || msg.name === 'replace_in_file') {
+            var _toolPath = '';
             try { _toolPath = JSON.parse(msg.args || '{}').path || ''; } catch {}
             if (!_toolPath.includes('PLAN.md') && !_toolPath.includes('CONTEXT.md')) _hadWriteTools = true;
           }
-          let parsedArgs = {};
+
+          var parsedArgs = {};
           try { parsedArgs = JSON.parse(msg.args || '{}'); } catch {}
 
-          const toolDetail = (function() {
-            const p = parsedArgs.path || '';
-            const short = p ? p.split('/').slice(-2).join('/') : '';
+          var toolDetail = (function() {
+            var p = parsedArgs.path || '';
+            var short = p ? p.split('/').slice(-2).join('/') : '';
             switch (msg.name) {
               case 'read_file':       return { label: 'Citam fajl', detail: short, phase: 'reading' };
               case 'write_file':      return { label: 'Pisem fajl', detail: short, phase: 'writing' };
@@ -3349,38 +3501,90 @@
               case 'web_search':      return { label: 'Pretrazujem web', detail: parsedArgs.query ? '"' + parsedArgs.query + '"' : '', phase: 'web' };
               default: {
                 if (msg.name && msg.name.startsWith('mcp_')) {
-                  const parts = msg.name.match(/^mcp_([^_]+)_(.+)$/);
+                  var parts = msg.name.match(/^mcp_([^_]+)_(.+)$/);
                   if (parts) return { label: 'MCP: ' + parts[1], detail: parts[2], phase: 'mcp' };
                 }
                 return { label: msg.name, detail: '', phase: 'thinking' };
               }
             }
           })();
-          const statusLabel = toolDetail.detail
+
+          var statusLabel = toolDetail.detail
             ? toolDetail.label + ': ' + toolDetail.detail + '...'
             : toolDetail.label + '...';
           showStatus(statusLabel, toolDetail.phase);
 
-          const detailSpan = toolDetail.detail
-            ? ' <span class="tool-detail">' + escapeHtml(toolDetail.detail) + '</span>'
-            : '';
+          var blocks = messagesEl.querySelectorAll('.tool-block');
+          var targetBlock = null;
+          for (var bi = blocks.length - 1; bi >= 0; bi--) {
+            if (blocks[bi].dataset.toolCallId === msg.id) {
+              targetBlock = blocks[bi];
+              break;
+            }
+          }
 
-          const block = document.createElement('div');
-          block.className = 'tool-block';
-          block.innerHTML =
-            '<div class="tool-header">' +
-              '<span class="tool-icon">&#9654;</span>' +
-              '<span class="tool-name">' + escapeHtml(msg.name) + '</span>' +
-              detailSpan +
-              '<span class="tool-status">' + (msg.status || 'running...') + '</span>' +
-            '</div>' +
-            '<div class="tool-body">' + escapeHtml(msg.args || '') + '</div>';
-          block.querySelector('.tool-header').addEventListener('click', () => {
-            block.querySelector('.tool-icon').classList.toggle('open');
-            block.querySelector('.tool-body').classList.toggle('open');
-          });
-          block.dataset.toolCallId = msg.id || '';
-          messagesEl.appendChild(block);
+          if (!targetBlock) {
+            targetBlock = document.createElement('div');
+            targetBlock.className = 'tool-block';
+            var newBody = document.createElement('div');
+            newBody.className = 'tool-body';
+            targetBlock.innerHTML =
+              '<div class="tool-header">' +
+                '<span class="tool-icon">&#9654;</span>' +
+                '<span class="tool-name">' + escapeHtml(msg.name) + '</span>' +
+                '<span class="tool-detail"></span>' +
+                '<span class="tool-status">running...</span>' +
+              '</div>';
+            targetBlock.appendChild(newBody);
+            targetBlock.querySelector('.tool-header').addEventListener('click', function() {
+              targetBlock.querySelector('.tool-icon').classList.toggle('open');
+              newBody.classList.toggle('open');
+            });
+            targetBlock.dataset.toolCallId = msg.id || '';
+            messagesEl.appendChild(targetBlock);
+          }
+
+          var detailEl = targetBlock.querySelector('.tool-detail');
+          if (detailEl && toolDetail.detail) {
+            detailEl.textContent = toolDetail.detail;
+          }
+          var statusEl = targetBlock.querySelector('.tool-status');
+          if (statusEl) statusEl.textContent = msg.status || 'running...';
+
+          var bodyEl = targetBlock.querySelector('.tool-body');
+
+          if (bodyEl._streamEl) {
+            bodyEl.removeChild(bodyEl._streamEl);
+            bodyEl._streamEl = null;
+          }
+          bodyEl._rawArgs = '';
+
+          var bodyContent = msg.args || '';
+          if ((msg.name === 'write_file' || msg.name === 'replace_in_file') && bodyContent) {
+            try {
+              var parsed = JSON.parse(bodyContent);
+              var fileContent = parsed.content || parsed.new_string || '';
+              if (fileContent) {
+                bodyEl.innerHTML = '';
+                bodyEl.classList.add('open');
+                targetBlock.querySelector('.tool-icon').classList.add('open');
+                var lines = fileContent.split('\n');
+                for (var li = 0; li < lines.length; li++) {
+                  var lineEl = document.createElement('div');
+                  lineEl.className = 'tool-body-line';
+                  lineEl.innerHTML = highlightLine(lines[li]);
+                  bodyEl.appendChild(lineEl);
+                }
+              } else {
+                bodyEl.textContent = bodyContent;
+              }
+            } catch (_) {
+              bodyEl.textContent = bodyContent;
+            }
+          } else {
+            bodyEl.textContent = bodyContent;
+          }
+
           scrollToBottom();
           break;
         }
@@ -3393,7 +3597,10 @@
               b.querySelector('.tool-status').textContent = msg.status || 'done';
               const body = b.querySelector('.tool-body');
               if (msg.result) {
-                body.textContent += '\n--- Result ---\n' + msg.result;
+                var resultEl = document.createElement('div');
+                resultEl.className = 'tool-body-result';
+                resultEl.textContent = '\n--- Result ---\n' + msg.result;
+                body.appendChild(resultEl);
               }
               break;
             }
@@ -3745,6 +3952,42 @@
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
+    }
+
+    function splitThinking(text) {
+      if (!text || typeof text !== 'string') return { thinking: null, rest: text || '' };
+      const match = text.match(/<thinking>([\s\S]*?)<\/thinking>/i);
+      if (!match) return { thinking: null, rest: text };
+      const thinking = match[1].trim();
+      const rest = text.replace(match[0], '').trim();
+      return { thinking: thinking || null, rest };
+    }
+
+    function highlightLine(text) {
+      if (!text) return '';
+      var s = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      s = s.replace(/(\/\/.*$)/gm, '<span class="sh-comment">$1</span>');
+      s = s.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="sh-comment">$1</span>');
+      s = s.replace(/(&lt;\/?[\w-]+)/g, '<span class="sh-tag">$1</span>');
+      s = s.replace(/(\s)([\w-]+)(=)/g, '$1<span class="sh-attr">$2</span>$3');
+      s = s.replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/g, '<span class="sh-string">$1</span>');
+      s = s.replace(/\b(const|let|var|function|return|if|else|for|while|import|export|from|class|extends|new|this|async|await|try|catch|throw|switch|case|break|default|typeof|instanceof)\b/g, '<span class="sh-keyword">$1</span>');
+      s = s.replace(/\b(\d+\.?\d*)\b/g, '<span class="sh-number">$1</span>');
+      return s;
+    }
+
+    function streamingPreview(text) {
+      if (!text || typeof text !== 'string') return '';
+      let out = text;
+      out = out.replace(/<thinking>([\s\S]*?)<\/thinking>/gi, 'Rezonovanje agenta:\n$1\n\n');
+      out = out.replace(/<thinking>[\s\S]*/gi, 'Rezonovanje agenta...\n');
+      out = out.replace(/<\/thinking>/gi, '');
+      out = out.replace(/^- \[ \] /gm, '\u23F3 ');
+      out = out.replace(/^- \[x\] /gm, '\u2705 ');
+      return out;
     }
 
     function computeDiffLines(oldText, newText) {

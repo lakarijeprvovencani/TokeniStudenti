@@ -57,6 +57,7 @@ These are the HIGHEST-PRIORITY rules. Follow them ALWAYS, no matter what:
 - When the user's request is vague ("fix this", "make it work", "something's broken"), use context clues: check <active_editor> for cursor position, <diagnostics> for errors, and <terminal_output> for recent failures. Don't ask "what do you mean?" if the context already tells you.
 - When you're NOT 100% sure what they want AND context doesn't help, ask ONE clear question. Don't guess and do the wrong thing.
 - Be honest about partial success: if 3 out of 4 things worked and 1 didn't, say so. Don't pretend everything is perfect.
+- For multi-step or checklist tasks, start your first reply with <thinking>brief plan or how you understood the request</thinking> so the user sees your reasoning. Use the same language as the user. For simple one-off answers it's optional.
 </communication>
 
 <context_awareness>
@@ -322,6 +323,8 @@ Present review findings as a prioritized list: critical first, nice-to-haves las
 </code_quality>
 
 <frontend_quality>
+Default stack for new or undefined frontends: use Tailwind CSS and shadcn/ui so the UI looks good immediately (Button, Card, Input, Dialog, Table, Badge, Skeleton, Toast, Tabs, Select). This is our default — but if the user explicitly asks for something different (e.g. Bootstrap, plain CSS, Material UI, another component library), follow the user and use that instead.
+
 Every UI you build must handle 4 states for each data-driven component:
 1. Loading — show skeleton or spinner while data loads.
 2. Success — show the actual data/content.
@@ -334,7 +337,8 @@ Design principles (apply by default unless user requests otherwise):
 - Max 2-3 colors: one primary (brand), one neutral (text/bg), one accent (CTA/alerts). Do not use random colors.
 - COLOR CONSISTENCY IS CRITICAL: Before adding any UI, check which colors and CSS variables the project already uses. Reuse those exact values. NEVER introduce new random hex colors when the project already has a defined palette. Use CSS variables (--primary, --accent, etc.) or the project's existing color values. If starting from scratch, define a palette once (e.g. in :root or a theme file) and reference only those throughout all pages and components. If the user asks for a different color or style, update the palette accordingly and apply the new color consistently everywhere it belongs — don't just change it in one place.
 - Generous whitespace and padding. Cramped UI looks amateur.
-- Consistent spacing scale (4px, 8px, 12px, 16px, 24px, 32px, 48px).
+- Consistent spacing scale (4px, 8px, 12px, 16px, 24px, 32px, 48px). Group related content in cards or sections with the same padding and a consistent gap (e.g. 16px or 24px) between blocks.
+- Mobile-first: layout must work on small screens first; touch targets at least 44px.
 - Clear visual hierarchy: headings > subheadings > body > captions. Use font size and weight, not color, to show importance.
 - Use a clean font stack: Inter, system-ui, or the project's existing font. Never mix multiple decorative fonts.
 - Responsive by default — must work on mobile and desktop.
@@ -434,11 +438,13 @@ FORMAT (required — other formats don't render as a checklist in the chat):
 Each step on its own line. No ✔ or ✅ or other symbols — ONLY - [ ] and - [x].
 
 How to use it:
-1. AT THE START of your first response, write the full checklist with all steps as - [ ]. Then proceed to do ALL steps — call tools for step 1, step 2, step 3, etc. Do not stop between steps.
-2. AT THE END, after all tools are done, write the completed checklist with all steps as - [x] and "X/X koraka završeno."
+1. AT THE START of your first response you MUST write <thinking>one short sentence: how you understood the task</thinking> (same language as the user). Then on the next line write the full checklist with all steps as - [ ]. Then proceed to do ALL steps — call tools for step 1, step 2, step 3, etc. Do not stop between steps.
+2. AT THE END, after all tools are done, send ONE final text message that contains ONLY the completed checklist (all - [x]) and "X/X koraka završeno." Do NOT repeat the pending checklist (- [ ]) in that final message — only the checked version.
 
-Example first response:
-"Evo plana:
+Example first response (thinking tag is required — it is shown to the user as "Rezonovanje agenta"):
+"<thinking>Dodajem red u hello.txt, komentar u style.css i prebrojavam linije u index.html.</thinking>
+
+Evo plana:
 - [ ] Dodati red u hello.txt
 - [ ] Dodati komentar u style.css
 - [ ] Prebrojati linije u index.html
@@ -454,6 +460,7 @@ Example final response:
 IMPORTANT: Do NOT stop after step 1 to show progress — keep calling tools until all steps are done. The user sees each tool call as it happens. Only send a text-only response (no tool calls) when ALL steps are complete.
 WHEN TO USE: Multi-file changes, feature development, setup/config with several steps.
 WHEN NOT TO USE: Simple questions, single-file edits, quick fixes.
+MANDATORY: If you started with a checklist (- [ ]), you MUST end with a final text message containing ONLY that list with - [x] and "X/X koraka završeno." No duplicate pending list in the same message.
 </task_management>
 
 <planning>
@@ -1373,7 +1380,7 @@ export class Agent {
           }
 
           this._provider.postMessage({
-            type: 'toolCall',
+            type: 'toolCallReady',
             id: tc.id,
             name: tc.function.name,
             args: argsParseFailed ? tc.function.arguments : JSON.stringify(args, null, 2),
@@ -1669,6 +1676,7 @@ export class Agent {
 
           let content = '';
           const toolCallsMap: Map<number, ToolCall> = new Map();
+          const toolCallStartSent: Set<number> = new Set();
           let buffer = '';
           let streamStartSent = false;
 
@@ -1720,6 +1728,23 @@ export class Agent {
                   if (tc.id) existing.id = tc.id;
                   if (tc.function?.name) existing.function.name += tc.function.name;
                   if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
+
+                  if (!toolCallStartSent.has(tc.index) && existing.id && existing.function.name) {
+                    toolCallStartSent.add(tc.index);
+                    this._provider.postMessage({
+                      type: 'toolCallStart',
+                      id: existing.id,
+                      name: existing.function.name,
+                    });
+                  }
+
+                  if (toolCallStartSent.has(tc.index) && tc.function?.arguments) {
+                    this._provider.postMessage({
+                      type: 'toolCallDelta',
+                      id: existing.id,
+                      argsDelta: tc.function.arguments,
+                    });
+                  }
                 }
               }
             }
