@@ -620,7 +620,7 @@ async function toolExecuteCommand(args: Record<string, unknown>): Promise<ToolCa
     return { success: false, output: 'User rejected the command.' };
   }
 
-  const isLikelyServer = /\b(node|nodemon|npm\s+start|npm\s+run\s+(dev|start|serve)|npx\s+(vite|next|nuxt|remix|astro)|vite\b|next\s+dev|python.*app|flask|uvicorn|php\s+-S|ruby.*server|cargo\s+run)\b/i.test(command);
+  const isLikelyServer = /\b(node|nodemon|npm\s+start|npm\s+run\s+(dev|start|serve)|npx\s+(vite|next|nuxt|remix|astro|serve)|vite\b|next\s+dev|python.*http\.server|python.*app|flask|uvicorn|php\s+-S|ruby.*server|cargo\s+run)\b/i.test(command);
   const SERVER_READY_TIMEOUT = 8000;
   const NORMAL_TIMEOUT = 120000;
 
@@ -649,7 +649,7 @@ async function toolExecuteCommand(args: Record<string, unknown>): Promise<ToolCa
       resolve({ success: true, output: msg });
     };
 
-    const serverPatterns = /listening|server.*running|started.*on|http:\/\/localhost|ready on|serving|0\.0\.0\.0:|127\.0\.0\.1:/i;
+    const serverPatterns = /listening|server.*running|started.*on|http:\/\/localhost|ready on|serving!?|0\.0\.0\.0:|127\.0\.0\.1:|Serving\s+HTTP/i;
 
     proc.stdout?.on('data', (chunk: string) => {
       stdout += chunk;
