@@ -1,1 +1,19 @@
-{"tables":[{"name":"public.generated_posts","rls_enabled":true,"rows":0},{"name":"public.test","rls_enabled":false,"rows":0,"columns":["id","name","created_at","ime i prezime"]}]}
+{
+  "generated_at": "2026-03-16T00:00:00Z",
+  "note": "List of database tables discovered via MCP. Each table includes optional 'columns' when available. Keep this file JSON-parseable so tools can read it.",
+  "tables": [
+    {
+      "name": "public.generated_posts",
+      "rls_enabled": true,
+      "rows": 0,
+      "columns": []
+    },
+    {
+      "name": "public.test",
+      "rls_enabled": false,
+      "rows": 0,
+      "columns": ["id", "name", "created_at", "ime i prezime"],
+      "notes": "Column name contains a space; consider renaming to 'ime_i_prezime' to avoid quoting in SQL."
+    }
+  ]
+}

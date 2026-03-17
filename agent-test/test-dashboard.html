@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="sr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Test pregled</title>
+  <!-- Tailwind CDN za brzi prototip (bez build sistema) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <main class="max-w-5xl mx-auto p-6">
+    <header class="mb-8">
+      <h1 class="text-3xl font-semibold leading-tight">Test pregled</h1>
+      <p class="mt-2 text-gray-600">Kratki pregled test elemenata: kartice i tabela sa primer podacima.</p>
+    </header>
+
+    <!-- Cards -->
+    <section class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+      <div class="bg-white rounded-lg shadow-sm p-5 flex flex-col gap-3">
+        <div class="text-sm text-gray-500">Kartica</div>
+        <div class="text-xl font-medium">Broj 1</div>
+        <div class="text-gray-500 text-sm">Placeholder opis ili vrednost.</div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-sm p-5 flex flex-col gap-3">
+        <div class="text-sm text-gray-500">Kartica</div>
+        <div class="text-xl font-medium">Broj 2</div>
+        <div class="text-gray-500 text-sm">Placeholder opis ili vrednost.</div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-sm p-5 flex flex-col gap-3">
+        <div class="text-sm text-gray-500">Kartica</div>
+        <div class="text-xl font-medium">Broj 3</div>
+        <div class="text-gray-500 text-sm">Placeholder opis ili vrednost.</div>
+      </div>
+    </section>
+
+    <!-- Table -->
+    <section class="bg-white rounded-lg shadow-sm p-6">
+      <h2 class="text-lg font-medium mb-4">Lista statusa</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full table-auto border-collapse">
+          <thead>
+            <tr class="text-left text-sm text-gray-600 border-b">
+              <th class="py-3 px-4">Ime</th>
+              <th class="py-3 px-4">Status</th>
+            </tr>
+          </thead>
+          <tbody class="text-sm">
+            <tr class="border-b last:border-b-0 hover:bg-gray-50">
+              <td class="py-3 px-4">Marko Markovic</td>
+              <td class="py-3 px-4 text-green-600 font-medium">Aktivan</td>
+            </tr>
+            <tr class="border-b last:border-b-0 hover:bg-gray-50">
+              <td class="py-3 px-4">Jelena Jovanovic</td>
+              <td class="py-3 px-4 text-yellow-600 font-medium">Na čekanju</td>
+            </tr>
+            <tr class="hover:bg-gray-50">
+              <td class="py-3 px-4">Ana Petrović</td>
+              <td class="py-3 px-4 text-red-600 font-medium">Neaktivan</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-4 text-sm text-gray-500">Prikaz 3 placeholder reda. Umetnite stvarne podatke po potrebi.</div>
+    </section>
+  </main>
+</body>
+</html>

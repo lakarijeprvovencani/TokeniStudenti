@@ -136,6 +136,17 @@
     }
     .context-fill.warning { background: #cca700; }
     .context-fill.danger { background: #f14c4c; }
+    .balance-label {
+      white-space: nowrap;
+      font-family: var(--vscode-editor-font-family);
+      font-weight: 500;
+      font-size: 11px;
+      opacity: 0.7;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.06);
+    }
+    .balance-label.low { color: #f14c4c; opacity: 1; }
     .context-label {
       white-space: nowrap;
       font-family: var(--vscode-editor-font-family);
@@ -2074,6 +2085,7 @@
   <div class="context-bar" id="contextBar">
     <div class="context-progress"><div class="context-fill" id="contextFill"></div></div>
     <span class="context-label" id="contextLabel">0K / 128K</span>
+    <span class="balance-label" id="balanceLabel" style="display:none" title="Preostali krediti"></span>
     <button class="undo-btn" id="undoBtn" title="Vrati sve promene agenta na stanje pre izmena" style="display:none" data-count="0">↩ Undo</button>
     <button class="context-new-session" id="contextNewSession">Novi chat</button>
   </div>
@@ -3751,6 +3763,17 @@
           contextFill.className = 'context-fill' + (pct >= 85 ? ' danger' : pct >= 65 ? ' warning' : '');
           contextLabel.textContent = usedK + 'K / ' + limitK + 'K';
           contextNewSession.classList.toggle('visible', pct >= 75);
+          break;
+        }
+
+        case 'balanceUpdate': {
+          const bal = msg.balance_usd;
+          const balEl = document.getElementById('balanceLabel');
+          if (balEl && typeof bal === 'number') {
+            balEl.textContent = '$' + bal.toFixed(2);
+            balEl.style.display = '';
+            balEl.className = 'balance-label' + (bal < 1 ? ' low' : '');
+          }
           break;
         }
 

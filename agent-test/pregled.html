@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="sr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pregled</title>
+  <!-- Tailwind CDN za brzi prototip -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <main class="max-w-5xl mx-auto p-6">
+    <header class="mb-8">
+      <h1 class="text-3xl font-semibold leading-tight">Pregled</h1>
+      <p class="mt-2 text-gray-600">Kratki pregled: tri kartice sa ključnim informacijama i tabela sa primer podacima.</p>
+    </header>
+
+    <!-- Kartice u jednom redu -->
+    <section class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+      <div class="bg-white rounded-lg shadow-sm p-5 flex flex-col gap-3">
+        <div class="text-sm text-gray-500">Ukupno</div>
+        <div class="text-2xl font-medium">128</div>
+        <div class="text-gray-500 text-sm">Broj svih zapisa</div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-sm p-5 flex flex-col gap-3">
+        <div class="text-sm text-gray-500">Aktivni</div>
+        <div class="text-2xl font-medium">87</div>
+        <div class="text-gray-500 text-sm">Trenutno aktivni korisnici</div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-sm p-5 flex flex-col gap-3">
+        <div class="text-sm text-gray-500">Na čekanju</div>
+        <div class="text-2xl font-medium">5</div>
+        <div class="text-gray-500 text-sm">Zahtevi za odobravanje</div>
+      </div>
+    </section>
+
+    <!-- Tabela -->
+    <section class="bg-white rounded-lg shadow-sm p-5">
+      <h2 class="text-lg font-medium mb-4">Lista korisnika</h2>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ime</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Napomene</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100">
+            <tr class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap">Marko Marković</td>
+              <td class="px-6 py-4 whitespace-nowrap"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Aktivan</span></td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Redovan pristup</td>
+            </tr>
+
+            <tr class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap">Jovana Jovanović</td>
+              <td class="px-6 py-4 whitespace-nowrap"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Neaktivan</span></td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Isključen nalog</td>
+            </tr>
+
+            <tr class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap">Petar Petrović</td>
+              <td class="px-6 py-4 whitespace-nowrap"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Na čekanju</span></td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Čeka potvrdu</td>
+            </tr>
+
+            <tr class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap">Ana Anić</td>
+              <td class="px-6 py-4 whitespace-nowrap"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Aktivan</span></td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Premium nalog</td>
+            </tr>
+
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>

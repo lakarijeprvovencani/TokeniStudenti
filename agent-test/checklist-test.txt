@@ -1,0 +1,3 @@
+Checklist test OK
+Test 0.59.2
+Korak 3 OK

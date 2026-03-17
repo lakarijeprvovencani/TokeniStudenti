@@ -1,0 +1,21 @@
+Mogućnosti agenta (VS Code ekstenzija)
+
+• Chat sa streaming markdown (tabele, kod, naslovi, liste)
+• 8 alata: čitanje/pisanje fajlova, replace, listanje, pretraga, izvršavanje komandi, fetch URL, web pretraga
+• Inline diff preview sa dugmadima prihvati/odbaci
+• Odobravanje komandi pre izvršavanja (run/reject)
+• Auto-approve podešavanja po tipu (write, replace, execute)
+• Podešavanja: API ključ, URL, model
+• Istorija chata — sesije, učitavanje, brisanje
+• Token bar — prikaz korišćenja konteksta u realnom vremenu
+• 7 modela: Lite, Turbo, Pro, Max, Power, Ultra, Architect
+• Slike — paste ili file picker (za vision modele)
+• Plan Mode — checkbox za plan-based rad sa fazama
+• Slash komande: /test, /fix, /doc, /commit, /explain, /refactor
+• @fajl i @folder — ekspanzija sadržaja u poruku
+• Attach fajlova — PDF, slike, tekstualni fajlovi
+• Checkpoint/Undo — vraćanje promena po fajlu ili sve odjednom
+• MCP — povezivanje eksternih servera (GitHub, baze, itd.)
+• Kontekst: stablo fajlova, aktivni editor, greške, git status, terminal output, project memory
+• Custom pravila iz fajla u rootu projekta
+• Komande: New Session, Set API Key, Stop, Explain Selection, Refactor Selection, Revert All
