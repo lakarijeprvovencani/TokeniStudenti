@@ -611,6 +611,25 @@ export function toOpenAIStreamChunk(deltaContent, options = {}) {
 }
 
 /**
+ * SSE chunk sa tool_call delta (stream args u realnom vremenu).
+ */
+export function toOpenAIStreamChunkToolCallDelta(index, id, name, argsDelta, options = {}) {
+  const { id: streamId = 'vajb-' + Date.now(), model = 'vajb-agent' } = options;
+  const tc = { index, type: 'function', function: {} };
+  if (id) tc.id = id;
+  if (name) tc.function.name = name;
+  if (argsDelta) tc.function.arguments = argsDelta;
+  const obj = {
+    id: streamId,
+    object: 'chat.completion.chunk',
+    created: Math.floor(Date.now() / 1000),
+    model,
+    choices: [{ index: 0, delta: { tool_calls: [tc] }, finish_reason: null }],
+  };
+  return 'data: ' + JSON.stringify(obj) + '\n\n';
+}
+
+/**
  * SSE chunk sa tool_calls (za kraj streama kad Claude vrati tool_use).
  * Cursor očekuje delta.tool_calls da prikaže Apply i izvrši.
  */

@@ -1211,10 +1211,13 @@ export class Agent {
           });
         }
 
+        if (iteration > 0) {
+          this._provider.postMessage({ type: 'streamEnd' });
+        }
         this._provider.postMessage({
           type: 'status',
           phase: 'thinking',
-          text: iteration === 0 ? 'Obradjujem zahtev...' : 'Razmišljam o sledećem koraku...',
+          text: iteration === 0 ? 'Obradjujem zahtev...' : 'Pripremam sledeći korak...',
         });
 
         const messages = this._buildMessages();
@@ -1350,6 +1353,10 @@ export class Agent {
             result: result.output.substring(0, 3000),
           });
 
+          if (!result.success) {
+            this._provider.postMessage({ type: 'status', phase: 'thinking', text: 'Popravljam grešku...' });
+          }
+
           this._history.push({
             role: 'tool',
             tool_call_id: tc.id,
@@ -1378,6 +1385,7 @@ export class Agent {
       const isActiveLoop = loopId === undefined || loopId === this._loopId;
       if (isActiveLoop) {
         this._provider.postMessage({ type: 'streamEnd' });
+        this._provider.postMessage({ type: 'loopEnd' });
         this._autoSaveSession();
       }
     }
@@ -1558,18 +1566,22 @@ export class Agent {
         (fn as (v: unknown) => void)(val);
       };
 
+      const msgCount = messages.length;
+      const idleMs = msgCount > 20 ? 90_000 : msgCount > 10 ? 60_000 : 45_000;
+      const hardMs = Math.max(idleMs + 30_000, 120_000);
+
       const hardTimer = setTimeout(() => {
-        finish(reject, new Error('Odgovor traje predugo (60s). Probaj ponovo.'));
+        finish(reject, new Error(`Odgovor traje predugo (${hardMs / 1000}s). Probaj ponovo.`));
         try { req.destroy(); } catch { /* */ }
-      }, 60_000);
+      }, hardMs);
 
       let idleTimer: ReturnType<typeof setTimeout> | null = null;
       const resetIdle = () => {
         if (idleTimer) clearTimeout(idleTimer);
         idleTimer = setTimeout(() => {
-          finish(reject, new Error('Nema odgovora od servera (30s idle). Probaj ponovo.'));
+          finish(reject, new Error(`Nema odgovora od servera (${idleMs / 1000}s idle). Probaj ponovo.`));
           try { req.destroy(); } catch { /* */ }
-        }, 30_000);
+        }, idleMs);
       };
       resetIdle();
 
@@ -1654,6 +1666,10 @@ export class Agent {
               }
 
               if (choice.delta.tool_calls) {
+                if (!streamStartSent) {
+                  this._provider.postMessage({ type: 'streamStart' });
+                  streamStartSent = true;
+                }
                 for (const tc of choice.delta.tool_calls) {
                   if (!toolCallsMap.has(tc.index)) {
                     toolCallsMap.set(tc.index, {

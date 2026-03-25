@@ -20,6 +20,7 @@ import {
   openAIToolsToAnthropic,
   toOpenAIChatCompletion,
   toOpenAIStreamChunk,
+  toOpenAIStreamChunkToolCallDelta,
   toOpenAIStreamChunkToolCalls,
   streamDone,
   trimOpenAIMessages,
@@ -1131,6 +1132,8 @@ async function handleAnthropicStream(res, keyId, resolved, payload, client) {
         const b = event.content_block;
         toolCalls.push({ id: b.id, name: b.name || 'tool', inputStr: '' });
         currentToolIndex = toolCalls.length - 1;
+        res.write(toOpenAIStreamChunkToolCallDelta(currentToolIndex, b.id, b.name || 'tool', '', { id: streamId, model: resolved.id }));
+        if (res.flush) res.flush();
       }
       
       if (event.type === 'content_block_delta') {
@@ -1141,6 +1144,8 @@ async function handleAnthropicStream(res, keyId, resolved, payload, client) {
         }
         if (delta?.type === 'input_json_delta' && typeof delta.partial_json === 'string' && currentToolIndex >= 0 && toolCalls[currentToolIndex]) {
           toolCalls[currentToolIndex].inputStr += delta.partial_json;
+          res.write(toOpenAIStreamChunkToolCallDelta(currentToolIndex, null, null, delta.partial_json, { id: streamId, model: resolved.id }));
+          if (res.flush) res.flush();
         }
       }
       

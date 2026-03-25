@@ -2,7 +2,7 @@
   "name": "vajbagent",
   "displayName": "Vajb Agent",
   "description": "AI coding asistent: 7 modela (Lite do Architect), chat u VS Code, razume projekat, pise i menja kod, pokrece komande, Plan Mode, checklist, web pretraga, MCP, attach fajlova (PDF, slike), checkpoint/undo, auto-approve opcije. Bez pretplate.",
-  "version": "0.63.0",
+  "version": "0.63.3",
   "publisher": "VajbAgent",
   "engines": {
     "vscode": "^1.85.0"
@@ -150,12 +150,17 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src --ext ts",
-    "build:icon": "node scripts/build-icon.mjs"
+    "build:icon": "node scripts/build-icon.mjs",
+    "test": "node ./out/test/runTest.js",
+    "test:compile": "tsc -p ./"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.0",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.3.9",
     "@vscode/vsce": "^3.7.1",
+    "mocha": "^10.2.0",
     "sharp": "^0.33.5",
     "typescript": "^5.3.0"
   },

@@ -546,6 +546,16 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    .status-dots::after {
+      content: '';
+      animation: dots 1.4s steps(4, end) infinite;
+    }
+    @keyframes dots {
+      0%  { content: ''; }
+      25% { content: '.'; }
+      50% { content: '..'; }
+      75% { content: '...'; }
+    }
 
     /* Sticky approval bar */
     .approval-bar {
@@ -3092,7 +3102,7 @@
     let currentAssistantEl = null;
     let currentAssistantRawText = '';
     let obradjujemTimeoutId = null;
-    const OBRADJUJEM_UPGRADE_MS = 3000;
+    const OBRADJUJEM_UPGRADE_MS = 1500;
 
     function setStreaming(on) {
       isStreaming = on;
@@ -3127,7 +3137,13 @@
       const iconEl = statusIndicator.querySelector('.status-icon');
       iconEl.innerHTML = getStatusIcon(statusPhase);
       iconEl.className = 'status-icon' + (statusPhase === 'thinking' ? ' spin' : ' pulse');
-      statusIndicator.querySelector('.status-text').textContent = text;
+      const textEl = statusIndicator.querySelector('.status-text');
+      textEl.textContent = text;
+      if (statusPhase === 'thinking') {
+        textEl.classList.add('status-dots');
+      } else {
+        textEl.classList.remove('status-dots');
+      }
       statusIndicator.classList.add('visible');
       messagesEl.appendChild(statusIndicator);
       scrollToBottom();
@@ -3324,6 +3340,7 @@
 
         case 'status': {
           if (obradjujemTimeoutId) { clearTimeout(obradjujemTimeoutId); obradjujemTimeoutId = null; }
+          if (!isStreaming) setStreaming(true);
           const statusText = msg.text || 'Razmisljam...';
           showStatus(statusText, msg.phase || 'thinking');
           if (statusText.indexOf('Obradjujem zahtev') !== -1) {
@@ -3406,11 +3423,15 @@
 
           currentAssistantEl = null;
           currentAssistantRawText = '';
-          setStreaming(false);
 
           mentionFilesLoaded = false;
 
           scrollToBottom();
+          break;
+        }
+
+        case 'loopEnd': {
+          setStreaming(false);
           break;
         }
 
@@ -3482,7 +3503,9 @@
                 body.appendChild(body._streamEl);
               }
               body._streamEl.textContent = body._rawArgs;
-              scrollToBottom();
+              if (!body._scrollTimer) {
+                body._scrollTimer = setTimeout(function() { body._scrollTimer = null; scrollToBottom(); }, 200);
+              }
               break;
             }
           }
@@ -3923,10 +3946,22 @@
           setStreaming(false);
           hideApprovalBar();
           hideStatus();
+          if (currentAssistantEl) {
+            const partial = (currentAssistantRawText || '').trim();
+            if (partial) {
+              currentAssistantEl.classList.remove('streaming');
+              currentAssistantEl.innerHTML = renderMarkdown(partial);
+              addCopyButtons(currentAssistantEl);
+            } else {
+              currentAssistantEl.remove();
+            }
+            currentAssistantEl = null;
+            currentAssistantRawText = '';
+          }
           const stoppedDiv = document.createElement('div');
           stoppedDiv.className = 'msg-assistant';
           stoppedDiv.style.cssText = 'font-size:0.85rem;opacity:0.7;font-style:italic;';
-          stoppedDiv.textContent = 'Generisanje zaustavljeno.';
+          stoppedDiv.textContent = '⏹ Zaustavljeno.';
           messagesEl.appendChild(stoppedDiv);
           scrollToBottom();
           break;

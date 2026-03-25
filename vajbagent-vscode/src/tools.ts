@@ -405,6 +405,9 @@ async function toolReadFile(args: Record<string, unknown>): Promise<ToolCallResu
 
 // ── write_file (inline diff preview) ──
 async function toolWriteFile(args: Record<string, unknown>): Promise<ToolCallResult> {
+  if (!args.path || typeof args.path !== 'string') {
+    return { success: false, output: 'Error: write_file requires a "path" parameter (string). The model sent empty or missing arguments — this usually means the file content was too large for a single tool call. Try writing the file in smaller parts or use execute_command with heredoc.' };
+  }
   const filePath = resolveWorkspacePath(args.path as string);
   const newContent = args.content as string;
 
@@ -432,6 +435,9 @@ async function toolWriteFile(args: Record<string, unknown>): Promise<ToolCallRes
 
 // ── replace_in_file (inline diff preview) ──
 async function toolReplaceInFile(args: Record<string, unknown>): Promise<ToolCallResult> {
+  if (!args.path || typeof args.path !== 'string') {
+    return { success: false, output: 'Error: replace_in_file requires a "path" parameter (string). The model sent empty or missing arguments.' };
+  }
   const filePath = resolveWorkspacePath(args.path as string);
   const oldText = args.old_text as string;
   const newText = args.new_text as string;
@@ -611,6 +617,9 @@ let _lastCommandOutput = '';
 export function getLastCommandOutput(): string { return _lastCommandOutput; }
 
 async function toolExecuteCommand(args: Record<string, unknown>): Promise<ToolCallResult> {
+  if (!args.command || typeof args.command !== 'string') {
+    return { success: false, output: 'Error: execute_command requires a "command" parameter (string). The model sent empty or missing arguments.' };
+  }
   const command = args.command as string;
   const folders = vscode.workspace.workspaceFolders;
   const cwd = folders?.[0]?.uri.fsPath || process.cwd();
