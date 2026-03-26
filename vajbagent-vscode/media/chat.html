@@ -534,12 +534,21 @@
     .status-icon.pulse {
       animation: pulse 1.5s ease-in-out infinite;
     }
+    .status-icon.sparkle {
+      animation: sparkle 2s ease-in-out infinite;
+    }
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
     @keyframes pulse {
       0%, 100% { opacity: 0.5; }
       50% { opacity: 1; }
+    }
+    @keyframes sparkle {
+      0%, 100% { opacity: 0.6; transform: scale(1) rotate(0deg); }
+      25% { opacity: 1; transform: scale(1.15) rotate(8deg); }
+      50% { opacity: 0.8; transform: scale(0.95) rotate(-5deg); }
+      75% { opacity: 1; transform: scale(1.1) rotate(3deg); }
     }
     .status-text {
       white-space: nowrap;
@@ -3111,16 +3120,48 @@
       if (!on) hideStatus();
     }
 
+    const VAJB_SPARKLE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L13.5 8.5L20 7L14.5 11L18 17L12 13.5L6 17L9.5 11L4 7L10.5 8.5L12 2Z" fill="#FA7315" opacity="0.9"/><circle cx="12" cy="12" r="2" fill="#fff" opacity="0.6"/></svg>';
     const STATUS_ICONS = {
-      thinking: '<svg class="spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FA7315" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-dasharray="31.4 31.4" stroke-linecap="round"/></svg>',
+      thinking: VAJB_SPARKLE,
       reading: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4FC3F7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>',
       writing: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81C784" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
       command: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFB74D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>',
       searching: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#CE93D8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
       web: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4DD0E1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>',
-      streaming: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FA7315" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
+      streaming: VAJB_SPARKLE,
+      images: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#26C6DA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
+      download: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#66BB6A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
       mcp: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A5D6A7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>'
     };
+
+    // Rotating status messages for thinking phase
+    const THINKING_MESSAGES = [
+      'Razmisljam...',
+      'Analiziram zahtev...',
+      'Planiram pristup...',
+      'Sklapam resenje...',
+      'Osmisljavam plan...',
+      'Obradjujem...',
+      'Pripremam odgovor...',
+      'Razmatram opcije...',
+    ];
+    let _statusRotateTimer = null;
+    let _statusRotateIndex = 0;
+
+    function startStatusRotation() {
+      stopStatusRotation();
+      _statusRotateIndex = 0;
+      _statusRotateTimer = setInterval(function() {
+        if (statusIndicator && statusIndicator.classList.contains('visible') && statusPhase === 'thinking') {
+          _statusRotateIndex = (_statusRotateIndex + 1) % THINKING_MESSAGES.length;
+          statusIndicator.querySelector('.status-text').textContent = THINKING_MESSAGES[_statusRotateIndex];
+        }
+      }, 2500);
+    }
+
+    function stopStatusRotation() {
+      if (_statusRotateTimer) { clearInterval(_statusRotateTimer); _statusRotateTimer = null; }
+    }
 
     function getStatusIcon(phase) {
       return STATUS_ICONS[phase] || STATUS_ICONS.thinking;
@@ -3135,20 +3176,23 @@
       }
       const iconEl = statusIndicator.querySelector('.status-icon');
       iconEl.innerHTML = getStatusIcon(statusPhase);
-      iconEl.className = 'status-icon' + (statusPhase === 'thinking' ? ' spin' : ' pulse');
+      var animClass = (statusPhase === 'thinking' || statusPhase === 'streaming') ? 'sparkle' : 'pulse';
+      iconEl.className = 'status-icon ' + animClass;
       const textEl = statusIndicator.querySelector('.status-text');
       textEl.textContent = text;
-      if (statusPhase === 'thinking') {
-        textEl.classList.add('status-dots');
-      } else {
-        textEl.classList.remove('status-dots');
-      }
+      textEl.classList.remove('status-dots');
       statusIndicator.classList.add('visible');
       messagesEl.appendChild(statusIndicator);
       scrollToBottom();
+      if (statusPhase === 'thinking') {
+        startStatusRotation();
+      } else {
+        stopStatusRotation();
+      }
     }
 
     function hideStatus() {
+      stopStatusRotation();
       if (obradjujemTimeoutId) { clearTimeout(obradjujemTimeoutId); obradjujemTimeoutId = null; }
       if (statusIndicator) {
         statusIndicator.classList.remove('visible');
@@ -3342,19 +3386,6 @@
           if (!isStreaming) setStreaming(true);
           const statusText = msg.text || 'Razmisljam...';
           showStatus(statusText, msg.phase || 'thinking');
-          if (statusText.indexOf('Obradjujem zahtev') !== -1) {
-            obradjujemTimeoutId = setTimeout(function() {
-              if (statusIndicator && statusIndicator.classList.contains('visible')) {
-                statusIndicator.querySelector('.status-text').textContent = 'Razmisljam...';
-              }
-              obradjujemTimeoutId = setTimeout(function() {
-                obradjujemTimeoutId = null;
-                if (statusIndicator && statusIndicator.classList.contains('visible')) {
-                  statusIndicator.querySelector('.status-text').textContent = 'Planiram korake...';
-                }
-              }, OBRADJUJEM_UPGRADE_MS);
-            }, OBRADJUJEM_UPGRADE_MS);
-          }
           break;
         }
 
@@ -3448,6 +3479,8 @@
               case 'execute_command': return { label: 'Izvrsavam komandu', phase: 'command' };
               case 'fetch_url':       return { label: 'Ucitavam stranicu', phase: 'web' };
               case 'web_search':      return { label: 'Pretrazujem web', phase: 'web' };
+              case 'search_images':   return { label: 'Trazim slike', phase: 'images' };
+              case 'download_file':   return { label: 'Preuzimam fajl', phase: 'download' };
               default: {
                 if (n && n.startsWith('mcp_')) {
                   var parts = n.match(/^mcp_([^_]+)_(.+)$/);
@@ -3533,6 +3566,8 @@
               case 'execute_command': return { label: 'Izvrsavam komandu', detail: (parsedArgs.command || '').substring(0, 60), phase: 'command' };
               case 'fetch_url':       return { label: 'Ucitavam stranicu', detail: (parsedArgs.url || '').substring(0, 50), phase: 'web' };
               case 'web_search':      return { label: 'Pretrazujem web', detail: parsedArgs.query ? '"' + parsedArgs.query + '"' : '', phase: 'web' };
+              case 'search_images':   return { label: 'Trazim slike', detail: parsedArgs.query ? '"' + parsedArgs.query + '"' : '', phase: 'images' };
+              case 'download_file':   return { label: 'Preuzimam fajl', detail: short || (parsedArgs.url || '').substring(0, 50), phase: 'download' };
               default: {
                 if (msg.name && msg.name.startsWith('mcp_')) {
                   var parts = msg.name.match(/^mcp_([^_]+)_(.+)$/);
