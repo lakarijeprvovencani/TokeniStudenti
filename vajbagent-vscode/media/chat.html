@@ -465,9 +465,17 @@
       transition: background 0.15s;
     }
     .tool-header:hover { background: rgba(255, 255, 255, 0.05); }
-    .tool-icon { font-size: 11px; transition: transform 0.15s; }
+    .tool-icon { display: flex; align-items: center; transition: transform 0.15s; }
+    .tool-icon svg { width: 13px; height: 13px; }
     .tool-icon.open { transform: rotate(90deg); }
     .tool-name { font-weight: 600; color: #FA7315; }
+    .tool-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #66BB6A; flex-shrink: 0;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .tool-block.done .tool-dot { animation: none; }
+    .tool-block.error .tool-dot { background: #ef5350; animation: none; }
     .tool-detail {
       opacity: 0.7;
       font-size: 11px;
@@ -3854,16 +3862,19 @@
           block.className = 'tool-block';
           var bodyDiv = document.createElement('div');
           bodyDiv.className = 'tool-body';
+          var toolIcon = (STATUS_ICONS[startLabel.phase] || STATUS_ICONS.thinking);
           block.innerHTML =
             '<div class="tool-header">' +
-              '<span class="tool-icon">&#9654;</span>' +
-              '<span class="tool-name">' + escapeHtml(msg.name) + '</span>' +
+              '<span class="tool-dot"></span>' +
+              '<span class="tool-icon">' + toolIcon + '</span>' +
+              '<span class="tool-name">' + escapeHtml(startLabel.label) + '</span>' +
               '<span class="tool-detail"></span>' +
               '<span class="tool-status">running...</span>' +
             '</div>';
           block.appendChild(bodyDiv);
           block.querySelector('.tool-header').addEventListener('click', function() {
-            block.querySelector('.tool-icon').classList.toggle('open');
+            var iconEl = block.querySelector('.tool-icon');
+            iconEl.classList.toggle('open');
             bodyDiv.classList.toggle('open');
           });
           block.dataset.toolCallId = msg.id || '';
@@ -3915,8 +3926,14 @@
           var toolDetail = (function() {
             var p = parsedArgs.path || '';
             var short = p ? p.split('/').slice(-2).join('/') : '';
+            var lineInfo = '';
+            if (parsedArgs.start_line && parsedArgs.end_line) {
+              lineInfo = ' (linije ' + parsedArgs.start_line + '-' + parsedArgs.end_line + ')';
+            } else if (parsedArgs.start_line) {
+              lineInfo = ' (od linije ' + parsedArgs.start_line + ')';
+            }
             switch (msg.name) {
-              case 'read_file':       return { label: 'Citam fajl', detail: short, phase: 'reading' };
+              case 'read_file':       return { label: 'Citam fajl', detail: short + lineInfo, phase: 'reading' };
               case 'write_file':      return { label: 'Pisem fajl', detail: short, phase: 'writing' };
               case 'replace_in_file': return { label: 'Menjam fajl', detail: short, phase: 'writing' };
               case 'list_files':      return { label: 'Listajem fajlove', detail: short || parsedArgs.path || '', phase: 'searching' };
@@ -3955,10 +3972,12 @@
             targetBlock.className = 'tool-block';
             var newBody = document.createElement('div');
             newBody.className = 'tool-body';
+            var readyIcon = (STATUS_ICONS[toolDetail.phase] || STATUS_ICONS.thinking);
             targetBlock.innerHTML =
               '<div class="tool-header">' +
-                '<span class="tool-icon">&#9654;</span>' +
-                '<span class="tool-name">' + escapeHtml(msg.name) + '</span>' +
+                '<span class="tool-dot"></span>' +
+                '<span class="tool-icon">' + readyIcon + '</span>' +
+                '<span class="tool-name">' + escapeHtml(toolDetail.label) + '</span>' +
                 '<span class="tool-detail"></span>' +
                 '<span class="tool-status">running...</span>' +
               '</div>';
@@ -3969,6 +3988,10 @@
             });
             targetBlock.dataset.toolCallId = msg.id || '';
             messagesEl.appendChild(targetBlock);
+          } else {
+            // Update label with readable name
+            var nameEl = targetBlock.querySelector('.tool-name');
+            if (nameEl) nameEl.textContent = toolDetail.label;
           }
 
           var detailEl = targetBlock.querySelector('.tool-detail');
@@ -4021,6 +4044,7 @@
           const blocks = messagesEl.querySelectorAll('.tool-block');
           for (const b of blocks) {
             if (b.dataset.toolCallId === msg.id) {
+              b.classList.add(msg.status === 'error' ? 'error' : 'done');
               b.querySelector('.tool-status').textContent = msg.status || 'done';
               const body = b.querySelector('.tool-body');
               if (msg.result) {
