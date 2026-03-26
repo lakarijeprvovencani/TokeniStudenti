@@ -2887,41 +2887,40 @@
       });
     }
 
-    // Image paste
-    userInput.addEventListener('paste', (e) => {
-      const items = e.clipboardData?.items;
+    // Image paste — handles both direct image data and copied files from Finder
+    function handlePasteEvent(e) {
+      var items = e.clipboardData?.items;
       if (!items) return;
-      for (const item of items) {
-        if (item.type.startsWith('image/')) {
-          e.preventDefault();
-          const file = item.getAsFile();
-          if (file) addImageFile(file);
+      var handled = false;
+      var fileUris = [];
+      for (var pi = 0; pi < items.length; pi++) {
+        var item = items[pi];
+        if (item.type.startsWith('image/') && item.kind === 'file') {
+          var file = item.getAsFile();
+          if (file) { addImageFile(file); handled = true; }
+        }
+        if (item.kind === 'file' && item.type === 'application/octet-stream') {
+          var f = item.getAsFile();
+          if (f && /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(f.name)) { addImageFile(f); handled = true; }
+        }
+        if (item.kind === 'string' && (item.type === 'text/uri-list' || item.type === 'text/plain')) {
+          (function(it) {
+            it.getAsString(function(text) {
+              var lines = text.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+              var imgPaths = lines.filter(function(l) { return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(l); });
+              if (imgPaths.length > 0) {
+                vscode.postMessage({ type: 'dropImageUris', uris: imgPaths });
+              }
+            });
+          })(item);
         }
       }
-    });
+      if (handled) e.preventDefault();
+    }
+    document.addEventListener('paste', handlePasteEvent, true);
 
-    // Drag and drop — must intercept at document level to prevent VS Code from stealing the event
-    document.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-      inputContainer.classList.add('drag-over');
-    });
-    document.addEventListener('dragleave', (e) => {
-      if (!e.relatedTarget || e.relatedTarget === document.documentElement) {
-        inputContainer.classList.remove('drag-over');
-      }
-    });
-    document.addEventListener('drop', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      inputContainer.classList.remove('drag-over');
-      const files = e.dataTransfer?.files;
-      if (!files) return;
-      for (const file of files) {
-        if (file.type.startsWith('image/')) addImageFile(file);
-      }
-    });
+    // Note: drag & drop from OS file manager is blocked by VS Code's Electron shell.
+    // Use Cmd+C on image file in Finder, then Cmd+V in chat instead.
 
     function addImageFile(file) {
       const reader = new FileReader();

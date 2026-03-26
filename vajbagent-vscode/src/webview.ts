@@ -241,6 +241,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
         break;
       }
+      case 'dropImageUris': {
+        const uris = (message.uris as string[]) || [];
+        const mimeTypes: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml' };
+        for (const rawUri of uris) {
+          try {
+            let fsPath = rawUri;
+            if (rawUri.startsWith('file://')) {
+              fsPath = decodeURIComponent(new URL(rawUri).pathname);
+            }
+            const ext = (fsPath.split('.').pop() || '').toLowerCase();
+            const mime = mimeTypes[ext] || 'image/png';
+            const raw = fs.readFileSync(fsPath);
+            const b64 = `data:${mime};base64,${raw.toString('base64')}`;
+            this._view?.webview.postMessage({ type: 'imageAttached', name: path.basename(fsPath), base64: b64, mimeType: mime });
+          } catch { /* skip unreadable */ }
+        }
+        break;
+      }
       case 'parsePdf': {
         const base64Data = (message.base64 as string || '').replace(/^data:[^;]+;base64,/, '');
         const fileName = message.name as string || 'document.pdf';

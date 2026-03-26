@@ -1166,17 +1166,23 @@ async function handleAnthropicStream(res, keyId, resolved, payload, client) {
   clearInterval(keepAlive);
 
   if (toolCalls.length > 0) {
-    const openAIToolCalls = toolCalls.map((tc, i) => {
-      let args = tc.inputStr || '{}';
+    // Validate accumulated JSON for each tool call (fix if broken)
+    for (const tc of toolCalls) {
       try {
-        JSON.parse(args);
+        JSON.parse(tc.inputStr || '{}');
       } catch (parseErr) {
-        console.warn(`Tool call JSON parse failed for ${tc.name}: ${parseErr.message}. Raw: ${args.slice(0, 200)}...`);
-        args = '{}';
+        console.warn(`Tool call JSON parse failed for ${tc.name}: ${parseErr.message}. Raw: ${(tc.inputStr || '').slice(0, 200)}...`);
       }
-      return { index: i, id: tc.id, name: tc.name, arguments: args };
-    });
-    res.write(toOpenAIStreamChunkToolCalls(openAIToolCalls, { id: streamId, model: resolved.id }));
+    }
+    // Send finish_reason: tool_calls (args were already streamed via deltas)
+    const finishChunk = {
+      id: streamId,
+      object: 'chat.completion.chunk',
+      created: Math.floor(Date.now() / 1000),
+      model: resolved.id,
+      choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }],
+    };
+    res.write('data: ' + JSON.stringify(finishChunk) + '\n\n');
     if (res.flush) res.flush();
   } else {
     res.write(toOpenAIStreamChunk('', { id: streamId, model: resolved.id, finish: true }));
