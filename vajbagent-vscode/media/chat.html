@@ -667,6 +667,56 @@
       background: rgba(250, 115, 21, 0.04);
     }
 
+    /* Full-screen drop overlay */
+    .drop-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      pointer-events: none;
+    }
+    .drop-overlay.visible {
+      display: flex;
+      pointer-events: all;
+    }
+    .drop-overlay-box {
+      border: 2px dashed #FA7315;
+      border-radius: 16px;
+      padding: 32px 48px;
+      background: rgba(250, 115, 21, 0.08);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      animation: dropIn 0.2s ease-out;
+    }
+    @keyframes dropIn {
+      from { opacity: 0; transform: scale(0.95) translateY(8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .drop-overlay-icon {
+      width: 40px;
+      height: 40px;
+      color: #FA7315;
+    }
+    .drop-overlay-text {
+      font-size: 14px;
+      font-weight: 500;
+      color: #FA7315;
+    }
+    .drop-overlay-hint {
+      font-size: 11px;
+      opacity: 0.6;
+      color: var(--vscode-foreground);
+    }
+
     /* @ file autocomplete */
     .mention-dropdown {
       display: none;
@@ -2143,6 +2193,18 @@
     </div>
   </div>
 
+  <div class="drop-overlay" id="dropOverlay">
+    <div class="drop-overlay-box">
+      <svg class="drop-overlay-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      <div class="drop-overlay-text">Prevuci fajlove ovde</div>
+      <div class="drop-overlay-hint">Slike, kod, PDF — sve sto ti treba kao kontekst</div>
+    </div>
+  </div>
+
   <div class="input-area">
     <div class="mention-dropdown" id="slashDropdown"></div>
     <div class="mention-dropdown" id="mentionDropdown"></div>
@@ -2928,8 +2990,92 @@
     }
     document.addEventListener('paste', handlePasteEvent, true);
 
-    // Note: drag & drop from OS file manager is blocked by VS Code's Electron shell.
-    // Use Cmd+C on image file in Finder, then Cmd+V in chat instead.
+    // Drag & drop support
+    const dropOverlay = document.getElementById('dropOverlay');
+    let _dragCounter = 0;
+
+    document.addEventListener('dragenter', function(e) {
+      e.preventDefault();
+      _dragCounter++;
+      if (_dragCounter === 1) {
+        dropOverlay.classList.add('visible');
+      }
+    });
+
+    document.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      _dragCounter--;
+      if (_dragCounter <= 0) {
+        _dragCounter = 0;
+        dropOverlay.classList.remove('visible');
+      }
+    });
+
+    document.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    });
+
+    document.addEventListener('drop', function(e) {
+      e.preventDefault();
+      _dragCounter = 0;
+      dropOverlay.classList.remove('visible');
+
+      var files = e.dataTransfer?.files;
+      if (!files || files.length === 0) {
+        // Try URI list (from VS Code explorer)
+        var uriText = e.dataTransfer?.getData('text/uri-list') || e.dataTransfer?.getData('text/plain') || '';
+        if (uriText) {
+          var lines = uriText.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+          var imgPaths = lines.filter(function(l) { return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(l); });
+          if (imgPaths.length > 0) {
+            vscode.postMessage({ type: 'dropImageUris', uris: imgPaths });
+            return;
+          }
+          // Non-image file URIs - read as context
+          var filePaths = lines.filter(function(l) { return l.startsWith('file://') || l.startsWith('/'); });
+          if (filePaths.length > 0) {
+            vscode.postMessage({ type: 'dropFileUris', uris: filePaths });
+            return;
+          }
+        }
+        return;
+      }
+
+      for (var fi = 0; fi < files.length; fi++) {
+        var file = files[fi];
+        var ext = (file.name.split('.').pop() || '').toLowerCase();
+
+        if (/^image\//.test(file.type) || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name)) {
+          addImageFile(file);
+        } else if (ext === 'pdf') {
+          // Read PDF as base64 and send to backend for parsing
+          (function(f) {
+            var reader = new FileReader();
+            reader.onload = function() {
+              vscode.postMessage({ type: 'parsePdf', base64: reader.result, name: f.name });
+            };
+            reader.readAsDataURL(f);
+          })(file);
+        } else {
+          // Text/code file - read and attach as context
+          (function(f, fext) {
+            var reader = new FileReader();
+            reader.onload = function() {
+              var content = reader.result;
+              if (typeof content === 'string') {
+                var maxLen = 15000;
+                var truncated = content.length > maxLen
+                  ? content.substring(0, maxLen) + '\n... (skraceno, ' + content.length + ' karaktera ukupno)'
+                  : content;
+                vscode.postMessage({ type: 'fileAttached', name: f.name, content: truncated, ext: fext });
+              }
+            };
+            reader.readAsText(f);
+          })(file, ext);
+        }
+      }
+    });
 
     function addImageFile(file) {
       const reader = new FileReader();

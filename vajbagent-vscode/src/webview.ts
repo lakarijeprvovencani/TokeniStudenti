@@ -241,6 +241,32 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
         break;
       }
+      case 'dropFileUris': {
+        const uris = (message.uris as string[]) || [];
+        for (const rawUri of uris) {
+          try {
+            let fsPath = rawUri;
+            if (rawUri.startsWith('file://')) {
+              fsPath = decodeURIComponent(new URL(rawUri).pathname);
+            }
+            const fname = path.basename(fsPath);
+            const ext = (fname.split('.').pop() || '').toLowerCase();
+            if (['png','jpg','jpeg','gif','webp','bmp','svg'].includes(ext)) {
+              const mimeTypes: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml' };
+              const mime = mimeTypes[ext] || 'image/png';
+              const raw = fs.readFileSync(fsPath);
+              const b64 = `data:${mime};base64,${raw.toString('base64')}`;
+              this._view?.webview.postMessage({ type: 'imageAttached', name: fname, base64: b64, mimeType: mime });
+            } else {
+              const content = fs.readFileSync(fsPath, 'utf-8');
+              const maxLen = 15000;
+              const truncated = content.length > maxLen ? content.substring(0, maxLen) + '\n... (skraceno, ' + content.length + ' karaktera ukupno)' : content;
+              this._view?.webview.postMessage({ type: 'fileAttached', name: fname, content: truncated, ext });
+            }
+          } catch { /* skip unreadable */ }
+        }
+        break;
+      }
       case 'dropImageUris': {
         const uris = (message.uris as string[]) || [];
         const mimeTypes: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml' };
