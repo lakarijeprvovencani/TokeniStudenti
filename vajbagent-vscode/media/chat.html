@@ -680,8 +680,8 @@
     .mode-btn.open .mode-arrow { transform: rotate(180deg); }
     .mode-menu {
       display: none;
-      position: absolute;
-      bottom: calc(100% + 6px);
+      position: fixed;
+      bottom: 0;
       right: 0;
       min-width: 260px;
       background: var(--vscode-editor-background, #1e1e1e);
@@ -689,7 +689,7 @@
       border-radius: 12px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.4);
       padding: 6px;
-      z-index: 100;
+      z-index: 9000;
       animation: dropIn 0.15s ease-out;
     }
     .mode-menu.open { display: block; }
@@ -1920,6 +1920,34 @@
   </style>
 </head>
 <body>
+  <div class="mode-menu" id="modeMenu">
+    <div class="mode-menu-title">Rezim</div>
+    <div class="mode-option" data-mode="ask">
+      <svg class="mode-option-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      <div class="mode-option-body">
+        <div class="mode-option-name">Pitaj pre izmena</div>
+        <div class="mode-option-desc">Agent pita za odobrenje pre svake izmene fajla i komande</div>
+      </div>
+      <svg class="mode-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="mode-option active" data-mode="auto">
+      <svg class="mode-option-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      <div class="mode-option-body">
+        <div class="mode-option-name">Auto edit</div>
+        <div class="mode-option-desc">Agent automatski menja fajlove i izvrsava komande</div>
+      </div>
+      <svg class="mode-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="mode-option" data-mode="plan">
+      <svg class="mode-option-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+      <div class="mode-option-body">
+        <div class="mode-option-name">Plan mode</div>
+        <div class="mode-option-desc">Agent pravi plan i istrazuje kod pre nego sto menja</div>
+      </div>
+      <svg class="mode-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+  </div>
+
   <div class="header">
     <div class="header-left">
       <span class="header-title"><span style="color:#fff">Vajb</span>Agent</span>
@@ -2348,33 +2376,6 @@
               <span id="modeBtnLabel">Auto edit</span>
               <svg class="mode-arrow" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 4.5L6 7.5L9 4.5"/></svg>
             </button>
-            <div class="mode-menu" id="modeMenu">
-              <div class="mode-menu-title">Rezim</div>
-              <div class="mode-option" data-mode="ask">
-                <svg class="mode-option-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-                <div class="mode-option-body">
-                  <div class="mode-option-name">Pitaj pre izmena</div>
-                  <div class="mode-option-desc">Agent pita za odobrenje pre svake izmene fajla i komande</div>
-                </div>
-                <svg class="mode-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-              <div class="mode-option active" data-mode="auto">
-                <svg class="mode-option-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                <div class="mode-option-body">
-                  <div class="mode-option-name">Auto edit</div>
-                  <div class="mode-option-desc">Agent automatski menja fajlove i izvrsava komande</div>
-                </div>
-                <svg class="mode-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-              <div class="mode-option" data-mode="plan">
-                <svg class="mode-option-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
-                <div class="mode-option-body">
-                  <div class="mode-option-name">Plan mode</div>
-                  <div class="mode-option-desc">Agent pravi plan i istrazuje kod pre nego sto menja</div>
-                </div>
-                <svg class="mode-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-            </div>
           </div>
           <button class="send-btn" id="sendBtn" title="Posalji (Enter)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
@@ -2908,6 +2909,12 @@
     modeBtn.onclick = function(e) {
       e.stopPropagation();
       var isOpen = modeMenu.classList.contains('open');
+      if (!isOpen) {
+        // Position menu above the button
+        var rect = modeBtn.getBoundingClientRect();
+        modeMenu.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
+        modeMenu.style.right = (window.innerWidth - rect.right) + 'px';
+      }
       modeMenu.classList.toggle('open', !isOpen);
       modeBtn.classList.toggle('open', !isOpen);
     };
