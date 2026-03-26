@@ -328,6 +328,22 @@ export const TOOL_DEFINITIONS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'search_images',
+      description: 'Search Unsplash for high-quality, free-to-use stock images. Returns direct image URLs with photographer credits. Use this when the user needs topic-specific images for websites, apps, or designs (e.g. dental clinic, restaurant, fitness, real estate). Then use download_file to save each image locally.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search query in English (e.g. "dental clinic smiling woman", "modern restaurant interior", "fitness gym workout")' },
+          count: { type: 'integer', description: 'Number of images to return (1-10, default 5)' },
+          orientation: { type: 'string', description: 'Image orientation', enum: ['landscape', 'portrait', 'squarish'] },
+        },
+        required: ['query'],
+      },
+    },
+  },
 ];
 
 export async function executeTool(
@@ -353,6 +369,8 @@ export async function executeTool(
       return toolWebSearch(args);
     case 'download_file':
       return toolDownloadFile(args);
+    case 'search_images':
+      return toolSearchImages(args);
     default:
       return { success: false, output: `Unknown tool: ${name}` };
   }
@@ -975,5 +993,89 @@ async function toolDownloadFile(args: Record<string, unknown>): Promise<ToolCall
         });
       },
     );
+  });
+}
+
+// ── search_images (Unsplash) ──
+const UNSPLASH_ACCESS_KEY = 'g0rjagyZADA7OdWhIbfdgl2_zpIck2xbq0SYtLdYEzk';
+
+async function toolSearchImages(args: Record<string, unknown>): Promise<ToolCallResult> {
+  const query = (args.query as string || '').trim();
+  if (!query) {
+    return { success: false, output: 'Missing required parameter: query' };
+  }
+
+  const count = Math.min(Math.max(Number(args.count) || 5, 1), 10);
+  const orientation = (args.orientation as string) || 'landscape';
+
+  const searchUrl = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=${count}&orientation=${orientation}`;
+
+  return new Promise((resolve) => {
+    const req = https.request(
+      searchUrl,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Client-ID ${UNSPLASH_ACCESS_KEY}`,
+          'Accept-Version': 'v1',
+        },
+      },
+      (res) => {
+        let body = '';
+        res.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+        res.on('end', () => {
+          if (res.statusCode === 403 || res.statusCode === 429) {
+            resolve({
+              success: false,
+              output: 'Unsplash API rate limit reached (50 req/hour on demo tier). Use picsum.photos/WIDTH/HEIGHT for generic placeholders, or try again later.',
+            });
+            return;
+          }
+          if (res.statusCode && res.statusCode >= 400) {
+            resolve({ success: false, output: `Unsplash API error ${res.statusCode}: ${body.substring(0, 300)}` });
+            return;
+          }
+
+          try {
+            const data = JSON.parse(body);
+            const results = data.results || [];
+            if (results.length === 0) {
+              resolve({ success: true, output: `No images found for "${query}". Try a different or broader search term in English.` });
+              return;
+            }
+
+            const lines: string[] = [`Found ${results.length} image(s) for "${query}":\n`];
+            for (let i = 0; i < results.length; i++) {
+              const photo = results[i];
+              const imgUrl = `${photo.urls?.regular || photo.urls?.small}`;
+              const alt = photo.alt_description || photo.description || query;
+              const photographer = photo.user?.name || 'Unknown';
+              const profileUrl = photo.user?.links?.html || '';
+              lines.push(`${i + 1}. ${alt}`);
+              lines.push(`   URL: ${imgUrl}`);
+              lines.push(`   Credit: Photo by ${photographer} on Unsplash${profileUrl ? ` (${profileUrl})` : ''}`);
+              lines.push('');
+            }
+            lines.push('Use download_file to save each image locally, then reference it in the code.');
+            lines.push('Include photographer credit in an HTML comment or page footer (Unsplash license requirement).');
+
+            resolve({ success: true, output: lines.join('\n') });
+          } catch (parseErr) {
+            resolve({ success: false, output: `Failed to parse Unsplash response: ${(parseErr as Error).message}` });
+          }
+        });
+      },
+    );
+
+    req.on('error', (err) => {
+      resolve({ success: false, output: `Unsplash request failed: ${err.message}` });
+    });
+
+    req.setTimeout(10000, () => {
+      req.destroy();
+      resolve({ success: false, output: 'Unsplash request timed out (10s).' });
+    });
+
+    req.end();
   });
 }
