@@ -1431,7 +1431,7 @@ export class Agent {
         let toolCalls: ToolCall[] = [];
 
         const MAX_RETRIES = 3;
-        const RETRY_PATTERN = /timeout|predugo|idle|ECONNRESET|ENOTFOUND|socket hang up|429|502|503|529|rate.limit|ETIMEDOUT|ECONNREFUSED/i;
+        const RETRY_PATTERN = /timeout|predugo|idle|ECONNRESET|ENOTFOUND|socket hang up|429|502|503|529|rate.limit|ETIMEDOUT|ECONNREFUSED|Stream prekinut/i;
         let lastErr: unknown = null;
 
         for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
