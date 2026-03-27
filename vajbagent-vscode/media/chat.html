@@ -4491,7 +4491,6 @@
 
         case 'streamStart': {
           if (obradjujemTimeoutId) { clearTimeout(obradjujemTimeoutId); obradjujemTimeoutId = null; }
-          hideStatus();
           showStatus('Pisem odgovor...', 'streaming');
           currentAssistantRawText = '';
           const div = document.createElement('div');
@@ -4504,7 +4503,6 @@
 
         case 'streamDelta':
           if (obradjujemTimeoutId) { clearTimeout(obradjujemTimeoutId); obradjujemTimeoutId = null; }
-          hideStatus();
           if (currentAssistantEl) {
             currentAssistantRawText += msg.text;
             currentAssistantEl.innerHTML = renderMarkdown(streamingPreview(currentAssistantRawText));
@@ -4815,7 +4813,7 @@
         }
 
         case 'diffPreview': {
-          hideStatus();
+          showStatus('Cekam odobrenje...', 'thinking');
           const diffEl = createDiffBlock(msg.filePath, msg.oldContent, msg.newContent, msg.fullPath || '');
           messagesEl.appendChild(diffEl);
           showApprovalBar(msg.filePath, msg.fullPath || '', 'diff');
@@ -4824,7 +4822,7 @@
         }
 
         case 'commandPreview': {
-          hideStatus();
+          showStatus('Cekam odobrenje...', 'thinking');
           const cmdBlock = document.createElement('div');
           cmdBlock.className = 'cmd-block';
           cmdBlock.innerHTML =
