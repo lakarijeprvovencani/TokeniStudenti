@@ -459,6 +459,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         }
         break;
       }
+      case 'openFolder': {
+        const folderPath = message.path as string;
+        if (!folderPath) break;
+        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!root) break;
+        const fullFolderPath = path.isAbsolute(folderPath) ? folderPath : path.join(root, folderPath);
+        const uri = vscode.Uri.file(fullFolderPath);
+        await vscode.commands.executeCommand('revealInExplorer', uri);
+        break;
+      }
     }
   }
 

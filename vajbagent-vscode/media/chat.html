@@ -11,6 +11,15 @@
   <style nonce="{{nonce}}">
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --accent: #C8681A;
+      --accent-bright: #E07820;
+      --accent-gradient: linear-gradient(135deg, #E07820 0%, #B85C14 100%);
+      --accent-gradient-hover: linear-gradient(135deg, #D06D18 0%, #A05010 100%);
+      --accent-bg: rgba(200, 104, 26, 0.1);
+      --accent-border: rgba(200, 104, 26, 0.2);
+    }
+
     @keyframes msgIn {
       from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
@@ -49,42 +58,231 @@
       font-weight: 700;
       font-size: 12px;
       letter-spacing: 0.3px;
-      color: #FA7315;
+      color: var(--accent);
     }
     .input-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 5px 8px 2px;
+      display: none;
     }
-    .input-footer-left {
+
+    /* Model picker (custom menu, same style as mode picker) */
+    .model-picker-wrap {
+      position: relative;
+    }
+    .model-picker-btn {
       display: flex;
       align-items: center;
       gap: 4px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      color: var(--vscode-foreground);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s, border-color 0.15s;
+      opacity: 0.75;
+      white-space: nowrap;
     }
-    .footer-brand {
+    .model-picker-btn:hover { opacity: 1; background: rgba(255,255,255,0.1); border-color: var(--accent-border); }
+    .model-picker-btn .mpick-brand { font-weight: 600; font-size: 10px; }
+    .model-picker-btn .mpick-dot { opacity: 0.3; }
+    .model-picker-btn .mpick-name { color: var(--vscode-foreground); }
+    .model-picker-btn .mpick-arrow {
+      width: 8px; height: 8px; opacity: 0.4;
+      transition: transform 0.15s;
+    }
+    .model-picker-btn.open .mpick-arrow { transform: rotate(180deg); }
+
+    .model-menu {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      min-width: 240px;
+      background: var(--vscode-editor-background, #1e1e1e);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      padding: 6px;
+      z-index: 9000;
+      animation: dropIn 0.15s ease-out;
+    }
+    .model-menu.open { display: block; }
+    .model-menu-title {
+      padding: 6px 10px 4px;
       font-size: 11px;
       font-weight: 600;
-      opacity: 0.4;
+      opacity: 0.5;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
-    .footer-dot {
-      font-size: 11px;
-      opacity: 0.25;
+    .model-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.1s;
     }
-    .model-select {
-      background: transparent;
+    .model-option:hover { background: rgba(255,255,255,0.06); }
+    .model-option.active { background: rgba(250, 115, 21, 0.08); }
+    .model-option-name {
+      font-size: 12px;
+      font-weight: 600;
       color: var(--vscode-foreground);
-      border: none;
-      border-radius: 4px;
-      padding: 1px 2px;
+      flex: 1;
+    }
+    .model-option-desc {
+      font-size: 10px;
+      opacity: 0.45;
+      font-weight: 400;
+      margin-left: 4px;
+    }
+    .model-option-check {
+      width: 14px; height: 14px;
+      flex-shrink: 0;
+      opacity: 0;
+      color: var(--accent);
+    }
+    .model-option.active .model-option-check { opacity: 1; }
+    .model-option.active .model-option-name { color: var(--accent); }
+
+    /* Settings popup (same style as mode/model menu) */
+    .settings-popup {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      min-width: 280px;
+      max-width: 320px;
+      background: var(--vscode-editor-background, #1e1e1e);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      padding: 6px;
+      z-index: 9000;
+      animation: dropIn 0.15s ease-out;
+    }
+    .settings-popup.open { display: block; }
+    .settings-popup-title {
+      padding: 8px 10px 4px;
+      font-size: 11px;
+      font-weight: 600;
+      opacity: 0.5;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .settings-popup-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.06);
+      margin: 4px 6px;
+    }
+    .settings-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.1s;
+      font-size: 12px;
+    }
+    .settings-row:hover { background: rgba(255,255,255,0.06); }
+    .settings-row-icon {
+      width: 18px; height: 18px;
+      flex-shrink: 0;
+      opacity: 0.6;
+    }
+    .settings-row-body { flex: 1; min-width: 0; }
+    .settings-row-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--vscode-foreground);
+    }
+    .settings-row-desc {
+      font-size: 10.5px;
+      opacity: 0.5;
+      margin-top: 1px;
+      line-height: 1.3;
+    }
+    .settings-row-status {
+      font-size: 10px;
+      flex-shrink: 0;
+      opacity: 0.6;
+    }
+    .settings-row-status.ok { color: #4CAF50; opacity: 1; }
+    .settings-row-status.warn { color: #cca700; opacity: 1; }
+    .settings-input-row {
+      display: flex;
+      gap: 4px;
+      padding: 4px 10px 8px;
+    }
+    .settings-input {
+      flex: 1;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: var(--vscode-foreground);
+      outline: none;
+      font-family: var(--vscode-editor-font-family);
+    }
+    .settings-input:focus { border-color: rgba(255,255,255,0.2); }
+    .settings-save-btn {
+      padding: 6px 12px;
       font-size: 11px;
       cursor: pointer;
-      outline: none;
-      opacity: 0.45;
-      transition: opacity 0.15s;
+      background: rgba(255,255,255,0.08);
+      color: var(--vscode-foreground);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      font-weight: 600;
+      transition: background 0.15s;
     }
-    .model-select:hover { opacity: 0.8; }
-    .model-select:focus { opacity: 0.8; }
+    .settings-save-btn:hover { background: rgba(255,255,255,0.12); }
+    .settings-actions {
+      display: flex;
+      gap: 4px;
+      padding: 2px 10px 6px;
+    }
+    .settings-action-btn {
+      font-size: 10.5px;
+      padding: 5px 10px;
+      cursor: pointer;
+      background: rgba(255,255,255,0.05);
+      color: var(--vscode-foreground);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      transition: background 0.15s;
+    }
+    .settings-action-btn:hover { background: rgba(255,255,255,0.1); }
+    .settings-action-btn.primary {
+      background: rgba(250, 115, 21, 0.1);
+      color: var(--accent);
+      border-color: rgba(250, 115, 21, 0.2);
+    }
+    .settings-action-btn.primary:hover {
+      background: rgba(250, 115, 21, 0.18);
+    }
+    .settings-mcp-server {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      font-size: 11px;
+    }
+    .settings-mcp-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .settings-mcp-dot.ok { background: #4CAF50; }
+    .settings-mcp-dot.err { background: #f14c4c; }
+    .settings-mcp-name { font-weight: 500; }
+    .settings-mcp-tools { opacity: 0.4; font-size: 10px; margin-left: auto; }
     .header-actions {
       display: flex;
       align-items: center;
@@ -129,7 +327,7 @@
     }
     .context-fill {
       height: 100%;
-      background: #FA7315;
+      background: var(--accent-gradient);
       border-radius: 4px;
       transition: width 0.3s, background 0.3s;
       width: 0%;
@@ -170,7 +368,7 @@
     .undo-btn {
       background: none;
       border: 1px solid rgba(250, 115, 21, 0.4);
-      color: #FA7315;
+      color: var(--accent);
       border-radius: 4px;
       padding: 2px 8px;
       font-size: 10px;
@@ -187,7 +385,7 @@
       font-size: 11px;
     }
     .checkpoint-header {
-      color: #FA7315;
+      color: var(--accent);
       font-weight: 600;
       margin-bottom: 6px;
       font-size: 11px;
@@ -205,11 +403,11 @@
       cursor: pointer;
       opacity: 0.85;
     }
-    .checkpoint-filename:hover { color: #FA7315; opacity: 1; }
+    .checkpoint-filename:hover { color: var(--accent); opacity: 1; }
     .checkpoint-revert-btn {
       background: none;
       border: 1px solid rgba(250, 115, 21, 0.3);
-      color: #FA7315;
+      color: var(--accent);
       border-radius: 3px;
       padding: 1px 6px;
       font-size: 10px;
@@ -222,7 +420,7 @@
       width: 100%;
       margin-top: 6px;
       background: rgba(250, 115, 21, 0.1);
-      color: #FA7315;
+      color: var(--accent);
       border: 1px solid rgba(250, 115, 21, 0.25);
       border-radius: 4px;
       padding: 4px;
@@ -238,7 +436,7 @@
     }
     .followup-btn {
       background: rgba(250, 115, 21, 0.08);
-      color: #FA7315;
+      color: var(--accent);
       border: 1px solid rgba(250, 115, 21, 0.25);
       border-radius: 14px;
       padding: 4px 12px;
@@ -248,7 +446,7 @@
     }
     .followup-btn:hover {
       background: rgba(250, 115, 21, 0.18);
-      border-color: #FA7315;
+      border-color: var(--accent);
     }
 
     /* Messages area */
@@ -288,7 +486,7 @@
       letter-spacing: -0.5px;
       margin-bottom: 6px;
     }
-    .welcome-brand .v { color: #FA7315; }
+    .welcome-brand .v { color: var(--accent); }
     .welcome-msg h3 {
       font-size: 13px;
       font-weight: 500;
@@ -377,15 +575,15 @@
     .msg-user {
       align-self: flex-start;
       max-width: 100%;
-      background: none;
+      background: rgba(255,255,255,0.04);
       color: var(--vscode-foreground);
-      border-radius: 0;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.09);
       white-space: pre-wrap;
       font-weight: 600;
       font-size: 14px;
-      padding: 10px 14px 6px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-      margin-bottom: 2px;
+      padding: 10px 14px;
+      margin-bottom: 6px;
     }
     .msg-assistant {
       align-self: flex-start;
@@ -396,13 +594,15 @@
       border: 1px solid rgba(255, 255, 255, 0.04);
       border-radius: 12px;
       border-top-left-radius: 4px;
-      padding: 10px 14px;
+      padding: 12px 16px;
+      font-size: 14px;
+      line-height: 1.6;
     }
     .msg-assistant .credits-cta {
       display: inline-block;
       margin-top: 10px;
       padding: 8px 14px;
-      background: #FA7315;
+      background: var(--accent-gradient);
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -413,7 +613,7 @@
       transition: background 0.15s;
     }
     .msg-assistant .credits-cta:hover {
-      background: #e5670f;
+      background: var(--accent-gradient-hover);
     }
     .thinking-block {
       margin-bottom: 12px;
@@ -421,14 +621,14 @@
       background: rgba(255, 255, 255, 0.04);
       border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 8px;
-      border-left: 3px solid #FA7315;
+      border-left: 3px solid var(--accent);
     }
     .thinking-label {
       font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      color: #FA7315;
+      color: var(--accent);
       opacity: 0.9;
       margin-bottom: 6px;
     }
@@ -471,7 +671,7 @@
     .tool-icon { display: flex; align-items: center; transition: transform 0.15s; }
     .tool-icon svg { width: 13px; height: 13px; }
     .tool-icon.open { transform: rotate(90deg); }
-    .tool-name { font-weight: 600; color: #FA7315; }
+    .tool-name { font-weight: 600; color: var(--accent); }
     .tool-dot {
       width: 7px; height: 7px; border-radius: 50%;
       background: #66BB6A; flex-shrink: 0;
@@ -598,7 +798,7 @@
       background: rgba(30, 30, 30, 0.9);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      border-top: 2px solid #FA7315;
+      border-top: 2px solid var(--accent);
       flex-shrink: 0;
       animation: approvalSlideUp 0.25s ease;
     }
@@ -619,7 +819,7 @@
       flex-shrink: 0;
     }
     .approval-bar .btn-approve {
-      background: #FA7315;
+      background: var(--accent-gradient);
       color: #fff;
       border: none;
       border-radius: 4px;
@@ -628,7 +828,7 @@
       font-weight: 600;
       cursor: pointer;
     }
-    .approval-bar .btn-approve:hover { background: #e5670f; }
+    .approval-bar .btn-approve:hover { background: var(--accent-gradient-hover); }
     .approval-bar .btn-reject {
       background: transparent;
       color: var(--vscode-foreground);
@@ -656,7 +856,7 @@
     }
     .auto-approve-inline:hover { opacity: 1; }
     .auto-approve-inline input[type="checkbox"] {
-      accent-color: #FA7315;
+      accent-color: var(--accent);
       width: 13px;
       height: 13px;
       cursor: pointer;
@@ -683,8 +883,8 @@
       white-space: nowrap;
     }
     .mode-btn:hover {
-      border-color: rgba(250, 115, 21, 0.4);
-      background: rgba(250, 115, 21, 0.06);
+      border-color: var(--accent-border);
+      background: var(--accent-bg);
     }
     .mode-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
     .mode-btn .mode-arrow {
@@ -731,7 +931,7 @@
       margin-top: 1px;
       opacity: 0.7;
     }
-    .mode-option.active .mode-option-icon { opacity: 1; color: #FA7315; }
+    .mode-option.active .mode-option-icon { opacity: 1; color: var(--accent); }
     .mode-option-body { flex: 1; min-width: 0; }
     .mode-option-name {
       font-size: 12px;
@@ -749,15 +949,16 @@
       flex-shrink: 0;
       margin-top: 2px;
       opacity: 0;
-      color: #FA7315;
+      color: var(--accent);
     }
     .mode-option.active .mode-option-check { opacity: 1; }
 
     /* Input area — Cursor-inspired design */
     .input-area {
-      padding: 8px 10px 10px;
+      padding: 0 10px 6px;
       flex-shrink: 0;
       position: relative;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
     }
     .input-container {
       background: rgba(255, 255, 255, 0.03);
@@ -774,7 +975,7 @@
       box-shadow: 0 2px 16px rgba(250, 115, 21, 0.1), 0 2px 12px rgba(0,0,0,0.15);
     }
     .input-container.drag-over {
-      border-color: #FA7315;
+      border-color: var(--accent);
       background: rgba(250, 115, 21, 0.04);
     }
 
@@ -798,7 +999,7 @@
       pointer-events: all;
     }
     .drop-overlay-box {
-      border: 2px dashed #FA7315;
+      border: 2px dashed var(--accent);
       border-radius: 16px;
       padding: 32px 48px;
       background: rgba(250, 115, 21, 0.08);
@@ -815,12 +1016,12 @@
     .drop-overlay-icon {
       width: 40px;
       height: 40px;
-      color: #FA7315;
+      color: var(--accent);
     }
     .drop-overlay-text {
       font-size: 14px;
       font-weight: 500;
-      color: #FA7315;
+      color: var(--accent);
     }
     .drop-overlay-hint {
       font-size: 11px;
@@ -873,7 +1074,7 @@
       flex-shrink: 0;
     }
     .mention-item .mention-name {
-      color: #FA7315;
+      color: var(--accent);
     }
     .mention-hint {
       padding: 6px 10px;
@@ -881,6 +1082,23 @@
       opacity: 0.4;
       text-align: center;
     }
+    .input-top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 4px 2px;
+    }
+    .input-top-left {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .input-top-hint {
+      font-size: 10px;
+      opacity: 0.25;
+      margin-right: 4px;
+    }
+
     #userInput {
       width: 100%;
       min-height: 44px;
@@ -902,6 +1120,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 4px 6px 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
     }
     .input-toolbar-left {
       display: flex;
@@ -933,13 +1152,13 @@
     }
     .toolbar-btn.active {
       opacity: 1;
-      color: #FA7315;
+      color: var(--accent);
       background: rgba(250, 115, 21, 0.1);
     }
     .toolbar-btn svg { width: 16px; height: 16px; }
 
     .send-btn {
-      background: #FA7315;
+      background: var(--accent-gradient);
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -953,7 +1172,7 @@
       transition: background 0.15s, opacity 0.15s;
       box-shadow: 0 1px 4px rgba(250, 115, 21, 0.3);
     }
-    .send-btn:hover { background: #e5670f; }
+    .send-btn:hover { background: var(--accent-gradient-hover); }
     .send-btn:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; }
     .send-btn svg { width: 14px; height: 14px; }
 
@@ -1077,49 +1296,83 @@
     }
 
     /* Markdown content styles */
-    .msg-assistant p { margin: 4px 0; }
+    .msg-assistant p { margin: 8px 0; line-height: 1.6; }
     .msg-assistant p:first-child { margin-top: 0; }
     .msg-assistant p:last-child { margin-bottom: 0; }
-    .msg-assistant ul, .msg-assistant ol { margin: 4px 0; padding-left: 20px; }
-    .msg-assistant li { margin: 2px 0; }
+    .msg-assistant ul, .msg-assistant ol { margin: 10px 0; padding-left: 24px; }
+    .msg-assistant li { margin: 6px 0; line-height: 1.6; }
     .msg-assistant h1, .msg-assistant h2, .msg-assistant h3 {
-      margin: 8px 0 4px;
+      margin: 14px 0 8px;
       font-size: 14px;
-      font-weight: 600;
+      font-weight: 700;
+      letter-spacing: 0.3px;
     }
-    .msg-assistant h1 { font-size: 16px; }
-    .msg-assistant h2 { font-size: 15px; }
+    .msg-assistant h1 { font-size: 18px; margin-top: 16px; }
+    .msg-assistant h2 { font-size: 16px; margin-top: 14px; }
     .msg-assistant h4 { font-size: 13px; margin: 6px 0 3px; }
     .msg-assistant h5 { font-size: 12px; margin: 6px 0 3px; opacity: 0.85; }
+    .msg-assistant strong {
+      font-weight: 700;
+      color: rgba(255, 255, 255, 1);
+      letter-spacing: 0.2px;
+    }
+    .msg-assistant em {
+      font-style: italic;
+      opacity: 0.95;
+    }
     .msg-assistant code {
-      background: rgba(250, 115, 21, 0.08);
-      color: #FA7315;
+      background: rgba(255, 255, 255, 0.06);
+      color: #e8a86e;
       padding: 2px 6px;
       border-radius: 4px;
       font-family: var(--vscode-editor-font-family);
       font-size: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
     }
     .msg-assistant code.file-link {
       cursor: pointer;
       text-decoration: underline;
       text-decoration-style: dotted;
       text-underline-offset: 2px;
+      color: var(--accent);
+      background: rgba(250, 115, 21, 0.08);
+      border-color: rgba(250, 115, 21, 0.2);
+      font-weight: 500;
+      padding: 3px 8px;
+      transition: all 0.15s;
     }
     .msg-assistant code.file-link:hover {
-      background: rgba(250, 115, 21, 0.2);
+      background: rgba(250, 115, 21, 0.15);
       text-decoration-style: solid;
+      border-color: rgba(250, 115, 21, 0.3);
+      transform: translateX(2px);
     }
     .tree-file-link, .tree-folder-link {
       cursor: pointer;
       text-decoration: underline;
       text-decoration-style: dotted;
       text-underline-offset: 2px;
-      color: #FA7315;
+      color: var(--accent);
+      font-weight: 500;
+      padding: 2px 4px;
+      border-radius: 3px;
+      transition: all 0.15s;
+    }
+    .tree-file-link::before {
+      content: '📄 ';
+      margin-right: 2px;
+      opacity: 0.8;
+    }
+    .tree-folder-link::before {
+      content: '📁 ';
+      margin-right: 2px;
+      opacity: 0.8;
     }
     .tree-file-link:hover, .tree-folder-link:hover {
       text-decoration-style: solid;
       background: rgba(250, 115, 21, 0.15);
-      border-radius: 2px;
+      border-radius: 4px;
+      transform: translateX(2px);
     }
     .tree-folder-link {
       color: #e8a86e;
@@ -1143,7 +1396,7 @@
       font-weight: 500;
     }
     .msg-assistant a, .msg-assistant a.auto-link {
-      color: #FA7315;
+      color: var(--accent);
       text-decoration: underline;
       text-decoration-style: dotted;
       text-underline-offset: 2px;
@@ -1155,7 +1408,7 @@
       opacity: 0.85;
     }
     .code-block-wrapper {
-      border: 1px solid rgba(250, 115, 21, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 8px;
       margin: 6px 0;
       overflow: hidden;
@@ -1175,12 +1428,12 @@
     .code-block-lang {
       font-weight: 600;
       text-transform: lowercase;
-      color: #FA7315;
+      color: var(--accent);
       opacity: 1;
     }
     .copy-btn {
       background: rgba(250, 115, 21, 0.15);
-      color: #FA7315;
+      color: var(--accent);
       border: none;
       border-radius: 3px;
       padding: 2px 8px;
@@ -1210,7 +1463,7 @@
       opacity: 0.8;
     }
     .msg-assistant a {
-      color: #FA7315;
+      color: var(--accent);
       text-decoration: none;
     }
     .msg-assistant hr {
@@ -1244,17 +1497,22 @@
       background: rgba(250, 115, 21, 0.04);
     }
     .msg-assistant a:hover { text-decoration: underline; }
-    .msg-assistant.streaming { white-space: pre-wrap; }
+    .msg-assistant.streaming { }
     .msg-assistant table {
       border-collapse: collapse;
-      margin: 6px 0;
-      font-size: 12px;
+      margin: 12px 0;
+      font-size: 13px;
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      overflow: hidden;
     }
     .msg-assistant th, .msg-assistant td {
-      border: 1px solid var(--vscode-panel-border);
-      padding: 4px 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 10px 12px;
+      line-height: 1.5;
     }
-    .msg-assistant th { background: var(--vscode-editor-background); font-weight: 600; }
+    .msg-assistant th { background: rgba(255, 255, 255, 0.05); font-weight: 700; }
 
     /* Plan actions bar */
     .plan-actions {
@@ -1270,7 +1528,7 @@
     .plan-actions-header {
       font-size: 11px;
       font-weight: 700;
-      color: #FA7315;
+      color: var(--accent);
       margin-bottom: 8px;
     }
     .plan-actions-buttons {
@@ -1290,12 +1548,12 @@
     }
     .plan-btn:hover { opacity: 0.85; }
     .plan-btn-primary {
-      background: #FA7315;
+      background: var(--accent-gradient);
       color: #fff;
     }
     .plan-btn-secondary {
       background: rgba(250,115,21,0.12);
-      color: #FA7315;
+      color: var(--accent);
       border: 1px solid rgba(250,115,21,0.25);
     }
     .plan-btn-ghost {
@@ -1314,7 +1572,7 @@
       align-items: baseline;
     }
     .plan-phase-num {
-      color: #FA7315;
+      color: var(--accent);
       font-weight: 700;
       min-width: 16px;
       flex-shrink: 0;
@@ -1359,7 +1617,7 @@
     }
     .diff-header .diff-icon { opacity: 0.6; }
     .diff-header .diff-filename { font-weight: 600; color: var(--vscode-foreground); cursor: pointer; }
-    .diff-header .diff-filename:hover { color: #FA7315; }
+    .diff-header .diff-filename:hover { color: var(--accent); }
     .diff-header .diff-stats {
       margin-left: auto;
       font-size: 11px;
@@ -1426,7 +1684,7 @@
       background: var(--vscode-editor-background);
     }
     .diff-accept {
-      background: #FA7315;
+      background: var(--accent-gradient);
       color: #fff;
       border: none;
       border-radius: 4px;
@@ -1435,7 +1693,7 @@
       font-weight: 600;
       cursor: pointer;
     }
-    .diff-accept:hover { background: #e5670f; }
+    .diff-accept:hover { background: var(--accent-gradient-hover); }
     .diff-reject {
       background: transparent;
       color: var(--vscode-foreground);
@@ -1472,7 +1730,7 @@
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.8px;
-      color: #FA7315;
+      color: var(--accent);
       opacity: 0.7;
       border-top: 1px solid rgba(255,255,255,0.06);
       margin-top: 2px;
@@ -1513,10 +1771,10 @@
       min-width: 0;
     }
     .settings-field input:focus {
-      border-color: #FA7315;
+      border-color: var(--accent);
     }
     .settings-save-btn {
-      background: #FA7315;
+      background: var(--accent-gradient);
       color: #fff;
       border: none;
       border-radius: 4px;
@@ -1565,8 +1823,8 @@
       opacity: 0.5;
     }
     .toggle input:checked + .toggle-track {
-      background: #FA7315;
-      border-color: #FA7315;
+      background: var(--accent-gradient);
+      border-color: var(--accent);
     }
     .toggle input:checked + .toggle-track::after {
       transform: translateX(14px);
@@ -1650,7 +1908,7 @@
       background: var(--vscode-editor-background);
     }
     .cmd-accept {
-      background: #FA7315;
+      background: var(--accent-gradient);
       color: #fff;
       border: none;
       border-radius: 4px;
@@ -1659,7 +1917,7 @@
       font-weight: 600;
       cursor: pointer;
     }
-    .cmd-accept:hover { background: #e5670f; }
+    .cmd-accept:hover { background: var(--accent-gradient-hover); }
     .cmd-reject {
       background: transparent;
       color: var(--vscode-foreground);
@@ -1679,7 +1937,7 @@
       gap: 6px;
       padding: 4px 10px;
       font-size: 11px;
-      color: #FA7315;
+      color: var(--accent);
       opacity: 0.7;
     }
 
@@ -1888,7 +2146,7 @@
     .mcp-guide-section-title {
       font-size: 12px;
       font-weight: 700;
-      color: #FA7315;
+      color: var(--accent);
       margin-bottom: 6px;
       display: flex;
       align-items: center;
@@ -1917,7 +2175,7 @@
       top: 4px;
       right: 4px;
       background: rgba(250, 115, 21, 0.15);
-      color: #FA7315;
+      color: var(--accent);
       border: none;
       border-radius: 3px;
       padding: 2px 8px;
@@ -1942,14 +2200,14 @@
     .mcp-guide-steps li { margin-bottom: 3px; }
     .mcp-guide-steps code {
       background: rgba(250, 115, 21, 0.1);
-      color: #FA7315;
+      color: var(--accent);
       padding: 1px 4px;
       border-radius: 3px;
       font-family: var(--vscode-editor-font-family);
       font-size: 11px;
     }
     .mcp-guide-steps a {
-      color: #FA7315;
+      color: var(--accent);
       text-decoration: none;
     }
     .mcp-guide-steps a:hover { text-decoration: underline; }
@@ -1962,6 +2220,109 @@
   </style>
 </head>
 <body>
+  <div class="add-context-menu" id="addContextMenu">
+    <div class="add-context-item" id="ctxAddImage">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+      Dodaj sliku
+    </div>
+    <div class="add-context-item" id="ctxAddFile">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+      Dodaj fajl
+    </div>
+  </div>
+  <div class="model-menu" id="modelMenu">
+    <div class="model-menu-title">Model</div>
+    <div class="model-option" data-model="vajb-agent-lite">
+      <div class="model-option-name">Lite <span class="model-option-desc">— brz i jeftin, za manje taskove</span></div>
+      <svg class="model-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="model-option" data-model="vajb-agent-turbo">
+      <div class="model-option-name">Turbo <span class="model-option-desc">— reasoning, odlican za logiku</span></div>
+      <svg class="model-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="model-option" data-model="vajb-agent-pro">
+      <div class="model-option-name">Pro <span class="model-option-desc">— jak generalist za sve</span></div>
+      <svg class="model-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="model-option active" data-model="vajb-agent-max">
+      <div class="model-option-name">Max <span class="model-option-desc">— balansiran, odlican za kod</span></div>
+      <svg class="model-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="model-option" data-model="vajb-agent-power">
+      <div class="model-option-name">Power <span class="model-option-desc">— najjaci za kompleksne projekte</span></div>
+      <svg class="model-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="model-option" data-model="vajb-agent-ultra">
+      <div class="model-option-name">Ultra <span class="model-option-desc">— premium kvalitet, dubok kod</span></div>
+      <svg class="model-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="model-option" data-model="vajb-agent-architect">
+      <div class="model-option-name">Architect <span class="model-option-desc">— za arhitekturu i planiranje</span></div>
+      <svg class="model-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+  </div>
+
+  <div class="settings-popup" id="settingsPopup">
+    <div id="userInfoBar" style="display:none;padding:8px 10px 4px;font-size:11px;color:var(--vscode-foreground);">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span style="opacity:0.5;">Ulogovan kao</span> <strong id="userDisplayName" style="font-size:11px;"></strong>
+      </div>
+    </div>
+
+    <div class="settings-popup-title">API kljuc</div>
+    <div id="apiKeySavedState" style="display:none;">
+      <div class="settings-row" style="cursor:default;">
+        <svg class="settings-row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        <div class="settings-row-body">
+          <div class="settings-row-name">API kljuc sacuvan</div>
+          <div class="settings-row-desc">Kljuc je konfigurisan i aktivan</div>
+        </div>
+        <span class="settings-row-status ok">✓</span>
+      </div>
+      <div class="settings-actions">
+        <button id="apiKeyChangeBtn" class="settings-action-btn">Promeni</button>
+        <button id="apiKeyDeleteBtn" class="settings-action-btn" style="color:#e57373;">Obrisi</button>
+      </div>
+    </div>
+    <div id="apiKeyEditState">
+      <div class="settings-input-row">
+        <input type="password" id="settingsApiKey" placeholder="vajb_xxxxxxxx..." spellcheck="false" autocomplete="off" class="settings-input">
+        <button id="settingsApiKeySave" class="settings-save-btn">Sacuvaj</button>
+      </div>
+      <div style="padding:0 10px 6px;display:flex;align-items:center;gap:6px;">
+        <div id="apiKeyStatus" style="font-size:10px;flex:1;"></div>
+        <button id="apiKeyCancelBtn" style="display:none;font-size:10px;padding:1px 6px;cursor:pointer;background:transparent;color:var(--vscode-foreground);border:none;opacity:0.4;text-decoration:underline;">Otkazi</button>
+      </div>
+    </div>
+
+    <div class="settings-popup-divider"></div>
+
+    <div class="settings-popup-title">MCP serveri</div>
+    <div id="mcpStatusArea" style="padding:2px 6px 6px;font-size:11px;line-height:1.6;">
+      <div class="settings-mcp-server" style="opacity:0.5;">Nema konfigurisanih servera</div>
+    </div>
+    <div class="settings-actions">
+      <button id="mcpRestartBtn" class="settings-action-btn">Restartuj</button>
+      <button id="mcpConfigBtn" class="settings-action-btn primary">Konfiguriši</button>
+      <button id="mcpGuideBtn" class="settings-action-btn" style="opacity:0.6;">Kako dodati?</button>
+    </div>
+
+    <div class="settings-popup-divider"></div>
+
+    <div class="settings-popup-title">Pravila projekta</div>
+    <div id="rulesStatus" style="padding:2px 10px 2px;font-size:10.5px;display:none;"></div>
+    <div class="settings-actions" style="padding-bottom:8px;">
+      <button id="rulesEditBtn" class="settings-action-btn">Uredi pravila</button>
+    </div>
+
+    <input type="hidden" id="settingsApiUrl">
+    <button id="settingsApiUrlSave" style="display:none;"></button>
+    <input type="checkbox" id="autoWriteFile" style="display:none">
+    <input type="checkbox" id="autoReplaceInFile" style="display:none">
+    <input type="checkbox" id="autoExecuteCommand" style="display:none">
+  </div>
+
   <div class="mode-menu" id="modeMenu">
     <div class="mode-menu-title">Rezim</div>
     <div class="mode-option" data-mode="ask">
@@ -1995,8 +2356,7 @@
       <span class="header-title"><span style="color:#fff">Vajb</span>Agent</span>
     </div>
     <div class="header-actions">
-      <button class="icon-btn" id="settingsBtn" title="Podesavanja">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <button class="icon-btn" id="settingsBtn" title="Podesavanja" style="display:none">
       </button>
       <button class="icon-btn" id="guideBtn" title="Vodic za koriscenje">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -2008,84 +2368,8 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </button>
     </div>
-    <div class="settings-panel" id="settingsPanel">
-      <div id="userInfoBar" style="display:none;padding:10px 14px;font-size:12px;color:var(--vscode-foreground);border-bottom:1px solid rgba(255,255,255,0.06);">
-        <span style="opacity:0.45;font-size:10px;">Ulogovan:</span> <strong id="userDisplayName" style="margin-left:4px;"></strong>
-      </div>
-      <div class="settings-title">API kljuc</div>
-      <div id="apiKeySavedState" style="display:none;padding:4px 12px 8px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <span style="font-size:11px;color:#4CAF50;display:flex;align-items:center;gap:4px;">
-            <span style="font-size:13px;">✓</span> Kljuc sacuvan
-          </span>
-          <div style="display:flex;gap:6px;">
-            <button id="apiKeyChangeBtn" style="font-size:10px;padding:2px 10px;cursor:pointer;background:transparent;color:var(--vscode-foreground);border:1px solid var(--vscode-panel-border);border-radius:4px;opacity:0.6;">Promeni</button>
-            <button id="apiKeyDeleteBtn" style="font-size:10px;padding:2px 8px;cursor:pointer;background:transparent;color:#e57373;border:1px solid rgba(229,115,115,0.3);border-radius:4px;opacity:0.6;">Obrisi</button>
-          </div>
-        </div>
-      </div>
-      <div id="apiKeyEditState">
-        <div class="settings-field">
-          <input type="password" id="settingsApiKey" placeholder="vajb_xxxxxxxxxxxxxxxx" spellcheck="false" autocomplete="off">
-          <button id="settingsApiKeySave" class="settings-save-btn">Sacuvaj</button>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:2px;">
-          <div class="settings-field-status" id="apiKeyStatus" style="margin:0;flex:1;"></div>
-          <button id="apiKeyCancelBtn" style="display:none;font-size:10px;padding:2px 8px;cursor:pointer;background:transparent;color:var(--vscode-foreground);border:none;opacity:0.5;text-decoration:underline;">Otkazi</button>
-        </div>
-      </div>
-
-      <div class="settings-title" style="margin-top:8px">Auto-Approve</div>
-      <label class="settings-item">
-        <div class="settings-label">
-          <span class="settings-label-main">Write File</span>
-          <span class="settings-label-desc">Kreiranje / prepisivanje fajlova</span>
-        </div>
-        <div class="toggle">
-          <input type="checkbox" id="autoWriteFile">
-          <span class="toggle-track"></span>
-        </div>
-      </label>
-      <label class="settings-item">
-        <div class="settings-label">
-          <span class="settings-label-main">Replace in File</span>
-          <span class="settings-label-desc">Izmene delova fajla</span>
-        </div>
-        <div class="toggle">
-          <input type="checkbox" id="autoReplaceInFile">
-          <span class="toggle-track"></span>
-        </div>
-      </label>
-      <label class="settings-item">
-        <div class="settings-label">
-          <span class="settings-label-main">Execute Command</span>
-          <span class="settings-label-desc">Pokretanje shell komandi</span>
-        </div>
-        <div class="toggle">
-          <input type="checkbox" id="autoExecuteCommand">
-          <span class="toggle-track"></span>
-        </div>
-      </label>
-
-      <div class="settings-title" style="margin-top:4px">MCP Serveri</div>
-      <div id="mcpStatusArea" style="padding:2px 14px 8px;font-size:11px;opacity:0.65;line-height:1.6;">Nema konfigurisanih servera</div>
-      <div style="padding:0 14px 10px;display:flex;gap:6px;flex-wrap:wrap;">
-        <button id="mcpRestartBtn" style="font-size:11px;padding:4px 12px;cursor:pointer;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:5px;">Restartuj</button>
-        <button id="mcpConfigBtn" style="font-size:11px;padding:4px 12px;cursor:pointer;background:transparent;color:#FA7315;border:1px solid rgba(250,115,21,0.4);border-radius:5px;">Konfiguriši</button>
-        <button id="mcpGuideBtn" style="font-size:11px;padding:4px 12px;cursor:pointer;background:transparent;color:var(--vscode-foreground);border:1px solid rgba(255,255,255,0.12);border-radius:5px;opacity:0.6;">Kako dodati?</button>
-      </div>
-      <div class="settings-title" style="margin-top:4px">Pravila projekta</div>
-      <div style="padding:2px 14px 6px;font-size:11px;opacity:0.45;line-height:1.5;">
-        Definisi pravila za ovaj projekat — agent ce ih pratiti u svakom odgovoru.
-      </div>
-      <div id="rulesStatus" style="padding:2px 14px 4px;font-size:11px;display:none;"></div>
-      <div style="padding:0 14px 10px;display:flex;gap:6px;">
-        <button id="rulesEditBtn" style="font-size:11px;padding:4px 12px;cursor:pointer;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:5px;">Uredi pravila</button>
-      </div>
-
-      <input type="hidden" id="settingsApiUrl">
-      <button id="settingsApiUrlSave" style="display:none;"></button>
-    </div>
+    <!-- old settings panel kept hidden for JS refs -->
+    <div class="settings-panel" id="settingsPanel" style="display:none !important"></div>
   </div>
 
   <!-- History overlay -->
@@ -2257,7 +2541,7 @@
         <div class="guide-section-icon">📋</div>
         <div>
           <div class="guide-section-title">Plan Mode za velike zadatke</div>
-          <div class="guide-section-desc">Kad imas kompleksan zadatak (cela aplikacija, refaktor, integracija), ukljuci <strong style="color:#FA7315;">Plan Mode</strong> (dugme dole levo). Agent ce prvo napraviti detaljan plan i sacekati tvoje odobrenje pre nego sto menja kod.</div>
+          <div class="guide-section-desc">Kad imas kompleksan zadatak (cela aplikacija, refaktor, integracija), ukljuci <strong style="color:var(--accent);">Plan Mode</strong> (dugme dole levo). Agent ce prvo napraviti detaljan plan i sacekati tvoje odobrenje pre nego sto menja kod.</div>
         </div>
       </div>
 
@@ -2269,7 +2553,7 @@
             <strong style="color:#4FC3F7;">Lite</strong> — brz i jeftin, idealan za svakodnevno kodiranje i brza pitanja.<br>
             <strong style="color:#4FC3F7;">Turbo</strong> — reasoning model, odlican za logiku, debugging i matematiku.<br>
             <strong style="color:#81C784;">Pro</strong> — jak i pametan, za ozbiljnije projekte i kompleksniji kod.<br>
-            <strong style="color:#FA7315;">Max</strong> — kompleksni zadaci, planiranje, refaktor. Preporucen za Plan Mode.<br>
+            <strong style="color:var(--accent);">Max</strong> — kompleksni zadaci, planiranje, refaktor. Preporucen za Plan Mode.<br>
             <strong style="color:#CE93D8;">Power</strong> — najjaci OpenAI model, za flagship kvalitet.<br>
             <strong style="color:#CE93D8;">Ultra</strong> — premium Anthropic model, za najzahtevnije zadatke.<br>
             <strong style="color:#FF7043;">Architect</strong> — full-stack arhitekta, za cele aplikacije od nule.
@@ -2331,14 +2615,14 @@
       <h3>Tvoj AI coding asistent</h3>
 
       <div id="welcomeApiHint" class="welcome-hint welcome-hint-api" style="display:none;">
-        <strong style="color:#FA7315;">Prvo ti treba API kljuc</strong><br>
-        1. Napravi nalog na <a href="https://vajbagent.com" style="color:#FA7315;text-decoration:underline;" target="_blank">vajbagent.com</a> (dobijes $2 na poklon)<br>
+        <strong style="color:var(--accent);">Prvo ti treba API kljuc</strong><br>
+        1. Napravi nalog na <a href="https://vajbagent.com" style="color:var(--accent);text-decoration:underline;" target="_blank">vajbagent.com</a> (dobijes $2 na poklon)<br>
         2. Kopiraj API kljuc iz emaila ili dashboarda<br>
         3. Klikni na ⚙️ gore desno → nalepi kljuc i sacuvaj
       </div>
       <div id="welcomeCardsSection">
         <div class="welcome-hint welcome-hint-tip">
-          💡 Za vece zadatke, ukljuci <strong style="color:#FA7315;">Plan Mode</strong> <span style="opacity:0.4;">(📋 dole)</span> — agent pravi plan sa fazama pre izmena. Klikni <strong style="color:var(--vscode-foreground);">?</strong> gore za vodic.
+          💡 Za vece zadatke, ukljuci <strong style="color:var(--accent);">Plan Mode</strong> <span style="opacity:0.4;">(📋 dole)</span> — agent pravi plan sa fazama pre izmena. Klikni <strong style="color:var(--vscode-foreground);">?</strong> gore za vodic.
         </div>
       </div>
 
@@ -2369,14 +2653,27 @@
       </svg>
       <div class="drop-overlay-text">Prevuci fajlove ovde</div>
       <div class="drop-overlay-hint">Slike, kod, PDF — sve sto ti treba kao kontekst</div>
+      <div class="drop-overlay-hint" style="margin-top:4px;opacity:0.4;font-size:10px;">Drzi <kbd style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px;font-size:10px;border:1px solid rgba(255,255,255,0.15);">Shift</kbd> dok prevlacis iz VS Code editora</div>
     </div>
   </div>
 
   <div class="input-area">
     <div class="mention-dropdown" id="slashDropdown"></div>
     <div class="mention-dropdown" id="mentionDropdown"></div>
+    <div class="input-top-bar">
+      <div class="input-top-left">
+        <div class="model-picker-wrap" id="modelPickerWrap">
+          <button class="model-picker-btn" id="modelPickerBtn">
+            <span class="mpick-brand"><span style="color:#fff">Vajb</span><span style="color:var(--accent)">Agent</span></span>
+            <span class="mpick-dot">·</span>
+            <span class="mpick-name" id="modelPickerLabel">Max</span>
+            <svg class="mpick-arrow" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 4.5L6 7.5L9 4.5"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
     <div class="input-container">
-      <div id="planModeBar" style="display:none;padding:5px 12px;font-size:10px;color:#FA7315;background:rgba(250,115,21,0.06);border-bottom:1px solid rgba(250,115,21,0.15);align-items:center;gap:6px;">
+      <div id="planModeBar" style="display:none;padding:5px 12px;font-size:10px;color:var(--accent);background:rgba(250,115,21,0.06);border-bottom:1px solid rgba(250,115,21,0.15);align-items:center;gap:6px;">
         <span style="font-size:12px;">📋</span> <strong>Plan mode</strong> — agent ce napraviti plan, nece menjati kod
         <button id="planModeOff" style="margin-left:auto;background:none;border:none;color:var(--vscode-foreground);opacity:0.5;cursor:pointer;font-size:12px;padding:0 4px;">✕</button>
       </div>
@@ -2385,19 +2682,14 @@
       <div class="file-chips" id="filePreviews"></div>
       <div class="input-toolbar">
         <div class="input-toolbar-left">
-          <div class="add-context-menu" id="addContextMenu">
-            <div class="add-context-item" id="ctxAddImage">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-              Dodaj sliku
-            </div>
-            <div class="add-context-item" id="ctxAddFile">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
-              Dodaj fajl
-            </div>
-          </div>
           <button class="toolbar-btn" id="addContextBtn" title="Dodaj kontekst">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+          <button class="toolbar-btn" id="settingsBtnBottom" title="Podesavanja">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
             </svg>
           </button>
           <button class="toolbar-btn" id="imagePickerBtn" title="Dodaj sliku" style="display:none">
@@ -2441,21 +2733,16 @@
       </div>
     </div>
     <input type="file" id="imageFileInput" accept="image/*" multiple style="display:none;">
-    <div class="input-footer">
-      <div class="input-footer-left">
-        <span class="footer-brand"><span style="color:#fff">Vajb</span><span style="color:#FA7315">Agent</span></span>
-        <span class="footer-dot">·</span>
-        <select class="model-select" id="modelSelect">
-          <option value="vajb-agent-lite">Lite</option>
-          <option value="vajb-agent-turbo">Turbo</option>
-          <option value="vajb-agent-pro">Pro</option>
-          <option value="vajb-agent-max">Max</option>
-          <option value="vajb-agent-power">Power</option>
-          <option value="vajb-agent-ultra">Ultra</option>
-          <option value="vajb-agent-architect">Architect</option>
-        </select>
-      </div>
-    </div>
+    <!-- hidden select kept for JS compatibility -->
+    <select id="modelSelect" style="display:none">
+      <option value="vajb-agent-lite">Lite</option>
+      <option value="vajb-agent-turbo">Turbo</option>
+      <option value="vajb-agent-pro">Pro</option>
+      <option value="vajb-agent-max">Max</option>
+      <option value="vajb-agent-power">Power</option>
+      <option value="vajb-agent-ultra">Ultra</option>
+      <option value="vajb-agent-architect">Architect</option>
+    </select>
   </div>
 
   <script nonce="{{nonce}}">
@@ -2772,6 +3059,58 @@
       vscode.postMessage({ type: 'setModel', model: modelSelect.value });
     });
 
+    // Model picker (custom popup menu)
+    var MODEL_LABELS = {
+      'vajb-agent-lite': 'Lite',
+      'vajb-agent-turbo': 'Turbo',
+      'vajb-agent-pro': 'Pro',
+      'vajb-agent-max': 'Max',
+      'vajb-agent-power': 'Power',
+      'vajb-agent-ultra': 'Ultra',
+      'vajb-agent-architect': 'Architect',
+    };
+    var modelPickerBtn = document.getElementById('modelPickerBtn');
+    var modelPickerLabel = document.getElementById('modelPickerLabel');
+    var modelMenuEl = document.getElementById('modelMenu');
+
+    function updateModelPicker(modelId) {
+      modelPickerLabel.textContent = MODEL_LABELS[modelId] || modelId;
+      modelMenuEl.querySelectorAll('.model-option').forEach(function(opt) {
+        opt.classList.toggle('active', opt.dataset.model === modelId);
+      });
+    }
+
+    modelPickerBtn.onclick = function(e) {
+      e.stopPropagation();
+      var isOpen = modelMenuEl.classList.contains('open');
+      if (!isOpen) {
+        var rect = modelPickerBtn.getBoundingClientRect();
+        modelMenuEl.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
+        modelMenuEl.style.left = rect.left + 'px';
+      }
+      modelMenuEl.classList.toggle('open', !isOpen);
+      modelPickerBtn.classList.toggle('open', !isOpen);
+    };
+
+    modelMenuEl.querySelectorAll('.model-option').forEach(function(opt) {
+      opt.addEventListener('click', function() {
+        var modelId = opt.dataset.model;
+        modelSelect.value = modelId;
+        modelSelect.dispatchEvent(new Event('change'));
+        updateModelPicker(modelId);
+        modelMenuEl.classList.remove('open');
+        modelPickerBtn.classList.remove('open');
+      });
+    });
+
+    // Close model menu on outside click
+    document.addEventListener('click', function(e) {
+      if (!modelPickerBtn.contains(e.target) && !modelMenuEl.contains(e.target)) {
+        modelMenuEl.classList.remove('open');
+        modelPickerBtn.classList.remove('open');
+      }
+    });
+
     newSessionBtn.addEventListener('click', () => {
       closeAllOverlays();
       vscode.postMessage({ type: 'newSession' });
@@ -2793,21 +3132,32 @@
       historyOverlay.classList.remove('visible');
     });
 
-    // Settings panel toggle
-    settingsBtn.addEventListener('click', (e) => {
+    // Settings popup toggle (opens upward from gear icon)
+    var settingsBtnBottom = document.getElementById('settingsBtnBottom');
+    var settingsPopup = document.getElementById('settingsPopup');
+    function toggleSettings(e) {
       e.stopPropagation();
       guideOverlay.classList.remove('visible');
       historyOverlay.classList.remove('visible');
-      const opening = !settingsPanel.classList.contains('open');
-      settingsPanel.classList.toggle('open');
-      if (opening) vscode.postMessage({ type: 'getRulesStatus' });
-    });
+      modelMenuEl.classList.remove('open');
+      modelPickerBtn.classList.remove('open');
+      var isOpen = settingsPopup.classList.contains('open');
+      if (!isOpen) {
+        var rect = settingsBtnBottom.getBoundingClientRect();
+        settingsPopup.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
+        settingsPopup.style.left = Math.max(8, rect.left - 20) + 'px';
+        vscode.postMessage({ type: 'getRulesStatus' });
+      }
+      settingsPopup.classList.toggle('open', !isOpen);
+    }
+    settingsBtn.addEventListener('click', toggleSettings);
+    settingsBtnBottom.addEventListener('click', toggleSettings);
     document.addEventListener('click', (e) => {
-      if (!settingsPanel.contains(e.target) && e.target !== settingsBtn) {
-        settingsPanel.classList.remove('open');
+      if (!settingsPopup.contains(e.target) && e.target !== settingsBtn && !settingsBtnBottom.contains(e.target)) {
+        settingsPopup.classList.remove('open');
       }
     });
-    settingsPanel.addEventListener('click', (e) => { e.stopPropagation(); });
+    settingsPopup.addEventListener('click', (e) => { e.stopPropagation(); });
 
     autoWriteFile.addEventListener('change', () => {
       vscode.postMessage({ type: 'setAutoApprove', key: 'writeFile', value: autoWriteFile.checked });
@@ -2821,39 +3171,39 @@
 
     function renderMcpStatus(servers, totalTools, loading) {
       if (loading) {
-        mcpStatusArea.textContent = 'Pokrecem MCP servere...';
-        mcpStatusArea.style.color = '';
+        mcpStatusArea.innerHTML = '<div class="settings-mcp-server" style="opacity:0.5;">Pokrecem MCP servere...</div>';
         return;
       }
       if (!servers || servers.length === 0) {
-        mcpStatusArea.textContent = 'Nema konfigurisanih servera';
-        mcpStatusArea.style.color = '';
+        mcpStatusArea.innerHTML = '<div class="settings-mcp-server" style="opacity:0.5;">Nema konfigurisanih servera</div>';
         return;
       }
       const configError = servers.find(s => s.name === '_config');
       const realServers = servers.filter(s => s.name !== '_config');
-      const lines = [];
+      var html = '';
       if (configError) {
-        lines.push('⚠️ ' + configError.error);
+        html += '<div class="settings-mcp-server" style="color:#cca700;">⚠ ' + configError.error + '</div>';
       }
       realServers.forEach(s => {
-        const dot = s.ready ? '🟢' : '🔴';
-        let line = dot + ' ' + s.name;
-        if (s.ready) line += ' (' + s.toolCount + ' tools)';
-        if (s.error) line += ' — ' + s.error;
-        lines.push(line);
+        html += '<div class="settings-mcp-server">';
+        html += '<span class="settings-mcp-dot ' + (s.ready ? 'ok' : 'err') + '"></span>';
+        html += '<span class="settings-mcp-name">' + s.name + '</span>';
+        if (s.ready) html += '<span class="settings-mcp-tools">' + s.toolCount + ' tools</span>';
+        if (s.error) html += '<span style="font-size:10px;color:#f14c4c;margin-left:4px;">' + s.error + '</span>';
+        html += '</div>';
       });
-      if (totalTools > 0) lines.push('Ukupno: ' + totalTools + ' MCP tools');
-      if (lines.length === 0) {
-        mcpStatusArea.textContent = 'Nema konfigurisanih servera';
-      } else {
-        mcpStatusArea.innerHTML = lines.map(l => '<div style="margin-bottom:3px;">' + l + '</div>').join('');
+      if (totalTools > 0) {
+        html += '<div style="padding:2px 10px;font-size:10px;opacity:0.4;">Ukupno: ' + totalTools + ' tools</div>';
       }
-      mcpStatusArea.style.whiteSpace = 'normal';
+      if (!html) {
+        mcpStatusArea.innerHTML = '<div class="settings-mcp-server" style="opacity:0.5;">Nema konfigurisanih servera</div>';
+      } else {
+        mcpStatusArea.innerHTML = html;
+      }
     }
 
     mcpRestartBtn.onclick = function() {
-      mcpStatusArea.textContent = 'Pokrecem MCP servere...';
+      mcpStatusArea.innerHTML = '<div class="settings-mcp-server" style="opacity:0.5;">Pokrecem MCP servere...</div>';
       mcpRestartBtn.disabled = true;
       mcpRestartBtn.textContent = '...';
       vscode.postMessage({ type: 'restartMcp' });
@@ -2874,7 +3224,7 @@
     };
 
     mcpGuideBtn.onclick = function() {
-      settingsPanel.classList.remove('open');
+      settingsPopup.classList.remove('open');
       guideOverlay.classList.remove('visible');
       historyOverlay.classList.remove('visible');
       mcpGuideOverlay.classList.add('visible');
@@ -2884,7 +3234,7 @@
     };
 
     guideBtn.addEventListener('click', () => {
-      settingsPanel.classList.remove('open');
+      settingsPopup.classList.remove('open');
       historyOverlay.classList.remove('visible');
       guideOverlay.classList.toggle('visible');
     });
@@ -3051,7 +3401,7 @@
         vscode.postMessage({ type: 'sendMessage', text: msg, images: [] });
         setStreaming(true);
         showStatus('Izvrsavam plan...', 'thinking');
-        bar.querySelector('.plan-actions-buttons').innerHTML = '<span style="color:#FA7315;font-size:11px;font-weight:600;">Izvrsavam ceo plan...</span>';
+        bar.querySelector('.plan-actions-buttons').innerHTML = '<span style="color:var(--accent);font-size:11px;font-weight:600;">Izvrsavam ceo plan...</span>';
         activePlanBar = null;
         activePlanPhase = 0;
       });
@@ -3083,7 +3433,7 @@
       activePlanTotal = total;
 
       bar.querySelector('.plan-actions-buttons').innerHTML =
-        '<span style="color:#FA7315;font-size:11px;">Faza ' + phase + '/' + total + ' u toku...</span>';
+        '<span style="color:var(--accent);font-size:11px;">Faza ' + phase + '/' + total + ' u toku...</span>';
     }
 
     function onPhaseCompleted() {
@@ -3197,7 +3547,7 @@
       if (!url) return;
       vscode.postMessage({ type: 'setApiUrl', url });
       apiKeyStatus.textContent = 'URL sacuvan!';
-      apiKeyStatus.style.color = '#FA7315';
+      apiKeyStatus.style.color = 'var(--accent)';
       setTimeout(() => { apiKeyStatus.textContent = ''; }, 2000);
     });
 
@@ -3403,10 +3753,87 @@
       });
     }
 
-    function sendMessage() {
+    var VAJB_MAX_IMAGE_DATA_URL_CHARS = 700000;
+    var VAJB_MAX_IMAGE_SIDE = 1600;
+    var VAJB_JPEG_QUALITY = 0.82;
+
+    function mimeFromDataUrl(dataUrl, fallback) {
+      if (!dataUrl || typeof dataUrl !== 'string') return fallback || 'image/jpeg';
+      var m = /^data:([^;,]+)/.exec(dataUrl);
+      if (m) return m[1].trim();
+      return fallback || 'image/jpeg';
+    }
+
+    function shrinkDataUrlIfNeeded(dataUrl) {
+      if (!dataUrl || typeof dataUrl !== 'string' || dataUrl.length <= VAJB_MAX_IMAGE_DATA_URL_CHARS) {
+        return Promise.resolve(dataUrl);
+      }
+      if (/data:image\/(gif|svg\+xml)/i.test(dataUrl)) {
+        return Promise.resolve(dataUrl);
+      }
+      return new Promise(function(resolve) {
+        var resolved = false;
+        var timer = setTimeout(function() {
+          if (!resolved) { resolved = true; resolve(dataUrl); }
+        }, 8000);
+        var im = new Image();
+        im.onload = function() {
+          if (resolved) return;
+          try {
+            var w = im.width;
+            var h = im.height;
+            var scale = Math.min(1, VAJB_MAX_IMAGE_SIDE / Math.max(w, h, 1));
+            var tw = Math.max(1, Math.round(w * scale));
+            var th = Math.max(1, Math.round(h * scale));
+            var canvas = document.createElement('canvas');
+            canvas.width = tw;
+            canvas.height = th;
+            var ctx = canvas.getContext('2d');
+            if (!ctx) {
+              if (!resolved) { resolved = true; clearTimeout(timer); resolve(dataUrl); }
+              return;
+            }
+            ctx.drawImage(im, 0, 0, tw, th);
+            var q = VAJB_JPEG_QUALITY;
+            var out = canvas.toDataURL('image/jpeg', q);
+            var guard = 0;
+            while (out.length > VAJB_MAX_IMAGE_DATA_URL_CHARS && q > 0.42 && guard++ < 14) {
+              q -= 0.05;
+              out = canvas.toDataURL('image/jpeg', q);
+            }
+            if (!resolved) { resolved = true; clearTimeout(timer); resolve(out); }
+          } catch (e) {
+            if (!resolved) { resolved = true; clearTimeout(timer); resolve(dataUrl); }
+          }
+        };
+        im.onerror = function() {
+          if (!resolved) { resolved = true; clearTimeout(timer); resolve(dataUrl); }
+        };
+        im.src = dataUrl;
+      });
+    }
+
+    var _sendMessageBusy = false;
+    var _sendMessageBusyTimer = null;
+
+    async function sendMessage() {
       const text = userInput.value.trim();
       if (!text && pendingImages.length === 0 && pendingFiles.length === 0) return;
-      if (isStreaming) return;
+      if (_sendMessageBusy) {
+        // Safety: reset after 15s max to prevent permanent lock
+        if (_sendMessageBusyTimer) return;
+        _sendMessageBusyTimer = setTimeout(function() {
+          _sendMessageBusy = false;
+          _sendMessageBusyTimer = null;
+          console.warn('[VajbAgent] _sendMessageBusy force-reset after timeout');
+        }, 15000);
+        return;
+      }
+      if (isStreaming) {
+        vscode.postMessage({ type: 'stopGeneration' });
+        setStreaming(false);
+        hideStatus();
+      }
 
       document.querySelectorAll('.welcome-msg').forEach(el => el.remove());
 
@@ -3462,20 +3889,39 @@
         togglePlanMode(false);
       }
 
-      vscode.postMessage({
-        type: 'sendMessage',
-        text: sendText,
-        images: pendingImages.map(i => ({ base64: i.base64, mimeType: i.type })),
-      });
+      _sendMessageBusy = true;
+      try {
+        var imagesPayload = [];
+        for (var ii = 0; ii < pendingImages.length; ii++) {
+          var pi = pendingImages[ii];
+          var shrunk = await shrinkDataUrlIfNeeded(pi.base64);
+          var mt = (pi.type && String(pi.type).trim()) ? pi.type.trim() : mimeFromDataUrl(shrunk, 'image/jpeg');
+          if (shrunk.indexOf('data:image/jpeg') === 0 || shrunk.indexOf('data:image/jpg') === 0) {
+            mt = 'image/jpeg';
+          }
+          imagesPayload.push({ base64: shrunk, mimeType: mt });
+        }
 
-      userInput.value = '';
-      userInput.style.height = 'auto';
-      pendingImages = [];
-      pendingFiles = [];
-      renderImagePreviews();
-      renderFilePreviews();
-      setStreaming(true);
-      showStatus('Razmisljam...', 'thinking');
+        vscode.postMessage({
+          type: 'sendMessage',
+          text: sendText,
+          images: imagesPayload,
+        });
+
+        userInput.value = '';
+        userInput.style.height = 'auto';
+        pendingImages = [];
+        pendingFiles = [];
+        renderImagePreviews();
+        renderFilePreviews();
+        setStreaming(true);
+        showStatus('Razmisljam...', 'thinking');
+      } catch (e) {
+        console.error('[VajbAgent] sendMessage error:', e);
+      } finally {
+        _sendMessageBusy = false;
+        if (_sendMessageBusyTimer) { clearTimeout(_sendMessageBusyTimer); _sendMessageBusyTimer = null; }
+      }
     }
 
     let _hadWriteTools = false;
@@ -3568,7 +4014,7 @@
       if (!on) hideStatus();
     }
 
-    const VAJB_SPARKLE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L13.5 8.5L20 7L14.5 11L18 17L12 13.5L6 17L9.5 11L4 7L10.5 8.5L12 2Z" fill="#FA7315" opacity="0.9"/><circle cx="12" cy="12" r="2" fill="#fff" opacity="0.6"/></svg>';
+    const VAJB_SPARKLE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L13.5 8.5L20 7L14.5 11L18 17L12 13.5L6 17L9.5 11L4 7L10.5 8.5L12 2Z" fill="var(--accent)" opacity="0.9"/><circle cx="12" cy="12" r="2" fill="#fff" opacity="0.6"/></svg>';
     const STATUS_ICONS = {
       thinking: VAJB_SPARKLE,
       reading: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4FC3F7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>',
@@ -3697,7 +4143,7 @@
           const last = cmdBlocks[cmdBlocks.length - 1];
           if (last) {
             const actions = last.querySelector('.cmd-actions');
-            if (actions) actions.innerHTML = '<span style="color:#FA7315;font-size:12px;padding:4px;">&#10003; Pokrenuto</span>';
+            if (actions) actions.innerHTML = '<span style="color:var(--accent);font-size:12px;padding:4px;">&#10003; Pokrenuto</span>';
           }
         } else {
           vscode.postMessage({ type: 'diffResponse', accepted: true, fullPath: extra || '' });
@@ -3745,6 +4191,7 @@
       switch (msg.type) {
         case 'init':
           modelSelect.value = msg.model;
+          updateModelPicker(msg.model);
           if (msg.autoApprove) {
             autoWriteFile.checked = msg.autoApprove.writeFile || false;
             autoReplaceInFile.checked = msg.autoApprove.replaceInFile || false;
@@ -3783,9 +4230,9 @@
         case 'rulesStatus': {
           rulesStatus.style.display = 'block';
           if (msg.exists) {
-            rulesStatus.innerHTML = '<span style="color:#4CAF50;">✓ Pravila aktivna</span> <span style="opacity:0.4;">(' + msg.file + ')</span>';
+            rulesStatus.innerHTML = '<span style="color:#4CAF50;font-weight:500;">✓ Aktivna</span> <span style="opacity:0.4;font-size:10px;">(' + msg.file + ')</span>';
           } else {
-            rulesStatus.innerHTML = '<span style="opacity:0.5;">Nema pravila — klikni "Uredi" da kreiras</span>';
+            rulesStatus.innerHTML = '<span style="opacity:0.5;">Nema pravila</span>';
           }
           rulesEditBtn.textContent = msg.exists ? 'Uredi pravila' : 'Kreiraj pravila';
           break;
@@ -3818,7 +4265,7 @@
           messagesEl.innerHTML = '';
           const w = document.createElement('div');
           w.className = 'welcome-msg';
-          w.innerHTML = '<div class="welcome-brand"><span class="v">&lt;</span>VajbAgent<span class="v">/&gt;</span></div><h3>Tvoj AI coding asistent</h3><div class="welcome-hint welcome-hint-tip">💡 Za vece zadatke, ukljuci <strong style="color:#FA7315;">Plan Mode</strong> <span style="opacity:0.4;">(📋 dole)</span> — agent pravi plan sa fazama pre izmena.</div><div class="welcome-powered">Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski · Kreirao <strong>Nemanja Lakic</strong></div>';
+          w.innerHTML = '<div class="welcome-brand"><span class="v">&lt;</span>VajbAgent<span class="v">/&gt;</span></div><h3>Tvoj AI coding asistent</h3><div class="welcome-hint welcome-hint-tip">💡 Za vece zadatke, ukljuci <strong style="color:var(--accent);">Plan Mode</strong> <span style="opacity:0.4;">(📋 dole)</span> — agent pravi plan sa fazama pre izmena.</div><div class="welcome-powered">Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski · Kreirao <strong>Nemanja Lakic</strong></div>';
           messagesEl.appendChild(w);
           currentAssistantEl = null;
           currentAssistantRawText = '';
@@ -3856,7 +4303,7 @@
           hideStatus();
           if (currentAssistantEl) {
             currentAssistantRawText += msg.text;
-            currentAssistantEl.textContent = streamingPreview(currentAssistantRawText);
+            currentAssistantEl.innerHTML = renderMarkdown(streamingPreview(currentAssistantRawText));
             scrollToBottom();
           }
           break;
@@ -3881,6 +4328,7 @@
                 currentAssistantEl.innerHTML = renderMarkdown(planText);
               }
               addCopyButtons(currentAssistantEl);
+              setupFileLinks(currentAssistantEl);
             } else {
               currentAssistantEl.remove();
             }
@@ -3923,7 +4371,7 @@
               case 'read_file':       return { label: 'Citam fajl', phase: 'reading' };
               case 'write_file':      return { label: 'Pisem fajl', phase: 'writing' };
               case 'replace_in_file': return { label: 'Menjam fajl', phase: 'writing' };
-              case 'list_files':      return { label: 'Listajem fajlove', phase: 'searching' };
+              case 'list_files':      return { label: 'Listam fajlove', phase: 'searching' };
               case 'search_files':    return { label: 'Pretrazujem kod', phase: 'searching' };
               case 'execute_command': return { label: 'Izvrsavam komandu', phase: 'command' };
               case 'fetch_url':       return { label: 'Ucitavam stranicu', phase: 'web' };
@@ -4019,7 +4467,7 @@
               case 'read_file':       return { label: 'Citam fajl', detail: short + lineInfo, phase: 'reading' };
               case 'write_file':      return { label: 'Pisem fajl', detail: short, phase: 'writing' };
               case 'replace_in_file': return { label: 'Menjam fajl', detail: short, phase: 'writing' };
-              case 'list_files':      return { label: 'Listajem fajlove', detail: short || parsedArgs.path || '', phase: 'searching' };
+              case 'list_files':      return { label: 'Listam fajlove', detail: short || parsedArgs.path || '', phase: 'searching' };
               case 'search_files':    return { label: 'Pretrazujem kod', detail: parsedArgs.pattern ? '"' + parsedArgs.pattern + '"' : '', phase: 'searching' };
               case 'execute_command': return { label: 'Izvrsavam komandu', detail: (parsedArgs.command || '').substring(0, 60), phase: 'command' };
               case 'fetch_url':       return { label: 'Ucitavam stranicu', detail: (parsedArgs.url || '').substring(0, 50), phase: 'web' };
@@ -4181,7 +4629,7 @@
             '</div>';
           cmdBlock.querySelector('.cmd-accept').addEventListener('click', () => {
             vscode.postMessage({ type: 'commandResponse', accepted: true });
-            cmdBlock.querySelector('.cmd-actions').innerHTML = '<span style="color:#FA7315;font-size:12px;padding:4px;">&#10003; Pokrenuto</span>';
+            cmdBlock.querySelector('.cmd-actions').innerHTML = '<span style="color:var(--accent);font-size:12px;padding:4px;">&#10003; Pokrenuto</span>';
             hideApprovalBar();
             showStatus('Nastavljam...', 'thinking');
           });
@@ -4365,9 +4813,9 @@
         case 'error': {
           const errDiv = document.createElement('div');
           errDiv.className = 'msg msg-assistant error-msg';
-          let errHtml = '<p style="color:#FA7315">⚠ ' + escapeHtml(msg.text || 'Doslo je do greske.') + '</p>';
+          let errHtml = '<p style="color:var(--accent)">⚠ ' + escapeHtml(msg.text || 'Doslo je do greske.') + '</p>';
           if (msg.retryable) {
-            errHtml += '<button class="retry-btn" onclick="retryLastMessage()" style="margin-top:8px;padding:6px 16px;background:#FA7315;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem">Pokusaj ponovo</button>';
+            errHtml += '<button class="retry-btn" onclick="retryLastMessage()" style="margin-top:8px;padding:6px 16px;background:var(--accent-gradient);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem">Pokusaj ponovo</button>';
           }
           errDiv.innerHTML = errHtml;
           messagesEl.appendChild(errDiv);
@@ -4464,6 +4912,7 @@
               currentAssistantEl.classList.remove('streaming');
               currentAssistantEl.innerHTML = renderMarkdown(partial);
               addCopyButtons(currentAssistantEl);
+              setupFileLinks(currentAssistantEl);
             } else {
               currentAssistantEl.remove();
             }
@@ -4497,7 +4946,7 @@
         case 'terminalError': {
           const termDiv = document.createElement('div');
           termDiv.className = 'msg msg-assistant';
-          termDiv.innerHTML = '<div style="font-size:11px;color:#FA7315;font-weight:600;margin-bottom:4px;">⚠ Komanda nije uspela: <code>' + escapeHtml(msg.command || '') + '</code></div>' +
+          termDiv.innerHTML = '<div style="font-size:11px;color:var(--accent);font-weight:600;margin-bottom:4px;">⚠ Komanda nije uspela: <code>' + escapeHtml(msg.command || '') + '</code></div>' +
             '<pre style="background:var(--vscode-textCodeBlock-background);padding:8px;border-radius:4px;font-size:11px;max-height:150px;overflow:auto;margin:0;">' + escapeHtml(msg.output || '') + '</pre>';
           messagesEl.appendChild(termDiv);
           scrollToBottom();
@@ -4793,19 +5242,36 @@
         });
         header.appendChild(btn);
       });
-      container.querySelectorAll('code.file-link').forEach(el => {
+      setupFileLinks(container);
+    }
+
+    function setupFileLinks(container) {
+      container.querySelectorAll('code.file-link:not([data-linked])').forEach(el => {
+        el.dataset.linked = '1';
         el.addEventListener('click', () => {
           vscode.postMessage({ type: 'openFile', path: el.dataset.path });
         });
       });
-      container.querySelectorAll('.tree-file-link').forEach(el => {
+      container.querySelectorAll('.tree-file-link:not([data-linked])').forEach(el => {
+        el.dataset.linked = '1';
         el.addEventListener('click', () => {
           vscode.postMessage({ type: 'openFile', path: el.dataset.path });
         });
       });
-      container.querySelectorAll('.tree-folder-link').forEach(el => {
+      container.querySelectorAll('.tree-folder-link:not([data-linked])').forEach(el => {
+        el.dataset.linked = '1';
         el.addEventListener('click', () => {
           vscode.postMessage({ type: 'openFile', path: el.dataset.path });
+        });
+      });
+      container.querySelectorAll('a[href]:not([data-linked])').forEach(el => {
+        el.dataset.linked = '1';
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          const href = el.getAttribute('href');
+          if (href && !href.startsWith('http')) {
+            vscode.postMessage({ type: 'openFile', path: href });
+          }
         });
       });
     }

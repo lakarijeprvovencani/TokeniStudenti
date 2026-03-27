@@ -2,7 +2,7 @@
   "name": "vajbagent",
   "displayName": "Vajb Agent",
   "description": "AI coding asistent: 7 modela (Lite do Architect), chat u VS Code, razume projekat, pise i menja kod, pokrece komande, Plan Mode, checklist, web pretraga, MCP, attach fajlova (PDF, slike), checkpoint/undo, auto-approve opcije. Bez pretplate.",
-  "version": "0.65.0",
+  "version": "0.79.0",
   "publisher": "VajbAgent",
   "engines": {
     "vscode": "^1.85.0"
@@ -117,13 +117,13 @@
             "vajb-agent-architect"
           ],
           "enumDescriptions": [
-            "Lite — brz i jeftin, svakodnevno kodiranje",
-            "Turbo — reasoning model, logika i debugging",
-            "Pro — jak i pametan, ozbiljniji projekti",
-            "Max — kompleksni zadaci i planiranje",
-            "Power — flagship, najjaci nivo",
-            "Ultra — premium, najzahtevniji zadaci",
-            "Architect — full-stack arhitekta, cele aplikacije od nule"
+            "Lite \u2014 brz i jeftin, svakodnevno kodiranje",
+            "Turbo \u2014 reasoning model, logika i debugging",
+            "Pro \u2014 jak i pametan, ozbiljniji projekti",
+            "Max \u2014 kompleksni zadaci i planiranje",
+            "Power \u2014 flagship, najjaci nivo",
+            "Ultra \u2014 premium, najzahtevniji zadaci",
+            "Architect \u2014 full-stack arhitekta, cele aplikacije od nule"
           ],
           "description": "AI model za koriscenje"
         },
@@ -165,6 +165,12 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
+    "jsonrepair": "^3.13.3",
     "marked": "^17.0.4"
+  },
+  "__metadata": {
+    "installedTimestamp": 1774619877569,
+    "targetPlatform": "undefined",
+    "size": 1043307
   }
 }
