@@ -455,7 +455,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           const doc = await vscode.workspace.openTextDocument(fullPath);
           await vscode.window.showTextDocument(doc);
         } catch {
-          vscode.window.showWarningMessage(`Fajl nije pronadjen: ${filePath}`);
+          // File not found at direct path — search workspace
+          const basename = path.basename(filePath);
+          const found = await vscode.workspace.findFiles(`**/${basename}`, '**/node_modules/**', 5);
+          if (found.length > 0) {
+            const doc = await vscode.workspace.openTextDocument(found[0]);
+            await vscode.window.showTextDocument(doc);
+          } else {
+            vscode.window.showWarningMessage(`Fajl nije pronadjen: ${filePath}`);
+          }
         }
         break;
       }

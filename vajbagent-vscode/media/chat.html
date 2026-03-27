@@ -81,18 +81,32 @@
       font-weight: 500;
       cursor: pointer;
       transition: background 0.15s, opacity 0.15s, border-color 0.15s;
-      opacity: 0.75;
+      opacity: 0.9;
       white-space: nowrap;
     }
     .model-picker-btn:hover { opacity: 1; background: rgba(255,255,255,0.1); border-color: var(--accent-border); }
-    .model-picker-btn .mpick-brand { font-weight: 600; font-size: 10px; }
-    .model-picker-btn .mpick-dot { opacity: 0.3; }
-    .model-picker-btn .mpick-name { color: var(--vscode-foreground); }
+    .model-picker-btn .mpick-brand { font-weight: 700; font-size: 11px; }
+    .model-picker-btn .mpick-dot { opacity: 0.5; }
+    .model-picker-btn .mpick-name { color: var(--vscode-foreground); font-weight: 500; }
     .model-picker-btn .mpick-arrow {
-      width: 8px; height: 8px; opacity: 0.4;
+      width: 8px; height: 8px; opacity: 0.5;
       transition: transform 0.15s;
     }
     .model-picker-btn.open .mpick-arrow { transform: rotate(180deg); }
+
+    .drag-hint {
+      font-size: 11px;
+      opacity: 0.7;
+      color: var(--vscode-foreground);
+      margin-left: 8px;
+    }
+    .drag-hint kbd {
+      background: rgba(255,255,255,0.1);
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-size: 10px;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
 
     .model-menu {
       display: none;
@@ -366,68 +380,73 @@
     .context-new-session:hover { opacity: 1; }
     .context-new-session.visible { display: block; }
     .undo-btn {
-      background: none;
-      border: 1px solid rgba(250, 115, 21, 0.4);
-      color: var(--accent);
-      border-radius: 4px;
-      padding: 2px 8px;
-      font-size: 10px;
-      cursor: pointer;
-      opacity: 0.7;
-      transition: opacity 0.15s, background 0.15s;
-    }
-    .undo-btn:hover { opacity: 1; background: rgba(250, 115, 21, 0.12); }
-    .checkpoint-list {
-      background: rgba(250, 115, 21, 0.04);
-      border: 1px solid rgba(250, 115, 21, 0.15);
-      border-radius: 8px;
-      padding: 8px 10px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.7);
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-family: 'Inter', system-ui, sans-serif;
       font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      opacity: 0.8;
+      transition: all 0.15s;
+    }
+    .undo-btn:hover { opacity: 1; background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.2); color: #fff; }
+    .checkpoint-list {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 12px;
     }
     .checkpoint-header {
-      color: var(--accent);
-      font-weight: 600;
-      margin-bottom: 6px;
-      font-size: 11px;
+      color: rgba(255, 255, 255, 0.8);
+      font-weight: 700;
+      margin-bottom: 8px;
+      font-size: 12px;
     }
     .checkpoint-file {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 3px 0;
-      border-bottom: 1px solid rgba(250, 115, 21, 0.08);
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     }
     .checkpoint-file:last-of-type { border-bottom: none; }
     .checkpoint-filename {
-      color: var(--vscode-foreground);
+      color: rgba(255, 255, 255, 0.75);
       cursor: pointer;
-      opacity: 0.85;
+      font-size: 12px;
     }
-    .checkpoint-filename:hover { color: var(--accent); opacity: 1; }
+    .checkpoint-filename:hover { color: #fff; }
     .checkpoint-revert-btn {
-      background: none;
-      border: 1px solid rgba(250, 115, 21, 0.3);
-      color: var(--accent);
-      border-radius: 3px;
-      padding: 1px 6px;
-      font-size: 10px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.6);
+      border-radius: 5px;
+      padding: 2px 8px;
+      font-size: 11px;
       cursor: pointer;
-      opacity: 0.6;
+      transition: all 0.15s;
     }
-    .checkpoint-revert-btn:hover { opacity: 1; background: rgba(250, 115, 21, 0.1); }
+    .checkpoint-revert-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
     .checkpoint-revert-all {
       display: block;
       width: 100%;
-      margin-top: 6px;
-      background: rgba(250, 115, 21, 0.1);
-      color: var(--accent);
-      border: 1px solid rgba(250, 115, 21, 0.25);
-      border-radius: 4px;
-      padding: 4px;
-      font-size: 10px;
+      margin-top: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(255, 255, 255, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 6px;
+      font-size: 11px;
+      font-weight: 500;
       cursor: pointer;
+      transition: all 0.15s;
     }
-    .checkpoint-revert-all:hover { background: rgba(250, 115, 21, 0.2); }
+    .checkpoint-revert-all:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
     .followup-bar {
       display: flex;
       flex-wrap: wrap;
@@ -575,28 +594,66 @@
     .msg-user {
       align-self: flex-start;
       max-width: 100%;
-      background: rgba(255,255,255,0.04);
+      background: #2a2a2a;
       color: var(--vscode-foreground);
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.1);
       white-space: pre-wrap;
-      font-weight: 600;
+      font-weight: 500;
       font-size: 14px;
-      padding: 10px 14px;
-      margin-bottom: 6px;
+      padding: 12px 16px;
+      margin: 10px 0;
+      line-height: 1.5;
     }
+    /* Queued message bar — sits above input */
+    .queue-bar {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.6);
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.03);
+      flex-shrink: 0;
+      animation: msgIn 0.2s ease-out;
+    }
+    .queue-bar.visible { display: flex; }
+    .queue-bar-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .queue-bar-label {
+      font-size: 11px;
+      opacity: 0.5;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .queue-bar-dismiss {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.4);
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0 4px;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+    .queue-bar-dismiss:hover { color: rgba(255, 255, 255, 0.8); }
     .msg-assistant {
       align-self: flex-start;
-      background: rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      background: transparent;
       color: var(--vscode-foreground);
-      border: 1px solid rgba(255, 255, 255, 0.04);
-      border-radius: 12px;
-      border-top-left-radius: 4px;
-      padding: 12px 16px;
+      border: none;
+      border-radius: 0;
+      padding: 4px 8px;
+      margin: 8px 0;
       font-size: 14px;
-      line-height: 1.6;
+      line-height: 1.7;
     }
     .msg-assistant .credits-cta {
       display: inline-block;
@@ -616,96 +673,103 @@
       background: var(--accent-gradient-hover);
     }
     .thinking-block {
-      margin-bottom: 12px;
-      padding: 10px 12px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 8px;
-      border-left: 3px solid var(--accent);
+      margin-bottom: 10px;
+      cursor: pointer;
+      user-select: none;
     }
     .thinking-label {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--accent);
-      opacity: 0.9;
-      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'Inter', var(--vscode-font-family), system-ui, sans-serif;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.45);
+      transition: color 0.15s;
     }
+    .thinking-label:hover { color: rgba(255, 255, 255, 0.7); }
+    .thinking-label .thinking-chevron {
+      transition: transform 0.15s;
+      font-size: 10px;
+    }
+    .thinking-block.open .thinking-chevron { transform: rotate(90deg); }
     .thinking-content {
-      font-size: 12px;
-      line-height: 1.5;
-      color: var(--vscode-foreground);
-      opacity: 0.85;
+      display: none;
+      font-size: 13px;
+      line-height: 1.6;
+      color: rgba(255, 255, 255, 0.55);
       white-space: pre-wrap;
       word-break: break-word;
+      padding: 8px 0 4px 20px;
+      border-left: 2px solid rgba(255, 255, 255, 0.08);
+      margin-left: 4px;
+      margin-top: 6px;
     }
+    .thinking-block.open .thinking-content { display: block; }
 
     /* Tool call blocks */
     .tool-block {
       align-self: flex-start;
       width: 100%;
-      max-width: 95%;
-      min-height: 32px;
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 10px;
-      overflow: hidden;
-      font-size: 12px;
+      max-width: 100%;
+      font-family: 'Inter', var(--vscode-font-family), system-ui, sans-serif;
+      font-size: 13px;
       flex-shrink: 0;
-      animation: msgIn 0.2s ease-out;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      animation: msgIn 0.15s ease-out;
+      margin: 6px 0;
     }
     .tool-header {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 7px 10px;
-      background: rgba(255, 255, 255, 0.02);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
+      gap: 8px;
+      padding: 4px 8px;
       cursor: pointer;
       user-select: none;
-      transition: background 0.15s;
+      transition: opacity 0.15s;
     }
-    .tool-header:hover { background: rgba(255, 255, 255, 0.05); }
-    .tool-icon { display: flex; align-items: center; transition: transform 0.15s; }
-    .tool-icon svg { width: 13px; height: 13px; }
-    .tool-icon.open { transform: rotate(90deg); }
-    .tool-name { font-weight: 600; color: var(--accent); }
+    .tool-header:hover { opacity: 0.8; }
+    .tool-icon { display: none; }
+    .tool-name { font-weight: 700; color: rgba(255, 255, 255, 0.85); }
     .tool-dot {
       width: 7px; height: 7px; border-radius: 50%;
-      background: #66BB6A; flex-shrink: 0;
+      background: rgba(255, 255, 255, 0.35); flex-shrink: 0;
       animation: pulse 1.5s ease-in-out infinite;
     }
-    .tool-block.done .tool-dot { animation: none; }
+    .tool-block.done .tool-dot { background: #66BB6A; animation: none; }
     .tool-block.error .tool-dot { background: #ef5350; animation: none; }
     .tool-detail {
-      opacity: 0.7;
-      font-size: 11px;
+      opacity: 0.45;
+      font-size: 12px;
       font-family: var(--vscode-editor-font-family), monospace;
-      margin-left: 6px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       max-width: 55%;
     }
-    .tool-status { margin-left: auto; opacity: 0.6; flex-shrink: 0; }
+    .tool-status { display: none; }
+    .tool-summary {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.4);
+      padding: 0 4px;
+      margin-top: -2px;
+    }
     .tool-body {
       display: none;
-      padding: 8px 10px;
-      background: var(--vscode-editor-background);
-      color: var(--vscode-foreground);
-      border-top: 1px solid var(--vscode-panel-border);
+      padding: 8px 12px;
+      margin: 4px 0;
+      background: rgba(0, 0, 0, 0.2);
+      color: rgba(255, 255, 255, 0.75);
+      border-radius: 8px;
       white-space: pre-wrap;
-      font-family: var(--vscode-editor-font-family);
-      font-size: 11px;
+      font-family: var(--vscode-editor-font-family), 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.6;
       max-height: 200px;
       overflow-y: auto;
     }
     .tool-body.open { display: block; }
-    .tool-body-line { white-space: pre; line-height: 1.55; }
-    .tool-body-stream { white-space: pre-wrap; opacity: 0.55; font-size: 11px; line-height: 1.5; }
-    .tool-body-result { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border); white-space: pre-wrap; }
+    .tool-body-line { white-space: pre; line-height: 1.6; }
+    .tool-body-stream { white-space: pre-wrap; opacity: 0.5; font-size: 12px; line-height: 1.6; }
+    .tool-body-result { margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.06); white-space: pre-wrap; }
     .tool-section-label {
       font-size: 10px;
       font-weight: 700;
@@ -726,19 +790,27 @@
     .sh-func { color: #61afef; }
     .sh-punct { color: #abb2bf; opacity: 0.7; }
 
-    /* Status indicator */
+    /* Status bar — sits between messages and input */
+    .status-bar {
+      flex-shrink: 0;
+    }
+
+    /* Status indicator — inside status bar */
     .status-indicator {
-      align-self: flex-start;
-      display: flex;
+      display: none;
       align-items: center;
       gap: 8px;
-      padding: 6px 12px;
-      font-size: 12px;
-      color: var(--vscode-foreground);
-      opacity: 0.7;
+      padding: 8px 14px;
+      font-family: 'Inter', var(--vscode-font-family), system-ui, sans-serif;
+      font-size: 12.5px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      color: rgba(255, 255, 255, 0.65);
       flex-shrink: 0;
-      transition: opacity 0.2s;
-      animation: msgIn 0.2s ease-out;
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .status-indicator.visible {
+      display: flex;
     }
     .status-icon {
       display: flex;
@@ -776,6 +848,11 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    .status-text.switching {
+      opacity: 0;
+      transform: translateY(4px);
     }
     .status-dots::after {
       content: '';
@@ -1175,27 +1252,13 @@
     .send-btn:hover { background: var(--accent-gradient-hover); }
     .send-btn:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; }
     .send-btn svg { width: 14px; height: 14px; }
-
-    .stop-btn {
-      display: none;
+    .send-btn.stop-mode {
       background: #e53935;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      height: 28px;
-      padding: 0 12px;
-      cursor: pointer;
-      align-items: center;
-      justify-content: center;
-      gap: 5px;
-      flex-shrink: 0;
-      font-size: 11px;
-      font-weight: 600;
-      transition: background 0.15s;
+      box-shadow: 0 1px 4px rgba(229, 57, 53, 0.3);
+      border-radius: 50%;
     }
-    .stop-btn:hover { background: #c62828; }
-    .stop-btn.visible { display: flex; }
-    .stop-btn svg { width: 10px; height: 10px; }
+    .send-btn.stop-mode:hover { background: #c62828; }
+    .send-btn .stop-icon { width: 12px; height: 12px; }
 
     /* Image previews */
     .image-previews {
@@ -1288,27 +1351,38 @@
     .file-chip-remove:hover { opacity: 1; color: #e74c3c; }
 
     .msg img.inline-img {
-      max-width: 200px;
-      max-height: 150px;
-      border-radius: 6px;
+      max-width: 120px;
+      max-height: 90px;
+      border-radius: 8px;
       margin-top: 4px;
-      display: block;
+      display: inline-block;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.1);
+      object-fit: cover;
+      vertical-align: middle;
+    }
+    .msg .inline-img-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 6px;
     }
 
     /* Markdown content styles */
-    .msg-assistant p { margin: 8px 0; line-height: 1.6; }
+    .msg-assistant p { margin: 12px 0; line-height: 1.7; }
     .msg-assistant p:first-child { margin-top: 0; }
     .msg-assistant p:last-child { margin-bottom: 0; }
-    .msg-assistant ul, .msg-assistant ol { margin: 10px 0; padding-left: 24px; }
-    .msg-assistant li { margin: 6px 0; line-height: 1.6; }
+    .msg-assistant ul, .msg-assistant ol { margin: 12px 0; padding-left: 24px; }
+    .msg-assistant li { margin: 8px 0; line-height: 1.7; }
+    .msg-assistant li p { margin: 4px 0; }
     .msg-assistant h1, .msg-assistant h2, .msg-assistant h3 {
-      margin: 14px 0 8px;
+      margin: 18px 0 10px;
       font-size: 14px;
       font-weight: 700;
       letter-spacing: 0.3px;
     }
-    .msg-assistant h1 { font-size: 18px; margin-top: 16px; }
-    .msg-assistant h2 { font-size: 16px; margin-top: 14px; }
+    .msg-assistant h1 { font-size: 18px; margin-top: 20px; }
+    .msg-assistant h2 { font-size: 16px; margin-top: 18px; }
     .msg-assistant h4 { font-size: 13px; margin: 6px 0 3px; }
     .msg-assistant h5 { font-size: 12px; margin: 6px 0 3px; opacity: 0.85; }
     .msg-assistant strong {
@@ -1321,38 +1395,38 @@
       opacity: 0.95;
     }
     .msg-assistant code {
-      background: rgba(255, 255, 255, 0.06);
-      color: #e8a86e;
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.85);
       padding: 2px 6px;
       border-radius: 4px;
       font-family: var(--vscode-editor-font-family);
       font-size: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
     }
     .msg-assistant code.file-link {
       cursor: pointer;
       text-decoration: underline;
       text-decoration-style: dotted;
       text-underline-offset: 2px;
-      color: var(--accent);
-      background: rgba(250, 115, 21, 0.08);
-      border-color: rgba(250, 115, 21, 0.2);
+      color: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.12);
       font-weight: 500;
       padding: 3px 8px;
       transition: all 0.15s;
     }
     .msg-assistant code.file-link:hover {
-      background: rgba(250, 115, 21, 0.15);
+      background: rgba(255, 255, 255, 0.15);
       text-decoration-style: solid;
-      border-color: rgba(250, 115, 21, 0.3);
-      transform: translateX(2px);
+      border-color: rgba(255, 255, 255, 0.2);
+      color: #fff;
     }
     .tree-file-link, .tree-folder-link {
       cursor: pointer;
       text-decoration: underline;
       text-decoration-style: dotted;
       text-underline-offset: 2px;
-      color: var(--accent);
+      color: rgba(255, 255, 255, 0.85);
       font-weight: 500;
       padding: 2px 4px;
       border-radius: 3px;
@@ -1370,12 +1444,12 @@
     }
     .tree-file-link:hover, .tree-folder-link:hover {
       text-decoration-style: solid;
-      background: rgba(250, 115, 21, 0.15);
+      background: rgba(255, 255, 255, 0.1);
       border-radius: 4px;
-      transform: translateX(2px);
+      color: #fff;
     }
     .tree-folder-link {
-      color: #e8a86e;
+      color: rgba(255, 255, 255, 0.85);
     }
     .checklist-item {
       list-style: none;
@@ -1432,39 +1506,48 @@
       opacity: 1;
     }
     .copy-btn {
-      background: rgba(250, 115, 21, 0.15);
-      color: var(--accent);
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.6);
       border: none;
-      border-radius: 3px;
-      padding: 2px 8px;
+      border-radius: 4px;
+      padding: 3px 8px;
       font-size: 10px;
+      font-family: 'Inter', system-ui, sans-serif;
       cursor: pointer;
       opacity: 0.8;
       transition: opacity 0.15s, background 0.15s;
     }
-    .copy-btn:hover { opacity: 1; background: rgba(250, 115, 21, 0.25); }
+    .copy-btn:hover { opacity: 1; background: rgba(255, 255, 255, 0.15); color: #fff; }
     .msg-assistant pre {
-      background: var(--vscode-textCodeBlock-background);
-      padding: 8px 10px;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 10px 12px;
       margin: 0;
       overflow-x: auto;
       position: relative;
+      border-radius: 6px;
     }
     .msg-assistant pre code {
       background: none;
       padding: 0;
-      font-size: 12px;
-      line-height: 1.5;
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: rgba(255, 255, 255, 0.85);
     }
     .msg-assistant blockquote {
-      border-left: 3px solid rgba(250, 115, 21, 0.4);
-      margin: 4px 0;
-      padding: 2px 10px;
+      border-left: 3px solid rgba(255, 255, 255, 0.2);
+      margin: 8px 0;
+      padding: 4px 12px;
       opacity: 0.8;
     }
     .msg-assistant a {
-      color: var(--accent);
-      text-decoration: none;
+      color: rgba(255, 255, 255, 0.9);
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 2px;
+    }
+    .msg-assistant a:hover {
+      color: #fff;
+      text-decoration-style: solid;
     }
     .msg-assistant hr {
       border: none;
@@ -1616,8 +1699,8 @@
       font-size: 12px;
     }
     .diff-header .diff-icon { opacity: 0.6; }
-    .diff-header .diff-filename { font-weight: 600; color: var(--vscode-foreground); cursor: pointer; }
-    .diff-header .diff-filename:hover { color: var(--accent); }
+    .diff-header .diff-filename { font-weight: 600; color: rgba(255, 255, 255, 0.85); cursor: pointer; }
+    .diff-header .diff-filename:hover { color: #fff; }
     .diff-header .diff-stats {
       margin-left: auto;
       font-size: 11px;
@@ -1634,7 +1717,7 @@
       font-weight: 600;
       margin-left: 8px;
     }
-    .auto-approved-diff { border-color: rgba(78, 201, 176, 0.3); }
+    .auto-approved-diff { border-color: rgba(255, 255, 255, 0.08); }
     .diff-lines {
       max-height: 300px;
       overflow-y: auto;
@@ -1908,16 +1991,16 @@
       background: var(--vscode-editor-background);
     }
     .cmd-accept {
-      background: var(--accent-gradient);
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      padding: 4px 16px;
+      background: rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      padding: 5px 16px;
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
     }
-    .cmd-accept:hover { background: var(--accent-gradient-hover); }
+    .cmd-accept:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
     .cmd-reject {
       background: transparent;
       color: var(--vscode-foreground);
@@ -1936,9 +2019,15 @@
       align-items: center;
       gap: 6px;
       padding: 4px 10px;
-      font-size: 11px;
-      color: var(--accent);
-      opacity: 0.7;
+      margin: 4px 0;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.45);
+      opacity: 0.8;
+    }
+    .auto-approved-notice strong {
+      color: rgba(255, 255, 255, 0.6);
+      font-weight: 600;
     }
 
     .header { position: relative; z-index: 1000; }
@@ -2657,6 +2746,14 @@
     </div>
   </div>
 
+  <div class="status-bar" id="statusBar"></div>
+
+  <div class="queue-bar" id="queueBar">
+    <span class="queue-bar-label">Sledeća:</span>
+    <span class="queue-bar-text" id="queueBarText"></span>
+    <button class="queue-bar-dismiss" id="queueBarDismiss" title="Otkaži">✕</button>
+  </div>
+
   <div class="input-area">
     <div class="mention-dropdown" id="slashDropdown"></div>
     <div class="mention-dropdown" id="mentionDropdown"></div>
@@ -2670,6 +2767,7 @@
             <svg class="mpick-arrow" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 4.5L6 7.5L9 4.5"/></svg>
           </button>
         </div>
+        <span class="drag-hint">Prevuci fajl uz <kbd>Shift</kbd></span>
       </div>
     </div>
     <div class="input-container">
@@ -2715,10 +2813,6 @@
           </button>
         </div>
         <div class="input-toolbar-right">
-          <button class="stop-btn" id="stopBtn" title="Zaustavi">
-            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-            Stop
-          </button>
           <div class="mode-picker-wrap" id="modePickerWrap">
             <button class="mode-btn" id="modeBtn" title="Rezim rada">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
@@ -2727,7 +2821,8 @@
             </button>
           </div>
           <button class="send-btn" id="sendBtn" title="Posalji (Enter)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+            <svg class="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+            <svg class="stop-icon" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
           </button>
         </div>
       </div>
@@ -2751,7 +2846,8 @@
     const messagesEl = document.getElementById('messages');
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
-    const stopBtn = document.getElementById('stopBtn');
+    const sendIcon = sendBtn.querySelector('.send-icon');
+    const stopIcon = sendBtn.querySelector('.stop-icon');
     const modelSelect = document.getElementById('modelSelect');
     const newSessionBtn = document.getElementById('newSessionBtn');
     const welcomeEl = document.getElementById('welcome');
@@ -2804,6 +2900,7 @@
     }
 
     let isStreaming = false;
+    let _queuedMessage = null; // { text, images, files }
     let pendingImages = [];
     let pendingFiles = [];
     const filePreviewsEl = document.getElementById('filePreviews');
@@ -3050,9 +3147,18 @@
       }
     });
 
-    sendBtn.addEventListener('click', sendMessage);
-    stopBtn.addEventListener('click', () => {
-      vscode.postMessage({ type: 'stopGeneration' });
+    sendBtn.addEventListener('click', function() {
+      // If in stop mode (streaming + no text), stop generation
+      if (isStreaming && sendBtn.classList.contains('stop-mode')) {
+        vscode.postMessage({ type: 'stopGeneration' });
+        return;
+      }
+      sendMessage();
+    });
+    userInput.addEventListener('input', updateSendButton);
+    document.getElementById('queueBarDismiss').addEventListener('click', () => {
+      _queuedMessage = null;
+      document.getElementById('queueBar').classList.remove('visible');
     });
 
     modelSelect.addEventListener('change', () => {
@@ -3401,7 +3507,7 @@
         vscode.postMessage({ type: 'sendMessage', text: msg, images: [] });
         setStreaming(true);
         showStatus('Izvrsavam plan...', 'thinking');
-        bar.querySelector('.plan-actions-buttons').innerHTML = '<span style="color:var(--accent);font-size:11px;font-weight:600;">Izvrsavam ceo plan...</span>';
+        bar.querySelector('.plan-actions-buttons').innerHTML = '<span style="color:rgba(255,255,255,0.5);font-size:11px;font-weight:600;">Izvrsavam ceo plan...</span>';
         activePlanBar = null;
         activePlanPhase = 0;
       });
@@ -3433,7 +3539,7 @@
       activePlanTotal = total;
 
       bar.querySelector('.plan-actions-buttons').innerHTML =
-        '<span style="color:var(--accent);font-size:11px;">Faza ' + phase + '/' + total + ' u toku...</span>';
+        '<span style="color:rgba(255,255,255,0.5);font-size:11px;">Faza ' + phase + '/' + total + ' u toku...</span>';
     }
 
     function onPhaseCompleted() {
@@ -3830,33 +3936,61 @@
         return;
       }
       if (isStreaming) {
-        vscode.postMessage({ type: 'stopGeneration' });
-        setStreaming(false);
-        hideStatus();
+        // Queue the message — shown in bar, sent when agent finishes
+        var qText = userInput.value.trim();
+        if (!qText && pendingImages.length === 0 && pendingFiles.length === 0) return;
+        _queuedMessage = { text: qText, images: [...pendingImages], files: [...pendingFiles] };
+
+        // Show in queue bar
+        document.getElementById('queueBarText').textContent = qText || '(fajlovi)';
+        document.getElementById('queueBar').classList.add('visible');
+
+        // Clear input
+        userInput.value = '';
+        userInput.style.height = 'auto';
+        pendingImages = [];
+        pendingFiles = [];
+        renderImagePreviews();
+        renderFilePreviews();
+        _sendMessageBusy = false;
+        return;
       }
 
       document.querySelectorAll('.welcome-msg').forEach(el => el.remove());
 
-      if (pendingFiles.length > 0) {
-        const filesHtml = pendingFiles.map(f => '<span class="file-chip" style="margin-right:4px;"><span class="file-chip-icon">📎</span><span class="file-chip-name">' + f.name + '</span></span>').join('');
+      {
+        // Build a single combined user message bubble
         const el = document.createElement('div');
         el.className = 'msg msg-user';
-        el.style.display = 'flex';
-        el.style.flexWrap = 'wrap';
-        el.style.gap = '4px';
-        el.style.alignItems = 'center';
-        el.innerHTML = filesHtml;
-        messagesEl.appendChild(el);
+        let html = '';
+
+        // File chips
+        if (pendingFiles.length > 0) {
+          html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:' + (text || pendingImages.length ? '8px' : '0') + ';">';
+          html += pendingFiles.map(f => '<span class="file-chip" style="margin-right:4px;"><span class="file-chip-icon">📎</span><span class="file-chip-name">' + f.name + '</span></span>').join('');
+          html += '</div>';
+        }
+
+        // Image thumbnails row
+        if (pendingImages.length > 0) {
+          html += '<div class="inline-img-row" style="margin-bottom:' + (text ? '8px' : '0') + ';">';
+          pendingImages.forEach(img => {
+            html += '<img class="inline-img" src="' + img.base64 + '">';
+          });
+          html += '</div>';
+        }
+
+        // Text
+        if (text) {
+          const displayText = planModeActive ? '📋 [Plan] ' + text : text;
+          html += '<div>' + displayText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
+        }
+
+        if (html) {
+          el.innerHTML = html;
+          messagesEl.appendChild(el);
+        }
       }
-      if (text) {
-        addMessageBubble('user', planModeActive ? '📋 [Plan] ' + text : text);
-      }
-      pendingImages.forEach(img => {
-        const el = document.createElement('div');
-        el.className = 'msg msg-user';
-        el.innerHTML = '<img class="inline-img" src="' + img.base64 + '">';
-        messagesEl.appendChild(el);
-      });
 
       _lastUserText = text;
       let sendText = text;
@@ -3915,6 +4049,7 @@
         renderImagePreviews();
         renderFilePreviews();
         setStreaming(true);
+        _statusContext = detectStatusContext(sendText);
         showStatus('Razmisljam...', 'thinking');
       } catch (e) {
         console.error('[VajbAgent] sendMessage error:', e);
@@ -3985,12 +4120,21 @@
       } else {
         const { thinking, rest } = splitThinking(text);
         if (thinking) {
+          var thinkWords = thinking.split(/\s+/).length;
+          var thinkSec = Math.max(1, Math.round(thinkWords / 20));
           div.innerHTML =
             '<div class="thinking-block">' +
-              '<div class="thinking-label">Rezonovanje agenta</div>' +
+              '<div class="thinking-label">' +
+                '<span class="thinking-chevron">›</span> ' +
+                'Thought for ' + thinkSec + 's' +
+              '</div>' +
               '<div class="thinking-content">' + escapeHtml(thinking) + '</div>' +
             '</div>' +
             (rest ? '<div class="msg-body">' + renderMarkdown(rest) + '</div>' : '');
+          var thinkBlock = div.querySelector('.thinking-block');
+          thinkBlock.addEventListener('click', function() {
+            thinkBlock.classList.toggle('open');
+          });
         } else {
           div.innerHTML = renderMarkdown(text);
         }
@@ -4008,47 +4152,114 @@
 
     function setStreaming(on) {
       isStreaming = on;
-      sendBtn.disabled = on;
-      sendBtn.style.display = on ? 'none' : 'flex';
-      stopBtn.classList.toggle('visible', on);
+      sendBtn.disabled = false;
+      updateSendButton();
       if (!on) hideStatus();
     }
 
-    const VAJB_SPARKLE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L13.5 8.5L20 7L14.5 11L18 17L12 13.5L6 17L9.5 11L4 7L10.5 8.5L12 2Z" fill="var(--accent)" opacity="0.9"/><circle cx="12" cy="12" r="2" fill="#fff" opacity="0.6"/></svg>';
-    const STATUS_ICONS = {
-      thinking: VAJB_SPARKLE,
-      reading: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4FC3F7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>',
-      writing: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81C784" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
-      command: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFB74D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>',
-      searching: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#CE93D8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
-      web: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4DD0E1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>',
-      streaming: VAJB_SPARKLE,
-      images: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#26C6DA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
-      download: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#66BB6A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
-      mcp: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A5D6A7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>'
-    };
+    function updateSendButton() {
+      var hasText = userInput.value.trim().length > 0 || pendingImages.length > 0 || pendingFiles.length > 0;
+      if (isStreaming && !hasText) {
+        // Stop mode — red square
+        sendBtn.classList.add('stop-mode');
+        sendIcon.style.display = 'none';
+        stopIcon.style.display = 'block';
+        sendBtn.title = 'Zaustavi';
+      } else {
+        // Send mode — arrow
+        sendBtn.classList.remove('stop-mode');
+        sendIcon.style.display = 'block';
+        stopIcon.style.display = 'none';
+        sendBtn.title = isStreaming ? 'Posalji sledecu poruku' : 'Posalji (Enter)';
+      }
+    }
 
-    // Rotating status messages for thinking phase
-    const THINKING_MESSAGES = [
-      'Razmisljam...',
-      'Analiziram zahtev...',
-      'Planiram pristup...',
-      'Sklapam resenje...',
-      'Osmisljavam plan...',
-      'Obradjujem...',
-      'Pripremam odgovor...',
-      'Razmatram opcije...',
-    ];
+    const VAJB_SPARKLE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L13.5 8.5L20 7L14.5 11L18 17L12 13.5L6 17L9.5 11L4 7L10.5 8.5L12 2Z" fill="var(--accent)" opacity="0.9"/><circle cx="12" cy="12" r="2" fill="#fff" opacity="0.6"/></svg>';
+
+    // One icon for all statuses — the VajbAgent sparkle
+    function getStatusIcon() { return VAJB_SPARKLE; }
+
+    // Status messages — context-aware, branded, natural
+    const STATUS_MESSAGES = {
+      default: [
+        'Vajbujem...',
+        'Razmisljam...',
+        'Analiziram...',
+        'Planiram pristup...',
+        'Sklapam resenje...',
+        'Osmisljavam...',
+      ],
+      code: [
+        'Vajbujem kod...',
+        'Citam strukturu...',
+        'Analiziram fajlove...',
+        'Planiram izmene...',
+        'Pripremam resenje...',
+        'Pisem kod...',
+      ],
+      debug: [
+        'Vajbujem debug...',
+        'Trazim uzrok greske...',
+        'Analiziram error...',
+        'Ispitujem kod...',
+        'Dijagnostikujem...',
+        'Pronalazim fix...',
+      ],
+      search: [
+        'Pretrazujem projekat...',
+        'Vajbujem pretragu...',
+        'Skeniram fajlove...',
+        'Trazim po kodu...',
+      ],
+      web: [
+        'Vajbujem web...',
+        'Pretrazujem internet...',
+        'Ucitavam stranicu...',
+        'Analiziram rezultate...',
+      ],
+      build: [
+        'Vajbujem build...',
+        'Kompajliram...',
+        'Proveravam greske...',
+        'Pripremam deploy...',
+      ],
+      server: [
+        'Vajbujem server...',
+        'Pokrecem...',
+        'Cekam odgovor...',
+        'Proveravam status...',
+      ],
+    };
     let _statusRotateTimer = null;
     let _statusRotateIndex = 0;
+    let _statusContext = 'default';
+
+    function detectStatusContext(userText) {
+      if (!userText) return 'default';
+      var t = userText.toLowerCase();
+      if (/gresk|error|bug|fix|ne radi|pokvari|crash|fail/i.test(t)) return 'debug';
+      if (/pretrazi|search|nadji|find|google/i.test(t)) return 'search';
+      if (/http|url|sajt|stranica|link|web/i.test(t)) return 'web';
+      if (/build|kompajl|deploy|push/i.test(t)) return 'build';
+      if (/pokreni|start|server|run|pusti/i.test(t)) return 'server';
+      return 'code';
+    }
 
     function startStatusRotation() {
       stopStatusRotation();
       _statusRotateIndex = 0;
+      var messages = STATUS_MESSAGES[_statusContext] || STATUS_MESSAGES.default;
       _statusRotateTimer = setInterval(function() {
         if (statusIndicator && statusIndicator.classList.contains('visible') && statusPhase === 'thinking') {
-          _statusRotateIndex = (_statusRotateIndex + 1) % THINKING_MESSAGES.length;
-          statusIndicator.querySelector('.status-text').textContent = THINKING_MESSAGES[_statusRotateIndex];
+          var textEl = statusIndicator.querySelector('.status-text');
+          // Fade out
+          textEl.classList.add('switching');
+          setTimeout(function() {
+            _statusRotateIndex = (_statusRotateIndex + 1) % messages.length;
+            textEl.textContent = messages[_statusRotateIndex];
+            // Fade in
+            textEl.classList.remove('switching');
+          }, 250);
         }
       }, 2500);
     }
@@ -4057,26 +4268,22 @@
       if (_statusRotateTimer) { clearInterval(_statusRotateTimer); _statusRotateTimer = null; }
     }
 
-    function getStatusIcon(phase) {
-      return STATUS_ICONS[phase] || STATUS_ICONS.thinking;
-    }
+    const statusBar = document.getElementById('statusBar');
 
     function showStatus(text, phase) {
       if (phase) statusPhase = phase;
       if (!statusIndicator) {
         statusIndicator = document.createElement('div');
-        statusIndicator.className = 'status-indicator visible';
+        statusIndicator.className = 'status-indicator';
         statusIndicator.innerHTML = '<div class="status-icon"></div><span class="status-text"></span>';
+        statusBar.appendChild(statusIndicator);
       }
       const iconEl = statusIndicator.querySelector('.status-icon');
-      iconEl.innerHTML = getStatusIcon(statusPhase);
-      var animClass = (statusPhase === 'thinking' || statusPhase === 'streaming') ? 'sparkle' : 'pulse';
-      iconEl.className = 'status-icon ' + animClass;
+      iconEl.innerHTML = getStatusIcon();
+      iconEl.className = 'status-icon sparkle';
       const textEl = statusIndicator.querySelector('.status-text');
       textEl.textContent = text;
-      textEl.classList.remove('status-dots');
       statusIndicator.classList.add('visible');
-      messagesEl.appendChild(statusIndicator);
       scrollToBottom();
       if (statusPhase === 'thinking') {
         startStatusRotation();
@@ -4090,9 +4297,6 @@
       if (obradjujemTimeoutId) { clearTimeout(obradjujemTimeoutId); obradjujemTimeoutId = null; }
       if (statusIndicator) {
         statusIndicator.classList.remove('visible');
-        if (statusIndicator.parentNode) {
-          statusIndicator.parentNode.removeChild(statusIndicator);
-        }
       }
     }
 
@@ -4143,7 +4347,7 @@
           const last = cmdBlocks[cmdBlocks.length - 1];
           if (last) {
             const actions = last.querySelector('.cmd-actions');
-            if (actions) actions.innerHTML = '<span style="color:var(--accent);font-size:12px;padding:4px;">&#10003; Pokrenuto</span>';
+            if (actions) actions.innerHTML = '<span style="color:rgba(255,255,255,0.5);font-size:12px;padding:4px;">&#10003; Pokrenuto</span>';
           }
         } else {
           vscode.postMessage({ type: 'diffResponse', accepted: true, fullPath: extra || '' });
@@ -4359,12 +4563,34 @@
 
         case 'loopEnd': {
           setStreaming(false);
+          // If there's a queued message, send it now
+          if (_queuedMessage) {
+            var q = _queuedMessage;
+            _queuedMessage = null;
+            // Hide queue bar
+            document.getElementById('queueBar').classList.remove('visible');
+            // Create user bubble in chat
+            addMessageBubble('user', q.text || '(fajlovi)');
+            // Send to backend
+            setTimeout(function() {
+              var imagesPayload = (q.images || []).map(function(img) {
+                return { base64: img.base64, mimeType: img.mimeType || 'image/png' };
+              });
+              vscode.postMessage({
+                type: 'sendMessage',
+                text: q.text || '',
+                images: imagesPayload,
+              });
+              setStreaming(true);
+              _statusContext = detectStatusContext(q.text || '');
+              showStatus('Vajbujem...', 'thinking');
+            }, 300);
+          }
           break;
         }
 
         case 'toolCallStart': {
           if (obradjujemTimeoutId) { clearTimeout(obradjujemTimeoutId); obradjujemTimeoutId = null; }
-          hideStatus();
 
           var startLabel = (function(n) {
             switch (n) {
@@ -4388,35 +4614,7 @@
             }
           })(msg.name);
           showStatus(startLabel.label + '...', startLabel.phase);
-
-          var block = document.createElement('div');
-          block.className = 'tool-block';
-          var bodyDiv = document.createElement('div');
-          bodyDiv.className = 'tool-body';
-          var toolIcon = (STATUS_ICONS[startLabel.phase] || STATUS_ICONS.thinking);
-          block.innerHTML =
-            '<div class="tool-header">' +
-              '<span class="tool-dot"></span>' +
-              '<span class="tool-icon">' + toolIcon + '</span>' +
-              '<span class="tool-name">' + escapeHtml(startLabel.label) + '</span>' +
-              '<span class="tool-detail"></span>' +
-              '<span class="tool-status">running...</span>' +
-            '</div>';
-          block.appendChild(bodyDiv);
-          block.querySelector('.tool-header').addEventListener('click', function() {
-            var iconEl = block.querySelector('.tool-icon');
-            iconEl.classList.toggle('open');
-            bodyDiv.classList.toggle('open');
-          });
-          block.dataset.toolCallId = msg.id || '';
-
-          if (msg.name === 'write_file' || msg.name === 'replace_in_file') {
-            bodyDiv.classList.add('open');
-            block.querySelector('.tool-icon').classList.add('open');
-          }
-
-          messagesEl.appendChild(block);
-          scrollToBottom();
+          // Tool block is created by toolCallReady — no duplicate here
           break;
         }
 
@@ -4503,24 +4701,20 @@
             targetBlock.className = 'tool-block';
             var newBody = document.createElement('div');
             newBody.className = 'tool-body';
-            var readyIcon = (STATUS_ICONS[toolDetail.phase] || STATUS_ICONS.thinking);
             targetBlock.innerHTML =
               '<div class="tool-header">' +
                 '<span class="tool-dot"></span>' +
-                '<span class="tool-icon">' + readyIcon + '</span>' +
                 '<span class="tool-name">' + escapeHtml(toolDetail.label) + '</span>' +
                 '<span class="tool-detail"></span>' +
-                '<span class="tool-status">running...</span>' +
+                '<span class="tool-status"></span>' +
               '</div>';
             targetBlock.appendChild(newBody);
             targetBlock.querySelector('.tool-header').addEventListener('click', function() {
-              targetBlock.querySelector('.tool-icon').classList.toggle('open');
               newBody.classList.toggle('open');
             });
             targetBlock.dataset.toolCallId = msg.id || '';
             messagesEl.appendChild(targetBlock);
           } else {
-            // Update label with readable name
             var nameEl = targetBlock.querySelector('.tool-name');
             if (nameEl) nameEl.textContent = toolDetail.label;
           }
@@ -4529,8 +4723,7 @@
           if (detailEl && toolDetail.detail) {
             detailEl.textContent = toolDetail.detail;
           }
-          var statusEl = targetBlock.querySelector('.tool-status');
-          if (statusEl) statusEl.textContent = msg.status || 'running...';
+          // Status shown by dot color (gray=running, green=done, red=error)
 
           var bodyEl = targetBlock.querySelector('.tool-body');
 
@@ -4546,32 +4739,39 @@
               var parsed = JSON.parse(bodyContent);
               var fileContent = parsed.content || parsed.new_string || '';
               if (fileContent) {
+                var lineCount = fileContent.split('\n').length;
+                // Show summary under header
+                var summaryEl = document.createElement('div');
+                summaryEl.className = 'tool-summary';
+                summaryEl.textContent = lineCount + ' lines';
+                targetBlock.insertBefore(summaryEl, bodyEl);
+                // Put code in body (collapsed)
                 bodyEl.innerHTML = '';
-                bodyEl.classList.add('open');
-                targetBlock.querySelector('.tool-icon').classList.add('open');
                 var lines = fileContent.split('\n');
-                for (var li = 0; li < lines.length; li++) {
+                var maxLines = 40;
+                var showLines = Math.min(lines.length, maxLines);
+                for (var li = 0; li < showLines; li++) {
                   var lineEl = document.createElement('div');
                   lineEl.className = 'tool-body-line';
                   lineEl.innerHTML = highlightLine(lines[li]);
                   bodyEl.appendChild(lineEl);
                 }
-              } else {
-                bodyEl.textContent = bodyContent;
+                if (lines.length > maxLines) {
+                  var moreEl = document.createElement('div');
+                  moreEl.style.cssText = 'opacity:0.4;font-size:11px;padding:4px 0;';
+                  moreEl.textContent = '... + ' + (lines.length - maxLines) + ' more lines';
+                  bodyEl.appendChild(moreEl);
+                }
               }
-            } catch (_) {
-              bodyEl.textContent = bodyContent;
-            }
+            } catch (_) {}
           } else if (msg.name === 'execute_command' && bodyContent) {
             try {
               var cmdParsed = JSON.parse(bodyContent);
-              bodyEl.innerHTML = '<div class="tool-section-label">IN</div>' +
-                '<div style="white-space:pre-wrap;margin-bottom:4px;">' + escapeHtml(cmdParsed.command || bodyContent) + '</div>';
+              bodyEl.innerHTML = '<div style="white-space:pre-wrap;">' + escapeHtml(cmdParsed.command || bodyContent) + '</div>';
             } catch (_) {
-              bodyEl.innerHTML = '<div class="tool-section-label">IN</div>' +
-                '<div style="white-space:pre-wrap;">' + escapeHtml(bodyContent) + '</div>';
+              bodyEl.innerHTML = '<div style="white-space:pre-wrap;">' + escapeHtml(bodyContent) + '</div>';
             }
-          } else {
+          } else if (bodyContent) {
             bodyEl.textContent = bodyContent;
           }
 
@@ -4585,12 +4785,22 @@
           for (const b of blocks) {
             if (b.dataset.toolCallId === msg.id) {
               b.classList.add(msg.status === 'error' ? 'error' : 'done');
-              b.querySelector('.tool-status').textContent = msg.status || 'done';
               const body = b.querySelector('.tool-body');
               if (msg.result) {
+                // Count output lines for summary
+                var outLines = msg.result.split('\n').length;
+                var existingSummary = b.querySelector('.tool-summary');
+                if (!existingSummary) {
+                  var sumEl = document.createElement('div');
+                  sumEl.className = 'tool-summary';
+                  sumEl.textContent = outLines + ' lines of output';
+                  b.insertBefore(sumEl, body);
+                } else {
+                  existingSummary.textContent += '  →  ' + outLines + ' lines of output';
+                }
+                // Put result in body (collapsed)
                 var resultEl = document.createElement('div');
                 resultEl.className = 'tool-body-result';
-                resultEl.innerHTML = '<div class="tool-section-label">OUT</div>';
                 var resultText = document.createElement('div');
                 resultText.style.whiteSpace = 'pre-wrap';
                 resultText.textContent = msg.result;
@@ -4629,7 +4839,7 @@
             '</div>';
           cmdBlock.querySelector('.cmd-accept').addEventListener('click', () => {
             vscode.postMessage({ type: 'commandResponse', accepted: true });
-            cmdBlock.querySelector('.cmd-actions').innerHTML = '<span style="color:var(--accent);font-size:12px;padding:4px;">&#10003; Pokrenuto</span>';
+            cmdBlock.querySelector('.cmd-actions').innerHTML = '<span style="color:rgba(255,255,255,0.5);font-size:12px;padding:4px;">&#10003; Pokrenuto</span>';
             hideApprovalBar();
             showStatus('Nastavljam...', 'thinking');
           });
@@ -4813,9 +5023,9 @@
         case 'error': {
           const errDiv = document.createElement('div');
           errDiv.className = 'msg msg-assistant error-msg';
-          let errHtml = '<p style="color:var(--accent)">⚠ ' + escapeHtml(msg.text || 'Doslo je do greske.') + '</p>';
+          let errHtml = '<p style="color:#f14c4c">⚠ ' + escapeHtml(msg.text || 'Doslo je do greske.') + '</p>';
           if (msg.retryable) {
-            errHtml += '<button class="retry-btn" onclick="retryLastMessage()" style="margin-top:8px;padding:6px 16px;background:var(--accent-gradient);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem">Pokusaj ponovo</button>';
+            errHtml += '<button class="retry-btn" onclick="retryLastMessage()" style="margin-top:8px;padding:6px 16px;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;font-size:0.85rem">Pokusaj ponovo</button>';
           }
           errDiv.innerHTML = errHtml;
           messagesEl.appendChild(errDiv);
@@ -4946,7 +5156,7 @@
         case 'terminalError': {
           const termDiv = document.createElement('div');
           termDiv.className = 'msg msg-assistant';
-          termDiv.innerHTML = '<div style="font-size:11px;color:var(--accent);font-weight:600;margin-bottom:4px;">⚠ Komanda nije uspela: <code>' + escapeHtml(msg.command || '') + '</code></div>' +
+          termDiv.innerHTML = '<div style="font-size:11px;color:#f14c4c;font-weight:600;margin-bottom:4px;">⚠ Komanda nije uspela: <code>' + escapeHtml(msg.command || '') + '</code></div>' +
             '<pre style="background:var(--vscode-textCodeBlock-background);padding:8px;border-radius:4px;font-size:11px;max-height:150px;overflow:auto;margin:0;">' + escapeHtml(msg.output || '') + '</pre>';
           messagesEl.appendChild(termDiv);
           scrollToBottom();
@@ -5260,9 +5470,9 @@
       });
       container.querySelectorAll('.tree-folder-link:not([data-linked])').forEach(el => {
         el.dataset.linked = '1';
-        el.addEventListener('click', () => {
-          vscode.postMessage({ type: 'openFile', path: el.dataset.path });
-        });
+        el.style.cursor = 'default';
+        el.style.textDecoration = 'none';
+        el.style.opacity = '0.7';
       });
       container.querySelectorAll('a[href]:not([data-linked])').forEach(el => {
         el.dataset.linked = '1';
@@ -5273,6 +5483,20 @@
             vscode.postMessage({ type: 'openFile', path: href });
           }
         });
+      });
+      // Make bold file names clickable (e.g. **package.json**, **.env**)
+      container.querySelectorAll('strong:not([data-linked])').forEach(el => {
+        const text = (el.textContent || '').trim();
+        if (/^[.\w\-\/]+\.\w{1,10}$/.test(text)) {
+          el.dataset.linked = '1';
+          el.style.cursor = 'pointer';
+          el.style.textDecoration = 'underline';
+          el.style.textDecorationStyle = 'dotted';
+          el.style.textUnderlineOffset = '2px';
+          el.addEventListener('click', () => {
+            vscode.postMessage({ type: 'openFile', path: text });
+          });
+        }
       });
     }
 
