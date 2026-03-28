@@ -1208,7 +1208,6 @@
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 14px;
       transition: border-color 0.2s, box-shadow 0.2s;
-      overflow: hidden;
       box-shadow: 0 2px 12px rgba(0,0,0,0.15);
     }
     .input-container:focus-within {
@@ -1391,6 +1390,7 @@
       display: flex;
       align-items: center;
       gap: 2px;
+      position: relative;
     }
     .input-toolbar-right {
       display: flex;
@@ -1499,8 +1499,8 @@
     .add-context-menu {
       display: none;
       position: absolute;
-      bottom: calc(100% + 4px);
-      left: 6px;
+      bottom: calc(100% + 8px);
+      left: 0;
       background: var(--vscode-editor-background, #1e1e1e);
       border: 1px solid rgba(255,255,255,0.12);
       border-radius: 10px;
@@ -2524,16 +2524,6 @@
   </style>
 </head>
 <body>
-  <div class="add-context-menu" id="addContextMenu">
-    <div class="add-context-item" id="ctxAddImage">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-      Dodaj sliku
-    </div>
-    <div class="add-context-item" id="ctxAddFile">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
-      Dodaj fajl
-    </div>
-  </div>
   <div class="model-menu" id="modelMenu">
     <div class="model-menu-title">Model</div>
     <div class="model-option" data-model="vajb-agent-lite">
@@ -2928,11 +2918,7 @@
         2. Kopiraj API kljuc iz emaila ili dashboarda<br>
         3. Klikni na ⚙️ gore desno → nalepi kljuc i sacuvaj
       </div>
-      <div id="welcomeCardsSection">
-        <div class="welcome-hint welcome-hint-tip">
-          💡 Za vece zadatke, ukljuci <strong style="color:var(--accent);">Plan Mode</strong> <span style="opacity:0.4;">(📋 dole)</span> — agent pravi plan sa fazama pre izmena. Klikni <strong style="color:var(--vscode-foreground);">?</strong> gore za vodic.
-        </div>
-      </div>
+      <div id="welcomeCardsSection"></div>
 
       <div class="welcome-powered">
         Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski · Kreirao <strong>Nemanja Lakic</strong>
@@ -3006,6 +2992,16 @@
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
           </button>
+          <div class="add-context-menu" id="addContextMenu">
+            <div class="add-context-item" id="ctxAddImage">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+              Dodaj sliku
+            </div>
+            <div class="add-context-item" id="ctxAddFile">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+              Dodaj fajl
+            </div>
+          </div>
           <button class="toolbar-btn" id="settingsBtnBottom" title="Podesavanja">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
@@ -4844,7 +4840,7 @@
           messagesEl.innerHTML = '';
           const w = document.createElement('div');
           w.className = 'welcome-msg';
-          w.innerHTML = '<div class="welcome-brand"><span class="v">&lt;</span>VajbAgent<span class="v">/&gt;</span></div><h3>Sta kreiramo danas?</h3><div class="welcome-hint welcome-hint-tip">💡 Za vece zadatke, ukljuci <strong style="color:var(--accent);">Plan Mode</strong> <span style="opacity:0.4;">(📋 dole)</span> — agent pravi plan sa fazama pre izmena.</div><div class="welcome-powered">Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski · Kreirao <strong>Nemanja Lakic</strong></div>';
+          w.innerHTML = '<div class="welcome-brand"><span class="v">&lt;</span>VajbAgent<span class="v">/&gt;</span></div><h3>Sta kreiramo danas?</h3><div class="welcome-powered">Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski · Kreirao <strong>Nemanja Lakic</strong></div>';
           messagesEl.appendChild(w);
           currentAssistantEl = null;
           currentAssistantRawText = '';
