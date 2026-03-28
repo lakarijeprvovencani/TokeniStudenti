@@ -3158,10 +3158,10 @@
       mentionDropdown.innerHTML = matches.map((f, i) => {
         const name = f.split('/').pop();
         const dir = f.includes('/') ? f.substring(0, f.lastIndexOf('/')) : '';
-        return '<div class="mention-item' + (i === mentionSelected ? ' active' : '') + '" data-file="' + f + '">'
+        return '<div class="mention-item' + (i === mentionSelected ? ' active' : '') + '" data-file="' + escapeHtml(f) + '">'
           + '<span class="mention-icon">' + getFileIcon(name) + '</span>'
-          + '<span class="mention-name">' + name + '</span>'
-          + (dir ? '<span class="mention-path">' + dir + '</span>' : '')
+          + '<span class="mention-name">' + escapeHtml(name) + '</span>'
+          + (dir ? '<span class="mention-path">' + escapeHtml(dir) + '</span>' : '')
           + '</div>';
       }).join('');
 
@@ -3589,14 +3589,14 @@
       const realServers = servers.filter(s => s.name !== '_config');
       var html = '';
       if (configError) {
-        html += '<div class="settings-mcp-server" style="color:#cca700;">⚠ ' + configError.error + '</div>';
+        html += '<div class="settings-mcp-server" style="color:#cca700;">⚠ ' + escapeHtml(configError.error || '') + '</div>';
       }
       realServers.forEach(s => {
         html += '<div class="settings-mcp-server">';
         html += '<span class="settings-mcp-dot ' + (s.ready ? 'ok' : 'err') + '"></span>';
-        html += '<span class="settings-mcp-name">' + s.name + '</span>';
+        html += '<span class="settings-mcp-name">' + escapeHtml(s.name) + '</span>';
         if (s.ready) html += '<span class="settings-mcp-tools">' + s.toolCount + ' tools</span>';
-        if (s.error) html += '<span style="font-size:10px;color:#f14c4c;margin-left:4px;">' + s.error + '</span>';
+        if (s.error) html += '<span style="font-size:10px;color:#f14c4c;margin-left:4px;">' + escapeHtml(s.error) + '</span>';
         html += '</div>';
       });
       if (totalTools > 0) {
@@ -4013,7 +4013,7 @@
         const iconMap = { pdf: '📄', js: '📜', ts: '📜', py: '🐍', json: '{}', html: '🌐', css: '🎨', md: '📝' };
         const icon = iconMap[f.ext] || '📎';
         const sizeLabel = f.content.length > 1000 ? ' (' + Math.round(f.content.length / 1000) + 'k)' : '';
-        chip.innerHTML = '<span class="file-chip-icon">' + icon + '</span><span class="file-chip-name" title="' + f.name + sizeLabel + '">' + f.name + '</span><button class="file-chip-remove" data-idx="' + idx + '">✕</button>';
+        chip.innerHTML = '<span class="file-chip-icon">' + icon + '</span><span class="file-chip-name" title="' + escapeHtml(f.name) + sizeLabel + '">' + escapeHtml(f.name) + '</span><button class="file-chip-remove" data-idx="' + idx + '">✕</button>';
         chip.querySelector('.file-chip-remove').addEventListener('click', () => {
           pendingFiles.splice(idx, 1);
           renderFilePreviews();
@@ -4274,7 +4274,7 @@
         // File chips
         if (pendingFiles.length > 0) {
           html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:' + (text || pendingImages.length ? '8px' : '0') + ';">';
-          html += pendingFiles.map(f => '<span class="file-chip" style="margin-right:4px;"><span class="file-chip-icon">📎</span><span class="file-chip-name">' + f.name + '</span></span>').join('');
+          html += pendingFiles.map(f => '<span class="file-chip" style="margin-right:4px;"><span class="file-chip-icon">📎</span><span class="file-chip-name">' + escapeHtml(f.name) + '</span></span>').join('');
           html += '</div>';
         }
 
@@ -4787,7 +4787,7 @@
         case 'rulesStatus': {
           rulesStatus.style.display = 'block';
           if (msg.exists) {
-            rulesStatus.innerHTML = '<span style="color:#4CAF50;font-weight:500;">✓ Aktivna</span> <span style="opacity:0.4;font-size:10px;">(' + msg.file + ')</span>';
+            rulesStatus.innerHTML = '<span style="color:#4CAF50;font-weight:500;">✓ Aktivna</span> <span style="opacity:0.4;font-size:10px;">(' + escapeHtml(msg.file || '') + ')</span>';
           } else {
             rulesStatus.innerHTML = '<span style="opacity:0.5;">Nema pravila</span>';
           }
@@ -5380,6 +5380,7 @@
             }
           }
           currentAssistantEl = null;
+          togglePlanMode(false);
           setStreaming(false);
           break;
         }

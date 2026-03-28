@@ -460,6 +460,10 @@ async function toolReplaceInFile(args: Record<string, unknown>): Promise<ToolCal
   const oldText = args.old_text as string;
   const newText = args.new_text as string;
 
+  if (oldText === newText) {
+    return { success: true, output: 'No changes needed: old_text and new_text are identical.' };
+  }
+
   try {
     if (!fs.existsSync(filePath)) {
       return { success: false, output: `File not found: ${filePath}` };
@@ -752,6 +756,9 @@ async function toolFetchUrl(args: Record<string, unknown>, redirectCount = 0): P
 
   try {
     const urlObj = new URL(url);
+    if (!['https:', 'http:'].includes(urlObj.protocol)) {
+      return { success: false, output: 'Only HTTP/HTTPS URLs are allowed.' };
+    }
     const isHttps = urlObj.protocol === 'https:';
     const transport = isHttps ? await import('https') : await import('http');
 

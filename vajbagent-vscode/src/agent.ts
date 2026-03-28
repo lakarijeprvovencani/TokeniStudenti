@@ -1086,6 +1086,7 @@ export class Agent {
 
   public async sendMessage(text: string, images: Array<{ base64: string; mimeType: string }> = []) {
     if (this._sending) return;
+    if (!text.trim() && images.length === 0) return;
     this._sending = true;
     this._abortController = null;
 
@@ -1437,9 +1438,18 @@ export class Agent {
         const stat = fs.statSync(absPath);
         if (stat.isFile()) {
           try {
+            // Skip large files (>1MB)
+            if (stat.size > 1024 * 1024) {
+              expanded = expanded.replace(
+                `@${filePath}`,
+                `@${filePath} (fajl prevelik — ${Math.round(stat.size / 1024)}KB)`
+              );
+              continue;
+            }
             // Skip binary files
-            const BINARY_EXTS = new Set(['DS_Store', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', 'svg', 'woff', 'woff2', 'ttf', 'eot', 'otf', 'mp3', 'mp4', 'wav', 'avi', 'mov', 'zip', 'tar', 'gz', 'rar', '7z', 'pdf', 'exe', 'dll', 'so', 'dylib', 'o', 'obj', 'class', 'pyc', 'vsix', 'lock']);
-            const ext = path.basename(absPath).startsWith('.DS_Store') ? 'DS_Store' : (absPath.split('.').pop() || '').toLowerCase();
+            const BINARY_EXTS = new Set(['DS_Store', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', 'woff', 'woff2', 'ttf', 'eot', 'otf', 'mp3', 'mp4', 'wav', 'avi', 'mov', 'flac', 'aac', 'ogg', 'zip', 'tar', 'gz', 'rar', '7z', 'xz', 'bz2', 'pdf', 'exe', 'dll', 'so', 'dylib', 'o', 'obj', 'a', 'lib', 'class', 'pyc', 'pyo', 'wasm', 'node', 'vsix', 'lock', 'jar', 'war', 'db', 'sqlite', 'sqlite3']);
+            const basename = path.basename(absPath);
+            const ext = basename === '.DS_Store' ? 'DS_Store' : (basename.split('.').pop() || '').toLowerCase();
             if (BINARY_EXTS.has(ext)) {
               expanded = expanded.replace(
                 `@${filePath}`,
