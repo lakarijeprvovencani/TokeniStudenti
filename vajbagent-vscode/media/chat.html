@@ -813,10 +813,11 @@
       color: var(--vscode-foreground);
       border: none;
       border-radius: 0;
-      padding: 4px 8px;
+      padding: 6px 10px;
       margin: 8px 0;
       font-size: 14px;
-      line-height: 1.7;
+      line-height: 1.75;
+      letter-spacing: 0.01em;
     }
     .msg-assistant .credits-cta {
       display: inline-block;
@@ -1562,39 +1563,39 @@
     }
 
     /* Markdown content styles */
-    .msg-assistant p { margin: 12px 0; line-height: 1.7; }
+    .msg-assistant p { margin: 10px 0; line-height: 1.75; }
     .msg-assistant p:first-child { margin-top: 0; }
     .msg-assistant p:last-child { margin-bottom: 0; }
-    .msg-assistant ul, .msg-assistant ol { margin: 12px 0; padding-left: 24px; }
-    .msg-assistant li { margin: 8px 0; line-height: 1.7; }
-    .msg-assistant li p { margin: 4px 0; }
+    .msg-assistant ul, .msg-assistant ol { margin: 10px 0; padding-left: 22px; }
+    .msg-assistant li { margin: 6px 0; line-height: 1.7; }
+    .msg-assistant li p { margin: 3px 0; }
     .msg-assistant h1, .msg-assistant h2, .msg-assistant h3 {
-      margin: 18px 0 10px;
-      font-size: 14px;
+      margin: 20px 0 8px;
       font-weight: 700;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.2px;
+      color: rgba(255, 255, 255, 0.95);
     }
-    .msg-assistant h1 { font-size: 18px; margin-top: 20px; }
-    .msg-assistant h2 { font-size: 16px; margin-top: 18px; }
-    .msg-assistant h4 { font-size: 13px; margin: 6px 0 3px; }
-    .msg-assistant h5 { font-size: 12px; margin: 6px 0 3px; opacity: 0.85; }
+    .msg-assistant h1 { font-size: 17px; }
+    .msg-assistant h2 { font-size: 15px; }
+    .msg-assistant h3 { font-size: 14px; }
+    .msg-assistant h4 { font-size: 13px; margin: 14px 0 4px; }
+    .msg-assistant h5 { font-size: 12px; margin: 10px 0 4px; opacity: 0.85; }
     .msg-assistant strong {
       font-weight: 700;
       color: rgba(255, 255, 255, 1);
-      letter-spacing: 0.2px;
     }
     .msg-assistant em {
       font-style: italic;
-      opacity: 0.95;
+      opacity: 0.9;
     }
     .msg-assistant code {
-      background: rgba(255, 255, 255, 0.08);
-      color: rgba(255, 255, 255, 0.85);
+      background: rgba(255, 255, 255, 0.07);
+      color: rgba(255, 255, 255, 0.88);
       padding: 2px 6px;
       border-radius: 4px;
       font-family: var(--vscode-editor-font-family);
-      font-size: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 12.5px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
     }
     .msg-assistant code.file-link {
       cursor: pointer;
@@ -5800,6 +5801,9 @@
       html = html.replace(/(^|[\s>(])(localhost:\d+[^\s<>"')\]]*)/gm, function(m, pre, url) {
         return pre + '<a href="http://' + url + '" target="_blank" class="auto-link">' + url + '</a>';
       });
+
+      // Single newlines → line breaks (within paragraphs)
+      html = html.replace(/([^\n])\n([^\n<])/g, '$1<br>$2');
 
       // Paragraphs (double newline)
       html = html.replace(/\n\n/g, '</p><p>');
