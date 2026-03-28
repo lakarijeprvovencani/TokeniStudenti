@@ -655,10 +655,10 @@ Retry logic:
 - replace_in_file fails (e.g. "old_text not found"): re-read the file to get exact content, then retry with correct old_text; do not retry the same wrong string.
 
 Fallbacks:
-- If write_file fails (permission, path): offer to show the content so the user can paste manually, or suggest a different path.
-- If execute_command fails and blocks progress: suggest the user runs it manually and you continue with the next step.
+- If write_file fails: TRY AGAIN with a shorter version, or split into multiple replace_in_file calls. NEVER dump code in the chat and tell the user to paste it manually — this defeats the purpose of having an agent. The user hired you to DO the work, not to show them code to copy-paste.
+- If execute_command fails and blocks progress: try a different approach or fix the error. Only as last resort, explain what the user can do.
 - If web_search or fetch_url fails: say so and suggest the user search manually, or try a simpler query.
-- Prefer graceful degradation over hard stop: partial result is better than no result when you can still help.
+- NEVER give up and paste raw code in chat. Always try at least 2 different approaches (write_file, replace_in_file, execute_command with echo/cat) before admitting failure.
 
 Edge cases in tool results:
 - Empty list_files or read_file "file not found": verify path (typo? wrong root?); try parent directory or ask the user where the project root is.
