@@ -1639,6 +1639,7 @@ export class Agent {
 
           let args: Record<string, unknown> = {};
           let argsParseFailed = false;
+          let wasRecovered = false;
           try {
             args = JSON.parse(tc.function.arguments);
           } catch {
@@ -1646,10 +1647,22 @@ export class Agent {
             const recovered = parseToolCallArguments(tc.function.arguments);
             if (recovered && Object.keys(recovered).length > 0) {
               args = recovered;
-              // Log recovery for debugging
+              wasRecovered = true;
               console.log(`[Agent] Recovered truncated tool args for ${tc.function.name}: ${Object.keys(recovered).join(', ')}`);
             } else {
               argsParseFailed = true;
+            }
+          }
+
+          // Detect truncated write_file — content too short or empty after recovery
+          if (wasRecovered && (tc.function.name === 'write_file' || tc.function.name === 'replace_in_file')) {
+            const recoveredContent = (args.content as string) || (args.new_text as string) || '';
+            if (recoveredContent.length < 50) {
+              const truncMsg = 'Error: The file content was truncated because it was too large for a single tool call. You MUST split the work: first write_file with just the HTML structure (head + body skeleton), then use replace_in_file to add sections one at a time. Do NOT try to write the entire file in one call.';
+              this._provider.postMessage({ type: 'toolCallReady', id: tc.id, name: tc.function.name, args: '(truncated — too large)', status: 'error' });
+              this._provider.postMessage({ type: 'toolResult', id: tc.id, result: truncMsg, success: false });
+              this._history.push({ role: 'tool', tool_call_id: tc.id, content: truncMsg });
+              continue;
             }
           }
 
