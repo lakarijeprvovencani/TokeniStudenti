@@ -633,12 +633,25 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
+    .queue-bar-send {
+      background: none;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 10px;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+    .queue-bar-send:hover { color: #fff; border-color: rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.08); }
     .queue-bar-dismiss {
       background: none;
       border: none;
-      color: rgba(255, 255, 255, 0.4);
+      color: rgba(255, 255, 255, 0.3);
       cursor: pointer;
-      font-size: 16px;
+      font-size: 14px;
       padding: 0 4px;
       line-height: 1;
       transition: color 0.15s;
@@ -2749,8 +2762,9 @@
   <div class="status-bar" id="statusBar"></div>
 
   <div class="queue-bar" id="queueBar">
-    <span class="queue-bar-label">Sledeća:</span>
+    <span class="queue-bar-label">SLEDEĆA:</span>
     <span class="queue-bar-text" id="queueBarText"></span>
+    <button class="queue-bar-send" id="queueBarSend" title="Zaustavi agenta i pošalji ovu poruku odmah">Pošalji sad</button>
     <button class="queue-bar-dismiss" id="queueBarDismiss" title="Otkaži">✕</button>
   </div>
 
@@ -3159,6 +3173,26 @@
     document.getElementById('queueBarDismiss').addEventListener('click', () => {
       _queuedMessage = null;
       document.getElementById('queueBar').classList.remove('visible');
+      updateSendButton();
+    });
+    document.getElementById('queueBarSend').addEventListener('click', () => {
+      // Stop agent, then send queued message immediately
+      vscode.postMessage({ type: 'stopGeneration' });
+      var q = _queuedMessage;
+      _queuedMessage = null;
+      document.getElementById('queueBar').classList.remove('visible');
+      if (q) {
+        setTimeout(function() {
+          addMessageBubble('user', q.text || '(fajlovi)');
+          var imagesPayload = (q.images || []).map(function(img) {
+            return { base64: img.base64, mimeType: img.mimeType || 'image/png' };
+          });
+          vscode.postMessage({ type: 'sendMessage', text: q.text || '', images: imagesPayload });
+          setStreaming(true);
+          _statusContext = detectStatusContext(q.text || '');
+          showStatus('Vajbujem...', 'thinking');
+        }, 500);
+      }
     });
 
     modelSelect.addEventListener('change', () => {
@@ -3945,9 +3979,10 @@
         document.getElementById('queueBarText').textContent = qText || '(fajlovi)';
         document.getElementById('queueBar').classList.add('visible');
 
-        // Clear input
+        // Clear input & update button to show stop is still available
         userInput.value = '';
         userInput.style.height = 'auto';
+        updateSendButton();
         pendingImages = [];
         pendingFiles = [];
         renderImagePreviews();
@@ -4159,8 +4194,14 @@
 
     function updateSendButton() {
       var hasText = userInput.value.trim().length > 0 || pendingImages.length > 0 || pendingFiles.length > 0;
-      if (isStreaming && !hasText) {
-        // Stop mode — red square
+      if (isStreaming && !hasText && !_queuedMessage) {
+        // Stop mode — red square (only if no queue)
+        sendBtn.classList.add('stop-mode');
+        sendIcon.style.display = 'none';
+        stopIcon.style.display = 'block';
+        sendBtn.title = 'Zaustavi';
+      } else if (isStreaming && !hasText && _queuedMessage) {
+        // Queue active, no new text — still show stop
         sendBtn.classList.add('stop-mode');
         sendIcon.style.display = 'none';
         stopIcon.style.display = 'block';
