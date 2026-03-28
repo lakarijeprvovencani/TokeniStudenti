@@ -691,7 +691,7 @@
       border: 1px solid rgba(200, 104, 26, 0.25);
       border-radius: 6px;
       padding: 3px 9px;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
       font-size: 11px;
       font-weight: 600;
       color: var(--accent-bright);
@@ -4289,22 +4289,11 @@
 
         // Text
         if (text) {
-          let displayHtml = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-          // Style @mentions
-          displayHtml = displayHtml.replace(/@([\w.\/\-]+)/g, '<span class="mention-tag">@$1</span>');
-          // Style slash commands — command in accent, rest in normal color
-          const slashDisplayMatch = text.match(/^\/(\w+)(\s+.*)?$/);
-          if (slashDisplayMatch) {
-            const cmdName = slashDisplayMatch[1];
-            const cmdArg = (slashDisplayMatch[2] || '').trim();
-            const argHtml = cmdArg ? ' ' + cmdArg.replace(/@([\w.\/\-]+)/g, '<span class="mention-tag">@$1</span>') : '';
-            displayHtml = '<span class="slash-cmd-tag">/' + cmdName + '</span>' + argHtml;
-          }
           // Plan mode prefix with SVG icon
           if (planModeActive) {
             html += '<div class="plan-mode-tag"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>Plan</div>';
           }
-          html += '<div>' + displayHtml + '</div>';
+          html += '<div>' + styleUserText(text) + '</div>';
         }
 
         if (html) {
@@ -4433,11 +4422,26 @@
       showStatus('Pokusavam ponovo...', 'thinking');
     }
 
+    function styleUserText(text) {
+      let html = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      // Style @mentions
+      html = html.replace(/@([\w.\/\-]+)/g, '<span class="mention-tag">@$1</span>');
+      // Style slash commands
+      const slashMatch = text.match(/^\/(\w+)(\s+.*)?$/);
+      if (slashMatch) {
+        const cmdName = slashMatch[1];
+        const cmdArg = (slashMatch[2] || '').trim();
+        const argHtml = cmdArg ? ' ' + cmdArg.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/@([\w.\/\-]+)/g, '<span class="mention-tag">@$1</span>') : '';
+        html = '<span class="slash-cmd-tag">/' + cmdName + '</span>' + argHtml;
+      }
+      return html;
+    }
+
     function addMessageBubble(role, text) {
       const div = document.createElement('div');
       div.className = 'msg msg-' + role;
       if (role === 'user') {
-        div.textContent = text;
+        div.innerHTML = styleUserText(text);
       } else {
         const { thinking, rest } = splitThinking(text);
         if (thinking) {
