@@ -1876,7 +1876,16 @@ export class Agent {
     const apiUrl = getApiUrl();
     const model = getModel();
 
-    const mcpToolDefs = this._mcpManager.getToolDefinitions();
+    // Filter out MCP filesystem tools that duplicate built-in tools
+    const DUPLICATE_MCP_TOOLS = new Set([
+      'read_file', 'write_file', 'edit_file', 'create_directory',
+      'list_directory', 'directory_tree', 'move_file', 'search_files',
+      'get_file_info', 'list_allowed_directories', 'read_multiple_files',
+    ]);
+    const mcpToolDefs = this._mcpManager.getToolDefinitions().filter(t => {
+      const match = t.function.name.match(/^mcp_filesystem_(.+)$/);
+      return !match || !DUPLICATE_MCP_TOOLS.has(match[1]);
+    });
     const allTools = [...TOOL_DEFINITIONS, ...mcpToolDefs];
 
     const reqBody = JSON.stringify({
