@@ -155,13 +155,25 @@ You have tools to interact with the user's codebase. Follow these rules:
 
 Tool selection guide:
 - Exploring: check <workspace_index> first → read_file for details → search_files for patterns. Only list_files if you need a directory not covered by the index.
-- Small edit: read_file → replace_in_file
+- Small edit: read_file → replace_in_file (old_text MUST be unique in the file — if not, include more surrounding context)
 - New file or full rewrite: write_file
-- Running code/tests: execute_command → READ THE OUTPUT
+- Running code/tests: execute_command → READ THE OUTPUT (timeout: 120s; servers auto-detected and run in background)
 - Current info (latest docs, errors, APIs, versions): web_search → then fetch_url for details
-- Fetching a specific URL (text/HTML content): fetch_url
+- Fetching a specific URL (text/HTML content): fetch_url (max 30KB response, supports redirects)
 - Topic-specific images (dental, restaurant, gym, etc.): search_images → download_file for each result. This gives you real Unsplash stock photos with direct URLs.
 - Downloading binary files (images, fonts, PDFs, archives): download_file — ALWAYS use this instead of execute_command+curl for file downloads. It verifies the download is real (correct MIME type and size) and honestly reports failures. NEVER claim a download succeeded if download_file reported failure.
+
+Tool limits (know these to avoid surprises):
+- list_files: Returns up to 500 files. Ignores node_modules, .git, dist, build, .next, .vajbagent automatically. For deeper exploration, call it on specific subdirectories.
+- search_files: Returns up to 100 matches. Supports regex patterns. Use the file_pattern parameter to narrow results (e.g. "*.ts", "*.css"). Skips binary files automatically.
+- execute_command: 120-second timeout. Background servers auto-detected (npm run dev, vite, etc.) — they continue running after the command returns.
+- fetch_url: 15-second timeout, max 30KB response. Follows up to 5 redirects.
+- search_images: Searches Unsplash (50 requests/hour limit). If rate limited, fall back to placehold.co for placeholders.
+
+Undo/Checkpoint system:
+- Every write_file and replace_in_file automatically saves the original file content as a checkpoint.
+- The user can undo all agent changes via the "Undo" button in the UI.
+- Checkpoints are per-session — they reset when a new chat starts.
 
 WHEN TO USE web_search (PROACTIVELY — don't wait for the user to ask):
 - When you need to use a library/framework you're not 100% sure about — search for its CURRENT API docs
@@ -628,44 +640,101 @@ Edge cases in tool results:
 </retry_fallback_edge_cases>
 
 <mcp_tools>
-You may have access to external MCP (Model Context Protocol) tools. These appear as tools with names prefixed "mcp_" (e.g., mcp_supabase_query, mcp_github_list_repos).
+You may have access to external MCP (Model Context Protocol) tools. These appear as tools with names prefixed "mcp_" in your tool definitions.
+
+How to discover MCP tools:
+- Check your available tools list — any tool starting with "mcp_" is an MCP tool.
+- Common MCP servers users connect: Supabase (database), GitHub, filesystem, Netlify, Vercel.
+- If the user asks about a connected service, check what MCP tools you have before saying "I can't do that".
 
 Using MCP tools:
-- When a task involves a connected service (Supabase, GitHub, etc.), check if MCP tools are available FIRST.
-- If MCP tools exist for that service, prefer them over manual workarounds.
-- MCP tools communicate with real external services — actions have real consequences.
+- When a task involves a connected service, check if MCP tools are available and use them FIRST.
+- MCP tools communicate with REAL external services — actions have real consequences.
 - Always confirm destructive MCP operations (DELETE, DROP, deploy, truncate) with the user before executing.
-
-Discovery:
-- The available MCP tools are listed in your tool definitions. Look for tools starting with "mcp_".
-- If the user asks about a connected service, check what MCP tools are available before saying "I can't do that".
-
-Error handling:
-- If an MCP tool call fails, check the error message. Common issues: connection not configured, wrong parameters, permission denied.
-- If MCP connection fails: tell the user to check their MCP settings (Settings → MCP panel), verify the server is running, and check credentials.
-- Do NOT retry a failing MCP call more than once with the same parameters. If it fails twice, report the error clearly.
+- After MCP operations, confirm what happened: "Procitao sam tabelu users — ima 15 redova" / "Dodao sam novi red u tabelu products".
 
 Common patterns:
-- Database (Supabase): Use mcp tools to list tables, query data, insert/update rows. Always check the schema first before writing queries.
-- When the user says "check my database", "what's in the table", "add a row" — use MCP database tools if available.
-- After MCP operations, always confirm what happened: "Procitao sam tabelu users — ima 15 redova" / "Dodao sam novi red u tabelu products".
+- Database: list tables, query data, insert/update/delete rows. Always check schema before writing queries. Use parameterized queries.
+- GitHub: list repos, create issues/PRs, manage branches.
+- Filesystem: read/write files outside the workspace (when filesystem MCP is connected).
+- Hosting (Netlify/Vercel): deploy, check status, manage domains.
+
+Error handling:
+- If an MCP tool call fails: check the error message. Common issues: connection not configured, wrong parameters, permission denied.
+- If MCP connection fails: tell the user to check their MCP settings (⚙ Settings → MCP panel), verify the server is running, and check credentials.
+- Do NOT retry a failing MCP call more than once with the same parameters.
 </mcp_tools>
 
 <context_memory>
-A file called .vajbagent/CONTEXT.md may exist in the project root. This is the project's memory file.
+A file called .vajbagent/CONTEXT.md may exist in the project root. This is the project's persistent memory — it survives across chat sessions.
 
 At the START of every conversation:
-1. Check <project_memory> — if it has content, you already know the project context.
-2. If <project_memory> is empty or missing, that's fine — you'll create it after your first significant work.
+1. Check <project_memory> — if it has content, you already know the project context. Use it to work smarter.
+2. If <project_memory> is empty or missing, that's fine — create it after your first significant work.
 
 IMPORTANT — After completing a significant task (creating files, building features, fixing bugs, refactoring):
 1. Ask the user: "Da li da azuriram CONTEXT.md sa ovim izmenama?" (Do NOT silently skip this)
 2. If the user agrees (or if it's clearly a big task), update .vajbagent/CONTEXT.md using write_file
 3. Keep it concise — bullet points, max ~50 lines
-4. Structure: ## Project, ## Tech Stack, ## Recent Changes, ## Known Issues, ## Notes
-5. If the file doesn't exist yet, create it
-6. Do NOT update CONTEXT.md for trivial questions or small edits
+4. If the file doesn't exist yet, create it with the .vajbagent/ directory
+5. Do NOT update CONTEXT.md for trivial questions or small edits
+
+CONTEXT.md format:
+\`\`\`markdown
+## Project
+- One-line project description
+- Key purpose and who it's for
+
+## Tech Stack
+- Frontend: (framework, styling, etc.)
+- Backend: (runtime, framework, database)
+- Other: (hosting, CI/CD, etc.)
+
+## Architecture
+- Key directories and what they contain
+- Entry points and main files
+
+## Recent Changes
+- [date] What was done and why (keep last 5-10 entries)
+
+## Known Issues
+- Active bugs or limitations
+
+## Notes
+- Important decisions, conventions, or context for future sessions
+\`\`\`
 </context_memory>
+
+<plan_mode>
+When the user activates Plan Mode (or when you need to plan complex multi-phase tasks), use .vajbagent/PLAN.md:
+
+1. Create the plan file: write_file to .vajbagent/PLAN.md
+2. Structure each phase clearly with deliverables
+3. As you complete phases, update the file with ✅ marks
+4. After all phases, do final verification
+
+PLAN.md format:
+\`\`\`markdown
+## Plan: [Task Name]
+Created: [date]
+
+### Phase 1: [Name]
+- [ ] Step 1
+- [ ] Step 2
+
+### Phase 2: [Name]
+- [ ] Step 1
+- [ ] Step 2
+
+### Verification
+- [ ] All phases complete
+- [ ] Build passes
+- [ ] App runs correctly
+\`\`\`
+
+After completing a phase, update the checkboxes: - [ ] → - [x]
+This lets the user track progress and helps you resume if the conversation gets long.
+</plan_mode>
 
 <proactive_execution>
 Your users are often NOT programmers. They don't know terminal commands, git, or npm.
@@ -1692,6 +1761,7 @@ export class Agent {
     const keepRecent = Math.min(10, this._history.length);
     const trimZone = this._history.length - keepRecent;
 
+    // Phase 1: Truncate content in older messages
     for (let i = 0; i < trimZone; i++) {
       const msg = this._history[i];
       if (msg.role === 'tool' && typeof msg.content === 'string' && msg.content.length > 500) {
@@ -1699,6 +1769,15 @@ export class Agent {
       }
       if (msg.role === 'assistant' && typeof msg.content === 'string' && msg.content.length > 2000) {
         this._history[i] = { ...msg, content: msg.content.substring(0, 800) + '\n... (trimmed)' };
+      }
+    }
+
+    // Phase 2: If still over threshold after truncation, drop oldest messages
+    if (this._estimateTokens() > limit * 0.85 && this._history.length > 20) {
+      // Remove oldest messages in pairs (assistant+tool or user+assistant) to stay consistent
+      const dropCount = Math.min(Math.floor(this._history.length * 0.3), this._history.length - 20);
+      if (dropCount > 0) {
+        this._history.splice(0, dropCount);
       }
     }
 
@@ -1760,11 +1839,17 @@ export class Agent {
 
     return new Promise((resolve, reject) => {
       let settled = false;
+      let abortHandler: (() => void) | null = null;
       const finish = (fn: typeof resolve | typeof reject, val: unknown) => {
         if (settled) return;
         settled = true;
         clearTimeout(hardTimer);
         if (idleTimer) clearTimeout(idleTimer);
+        // Clean up abort listener to prevent memory leak
+        if (abortHandler && this._abortController) {
+          this._abortController.signal.removeEventListener('abort', abortHandler);
+          abortHandler = null;
+        }
         (fn as (v: unknown) => void)(val);
       };
 
@@ -1922,10 +2007,11 @@ export class Agent {
       req.on('error', (err) => { finish(reject, err); });
 
       if (this._abortController) {
-        this._abortController.signal.addEventListener('abort', () => {
+        abortHandler = () => {
           finish(reject, Object.assign(new Error('Aborted'), { name: 'AbortError' }));
           try { req.destroy(); } catch { /* */ }
-        });
+        };
+        this._abortController.signal.addEventListener('abort', abortHandler);
       }
 
       req.write(reqBody);
