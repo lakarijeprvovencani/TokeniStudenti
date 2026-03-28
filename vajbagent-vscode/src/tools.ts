@@ -427,7 +427,11 @@ async function toolWriteFile(args: Record<string, unknown>): Promise<ToolCallRes
     return { success: false, output: 'Error: write_file requires a "path" parameter (string). The model sent empty or missing arguments — this usually means the file content was too large for a single tool call. Try writing the file in smaller parts or use execute_command with heredoc.' };
   }
   const filePath = resolveWorkspacePath(args.path as string);
-  const newContent = args.content as string;
+  const newContent = (args.content as string) ?? '';
+
+  if (typeof newContent !== 'string') {
+    return { success: false, output: 'Error: content must be a string.' };
+  }
 
   try {
     const dir = path.dirname(filePath);
@@ -460,6 +464,12 @@ async function toolReplaceInFile(args: Record<string, unknown>): Promise<ToolCal
   const oldText = args.old_text as string;
   const newText = args.new_text as string;
 
+  if (!oldText || typeof oldText !== 'string') {
+    return { success: false, output: 'Error: old_text is required and must be a non-empty string.' };
+  }
+  if (typeof newText !== 'string') {
+    return { success: false, output: 'Error: new_text must be a string.' };
+  }
   if (oldText === newText) {
     return { success: true, output: 'No changes needed: old_text and new_text are identical.' };
   }
@@ -666,7 +676,7 @@ async function toolExecuteCommand(args: Record<string, unknown>): Promise<ToolCa
     let stderr = '';
     let done = false;
 
-    const proc = exec(command, { cwd, timeout: NORMAL_TIMEOUT, maxBuffer: 2 * 1024 * 1024 });
+    const proc = exec(command, { cwd, timeout: NORMAL_TIMEOUT, maxBuffer: 10 * 1024 * 1024 });
 
     const finishEarly = (msg: string) => {
       if (done) return;
@@ -787,7 +797,10 @@ async function toolFetchUrl(args: Record<string, unknown>, redirectCount = 0): P
         }
 
         let data = '';
-        res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+        const MAX_RESPONSE = 500000; // 500KB safety limit
+        res.on('data', (chunk: Buffer) => {
+          if (data.length < MAX_RESPONSE) data += chunk.toString();
+        });
         res.on('end', () => {
           const maxLen = 30000;
           const truncated = data.length > maxLen ? data.substring(0, maxLen) + '\n... (truncated)' : data;

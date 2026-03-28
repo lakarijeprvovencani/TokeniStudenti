@@ -983,7 +983,11 @@ export class Agent {
     const sessions = this.getSessions();
     const session = sessions.find(s => s.id === sessionId);
     if (!session) return;
-    this._history = JSON.parse(JSON.stringify(session.messages));
+    try {
+      this._history = JSON.parse(JSON.stringify(session.messages || []));
+    } catch {
+      this._history = [];
+    }
     this._currentSessionId = session.id;
     this._sendContextUpdate();
   }
