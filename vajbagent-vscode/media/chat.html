@@ -1646,20 +1646,37 @@
     }
     .checklist-item {
       list-style: none;
-      padding: 4px 0;
+      padding: 5px 0;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
+      font-size: 13px;
     }
     .checklist-item .check-icon {
-      font-size: 14px;
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      line-height: 1;
+    }
+    .checklist-item.done .check-icon {
+      background: var(--accent);
+      color: #fff;
+    }
+    .checklist-item.pending .check-icon {
+      background: none;
+      border: 2px solid rgba(255, 255, 255, 0.25);
     }
     .checklist-item.done .check-text {
-      color: rgba(255, 255, 255, 0.7);
+      color: rgba(255, 255, 255, 0.45);
+      text-decoration: line-through;
     }
     .checklist-item.pending .check-text {
-      color: rgba(255, 255, 255, 0.95);
+      color: rgba(255, 255, 255, 0.9);
       font-weight: 500;
     }
     .msg-assistant a, .msg-assistant a.auto-link {
@@ -5766,8 +5783,8 @@
       });
 
       // Checklist items (- [x] done, - [ ] pending)
-      html = html.replace(/^- \[x\] (.+)$/gm, '<li class="checklist-item done"><span class="check-icon">✅</span> <span class="check-text">$1</span></li>');
-      html = html.replace(/^- \[ \] (.+)$/gm, '<li class="checklist-item pending"><span class="check-icon">⬜</span> <span class="check-text">$1</span></li>');
+      html = html.replace(/^- \[x\] (.+)$/gm, '<li class="checklist-item done"><span class="check-icon">✓</span> <span class="check-text">$1</span></li>');
+      html = html.replace(/^- \[ \] (.+)$/gm, '<li class="checklist-item pending"><span class="check-icon"></span> <span class="check-text">$1</span></li>');
 
       // Unordered lists
       html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
