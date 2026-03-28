@@ -30,7 +30,7 @@ nav{background:rgba(10,10,10,.92);backdrop-filter:blur(20px);border-bottom:1px s
 .btn-login{background:var(--orange)!important;color:#000!important;font-weight:700!important;padding:9px 20px!important;border-radius:8px!important}
 .btn-login:hover{opacity:.9}
 
-.hero{padding:100px 24px 80px;text-align:center;position:relative;overflow:hidden}
+.hero{padding:100px 24px 90px;text-align:center;position:relative;overflow:hidden}
 .hero::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:800px;height:800px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,.06),transparent 65%);pointer-events:none}
 .hero-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border:1px solid rgba(249,115,22,.3);background:var(--orange-dim);border-radius:50px;font-size:.78rem;color:var(--orange2);font-weight:600;margin-bottom:28px}
 .hero-pill::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--orange);animation:pulse 2s infinite}
@@ -43,18 +43,18 @@ nav{background:rgba(10,10,10,.92);backdrop-filter:blur(20px);border-bottom:1px s
 .btn-primary{background:var(--orange);color:#000}.btn-primary:hover{opacity:.88;transform:translateY(-1px)}
 .btn-secondary{background:transparent;color:var(--text);border:1px solid var(--border2)}.btn-secondary:hover{border-color:#444}
 
-section{max-width:1100px;margin:0 auto;padding:80px 24px}
-.stag{font-size:.7rem;text-transform:uppercase;letter-spacing:.15em;color:var(--orange);font-weight:700;margin-bottom:12px}
-.stitle{font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;letter-spacing:-.03em;margin-bottom:8px;line-height:1.15}
+section{max-width:1100px;margin:0 auto;padding:90px 24px}
+.stag{font-size:.7rem;text-transform:uppercase;letter-spacing:.15em;color:var(--orange);font-weight:700;margin-bottom:14px}
+.stitle{font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;letter-spacing:-.03em;margin-bottom:10px;line-height:1.15}
 .stitle em{font-style:italic;color:var(--orange)}
-.ssub{font-size:.95rem;color:var(--text2);margin-bottom:44px;max-width:540px;line-height:1.65}
+.ssub{font-size:.95rem;color:var(--text2);margin-bottom:48px;max-width:560px;line-height:1.7}
 
 .benefits{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .bcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;transition:border-color .2s}
 .bcard:hover{border-color:var(--orange)}
 .bcard-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.15rem;margin-bottom:16px;font-weight:700;background:var(--orange-dim);color:var(--orange)}
-.bcard h3{font-size:.95rem;font-weight:700;margin-bottom:6px}
-.bcard p{font-size:.84rem;color:var(--text2);line-height:1.6}
+.bcard h3{font-size:.95rem;font-weight:700;margin-bottom:8px}
+.bcard p{font-size:.84rem;color:var(--text2);line-height:1.65}
 
 #primeri .benefits{gap:16px;grid-template-columns:repeat(3,1fr);max-width:900px;margin:0 auto}
 @media(max-width:800px){#primeri .benefits{grid-template-columns:repeat(2,1fr)}}
@@ -73,32 +73,35 @@ section{max-width:1100px;margin:0 auto;padding:80px 24px}
 .cursor-intro .intro-card h3{font-size:1.05rem;font-weight:700;margin-bottom:10px;color:var(--text);line-height:1.3}
 .cursor-intro .intro-card p{font-size:.9rem;color:var(--text2);line-height:1.65}
 
-.tiers{display:grid;grid-template-columns:repeat(7,minmax(140px,1fr));gap:12px;overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;padding-top:4px;max-width:1100px;margin:0 auto}
-.tier{background:var(--surface2);border:1px solid var(--border2);border-radius:16px;padding:28px 20px;text-align:center;transition:all .25s;position:relative;min-height:220px;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;overflow:visible}
+/* Tiers — 2 rows */
+.tiers{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;max-width:1100px;margin:0 auto}
+.tier{background:var(--surface2);border:1px solid var(--border2);border-radius:16px;padding:28px 22px;text-align:center;transition:all .25s;position:relative;min-height:240px;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;overflow:visible}
 .tier:hover{border-color:var(--orange);transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
-.tier.pop{border-color:rgba(249,115,22,.45)}
+.tier.pop{border-color:rgba(249,115,22,.45);grid-column:span 1}
 .tier.pop .tier-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);display:inline-block;padding:8px 14px;min-height:20px;box-sizing:border-box;background:var(--orange);color:#000;font-size:.65rem;font-weight:800;letter-spacing:.08em;border-radius:6px;line-height:1.15;white-space:nowrap;overflow:visible}
-.t-name{font-size:1.1rem;font-weight:800;margin-bottom:4px;color:var(--text)}
-.t-desc{font-size:.75rem;color:var(--text2);margin-bottom:14px;min-height:1.4em}
-.t-model{font-size:.72rem;color:var(--text3);margin-bottom:8px;font-weight:500}
-.t-val{font-size:1.75rem;font-weight:900;letter-spacing:-.03em;margin-bottom:2px;color:var(--orange);white-space:nowrap}
-.t-val.t-val-wide{font-size:1.45rem}
-.t-val-sub{font-size:.8rem;color:var(--text);margin-bottom:8px}
-.t-detail{font-size:.68rem;color:var(--text3);line-height:1.5;margin-top:4px}
-.t-price{font-size:.82rem;color:var(--text);line-height:1.4;min-height:2.8em;display:flex;align-items:center;justify-content:center}.t-price b{color:var(--text);font-size:1rem}
+.t-name{font-size:1.2rem;font-weight:800;margin-bottom:6px;color:var(--text)}
+.t-desc{font-size:.8rem;color:var(--text2);margin-bottom:14px;min-height:1.4em}
+.t-model{font-size:.75rem;color:var(--text3);margin-bottom:10px;font-weight:500}
+.t-val{font-size:1.85rem;font-weight:900;letter-spacing:-.03em;margin-bottom:2px;color:var(--orange);white-space:nowrap}
+.t-val.t-val-wide{font-size:1.55rem}
+.t-val-sub{font-size:.82rem;color:var(--text);margin-bottom:10px}
+.t-detail{font-size:.72rem;color:var(--text3);line-height:1.55;margin-top:4px}
 
-/* Pricing table */
-.price-table{width:100%;border-collapse:separate;border-spacing:0;background:var(--surface);border:1px solid var(--border2);border-radius:16px;overflow:hidden;margin-top:32px;font-size:.85rem}
-.price-table thead{background:var(--surface2)}
-.price-table th{padding:14px 16px;text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);font-weight:700;border-bottom:2px solid var(--border2)}
-.price-table th:first-child{color:var(--orange)}
-.price-table td{padding:12px 16px;border-bottom:1px solid var(--border);color:var(--text2)}
-.price-table tr:last-child td{border-bottom:none}
-.price-table tr:hover td{background:rgba(249,115,22,.03)}
-.price-table td:first-child{color:var(--text);font-weight:600}
-.price-table .highlight{color:var(--orange);font-weight:700}
-.price-table .ctx{font-size:.72rem;color:var(--text3)}
+/* Feature grid */
+.feat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.feat-item{background:var(--surface2);border:1px solid var(--border2);border-radius:14px;padding:22px 20px;transition:all .2s}
+.feat-item:hover{border-color:rgba(249,115,22,.35);box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.feat-item .fi-icon{font-size:1.3rem;margin-bottom:12px;display:block}
+.feat-item h4{font-size:.88rem;font-weight:700;margin-bottom:6px;color:var(--text);line-height:1.3}
+.feat-item p{font-size:.78rem;color:var(--text2);line-height:1.6}
 
+/* Feature highlight cards (bigger) */
+.feat-highlights{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:32px}
+.feat-hl{background:var(--surface2);border:1px solid var(--border2);border-radius:16px;padding:30px 26px;border-left:4px solid var(--orange);transition:all .2s}
+.feat-hl:hover{border-color:rgba(249,115,22,.4);box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.feat-hl .fi-icon{font-size:1.5rem;margin-bottom:14px;display:block}
+.feat-hl h4{font-size:1rem;font-weight:700;margin-bottom:8px;color:var(--text)}
+.feat-hl p{font-size:.85rem;color:var(--text2);line-height:1.65}
 
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .step-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;text-align:center;transition:border-color .2s}
@@ -119,20 +122,7 @@ section{max-width:1100px;margin:0 auto;padding:80px 24px}
 .pathway-step.poklon:hover{box-shadow:0 4px 24px rgba(249,115,22,.12)}
 .pathway-step.poklon .p-num{background:var(--orange);color:#000;border-color:var(--orange);font-size:1.35rem}
 
-.pathway-note{margin-top:32px;padding:20px 24px;background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.2);border-radius:12px;max-width:640px;margin-left:auto;margin-right:auto}
-.pathway-note p{margin:0;font-size:.9rem;color:var(--text2);line-height:1.65}
-.pathway-note strong{color:var(--text)}
-
-.sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-.sum-card{background:var(--surface2);border:1px solid var(--border2);border-radius:16px;padding:28px 26px;border-left:4px solid var(--orange)}
-.sum-card:hover{border-color:rgba(249,115,22,.35);box-shadow:0 6px 24px rgba(0,0,0,.2)}
-.sum-card h3{font-size:1.05rem;font-weight:700;margin-bottom:14px;color:var(--orange)}
-.sum-card p{font-size:.88rem;color:var(--text);line-height:2}
-.sum-card .win-line::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:10px;background:var(--orange)}
-.sum-muted h3{color:var(--text2)}
-.sum-muted .win-line::before{background:var(--text3)}
-
-.mini-cta{text-align:center;margin-top:44px;padding:28px 24px;background:rgba(249,115,22,.07);border:1px solid rgba(249,115,22,.25);border-radius:14px}
+.mini-cta{text-align:center;margin-top:48px;padding:28px 24px;background:rgba(249,115,22,.07);border:1px solid rgba(249,115,22,.25);border-radius:14px}
 .mini-cta p{margin:0 0 16px;color:var(--text);font-size:1rem;font-weight:500}
 .mini-cta a{display:inline-block;padding:12px 26px;background:var(--orange);color:#000;border-radius:10px;font-size:.9rem;font-weight:700;transition:all .2s}
 .mini-cta a:hover{opacity:.9;transform:translateY(-1px)}
@@ -168,9 +158,20 @@ section{max-width:1100px;margin:0 auto;padding:80px 24px}
 .dm-pn{color:var(--orange);font-weight:700;min-width:18px}
 .dm-path{color:var(--orange);font-family:'SF Mono',monospace;font-size:.75rem}
 .demo-desc{padding:14px 20px 18px;font-size:.85rem;color:var(--text2);line-height:1.6}
+.dm-slash{font-size:.72rem;background:rgba(249,115,22,.12);color:var(--orange);padding:3px 8px;border-radius:4px;font-weight:700;font-family:'SF Mono',monospace}
+.dm-mention{color:var(--orange);font-weight:700;font-size:.82rem}
 @media(max-width:800px){.demo-grid{grid-template-columns:1fr}}
 
-.cta{text-align:center;padding:80px 24px 100px;position:relative}
+.sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.sum-card{background:var(--surface2);border:1px solid var(--border2);border-radius:16px;padding:28px 26px;border-left:4px solid var(--orange)}
+.sum-card:hover{border-color:rgba(249,115,22,.35);box-shadow:0 6px 24px rgba(0,0,0,.2)}
+.sum-card h3{font-size:1.05rem;font-weight:700;margin-bottom:14px;color:var(--orange)}
+.sum-card p{font-size:.88rem;color:var(--text);line-height:2}
+.sum-card .win-line::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:10px;background:var(--orange)}
+.sum-muted h3{color:var(--text2)}
+.sum-muted .win-line::before{background:var(--text3)}
+
+.cta{text-align:center;padding:90px 24px 100px;position:relative}
 .cta::before{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(249,115,22,.05),transparent 65%);pointer-events:none}
 .cta h2{font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;letter-spacing:-.03em;margin-bottom:10px}
 .cta p{color:var(--text2);margin-bottom:32px;font-size:.95rem}
@@ -192,19 +193,18 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 
 @media(max-width:900px){
   .benefits,.steps{grid-template-columns:1fr 1fr}
-  .tiers{grid-template-columns:repeat(4,1fr);max-width:100%}
+  .tiers{grid-template-columns:repeat(2,1fr)}
   .sum-grid{grid-template-columns:1fr}
   .cursor-intro{grid-template-columns:1fr}
-}
-@media(max-width:700px){
-  .tiers{grid-template-columns:repeat(3,1fr)}
+  .feat-highlights{grid-template-columns:1fr 1fr}
+  .feat-grid{grid-template-columns:repeat(2,1fr)}
 }
 @media(max-width:600px){
   html,body{overflow-x:hidden;max-width:100vw}
   .ticker{font-size:.62rem;padding:6px 0}
   .ticker-track span{padding:0 20px}
   .benefits,.steps{grid-template-columns:1fr}
-  .tiers{grid-template-columns:1fr 1fr}
+  .tiers{grid-template-columns:1fr}
   .cursor-intro{grid-template-columns:1fr;gap:16px}
   .cursor-intro .intro-card{padding:24px 20px}
   .pathway{max-width:100%;padding-left:0}
@@ -217,8 +217,11 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
   .cta-cards{flex-direction:column;align-items:stretch}
   .cta-card{max-width:100%;min-width:0}
   .nav-links a:not(.btn-login):not(.btn-nav-login){display:none}
-  .price-table{font-size:.72rem}
-  .price-table th,.price-table td{padding:8px 10px}
+  .feat-highlights{grid-template-columns:1fr}
+  .feat-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:400px){
+  .feat-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -228,14 +231,16 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
   <div class="ticker-track">
     <span>Radi u Cursoru, VS Code-u i svuda</span>
     <span>Plati samo kad koristiš</span>
-    <span>7 nivoa AI modela</span>
+    <span>7 AI modela — od Lite do Architect</span>
     <span>Bez mesečne obaveze</span>
     <span>~50 sati kodiranja za $15</span>
+    <span>Slash komande, @mentions, Plan Mode</span>
     <span>Radi u Cursoru, VS Code-u i svuda</span>
     <span>Plati samo kad koristiš</span>
-    <span>7 nivoa AI modela</span>
+    <span>7 AI modela — od Lite do Architect</span>
     <span>Bez mesečne obaveze</span>
     <span>~50 sati kodiranja za $15</span>
+    <span>Slash komande, @mentions, Plan Mode</span>
   </div>
 </div>
 
@@ -244,8 +249,8 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     <div class="nav-brand">Vajb<span>Agent</span></div>
     <div class="nav-links">
       <a href="#kako-funkcionise">Kako radi?</a>
-      <a href="#modeli">Nivoi</a>
-      <a href="#primeri">Primeri</a>
+      <a href="#mogucnosti">Mogućnosti</a>
+      <a href="#modeli">Modeli</a>
       <a href="/dashboard" class="btn-nav-login">Uloguj se</a>
       <a href="/dashboard?tab=register" class="btn-login">Počni besplatno</a>
     </div>
@@ -253,84 +258,253 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 </nav>
 
 <div class="hero">
-  <div class="hero-pill">VajbAgent ekstenzija — radi u Cursoru i VS Code-u</div>
-  <h1>AI kodiranje <em>bez pretplate</em><br>u editoru koji već koristiš</h1>
-  <p>VajbAgent je besplatna ekstenzija za Cursor i VS Code. Čita, piše i menja fajlove, pokreće komande. Platiš samo koliko koristiš, bez mesečne obaveze.</p>
+  <div class="hero-pill">VajbAgent v1.0 — radi u Cursoru i VS Code-u</div>
+  <h1>AI agent koji <em>kodira umesto tebe</em><br>direktno u editoru</h1>
+  <p>VajbAgent je besplatna ekstenzija za Cursor i VS Code. Čita, piše i menja fajlove, pokreće komande, pretražuje web, pravi planove. <strong>Platiš samo koliko koristiš.</strong></p>
   <div class="hero-btns">
     <a href="/dashboard?tab=register" class="btn-hero btn-primary">Počni odmah — dajemo ti $2 na poklon</a>
-    <a href="#kako-funkcionise" class="btn-hero btn-secondary">Kako funkcioniše?</a>
+    <a href="#mogucnosti" class="btn-hero btn-secondary">Šta sve može?</a>
   </div>
   <p style="margin-top:20px;font-size:.88rem;color:var(--text2);">Već imaš nalog? <a href="https://marketplace.visualstudio.com/items?itemName=VajbAgent.vajbagent" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600;text-decoration:underline;text-underline-offset:3px;">Instaliraj ekstenziju u Cursoru ili VS Code-u</a></p>
 </div>
 
+<!-- Kako funkcionise -->
 <section id="kako-funkcionise">
-  <div class="stitle">Kako funkcioniše: <em>VajbAgent ekstenzija</em></div>
-  <div class="ssub">Instaliraš ekstenziju, uneseš ključ i kodiraš. Evo tri stvari koje treba da znaš.</div>
+  <div class="stag">Kako funkcioniše</div>
+  <div class="stitle">Instaliraj, unesi ključ, <em>kodiraj</em></div>
+  <div class="ssub">Setup traje 2 minuta. Tri stvari koje treba da znaš.</div>
   <div class="cursor-intro">
     <div class="intro-card">
       <span class="num">1</span>
-      <h3>VajbAgent je besplatna ekstenzija</h3>
-      <p>Instaliraš VajbAgent direktno u Cursor ili VS Code. Ekstenzija je besplatna i radi svuda — pričaš sa AI-jem, on čita, piše i menja kod za tebe. <a href="https://marketplace.visualstudio.com/items?itemName=VajbAgent.vajbagent" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600;text-decoration:underline;text-underline-offset:2px;">Instaliraj na Marketplace-u →</a></p>
+      <h3>Besplatna ekstenzija</h3>
+      <p>Instaliraš VajbAgent direktno u <strong>Cursor</strong> ili <strong>VS Code</strong>. Ekstenzija je besplatna — pričaš sa AI agentom, on čita, piše i menja kod za tebe. <a href="https://marketplace.visualstudio.com/items?itemName=VajbAgent.vajbagent" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600;text-decoration:underline;text-underline-offset:2px;">Instaliraj →</a></p>
     </div>
     <div class="intro-card">
       <span class="num">2</span>
-      <h3>7 nivoa AI modela</h3>
-      <p>Biraš nivo u ekstenziji jednim klikom: Lite za svakodnevno, Pro za jače projekte, Ultra za premium. Native tool calling — efikasnije od konkurencije.</p>
+      <h3>7 AI modela</h3>
+      <p>Biraš model jednim klikom u headeru: <strong>Lite</strong> za svakodnevno, <strong>Pro</strong> za jače projekte, <strong>Ultra</strong> za premium. Svaki nivo = druga snaga = druga cena.</p>
     </div>
     <div class="intro-card">
       <span class="num">3</span>
       <h3>Platiš koliko koristiš</h3>
-      <p>Bez mesečne pretplate. Dopuniš kredit kad hoćeš, koristiš dok traje. $15 na Lite nivou = ~50 sati kodiranja.</p>
+      <p><strong>Bez mesečne pretplate.</strong> Dopuniš kredit kad hoćeš, koristiš dok traje. $15 na Lite = ~50 sati kodiranja.</p>
     </div>
   </div>
 </section>
 
-<section id="benefiti">
-  <div class="stag">Zašto ovo?</div>
-  <div class="stitle">Počni za 2 minuta: <em>instaliraj, unesi ključ, kodiraj</em></div>
-  <div class="ssub">VajbAgent ekstenzija radi u Cursoru (besplatna verzija!) i VS Code-u. Nema komplikacija sa podešavanjem.</div>
-  <div class="pathway">
-    <div class="pathway-step">
-      <div class="p-wrap"><span class="p-num">1</span></div>
-      <div>
-        <h3>Napravi nalog i dobij API ključ</h3>
-        <p>Registracija traje 30 sekundi. Dobijaš API ključ + $2 kredita na poklon. Bez kartice.</p>
-      </div>
+<!-- Sve mogucnosti -->
+<section id="mogucnosti">
+  <div class="stag">Mogućnosti</div>
+  <div class="stitle">Sve što VajbAgent <em>može da uradi</em></div>
+  <div class="ssub">Kompletna lista mogućnosti ekstenzije — prostim jezikom.</div>
+
+  <!-- Highlight cards — top 3 -->
+  <div class="feat-highlights">
+    <div class="feat-hl">
+      <span class="fi-icon">🤖</span>
+      <h4>Chat sa AI agentom</h4>
+      <p>Pričaš sa agentom u panelu editora. On čita tvoje fajlove, piše novi kod, menja postojeći, pokreće komande — sve kroz konverzaciju. Streaming odgovori u realnom vremenu.</p>
     </div>
-    <div class="pathway-step">
-      <div class="p-wrap"><span class="p-num">2</span></div>
-      <div>
-        <h3>Instaliraj VajbAgent ekstenziju</h3>
-        <p>U Cursoru ili VS Code-u: Extensions → traži "VajbAgent" → Install. Ili otvori direktno: <a href="https://marketplace.visualstudio.com/items?itemName=VajbAgent.vajbagent" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600;text-decoration:underline;text-underline-offset:2px;">Marketplace – VajbAgent</a> i klikni Install.</p>
-      </div>
+    <div class="feat-hl">
+      <span class="fi-icon">📋</span>
+      <h4>Plan Mode</h4>
+      <p>Za složenije zadatke, agent napravi plan sa fazama. Ti kontrolišeš tempo — izvršavaš fazu po fazu ili sve odjednom. Pregled pre izvršavanja.</p>
     </div>
-    <div class="pathway-step">
-      <div class="p-wrap"><span class="p-num">3</span></div>
-      <div>
-        <h3>Unesi API ključ i kodiraj</h3>
-        <p>Otvori VajbAgent panel, unesi ključ i počni da pričaš sa AI-jem. Biraš model u footeru ekstenzije — od Lite do Ultra.</p>
-      </div>
-    </div>
-    <div class="pathway-step poklon">
-      <div class="p-wrap"><span class="p-num">🎁</span></div>
-      <div>
-        <h3>$2 na poklon kad napraviš nalog</h3>
-        <p>Dobijaš $2 kredita besplatno. To je ~200 zahteva na Lite, ili ~40 na Pro. Dovoljno da probaš sve bez kartice.</p>
-      </div>
+    <div class="feat-hl">
+      <span class="fi-icon">↩️</span>
+      <h4>Checkpoint & Undo</h4>
+      <p>Svaka izmena se čuva. Ako ti se ne svidi rezultat — jedan klik i vratiš sve na prethodno stanje. Po fajlu ili sve odjednom.</p>
     </div>
   </div>
 
+  <!-- Full feature grid -->
+  <div class="feat-grid">
+    <div class="feat-item">
+      <span class="fi-icon">📂</span>
+      <h4>Čita i piše fajlove</h4>
+      <p>Automatski čita, kreira i menja fajlove u tvom projektu. Diff preview pre svake izmene.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">⌨️</span>
+      <h4>Pokreće komande</h4>
+      <p>Pokreće shell komande u terminalu — npm install, git commit, build, test... Sve iz chata.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">⚡</span>
+      <h4>Slash komande</h4>
+      <p><strong>/test</strong> · <strong>/fix</strong> · <strong>/doc</strong> · <strong>/commit</strong> · <strong>/explain</strong> · <strong>/refactor</strong> — brze akcije jednim klikom.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">@</span>
+      <h4>@file i @folder mentions</h4>
+      <p>Taguješ <strong>@fajl</strong> ili <strong>@folder</strong> u chatu — agent odmah čita sadržaj. Autocomplete ti nudi fajlove.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">🔍</span>
+      <h4>Web pretraga</h4>
+      <p>Agent pretražuje internet za aktuelne informacije — dokumentaciju, rešenja, primere.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">🌐</span>
+      <h4>Fetch URL</h4>
+      <p>Daj mu link — pročitaće sadržaj stranice, API odgovor, dokumentaciju. GET, POST, PUT, DELETE.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">🖼️</span>
+      <h4>Slike & drag-drop</h4>
+      <p>Prevuci sliku u chat, nalepi sa Ctrl+V, ili dodaj preko file picker-a. Agent vidi i analizira slike.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">📸</span>
+      <h4>Pretraga slika (Unsplash)</h4>
+      <p>Agent traži i skida besplatne stock fotografije sa Unsplash-a direktno u tvoj projekat.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">🔌</span>
+      <h4>MCP integracija</h4>
+      <p>Povezivanje sa eksternim servisima — Supabase, GitHub, baze podataka, Slack i bilo koji MCP server.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">🛡️</span>
+      <h4>Auto-approve mode</h4>
+      <p>Uključi auto-approve za write, replace ili execute — agent radi bez pitanja. Ili odobravaj svaku akciju pojedinačno.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">📄</span>
+      <h4>CONTEXT.md</h4>
+      <p>Agent pamti tvoj projekat između sesija. Struktura, odluke, stack — sve sačuvano u jednom fajlu.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">🔎</span>
+      <h4>Dijagnostika</h4>
+      <p>Vidi greške iz VS Code-a u realnom vremenu. Posle svake izmene proverava da li je nešto puklo.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">📑</span>
+      <h4>PDF čitanje</h4>
+      <p>Prikači PDF u chat — agent čita sadržaj i koristi ga za kontekst. Dokumentacija, specifikacije, zadaci.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">🔀</span>
+      <h4>Git operacije</h4>
+      <p>Commit, push, branch, diff — sve iz chata. <strong>/commit</strong> komanda generiše poruku iz promena.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">💬</span>
+      <h4>@terminal mention</h4>
+      <p>Taguješ <strong>@terminal</strong> — agent čita poslednji output iz terminala. Savršeno za debugging build grešaka.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">📜</span>
+      <h4>Custom pravila</h4>
+      <p>Napravi <strong>.vajbagentrules</strong> fajl — agent prati tvoja pravila (TypeScript strict, pnpm, srpski komentari...).</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">🕐</span>
+      <h4>Istorija sesija</h4>
+      <p>Svi prethodni razgovori sačuvani. Vrati se na bilo koji, nastavi gde si stao ili obriši.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">🖱️</span>
+      <h4>Desni klik — Explain / Refactor</h4>
+      <p>Selektuj kod, desni klik → <strong>Explain Selection</strong> ili <strong>Refactor Selection</strong>. Agent odmah reaguje.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">🎨</span>
+      <h4>Markdown & syntax highlight</h4>
+      <p>Odgovori sa formatiranim kodom, tabelama, listama. Copy dugme na svakom code bloku.</p>
+    </div>
+    <div class="feat-item">
+      <span class="fi-icon">🔑</span>
+      <h4>Jedan ključ, svi modeli</h4>
+      <p>Jedan VajbAgent API ključ — pristupaš svim modelima. Bez naloga kod više provajdera.</p>
+    </div>
+  </div>
 </section>
 
+<!-- Demo mockupi -->
+<section id="u-akciji">
+  <div class="stag">U akciji</div>
+  <div class="stitle">Pogledaj VajbAgent <em>u akciji</em></div>
+  <div class="ssub">Evo šta radi — direktno u tvom editoru, bez napuštanja koda.</div>
+
+  <div class="demo-grid">
+    <div class="demo-card">
+      <div class="demo-label"><span class="demo-dot"></span> Chat sa AI agentom</div>
+      <div class="demo-mock">
+        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-tokens">2.1K / 400K</span></div>
+        <div class="dm-bubble dm-user">Napravi mi login stranicu sa formom</div>
+        <div class="dm-tool"><span>▶</span> write_file <em>public/login.html</em> <span class="dm-done">done</span></div>
+        <div class="dm-tool"><span>▶</span> write_file <em>public/login.css</em> <span class="dm-done">done</span></div>
+        <div class="dm-bubble dm-agent">Napravio sam login stranicu sa:<br>• Responzivna forma (email + password)<br>• Validacija polja<br>• Dark tema sa narandžastim akcentom<br>• Animirana "Prijavi se" dugmad</div>
+        <div class="dm-files"><b>Izmenjeni fajlovi (2)</b><br><span>public/login.html</span> · <span>public/login.css</span></div>
+      </div>
+      <p class="demo-desc">Opiši šta želiš — agent čita, piše i menja fajlove. Sve vidiš u chatu sa diff preview-om.</p>
+    </div>
+
+    <div class="demo-card">
+      <div class="demo-label"><span class="demo-dot"></span> Slash komande & @mentions</div>
+      <div class="demo-mock">
+        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-tokens">0.5K / 400K</span></div>
+        <div class="dm-bubble dm-user" style="font-size:.8rem">Pogledaj <span class="dm-mention">@src/api/routes.ts</span> i popravi greške</div>
+        <div class="dm-tool"><span>▶</span> read_file <em>src/api/routes.ts</em> <span class="dm-done">done</span></div>
+        <div class="dm-tool"><span>▶</span> replace_in_file <em>src/api/routes.ts</em> <span class="dm-done">done</span></div>
+        <div class="dm-bubble dm-agent">Popravio sam 2 greške u routes.ts:<br>• Nedostajao async/await na handler-u<br>• Pogrešan tip za req.params</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+          <span class="dm-slash">/fix</span>
+          <span class="dm-slash">/test</span>
+          <span class="dm-slash">/doc</span>
+          <span class="dm-slash">/commit</span>
+          <span class="dm-slash">/explain</span>
+          <span class="dm-slash">/refactor</span>
+        </div>
+      </div>
+      <p class="demo-desc">Taguješ fajlove sa @, koristiš slash komande za brze akcije. Autocomplete za sve.</p>
+    </div>
+
+    <div class="demo-card">
+      <div class="demo-label"><span class="demo-dot"></span> Plan Mode — faze</div>
+      <div class="demo-mock">
+        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-plan">📋 Plan</span></div>
+        <div class="dm-bubble dm-user">[Plan] Napravi todo app sa dodavanjem i brisanjem</div>
+        <div class="dm-plan-box">
+          <div class="dm-plan-title">Plan spreman — 4 faze</div>
+          <div class="dm-plan-btns"><span class="dm-btn-exec">Izvrši ceo plan</span><span class="dm-btn-phase">Faza 1 ▶</span><span class="dm-btn-cancel">Otkaži</span></div>
+          <div class="dm-phase"><span class="dm-pn">1.</span> Priprema projekta i fajlova</div>
+          <div class="dm-phase"><span class="dm-pn">2.</span> Backend: API rute i logika</div>
+          <div class="dm-phase"><span class="dm-pn">3.</span> Frontend: UI komponente</div>
+          <div class="dm-phase"><span class="dm-pn">4.</span> Testiranje i clean-up</div>
+        </div>
+      </div>
+      <p class="demo-desc">Složene projekte razbija na faze. Izvršavaš jednu po jednu ili sve odjednom.</p>
+    </div>
+
+    <div class="demo-card">
+      <div class="demo-label"><span class="demo-dot"></span> Checkpoint & Undo</div>
+      <div class="demo-mock">
+        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-undo">↩ Undo (3)</span></div>
+        <div class="dm-bubble dm-user">Dodaj dark mode na ceo sajt</div>
+        <div class="dm-tool"><span>▶</span> read_file <em>public/style.css</em> <span class="dm-done">done</span></div>
+        <div class="dm-tool"><span>▶</span> replace_in_file <em>public/style.css</em> <span class="dm-done">done</span></div>
+        <div class="dm-tool"><span>▶</span> replace_in_file <em>public/index.html</em> <span class="dm-done">done</span></div>
+        <div class="dm-bubble dm-agent">Dodao sam dark mode:<br>• CSS varijable za temu<br>• Toggle dugme u headeru<br>• localStorage za čuvanje izbora</div>
+        <div class="dm-files"><b>Izmenjeni fajlovi (3)</b><br><span>public/style.css</span> <em class="dm-revert">↩</em> · <span>public/index.html</span> <em class="dm-revert">↩</em> · <span>public/app.js</span> <em class="dm-revert">↩</em></div>
+      </div>
+      <p class="demo-desc">Svaka izmena se čuva. Ne sviđa ti se? Klikni ↩ i vrati po fajlu ili sve odjednom.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Modeli -->
 <section id="modeli">
-  <div class="stag">Nivoi</div>
-  <div class="stitle">7 nivoa snage: <em>biraj po potrebi projekta</em></div>
-  <div class="ssub">Svaki nivo = druga snaga = druga cena. Biraj po složenosti zadatka.</div>
+  <div class="stag">Modeli</div>
+  <div class="stitle">7 AI modela: <em>biraj po potrebi</em></div>
+  <div class="ssub">Svaki model ima drugu snagu i cenu. Biraš jednim klikom u headeru ekstenzije.</div>
   <div class="tiers">
     <div class="tier pop">
       <span class="tier-badge" aria-hidden="true">BEST VALUE</span>
       <div class="t-name">Lite</div>
-      <div class="t-desc">Svakodnevno</div>
+      <div class="t-desc">Svakodnevno kodiranje</div>
       <div class="t-model">Brz i efikasan · 400K kontekst</div>
       <div class="t-val t-val-wide">~1.500</div>
       <div class="t-val-sub">zahteva za $15</div>
@@ -338,8 +512,8 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     </div>
     <div class="tier">
       <div class="t-name">Turbo</div>
-      <div class="t-desc">Reasoning</div>
-      <div class="t-model">Razmišlja korak po korak · 200K kontekst</div>
+      <div class="t-desc">Reasoning model</div>
+      <div class="t-model">Razmišlja korak po korak · 200K</div>
       <div class="t-val">~475</div>
       <div class="t-val-sub">zahteva za $15</div>
       <div class="t-detail">~$0.032/req · ~16h kodiranja</div>
@@ -354,7 +528,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     </div>
     <div class="tier">
       <div class="t-name">Power</div>
-      <div class="t-desc">Flagship</div>
+      <div class="t-desc">Flagship model</div>
       <div class="t-model">Najjači nivo · 1M+ kontekst</div>
       <div class="t-val">~175</div>
       <div class="t-val-sub">zahteva za $15</div>
@@ -362,16 +536,16 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     </div>
     <div class="tier">
       <div class="t-name">Max</div>
-      <div class="t-desc">Kompleksno</div>
-      <div class="t-model">Balansiran premium · 200K kontekst</div>
+      <div class="t-desc">Balansiran premium</div>
+      <div class="t-model">Kompleksni zadaci · 200K</div>
       <div class="t-val">~205</div>
       <div class="t-val-sub">zahteva za $15</div>
       <div class="t-detail">~$0.073/req · ~7h kodiranja</div>
     </div>
     <div class="tier">
       <div class="t-name">Ultra</div>
-      <div class="t-desc">Premium</div>
-      <div class="t-model">Vrhunski AI · 200K kontekst</div>
+      <div class="t-desc">Premium AI</div>
+      <div class="t-model">Vrhunski model · 200K kontekst</div>
       <div class="t-val">~120</div>
       <div class="t-val-sub">zahteva za $15</div>
       <div class="t-detail">~$0.125/req · ~4h kodiranja</div>
@@ -385,15 +559,14 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
       <div class="t-detail">~$0.125/req · ~4h kodiranja</div>
     </div>
   </div>
-  <p style="text-align:center;font-size:.78rem;color:var(--text2);margin-top:20px;max-width:700px;margin-left:auto;margin-right:auto;">Procena za aktivno kodiranje (~30 zahteva/sat). Kraća pitanja troše manje tokena.</p>
+  <p style="text-align:center;font-size:.8rem;color:var(--text2);margin-top:24px;max-width:700px;margin-left:auto;margin-right:auto;line-height:1.6;">Procena za aktivno kodiranje (~30 zahteva/sat). Kraća pitanja troše manje tokena. <strong>Kombinuj modele</strong> kako hoćeš — Lite za svakodnevno, Pro kad zatreba više snage.</p>
 </section>
 
-
-
+<!-- Primeri -->
 <section id="primeri">
   <div class="stag">Primeri</div>
-  <div class="stitle">Koji nivo za <em>šta?</em></div>
-  <div class="ssub">Konkretni primeri kada koji nivo ima smisla.</div>
+  <div class="stitle">Koji model za <em>šta?</em></div>
+  <div class="ssub">Konkretni primeri kada koji model ima smisla.</div>
   <div class="benefits">
     <div class="bcard">
       <div class="bcard-icon">💬</div>
@@ -418,7 +591,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     <div class="bcard">
       <div class="bcard-icon">🏗️</div>
       <h3>Max — balansiran premium</h3>
-      <p>"Zašto mi app puca?" "Pomozi da sredim strukturu." Najjači balansiran nivo za kompleksne zadatke.</p>
+      <p>"Zašto mi app puca?" "Pomozi da sredim strukturu." Najjači balansiran model za kompleksne zadatke.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon">⚡</div>
@@ -428,93 +601,26 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
   </div>
 </section>
 
-<section id="u-akciji">
-  <div class="stag">Mogućnosti</div>
-  <div class="stitle">Pogledaj VajbAgent <em>u akciji</em></div>
-  <div class="ssub">Evo šta sve radi — direktno u tvom editoru, bez napuštanja koda.</div>
-
-  <div class="demo-grid">
-    <div class="demo-card">
-      <div class="demo-label"><span class="demo-dot"></span> Chat sa AI agentom</div>
-      <div class="demo-mock">
-        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-tokens">2.1K / 400K</span></div>
-        <div class="dm-bubble dm-user">Napravi mi login stranicu sa formom</div>
-        <div class="dm-tool"><span>▶</span> write_file <em>public/login.html</em> <span class="dm-done">done</span></div>
-        <div class="dm-tool"><span>▶</span> write_file <em>public/login.css</em> <span class="dm-done">done</span></div>
-        <div class="dm-bubble dm-agent">Napravio sam login stranicu sa:<br>• Responzivna forma (email + password)<br>• Validacija polja<br>• Dark tema sa narandžastim akcentom<br>• Animirana "Prijavi se" dugmad</div>
-        <div class="dm-files"><b>Izmenjeni fajlovi (2)</b><br><span>public/login.html</span> · <span>public/login.css</span></div>
-      </div>
-      <p class="demo-desc">Opiši šta želiš — agent čita, piše i menja fajlove za tebe. Sve vidiš u chatu, ništa se ne dešava iza scene.</p>
-    </div>
-
-    <div class="demo-card">
-      <div class="demo-label"><span class="demo-dot"></span> Plan Mode — faze</div>
-      <div class="demo-mock">
-        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-plan">📋 Plan</span></div>
-        <div class="dm-bubble dm-user">[Plan] Napravi todo app sa dodavanjem i brisanjem</div>
-        <div class="dm-plan-box">
-          <div class="dm-plan-title">Plan spreman — 4 faze</div>
-          <div class="dm-plan-btns"><span class="dm-btn-exec">Izvrši ceo plan</span><span class="dm-btn-phase">Faza 1 ▶</span><span class="dm-btn-cancel">Otkaži</span></div>
-          <div class="dm-phase"><span class="dm-pn">1.</span> Priprema projekta i fajlova</div>
-          <div class="dm-phase"><span class="dm-pn">2.</span> Backend: API rute i logika</div>
-          <div class="dm-phase"><span class="dm-pn">3.</span> Frontend: UI komponente</div>
-          <div class="dm-phase"><span class="dm-pn">4.</span> Testiranje i clean-up</div>
-        </div>
-      </div>
-      <p class="demo-desc">Složene projekte razbija na faze. Ti kontrolišeš tempo — izvršavaš jednu po jednu ili sve odjednom.</p>
-    </div>
-
-    <div class="demo-card">
-      <div class="demo-label"><span class="demo-dot"></span> Automatski popravlja greške</div>
-      <div class="demo-mock">
-        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-undo">↩ Undo (1)</span></div>
-        <div class="dm-bubble dm-user">Imam li neke greške u projektu?</div>
-        <div class="dm-tool"><span>▶</span> read_file <em>src/app.ts</em> <span class="dm-done">done</span></div>
-        <div class="dm-tool"><span>▶</span> replace_in_file <em>src/app.ts</em> <span class="dm-done">done</span></div>
-        <div class="dm-bubble dm-agent">Pronašao sam i popravio <b>2 greške</b>:<br>• Nedostajao import za Router<br>• Pogrešan tip u handleError()<br>Sve je sada čisto ✓</div>
-        <div class="dm-files"><b>Izmenjeni fajlovi (1)</b><br><span>src/app.ts</span> <em class="dm-revert">↩</em></div>
-      </div>
-      <p class="demo-desc">Vidi greške iz VS Code dijagnostike, čita fajl, popravlja problem i nudi ti Undo ako želiš da vratiš.</p>
-    </div>
-
-    <div class="demo-card">
-      <div class="demo-label"><span class="demo-dot"></span> Razume tvoj projekat</div>
-      <div class="demo-mock">
-        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-tokens">0.7K / 400K</span></div>
-        <div class="dm-bubble dm-user">Koja je struktura projekta?</div>
-        <div class="dm-bubble dm-agent" style="font-size:.78rem;line-height:1.7">
-          <b>Struktura:</b><br>
-          <span class="dm-path">📂 src/</span> — backend (Express)<br>
-          <span class="dm-path">📂 public/</span> — frontend stranice<br>
-          <span class="dm-path">📄 package.json</span> — Node.js<br>
-          <span class="dm-path">📄 .env</span> — konfiguracija<br><br>
-          <em style="color:#999">Odgovor bez tool poziva — već zna strukturu</em>
-        </div>
-      </div>
-      <p class="demo-desc">Automatski indeksira tvoj workspace. Zna strukturu, tehnologije, Git stanje i koji fajl gledaš — pre nego što ga ista pitaš.</p>
-    </div>
-  </div>
-</section>
-
+<!-- Kako poceti -->
 <section id="kako-radi">
   <div class="stag">Kako početi</div>
   <div class="stitle">3 koraka do <em>AI kodiranja</em></div>
-  <div class="ssub">Setup traje 2 minuta.</div>
+  <div class="ssub">Setup traje 2 minuta. Bez komplikacija.</div>
   <div class="steps">
     <div class="step-card">
       <div class="step-num">1</div>
       <h3>Napravi nalog</h3>
-      <p>Registruj se i dobijaš $2 kredita + API ključ. Bez kartice, bez obaveze.</p>
+      <p>Registruj se i dobijaš <strong>$2 kredita</strong> + API ključ. Bez kartice, bez obaveze.</p>
     </div>
     <div class="step-card">
       <div class="step-num">2</div>
-      <h3>Instaliraj VajbAgent ekstenziju</h3>
-      <p>U Cursoru ili VS Code-u: Extensions → traži "VajbAgent" → Install. Gotovo za 30 sekundi.</p>
+      <h3>Instaliraj ekstenziju</h3>
+      <p>U Cursoru ili VS Code-u: Extensions → traži <strong>"VajbAgent"</strong> → Install. Gotovo za 30 sekundi.</p>
     </div>
     <div class="step-card">
       <div class="step-num">3</div>
-      <h3>Unesi API ključ i kodiraj</h3>
-      <p>Otvori VajbAgent panel, unesi ključ i počni. Biraš model u footeru — od Lite do Ultra.</p>
+      <h3>Unesi ključ i kodiraj</h3>
+      <p>Otvori VajbAgent panel, unesi ključ i počni. Biraš model u headeru — od <strong>Lite</strong> do <strong>Ultra</strong>.</p>
     </div>
   </div>
   <div class="mini-cta">
@@ -523,34 +629,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
   </div>
 </section>
 
-<section id="sta-je">
-  <div class="stag">Objašnjenje</div>
-  <div class="stitle">Šta je <em>VajbAgent?</em></div>
-  <div class="ssub">Prostim rečima, bez komplikacija.</div>
-  <div class="sum-grid">
-    <div class="sum-card">
-      <h3>VajbAgent je AI agent u tvom editoru</h3>
-      <p>
-        <span class="win-line">Besplatna ekstenzija za Cursor i VS Code</span><br>
-        <span class="win-line">Čita, piše i menja fajlove za tebe</span><br>
-        <span class="win-line">Pokreće komande u terminalu</span><br>
-        <span class="win-line">7 nivoa AI modela — od Lite do Ultra</span><br>
-        <span class="win-line">Platiš samo koliko potrošiš, bez pretplate</span>
-      </p>
-    </div>
-    <div class="sum-card">
-      <h3>Za koga je ovo?</h3>
-      <p>
-        <span class="win-line">Za "vibe kodere" — ljude koji kodiraju po osećaju</span><br>
-        <span class="win-line">Za početnike koji uče programiranje</span><br>
-        <span class="win-line">Za sve koji ne žele mesečnu pretplatu</span><br>
-        <span class="win-line">Za Cursor korisnike koji hoće više kontrole</span><br>
-        <span class="win-line">Za ljude kojima je lakše na srpskom</span>
-      </p>
-    </div>
-  </div>
-</section>
-
+<!-- Koliko kosta -->
 <section id="koliko-kosta">
   <div class="stag">Cene</div>
   <div class="stitle">Koliko košta <em>AI kodiranje?</em></div>
@@ -573,36 +652,37 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
         <span class="win-line"><b>Pro</b> ~295 zahteva · ~10h kodiranja</span><br>
         <span class="win-line"><b>Max</b> ~205 zahteva · ~7h kodiranja</span><br>
         <span class="win-line"><b>Ultra</b> ~120 zahteva · ~4h kodiranja</span><br>
-        <span class="win-line"><b>Kombinuj nivoe</b> kako hoćeš</span>
+        <span class="win-line"><b>Kombinuj modele</b> kako hoćeš</span>
       </p>
     </div>
   </div>
 </section>
 
+<!-- Zasto VajbAgent -->
 <section id="zasto-vajb">
   <div class="stag">Česta pitanja</div>
   <div class="stitle">Zašto VajbAgent ako mogu <em>sam da napravim API ključ?</em></div>
-  <div class="ssub">Da, možeš sam da praviš API ključeve kod provajdera. Ali evo zašto ljudi biraju VajbAgent.</div>
+  <div class="ssub">Možeš sam da praviš API ključeve kod provajdera. Ali evo zašto ljudi biraju VajbAgent.</div>
   <div class="benefits" style="grid-template-columns:repeat(3,1fr);max-width:1000px;margin:0 auto">
     <div class="bcard">
       <div class="bcard-icon">🔑</div>
       <h3>Jedan ključ, svi modeli</h3>
-      <p>Umesto da praviš naloge kod više provajdera — dobijaš pristup svim modelima kroz jedan VajbAgent ključ.</p>
+      <p>Umesto da praviš naloge kod više provajdera — pristupaš svim modelima kroz jedan VajbAgent ključ.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon">⚡</div>
       <h3>Native tool calling</h3>
-      <p>VajbAgent koristi native JSON tool calling — troši do 2x manje tokena od alternativa koje koriste XML format.</p>
+      <p>VajbAgent koristi native JSON tool calling — troši do 2x manje tokena od alternativa sa XML formatom.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon">💳</div>
       <h3>Bez komplikacija sa plaćanjem</h3>
-      <p>Ne moraš da dodaješ karticu na 3 sajta. Uplatiš ovde koliko hoćeš, koristiš dok traje.</p>
+      <p>Ne moraš karticu na 3 sajta. Uplatiš ovde koliko hoćeš, koristiš dok traje.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon">🎁</div>
       <h3>$2 besplatno za probu</h3>
-      <p>Napraviš nalog, dobiješ $2 kredita. Probaš bez rizika. Ako ti se ne svidi, nisi ništa izgubio.</p>
+      <p>Napraviš nalog, dobiješ $2 kredita. Probaš bez rizika. Ako ti se ne svidi — nisi ništa izgubio.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon">🇷🇸</div>
@@ -617,6 +697,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
   </div>
 </section>
 
+<!-- CTA -->
 <div class="cta">
   <h2>Probaj besplatno</h2>
   <p>Napravi nalog, dobijaš $2 na poklon. Bez kartice, bez obaveze.</p>
