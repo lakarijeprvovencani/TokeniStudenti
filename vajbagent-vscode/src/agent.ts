@@ -8,6 +8,7 @@ import { McpManager } from './mcp';
 import https from 'https';
 import http from 'http';
 import { execSync } from 'child_process';
+import { parseToolCallArguments } from './toolArgsParse';
 
 const MAX_ITERATIONS = 50;
 
@@ -1637,7 +1638,15 @@ export class Agent {
           try {
             args = JSON.parse(tc.function.arguments);
           } catch {
-            argsParseFailed = true;
+            // JSON parse failed — try recovery with parseToolCallArguments
+            const recovered = parseToolCallArguments(tc.function.arguments);
+            if (recovered && Object.keys(recovered).length > 0) {
+              args = recovered;
+              // Log recovery for debugging
+              console.log(`[Agent] Recovered truncated tool args for ${tc.function.name}: ${Object.keys(recovered).join(', ')}`);
+            } else {
+              argsParseFailed = true;
+            }
           }
 
           this._provider.postMessage({
