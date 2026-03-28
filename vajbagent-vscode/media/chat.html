@@ -657,6 +657,41 @@
       transition: color 0.15s;
     }
     .queue-bar-dismiss:hover { color: rgba(255, 255, 255, 0.8); }
+
+    /* Toast notification — slides in from top */
+    .toast {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      margin: 0 8px 4px;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.75);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      flex-shrink: 0;
+      animation: toastIn 0.3s ease-out;
+    }
+    .toast.visible { display: flex; }
+    .toast-text { flex: 1; line-height: 1.4; }
+    .toast-text a { color: rgba(255, 255, 255, 0.9); text-decoration: underline; }
+    .toast-dismiss {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.3);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 2px;
+      line-height: 1;
+    }
+    .toast-dismiss:hover { color: rgba(255, 255, 255, 0.7); }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     .msg-assistant {
       align-self: flex-start;
       background: transparent;
@@ -2711,6 +2746,10 @@
     <button class="undo-btn" id="undoBtn" title="Vrati sve promene agenta na stanje pre izmena" style="display:none" data-count="0">↩ Undo</button>
     <button class="context-new-session" id="contextNewSession">Novi chat</button>
   </div>
+  <div class="toast" id="toastNotif">
+    <span class="toast-text" id="toastText"></span>
+    <button class="toast-dismiss" id="toastDismiss">✕</button>
+  </div>
   <div class="messages" id="messages">
     <div class="welcome-msg" id="welcome">
       <div class="welcome-brand"><span class="v">&lt;</span>Vajb<span class="v">Agent/&gt;</span></div>
@@ -3195,6 +3234,23 @@
       }
     });
 
+    // Toast notification helpers
+    let _toastTimer = null;
+    function showToast(html, autoHideMs) {
+      var el = document.getElementById('toastNotif');
+      document.getElementById('toastText').innerHTML = html;
+      el.classList.add('visible');
+      if (_toastTimer) clearTimeout(_toastTimer);
+      if (autoHideMs) {
+        _toastTimer = setTimeout(function() { el.classList.remove('visible'); }, autoHideMs);
+      }
+    }
+    function hideToast() {
+      document.getElementById('toastNotif').classList.remove('visible');
+      if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+    }
+    document.getElementById('toastDismiss').addEventListener('click', hideToast);
+
     modelSelect.addEventListener('change', () => {
       vscode.postMessage({ type: 'setModel', model: modelSelect.value });
     });
@@ -3450,6 +3506,11 @@
         autoExecuteCommand.checked = false;
       } else if (mode === 'plan') {
         togglePlanMode(true);
+      }
+
+      // Warn if switching mode mid-session
+      if (isStreaming) {
+        showToast('Mode promenjen dok agent radi — moze izazvati probleme. Preporučujemo novi chat.', 8000);
       }
     }
 
@@ -5002,9 +5063,17 @@
           const bal = msg.balance_usd;
           const balEl = document.getElementById('balanceLabel');
           if (balEl && typeof bal === 'number') {
+            const prevBal = parseFloat(balEl.textContent?.replace('$', '') || '999');
             balEl.textContent = '$' + bal.toFixed(2);
             balEl.style.display = '';
             balEl.className = 'balance-label' + (bal < 1 ? ' low' : '');
+
+            // Show toast warnings at key thresholds
+            if (bal < 0.50 && prevBal >= 0.50) {
+              showToast('Preostalo ti je <strong>$' + bal.toFixed(2) + '</strong>. <a href="https://vajbagent.com/dashboard" target="_blank">Dopuni kredite →</a>', 15000);
+            } else if (bal < 2 && prevBal >= 2) {
+              showToast('Krediti padaju — preostalo <strong>$' + bal.toFixed(2) + '</strong>. <a href="https://vajbagent.com/dashboard" target="_blank">Dopuni →</a>', 10000);
+            }
           }
           break;
         }
