@@ -692,6 +692,29 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
+    /* Model switch notice in chat */
+    .model-switch-notice {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 8px;
+      margin: 6px 0;
+      font-family: 'Inter', system-ui, sans-serif;
+      animation: msgIn 0.2s ease-out;
+    }
+    .model-switch-line {
+      flex: 1;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .model-switch-text {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.3);
+      white-space: nowrap;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+
     .msg-assistant {
       align-self: flex-start;
       background: transparent;
@@ -1161,45 +1184,47 @@
       bottom: 100%;
       left: 0;
       right: 0;
-      max-height: 220px;
+      max-height: 240px;
       overflow-y: auto;
-      background: #1e1e1e;
-      border: 1px solid rgba(250, 115, 21, 0.18);
+      background: var(--vscode-editor-background, #1e1e1e);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 10px;
       margin-bottom: 4px;
       z-index: 100;
-      box-shadow: 0 -4px 24px rgba(0,0,0,0.45);
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
       padding: 4px 0;
     }
     .mention-dropdown.open { display: block; }
     .mention-item {
-      padding: 6px 10px;
-      font-size: 12px;
+      padding: 8px 12px;
+      font-size: 13px;
       font-family: 'Inter', var(--vscode-font-family, sans-serif);
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      transition: background 0.1s;
     }
     .mention-item:hover, .mention-item.active, .mention-item.selected {
-      background: rgba(250, 115, 21, 0.1);
+      background: rgba(255, 255, 255, 0.06);
     }
     .mention-item .mention-icon {
-      opacity: 0.5;
+      opacity: 0.6;
       flex-shrink: 0;
-      font-size: 13px;
+      font-size: 14px;
     }
     .mention-item .mention-path {
-      opacity: 0.45;
-      font-size: 11px;
+      opacity: 0.35;
+      font-size: 12px;
       margin-left: auto;
       flex-shrink: 0;
     }
     .mention-item .mention-name {
-      color: var(--accent);
+      color: rgba(255, 255, 255, 0.9);
+      font-weight: 600;
     }
     .mention-hint {
       padding: 6px 10px;
@@ -1281,6 +1306,12 @@
       background: rgba(250, 115, 21, 0.1);
     }
     .toolbar-btn svg { width: 16px; height: 16px; }
+    .toolbar-separator {
+      width: 1px;
+      height: 14px;
+      background: rgba(255, 255, 255, 0.08);
+      margin: 0 2px;
+    }
 
     .send-btn {
       background: var(--accent-gradient);
@@ -2843,6 +2874,12 @@
               <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
             </svg>
           </button>
+          <span class="toolbar-separator"></span>
+          <button class="toolbar-btn" id="slashBtn" title="Slash komande">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="7" y1="20" x2="17" y2="4"/>
+            </svg>
+          </button>
           <button class="toolbar-btn" id="imagePickerBtn" title="Dodaj sliku" style="display:none">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="3"/>
@@ -3251,6 +3288,13 @@
     }
     document.getElementById('toastDismiss').addEventListener('click', hideToast);
 
+    // Slash button — opens slash command dropdown
+    document.getElementById('slashBtn').addEventListener('click', function() {
+      userInput.value = '/';
+      userInput.focus();
+      userInput.dispatchEvent(new Event('input'));
+    });
+
     modelSelect.addEventListener('change', () => {
       vscode.postMessage({ type: 'setModel', model: modelSelect.value });
     });
@@ -3291,11 +3335,22 @@
     modelMenuEl.querySelectorAll('.model-option').forEach(function(opt) {
       opt.addEventListener('click', function() {
         var modelId = opt.dataset.model;
+        var prevModel = modelSelect.value;
         modelSelect.value = modelId;
         modelSelect.dispatchEvent(new Event('change'));
         updateModelPicker(modelId);
         modelMenuEl.classList.remove('open');
         modelPickerBtn.classList.remove('open');
+
+        // Show model switch in chat
+        if (prevModel !== modelId) {
+          var label = MODEL_LABELS[modelId] || modelId;
+          var divider = document.createElement('div');
+          divider.className = 'model-switch-notice';
+          divider.innerHTML = '<span class="model-switch-line"></span><span class="model-switch-text">Prebačeno na ' + label + '</span><span class="model-switch-line"></span>';
+          messagesEl.appendChild(divider);
+          scrollToBottom();
+        }
       });
     });
 
