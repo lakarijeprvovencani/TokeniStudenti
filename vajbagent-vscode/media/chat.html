@@ -673,33 +673,30 @@
     }
     /* Slash command display in user messages */
     .slash-cmd-tag {
+      display: inline;
+      background: rgba(200, 104, 26, 0.15);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent-bright);
+      font-family: var(--vscode-editor-font-family);
+    }
+    /* Plan mode user message */
+    .plan-mode-tag {
       display: inline-flex;
       align-items: center;
       gap: 5px;
       background: rgba(200, 104, 26, 0.12);
       border: 1px solid rgba(200, 104, 26, 0.25);
-      border-radius: 8px;
-      padding: 4px 10px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--accent-bright);
-      font-family: var(--vscode-editor-font-family);
-    }
-    .slash-cmd-tag svg { width: 13px; height: 13px; flex-shrink: 0; }
-    /* Plan mode user message */
-    .plan-mode-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(200, 104, 26, 0.12);
-      border: 1px solid rgba(200, 104, 26, 0.25);
-      border-radius: 8px;
-      padding: 4px 10px;
-      margin-bottom: 6px;
+      border-radius: 6px;
+      padding: 3px 9px;
+      margin-bottom: 8px;
       font-size: 11px;
       font-weight: 600;
       color: var(--accent-bright);
     }
+    .plan-mode-tag svg { width: 12px; height: 12px; flex-shrink: 0; stroke: var(--accent-bright); }
     /* Queued message bar — sits above input */
     .queue-bar {
       display: none;
@@ -2972,8 +2969,9 @@
       </div>
     </div>
     <div class="input-container">
-      <div id="planModeBar" style="display:none;padding:5px 12px;font-size:10px;color:var(--accent);background:rgba(250,115,21,0.06);border-bottom:1px solid rgba(250,115,21,0.15);align-items:center;gap:6px;">
-        <span style="font-size:12px;">📋</span> <strong>Plan mode</strong> — agent ce napraviti plan, nece menjati kod
+      <div id="planModeBar" style="display:none;padding:5px 12px;font-size:11px;color:var(--accent-bright);background:rgba(200,104,26,0.06);border-bottom:1px solid rgba(200,104,26,0.15);align-items:center;gap:6px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0;"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+        <strong>Plan mode</strong> <span style="opacity:0.6;">— agent ce napraviti plan, nece menjati kod</span>
         <button id="planModeOff" style="margin-left:auto;background:none;border:none;color:var(--vscode-foreground);opacity:0.5;cursor:pointer;font-size:12px;padding:0 4px;">✕</button>
       </div>
       <div class="image-previews" id="imagePreviews"></div>
@@ -4294,19 +4292,17 @@
           let displayHtml = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
           // Style @mentions
           displayHtml = displayHtml.replace(/@([\w.\/\-]+)/g, '<span class="mention-tag">@$1</span>');
-          // Style slash commands
+          // Style slash commands — command in accent, rest in normal color
           const slashDisplayMatch = text.match(/^\/(\w+)(\s+.*)?$/);
           if (slashDisplayMatch) {
             const cmdName = slashDisplayMatch[1];
             const cmdArg = (slashDisplayMatch[2] || '').trim();
-            const cmdIcons = { test: '⬡', fix: '★', doc: '◈', commit: '◉', explain: '◬', refactor: '⟐' };
-            const cmdIcon = cmdIcons[cmdName] || '/';
-            const argHtml = cmdArg ? ' <span style="opacity:0.6;font-weight:400;">' + cmdArg.replace(/@([\w.\/\-]+)/g, '<span class="mention-tag">@$1</span>') + '</span>' : '';
-            displayHtml = '<span class="slash-cmd-tag">' + cmdIcon + ' /' + cmdName + argHtml + '</span>';
+            const argHtml = cmdArg ? ' ' + cmdArg.replace(/@([\w.\/\-]+)/g, '<span class="mention-tag">@$1</span>') : '';
+            displayHtml = '<span class="slash-cmd-tag">/' + cmdName + '</span>' + argHtml;
           }
-          // Plan mode prefix
+          // Plan mode prefix with SVG icon
           if (planModeActive) {
-            html += '<div class="plan-mode-tag">📋 Plan mode</div>';
+            html += '<div class="plan-mode-tag"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>Plan</div>';
           }
           html += '<div>' + displayHtml + '</div>';
         }
