@@ -1437,12 +1437,30 @@ export class Agent {
         const stat = fs.statSync(absPath);
         if (stat.isFile()) {
           try {
-            const content = fs.readFileSync(absPath, 'utf-8').substring(0, 5000);
-            const suffix = content.length >= 5000 ? '\n... (truncated)' : '';
-            expanded = expanded.replace(
-              `@${filePath}`,
-              `@${filePath}\n\`\`\`\n${content}${suffix}\n\`\`\``
-            );
+            // Skip binary files
+            const BINARY_EXTS = new Set(['DS_Store', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', 'svg', 'woff', 'woff2', 'ttf', 'eot', 'otf', 'mp3', 'mp4', 'wav', 'avi', 'mov', 'zip', 'tar', 'gz', 'rar', '7z', 'pdf', 'exe', 'dll', 'so', 'dylib', 'o', 'obj', 'class', 'pyc', 'vsix', 'lock']);
+            const ext = path.basename(absPath).startsWith('.DS_Store') ? 'DS_Store' : (absPath.split('.').pop() || '').toLowerCase();
+            if (BINARY_EXTS.has(ext)) {
+              expanded = expanded.replace(
+                `@${filePath}`,
+                `@${filePath} (binarni fajl — ne može se pročitati kao tekst)`
+              );
+            } else {
+              const content = fs.readFileSync(absPath, 'utf-8').substring(0, 5000);
+              // Check for binary content (null bytes)
+              if (content.includes('\0')) {
+                expanded = expanded.replace(
+                  `@${filePath}`,
+                  `@${filePath} (binarni fajl — ne može se pročitati kao tekst)`
+                );
+              } else {
+                const suffix = content.length >= 5000 ? '\n... (truncated)' : '';
+                expanded = expanded.replace(
+                  `@${filePath}`,
+                  `@${filePath}\n\`\`\`\n${content}${suffix}\n\`\`\``
+                );
+              }
+            }
           } catch { /* skip unreadable */ }
         } else if (stat.isDirectory()) {
           try {
