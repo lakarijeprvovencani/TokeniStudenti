@@ -2226,10 +2226,10 @@
     /* Auto-approved notification */
     .auto-approved-notice {
       align-self: flex-start;
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
+      gap: 5px;
+      padding: 2px 8px;
       margin: 4px 0;
       font-family: 'Inter', system-ui, sans-serif;
       font-size: 12px;
@@ -2237,8 +2237,12 @@
       opacity: 0.8;
     }
     .auto-approved-notice strong {
-      color: rgba(255, 255, 255, 0.6);
-      font-weight: 600;
+      color: rgba(255, 255, 255, 0.55);
+      font-weight: 500;
+      max-width: 250px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .header { position: relative; z-index: 1000; }
@@ -5254,8 +5258,10 @@
         case 'autoApproved': {
           const notice = document.createElement('div');
           notice.className = 'auto-approved-notice';
-          const label = msg.toolName === 'execute_command' ? msg.filePath : msg.filePath;
-          notice.innerHTML = '&#10003; Auto-approved: <strong>' + escapeHtml(label) + '</strong>';
+          const rawLabel = msg.filePath || '';
+          const shortLabel = rawLabel.includes('/') ? rawLabel.split('/').slice(-2).join('/') : rawLabel;
+          const displayLabel = shortLabel.length > 50 ? shortLabel.substring(0, 47) + '...' : shortLabel;
+          notice.innerHTML = '✓ <strong>' + escapeHtml(displayLabel) + '</strong>';
           messagesEl.appendChild(notice);
           scrollToBottom();
           break;
@@ -5309,7 +5315,8 @@
           } else {
             const notice = document.createElement('div');
             notice.className = 'auto-approved-notice';
-            notice.innerHTML = '&#10003; Auto-approved: <strong>' + escapeHtml(msg.filePath) + '</strong>';
+            const shortPath = (msg.filePath || '').includes('/') ? msg.filePath.split('/').slice(-2).join('/') : msg.filePath;
+            notice.innerHTML = '✓ <strong>' + escapeHtml(shortPath || '') + '</strong>';
             messagesEl.appendChild(notice);
           }
           scrollToBottom();
