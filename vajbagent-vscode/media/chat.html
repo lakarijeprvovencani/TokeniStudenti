@@ -660,6 +660,46 @@
       margin: 10px 0;
       line-height: 1.5;
     }
+    /* @mention tags in user messages */
+    .mention-tag {
+      display: inline;
+      background: rgba(200, 104, 26, 0.15);
+      color: var(--accent-bright);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--vscode-editor-font-family);
+    }
+    /* Slash command display in user messages */
+    .slash-cmd-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(200, 104, 26, 0.12);
+      border: 1px solid rgba(200, 104, 26, 0.25);
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-bright);
+      font-family: var(--vscode-editor-font-family);
+    }
+    .slash-cmd-tag svg { width: 13px; height: 13px; flex-shrink: 0; }
+    /* Plan mode user message */
+    .plan-mode-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(200, 104, 26, 0.12);
+      border: 1px solid rgba(200, 104, 26, 0.25);
+      border-radius: 8px;
+      padding: 4px 10px;
+      margin-bottom: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent-bright);
+    }
     /* Queued message bar — sits above input */
     .queue-bar {
       display: none;
@@ -4251,8 +4291,24 @@
 
         // Text
         if (text) {
-          const displayText = planModeActive ? '📋 [Plan] ' + text : text;
-          html += '<div>' + displayText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
+          let displayHtml = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          // Style @mentions
+          displayHtml = displayHtml.replace(/@([\w.\/\-]+)/g, '<span class="mention-tag">@$1</span>');
+          // Style slash commands
+          const slashDisplayMatch = text.match(/^\/(\w+)(\s+.*)?$/);
+          if (slashDisplayMatch) {
+            const cmdName = slashDisplayMatch[1];
+            const cmdArg = (slashDisplayMatch[2] || '').trim();
+            const cmdIcons = { test: '⬡', fix: '★', doc: '◈', commit: '◉', explain: '◬', refactor: '⟐' };
+            const cmdIcon = cmdIcons[cmdName] || '/';
+            const argHtml = cmdArg ? ' <span style="opacity:0.6;font-weight:400;">' + cmdArg.replace(/@([\w.\/\-]+)/g, '<span class="mention-tag">@$1</span>') + '</span>' : '';
+            displayHtml = '<span class="slash-cmd-tag">' + cmdIcon + ' /' + cmdName + argHtml + '</span>';
+          }
+          // Plan mode prefix
+          if (planModeActive) {
+            html += '<div class="plan-mode-tag">📋 Plan mode</div>';
+          }
+          html += '<div>' + displayHtml + '</div>';
         }
 
         if (html) {
@@ -4289,7 +4345,7 @@
       if (planModeActive) {
         sendText = '[PLAN MODE] Korisnik zeli SAMO plan. NE menjaj kod, NE koristi write_file ili replace_in_file za kod. Umesto toga:\n1. Istrazi projekat sa list_files i read_file da razumes trenutno stanje.\n2. Napravi detaljan plan sa NUMERISANIM FAZAMA (1. ..., 2. ..., 3. ...) — svaka faza jedan jasan korak.\n3. Sacuvaj plan u .vajbagent/PLAN.md koristeci write_file.\n4. Prikazi plan korisniku — faze ce biti prikazane sa dugmadima za izvrsavanje.\n5. Odgovaraj na ISTOM JEZIKU kojim korisnik pise.\n\nZahtev korisnika: ' + text;
         wasPlanModeMessage = true;
-        togglePlanMode(false);
+        // Plan mode stays active — user must manually turn it off
       }
 
       _sendMessageBusy = true;
