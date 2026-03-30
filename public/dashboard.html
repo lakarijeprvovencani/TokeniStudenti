@@ -158,6 +158,13 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .modal-box a:hover{text-decoration:underline}
 .modal-close{display:block;margin-top:20px;width:100%;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.88rem;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s}
 .modal-close:hover{border-color:var(--border2);background:var(--border)}
+.video-modal-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:min(90vw,720px);overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.5);animation:dropIn .2s ease-out}
+@keyframes dropIn{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+.video-modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);font-size:.9rem;font-weight:700}
+.video-modal-close{background:none;border:none;color:var(--text3);font-size:1.4rem;cursor:pointer;padding:0 4px;line-height:1;transition:color .15s}
+.video-modal-close:hover{color:var(--text)}
+.video-modal-body{position:relative;width:100%;padding-bottom:64.748%;background:#000}
+.video-modal-body iframe{position:absolute;inset:0;width:100%;height:100%;border:none}
 
 /* Login tabs */
 .login-tabs{display:flex;gap:0;margin-bottom:28px;border-bottom:1px solid var(--border)}
@@ -255,7 +262,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     <!-- PREGLED -->
     <div class="page active" id="pg-overview">
       <div class="page-title">Pregled</div>
-      <p class="overview-intro">Tvoj kredit i upotreba u jednom mestu. Stanje se osvežava pri učitavanju. <br>Nemaš još ekstenziju? <a href="#" onclick="document.querySelector('.nav-item[data-page=\'setup\']').click();return false" style="color:#f97316;font-weight:600;text-decoration:underline;text-underline-offset:3px;">Preuzmi je i instaliraj u Podešavanjima →</a></p>
+      <p class="overview-intro">Tvoj kredit i upotreba u jednom mestu. Stanje se osvežava pri učitavanju. <br>Nemaš još ekstenziju? <a href="#" onclick="document.querySelector('.nav-item[data-page=\'setup\']').click();return false" style="color:#f97316;font-weight:600;text-decoration:underline;text-underline-offset:3px;">Preuzmi je i instaliraj u Podešavanjima →</a> · <a href="#" onclick="openVideoModal();return false" style="color:#f97316;font-weight:600;text-decoration:underline;text-underline-offset:3px;">Pogledaj uvodni video ▶</a></p>
       <div class="pay-banner pay-ok" id="payOk" style="display:none">&#10003; Uplata uspešna! Krediti su dodati na tvoj nalog.<button class="close-b" onclick="closeBanner('payOk')">&times;</button></div>
       <div class="pay-banner pay-fail" id="payFail" style="display:none">Plaćanje je otkazano. Krediti nisu naplaćeni.<button class="close-b" onclick="closeBanner('payFail')">&times;</button></div>
       <div class="hero-bal">
@@ -337,7 +344,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <!-- VajbAgent Extension -->
       <div class="card" id="setup-extension">
         <div class="card-title">VajbAgent ekstenzija</div>
-        <p class="setup-intro">Naša ekstenzija radi u <strong>Cursoru</strong> (čak i besplatna verzija!), <strong>VS Code-u</strong> i svim kompatibilnim editorima. Native tool calling, čita i menja fajlove, pokreće komande.</p>
+        <p class="setup-intro">Naša ekstenzija radi u <strong>Cursoru</strong> (čak i besplatna verzija!), <strong>VS Code-u</strong> i svim kompatibilnim editorima. Native tool calling, čita i menja fajlove, pokreće komande. <a href="#" onclick="openVideoModal();return false" style="color:#f97316;font-weight:600;text-decoration:underline;text-underline-offset:3px;">Pogledaj uvodni video ▶</a></p>
 
         <div style="margin:20px 0;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
           <a href="/vajbagent-latest.vsix" download style="display:inline-flex;align-items:center;gap:8px;background:var(--accent,#f97316);color:#000;padding:12px 24px;border-radius:10px;font-weight:700;font-size:.95rem;text-decoration:none;transition:opacity .15s"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Preuzmi ekstenziju (.vsix)</a>
@@ -360,6 +367,17 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Video modal -->
+<div class="modal-overlay" id="videoModal" onclick="if(event.target===this) closeVideoModal()">
+  <div class="video-modal-box">
+    <div class="video-modal-header">
+      <span>Kako instalirati VajbAgent</span>
+      <button onclick="closeVideoModal()" class="video-modal-close">&times;</button>
+    </div>
+    <div class="video-modal-body" id="videoModalBody"></div>
+  </div>
+</div>
 
 <script>
 let apiKey='';
@@ -486,6 +504,7 @@ function doRegister(){
       localStorage.setItem('vajb_key',apiKey);
       showApp();refreshData();
       toast('Nalog kreiran! Dobrodošao, '+data.name);
+      setTimeout(openVideoModal, 800);
     })
     .catch(()=>{
       err.textContent='Greška pri povezivanju. Pokušaj ponovo.';err.style.display='block';
@@ -557,6 +576,17 @@ function render(d){
 }
 
 function closeBanner(id){$(id).style.display='none';history.replaceState(null,'','/dashboard')}
+function openVideoModal(){
+  const body=$('videoModalBody');
+  body.innerHTML='<iframe src="https://streamable.com/e/ja0o5w?loop=0" allow="fullscreen" allowfullscreen></iframe>';
+  $('videoModal').classList.add('show');
+  document.body.style.overflow='hidden';
+}
+function closeVideoModal(){
+  $('videoModal').classList.remove('show');
+  document.body.style.overflow='';
+  $('videoModalBody').innerHTML='';
+}
 function openKeyModal(){$('keyModal').classList.add('show');document.body.style.overflow='hidden';$('recoveryEmail').value='';$('recoveryMsg').style.display='none';$('recoveryBtn').disabled=false;$('recoveryBtn').textContent='Pošalji mi ključ'}
 function closeKeyModal(){$('keyModal').classList.remove('show');document.body.style.overflow=''}
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeKeyModal()});
