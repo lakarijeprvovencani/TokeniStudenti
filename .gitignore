@@ -6,3 +6,4 @@ node_modules/
 data/
 .vajbagent/
 *.vsix
+!public/vajbagent-latest.vsix

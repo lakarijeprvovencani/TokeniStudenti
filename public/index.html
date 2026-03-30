@@ -215,6 +215,11 @@ section{max-width:1100px;margin:0 auto;padding:90px 24px}
 .cta-card a:hover{opacity:.92;transform:translateY(-1px)}
 .cta-card a.ghost{background:transparent;border:2px solid var(--border2);color:var(--text)}
 .cta-card a.ghost:hover{border-color:var(--orange);color:var(--orange)}
+.install-help{margin-top:32px;padding:20px 28px;background:var(--surface2);border:1px solid var(--border2);border-radius:12px;max-width:600px;margin-left:auto;margin-right:auto;text-align:left}
+.install-help p{color:var(--text2);font-size:.85rem;margin-bottom:6px;line-height:1.6}
+.install-help p:last-child{margin-bottom:0}
+.install-help strong{color:var(--text)}
+.install-help code{background:rgba(249,115,22,.1);color:var(--orange);padding:2px 6px;border-radius:4px;font-size:.8rem}
 
 .powered{text-align:center;padding:20px 24px 12px;font-size:.78rem;color:var(--text3)}
 .powered a{color:var(--orange);font-weight:600;border-bottom:1px solid rgba(249,115,22,.3)}
@@ -295,7 +300,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     <a href="/dashboard?tab=register" class="btn-hero btn-primary">Počni odmah — dajemo ti $2 na poklon</a>
     <a href="#mogucnosti" class="btn-hero btn-secondary">Šta sve može?</a>
   </div>
-  <p style="margin-top:20px;font-size:.88rem;color:var(--text2);">Već imaš nalog? <a href="https://marketplace.visualstudio.com/items?itemName=VajbAgent.vajbagent" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600;text-decoration:underline;text-underline-offset:3px;">Instaliraj ekstenziju u Cursoru ili VS Code-u</a></p>
+  <p style="margin-top:20px;font-size:.88rem;color:var(--text2);">Već imaš nalog? <a href="/vajbagent-latest.vsix" download style="color:var(--orange);font-weight:600;text-decoration:underline;text-underline-offset:3px;">Preuzmi ekstenziju (.vsix)</a> za Cursor ili VS Code</p>
 </div>
 
 <!-- Kako funkcionise -->
@@ -307,7 +312,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     <div class="intro-card">
       <span class="num">1</span>
       <h3>Besplatna ekstenzija</h3>
-      <p>Instaliraš VajbAgent direktno u <strong>Cursor</strong> ili <strong>VS Code</strong>. Ekstenzija je besplatna — pričaš sa AI agentom, on čita, piše i menja kod za tebe. <a href="https://marketplace.visualstudio.com/items?itemName=VajbAgent.vajbagent" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600;text-decoration:underline;text-underline-offset:2px;">Instaliraj →</a></p>
+      <p>Instaliraš VajbAgent direktno u <strong>Cursor</strong> ili <strong>VS Code</strong>. Ekstenzija je besplatna — pričaš sa AI agentom, on čita, piše i menja kod za tebe. <a href="/vajbagent-latest.vsix" download style="color:var(--orange);font-weight:600;text-decoration:underline;text-underline-offset:2px;">Preuzmi .vsix →</a></p>
     </div>
     <div class="intro-card">
       <span class="num">2</span>
@@ -778,10 +783,14 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
       <a href="/dashboard" class="ghost">Uloguj se</a>
     </div>
     <div class="cta-card">
-      <h3>Instaliraj ekstenziju</h3>
-      <p>Cursor i VS Code</p>
-      <a href="https://marketplace.visualstudio.com/items?itemName=VajbAgent.vajbagent" target="_blank" rel="noopener" class="ghost">Otvori Marketplace</a>
+      <h3>Preuzmi ekstenziju</h3>
+      <p>Cursor i VS Code (.vsix)</p>
+      <a href="/vajbagent-latest.vsix" download class="ghost">Preuzmi v1.1.0</a>
     </div>
+  </div>
+  <div class="install-help">
+    <p><strong>Kako instalirati .vsix?</strong></p>
+    <p>Otvori Cursor ili VS Code → Extensions panel (<code>Ctrl+Shift+X</code>) → <code>⋯</code> meni gore desno → <strong>Install from VSIX...</strong> → izaberi preuzeti fajl.</p>
   </div>
 </div>
 
