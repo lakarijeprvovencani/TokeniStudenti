@@ -142,8 +142,10 @@ section{max-width:1100px;margin:0 auto;padding:90px 24px}
 .dm-bubble{padding:10px 14px;border-radius:10px;line-height:1.55;max-width:92%}
 .dm-user{background:var(--orange);color:#000;font-weight:600;align-self:flex-end;border-radius:10px 10px 3px 10px;font-size:.82rem}
 .dm-agent{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:10px 10px 10px 3px;font-size:.82rem}
-.dm-tool{font-size:.72rem;color:var(--text3);background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:6px 10px;display:flex;align-items:center;gap:6px}
-.dm-tool em{color:var(--text2);font-style:normal;flex:1}
+.dm-tool{font-size:.72rem;color:var(--text3);background:transparent;border:none;border-radius:0;padding:4px 8px;display:flex;align-items:center;gap:8px}
+.dm-tool-dot{width:7px;height:7px;border-radius:50%;background:#66BB6A;flex-shrink:0}
+.dm-tool-name{font-weight:700;color:rgba(255,255,255,.85)}
+.dm-tool em{color:var(--text3);font-style:normal;flex:1;font-size:.7rem;font-family:'SF Mono',monospace;opacity:.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dm-done{color:#4ec9b0;font-size:.65rem;font-weight:600}
 .dm-files{font-size:.72rem;color:var(--text2);background:rgba(249,115,22,.06);border:1px solid rgba(249,115,22,.15);border-radius:8px;padding:8px 12px;line-height:1.7}
 .dm-files span{color:var(--orange);font-weight:600;cursor:default}
@@ -159,8 +161,18 @@ section{max-width:1100px;margin:0 auto;padding:90px 24px}
 .dm-pn{color:var(--orange);font-weight:700;min-width:18px}
 .dm-path{color:var(--orange);font-family:'SF Mono',monospace;font-size:.75rem}
 .demo-desc{padding:14px 20px 18px;font-size:.85rem;color:var(--text2);line-height:1.6}
-.dm-slash{font-size:.72rem;background:rgba(249,115,22,.12);color:var(--orange);padding:3px 8px;border-radius:4px;font-weight:700;font-family:'SF Mono',monospace}
-.dm-mention{color:var(--orange);font-weight:700;font-size:.82rem}
+.dm-slash{font-size:.72rem;background:rgba(249,115,22,.15);color:var(--orange);padding:2px 7px;border-radius:4px;font-weight:600;font-family:'SF Mono',monospace;display:inline-flex;align-items:center;gap:4px}
+.dm-slash svg{width:11px;height:11px;stroke:var(--orange);flex-shrink:0}
+.dm-mention{background:rgba(249,115,22,.15);color:var(--orange);font-weight:600;font-size:.78rem;padding:1px 5px;border-radius:4px;font-family:'SF Mono',monospace}
+.dm-plan-icon{display:inline-flex;align-items:center;gap:5px;background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.25);border-radius:6px;padding:3px 8px;font-size:.65rem;font-weight:600;color:var(--orange)}
+.dm-plan-icon svg{width:12px;height:12px;stroke:var(--orange);fill:none}
+.dm-input-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-top:1px solid rgba(255,255,255,.06);margin-top:4px}
+.dm-input-bar-left{display:flex;align-items:center;gap:4px}
+.dm-toolbar-btn{background:none;border:none;color:var(--text3);padding:4px;border-radius:4px;display:flex;align-items:center;justify-content:center;opacity:.6;font-size:.7rem}
+.dm-toolbar-sep{width:1px;height:12px;background:rgba(255,255,255,.08)}
+.dm-send-btn{background:var(--orange);color:#000;border:none;border-radius:6px;width:26px;height:26px;display:flex;align-items:center;justify-content:center}
+.dm-send-btn svg{width:14px;height:14px}
+.dm-input-placeholder{flex:1;font-size:.72rem;color:var(--text3);opacity:.5;padding:0 8px}
 @media(max-width:800px){.demo-grid{grid-template-columns:1fr}}
 
 .sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
@@ -433,12 +445,13 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     <div class="demo-card">
       <div class="demo-label"><span class="demo-dot"></span> Chat sa AI agentom</div>
       <div class="demo-mock">
-        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-tokens">2.1K / 400K</span></div>
-        <div class="dm-bubble dm-user">Napravi mi login stranicu sa formom</div>
-        <div class="dm-tool"><span>▶</span> write_file <em>public/login.html</em> <span class="dm-done">done</span></div>
-        <div class="dm-tool"><span>▶</span> write_file <em>public/login.css</em> <span class="dm-done">done</span></div>
-        <div class="dm-bubble dm-agent">Napravio sam login stranicu sa:<br>• Responzivna forma (email + password)<br>• Validacija polja<br>• Dark tema sa narandžastim akcentom<br>• Animirana "Prijavi se" dugmad</div>
-        <div class="dm-files"><b>Izmenjeni fajlovi (2)</b><br><span>public/login.html</span> · <span>public/login.css</span></div>
+        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-tokens">44K / 200K</span></div>
+        <div class="dm-bubble dm-user">Dopuni newsletter sekciju sa validacijom i success porukom</div>
+        <div class="dm-tool"><span class="dm-tool-dot"></span> <span class="dm-tool-name">read_file</span> <em>public/index.html</em></div>
+        <div class="dm-tool"><span class="dm-tool-dot"></span> <span class="dm-tool-name">replace_in_file</span> <em>public/index.html</em></div>
+        <div class="dm-tool"><span class="dm-tool-dot"></span> <span class="dm-tool-name">replace_in_file</span> <em>public/style.css</em></div>
+        <div class="dm-bubble dm-agent">Sve je tu. Evo šta je izmenjeno:<br>• Formi dodat <span class="dm-mention">id</span>, <span class="dm-mention">novalidate</span> i <span class="dm-mention">autocomplete</span><br>• JS validacija email regex-om<br>• Input dobija crvenu ivicu ako email nije validan</div>
+        <div class="dm-files"><b>Izmene u 2 fajla:</b><br><span>index.html</span> · <span>style.css</span></div>
       </div>
       <p class="demo-desc">Opiši šta želiš — agent čita, piše i menja fajlove. Sve vidiš u chatu sa diff preview-om.</p>
     </div>
@@ -446,18 +459,18 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     <div class="demo-card">
       <div class="demo-label"><span class="demo-dot"></span> Slash komande & @mentions</div>
       <div class="demo-mock">
-        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-tokens">0.5K / 400K</span></div>
+        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-tokens">12K / 200K</span></div>
         <div class="dm-bubble dm-user" style="font-size:.8rem">Pogledaj <span class="dm-mention">@src/api/routes.ts</span> i popravi greške</div>
-        <div class="dm-tool"><span>▶</span> read_file <em>src/api/routes.ts</em> <span class="dm-done">done</span></div>
-        <div class="dm-tool"><span>▶</span> replace_in_file <em>src/api/routes.ts</em> <span class="dm-done">done</span></div>
+        <div class="dm-tool"><span class="dm-tool-dot"></span> <span class="dm-tool-name">read_file</span> <em>src/api/routes.ts</em></div>
+        <div class="dm-tool"><span class="dm-tool-dot"></span> <span class="dm-tool-name">replace_in_file</span> <em>src/api/routes.ts</em></div>
         <div class="dm-bubble dm-agent">Popravio sam 2 greške u routes.ts:<br>• Nedostajao async/await na handler-u<br>• Pogrešan tip za req.params</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
-          <span class="dm-slash">/fix</span>
-          <span class="dm-slash">/test</span>
-          <span class="dm-slash">/doc</span>
-          <span class="dm-slash">/commit</span>
-          <span class="dm-slash">/explain</span>
-          <span class="dm-slash">/refactor</span>
+          <span class="dm-slash"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>/fix</span>
+          <span class="dm-slash"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>/test</span>
+          <span class="dm-slash"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>/doc</span>
+          <span class="dm-slash"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M16 3.13a4 4 0 010 17.74"/><path d="M12 9v6"/></svg>/commit</span>
+          <span class="dm-slash"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5"/></svg>/explain</span>
+          <span class="dm-slash"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4z"/></svg>/refactor</span>
         </div>
       </div>
       <p class="demo-desc">Taguješ fajlove sa @, koristiš slash komande za brze akcije. Autocomplete za sve.</p>
@@ -466,15 +479,15 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     <div class="demo-card">
       <div class="demo-label"><span class="demo-dot"></span> Plan Mode — faze</div>
       <div class="demo-mock">
-        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-plan">📋 Plan</span></div>
-        <div class="dm-bubble dm-user">[Plan] Napravi todo app sa dodavanjem i brisanjem</div>
+        <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-plan-icon"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg> Plan</span></div>
+        <div class="dm-bubble dm-user">Napravi portfolio stranicu sa hero, galerijom i kontakt formom</div>
         <div class="dm-plan-box">
           <div class="dm-plan-title">Plan spreman — 4 faze</div>
           <div class="dm-plan-btns"><span class="dm-btn-exec">Izvrši ceo plan</span><span class="dm-btn-phase">Faza 1 ▶</span><span class="dm-btn-cancel">Otkaži</span></div>
-          <div class="dm-phase"><span class="dm-pn">1.</span> Priprema projekta i fajlova</div>
-          <div class="dm-phase"><span class="dm-pn">2.</span> Backend: API rute i logika</div>
-          <div class="dm-phase"><span class="dm-pn">3.</span> Frontend: UI komponente</div>
-          <div class="dm-phase"><span class="dm-pn">4.</span> Testiranje i clean-up</div>
+          <div class="dm-phase"><span class="dm-pn">1.</span> Priprema projekta i slike sa Unsplash</div>
+          <div class="dm-phase"><span class="dm-pn">2.</span> Hero sekcija sa avatarem i statistikama</div>
+          <div class="dm-phase"><span class="dm-pn">3.</span> Galerija projekata (6 kartica)</div>
+          <div class="dm-phase"><span class="dm-pn">4.</span> Kontakt forma sa validacijom</div>
         </div>
       </div>
       <p class="demo-desc">Složene projekte razbija na faze. Izvršavaš jednu po jednu ili sve odjednom.</p>
@@ -485,9 +498,9 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
       <div class="demo-mock">
         <div class="dm-header"><span class="dm-brand">Vajb<b>Agent</b></span><span class="dm-undo">↩ Undo (3)</span></div>
         <div class="dm-bubble dm-user">Dodaj dark mode na ceo sajt</div>
-        <div class="dm-tool"><span>▶</span> read_file <em>public/style.css</em> <span class="dm-done">done</span></div>
-        <div class="dm-tool"><span>▶</span> replace_in_file <em>public/style.css</em> <span class="dm-done">done</span></div>
-        <div class="dm-tool"><span>▶</span> replace_in_file <em>public/index.html</em> <span class="dm-done">done</span></div>
+        <div class="dm-tool"><span class="dm-tool-dot"></span> <span class="dm-tool-name">read_file</span> <em>public/style.css</em></div>
+        <div class="dm-tool"><span class="dm-tool-dot"></span> <span class="dm-tool-name">replace_in_file</span> <em>public/style.css</em></div>
+        <div class="dm-tool"><span class="dm-tool-dot"></span> <span class="dm-tool-name">replace_in_file</span> <em>public/index.html</em></div>
         <div class="dm-bubble dm-agent">Dodao sam dark mode:<br>• CSS varijable za temu<br>• Toggle dugme u headeru<br>• localStorage za čuvanje izbora</div>
         <div class="dm-files"><b>Izmenjeni fajlovi (3)</b><br><span>public/style.css</span> <em class="dm-revert">↩</em> · <span>public/index.html</span> <em class="dm-revert">↩</em> · <span>public/app.js</span> <em class="dm-revert">↩</em></div>
       </div>
