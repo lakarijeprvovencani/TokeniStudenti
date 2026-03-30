@@ -3982,8 +3982,11 @@
       if (hint) hint.style.display = 'block';
       const cards = document.getElementById('welcomeCardsSection');
       if (cards) cards.style.display = 'none';
-      // Show no-key banner
-      if (!document.getElementById('noKeyBanner')) {
+      // Show no-key banner inside welcome
+      const welcomeH3Del = document.querySelector('.welcome-msg h3');
+      if (welcomeH3Del) welcomeH3Del.style.display = 'none';
+      const welcomeElDel = document.querySelector('.welcome-msg');
+      if (welcomeElDel && !document.getElementById('noKeyBanner')) {
         const banner = document.createElement('div');
         banner.id = 'noKeyBanner';
         banner.className = 'no-key-banner';
@@ -3991,8 +3994,9 @@
           'Da bi koristio VajbAgent, unesi API kljuc:<br>' +
           '1. Napravi nalog na <a href="https://vajbagent.com" target="_blank">vajbagent.com</a> (dobijes $2 na poklon)<br>' +
           '2. Kopiraj API kljuc iz dashboarda<br>' +
-          '<button class="no-key-btn" onclick="document.getElementById(\'settingsBtnBottom\').click()">⚙️ Otvori podesavanja i unesi kljuc</button>';
-        messagesEl.insertBefore(banner, messagesEl.firstChild);
+          '3. Klikni na <strong>⚙️</strong> dole u toolbar-u i nalepi kljuc';
+        const powered = welcomeElDel.querySelector('.welcome-powered');
+        welcomeElDel.insertBefore(banner, powered);
       }
     });
 
@@ -4009,6 +4013,8 @@
       if (cards) cards.style.display = '';
       const banner = document.getElementById('noKeyBanner');
       if (banner) banner.remove();
+      const welcomeH3Save = document.querySelector('.welcome-msg h3');
+      if (welcomeH3Save) { welcomeH3Save.style.display = ''; welcomeH3Save.textContent = 'Sta kreiramo danas?'; }
     });
 
     settingsApiUrlSave.addEventListener('click', () => {
@@ -4832,8 +4838,11 @@
             if (hint) hint.style.display = 'block';
             const cards = document.getElementById('welcomeCardsSection');
             if (cards) cards.style.display = 'none';
-            // Insert persistent no-key banner before welcome
-            if (!document.getElementById('noKeyBanner')) {
+            // Replace welcome subtitle with no-key banner
+            const welcomeH3 = document.querySelector('.welcome-msg h3');
+            if (welcomeH3) welcomeH3.style.display = 'none';
+            const welcomeEl2 = document.querySelector('.welcome-msg');
+            if (welcomeEl2 && !document.getElementById('noKeyBanner')) {
               const banner = document.createElement('div');
               banner.id = 'noKeyBanner';
               banner.className = 'no-key-banner';
@@ -4841,8 +4850,9 @@
                 'Da bi koristio VajbAgent, unesi API kljuc:<br>' +
                 '1. Napravi nalog na <a href="https://vajbagent.com" target="_blank">vajbagent.com</a> (dobijes $2 na poklon)<br>' +
                 '2. Kopiraj API kljuc iz dashboarda<br>' +
-                '<button class="no-key-btn" onclick="document.getElementById(\'settingsBtnBottom\').click()">⚙️ Otvori podesavanja i unesi kljuc</button>';
-              messagesEl.insertBefore(banner, messagesEl.firstChild);
+                '3. Klikni na <strong>⚙️</strong> dole u toolbar-u i nalepi kljuc';
+              const powered = welcomeEl2.querySelector('.welcome-powered');
+              welcomeEl2.insertBefore(banner, powered);
             }
           }
           renderMcpStatus(msg.mcpServers, msg.mcpTotalTools, false);
@@ -4902,21 +4912,19 @@
           if (msg.hasApiKey !== undefined) {
             _hasApiKey = !!msg.hasApiKey;
           }
-          // Show no-key banner if needed
+          const w = document.createElement('div');
+          w.className = 'welcome-msg';
           if (!_hasApiKey) {
-            const banner = document.createElement('div');
-            banner.id = 'noKeyBanner';
-            banner.className = 'no-key-banner';
-            banner.innerHTML = '<strong>API kljuc nije podesen</strong><br>' +
+            w.innerHTML = '<div class="welcome-brand"><span class="v">&lt;</span>VajbAgent<span class="v">/&gt;</span></div>' +
+              '<div class="no-key-banner"><strong>API kljuc nije podesen</strong><br>' +
               'Da bi koristio VajbAgent, unesi API kljuc:<br>' +
               '1. Napravi nalog na <a href="https://vajbagent.com" target="_blank">vajbagent.com</a> (dobijes $2 na poklon)<br>' +
               '2. Kopiraj API kljuc iz dashboarda<br>' +
-              '<button class="no-key-btn" onclick="document.getElementById(\'settingsBtnBottom\').click()">⚙️ Otvori podesavanja i unesi kljuc</button>';
-            messagesEl.appendChild(banner);
+              '3. Klikni na <strong>⚙️</strong> dole u toolbar-u i nalepi kljuc</div>' +
+              '<div class="welcome-powered">Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski · Kreirao <strong>Nemanja Lakic</strong></div>';
+          } else {
+            w.innerHTML = '<div class="welcome-brand"><span class="v">&lt;</span>VajbAgent<span class="v">/&gt;</span></div><h3>Sta kreiramo danas?</h3><div class="welcome-powered">Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski · Kreirao <strong>Nemanja Lakic</strong></div>';
           }
-          const w = document.createElement('div');
-          w.className = 'welcome-msg';
-          w.innerHTML = '<div class="welcome-brand"><span class="v">&lt;</span>VajbAgent<span class="v">/&gt;</span></div><h3>Sta kreiramo danas?</h3><div class="welcome-powered">Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski · Kreirao <strong>Nemanja Lakic</strong></div>';
           messagesEl.appendChild(w);
           currentAssistantEl = null;
           currentAssistantRawText = '';
