@@ -1126,7 +1126,7 @@ export class Agent {
 
     const apiKey = await getApiKey(this._context.secrets);
     if (!apiKey) {
-      this._provider.postMessage({ type: 'error', text: 'API key nije podesen. Koristi komandu "VajbAgent: Set API Key".' });
+      this._provider.postMessage({ type: 'error', text: 'API kljuc nije podesen. Klikni na ⚙️ dole i unesi kljuc.' });
       return;
     }
 

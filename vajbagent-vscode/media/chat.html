@@ -617,6 +617,28 @@
       border: 1px solid rgba(250,115,21,0.2);
       color: var(--vscode-foreground);
     }
+    .no-key-banner {
+      margin: 16px;
+      padding: 18px 20px;
+      background: rgba(250,115,21,0.08);
+      border: 1px solid rgba(250,115,21,0.25);
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--vscode-foreground);
+      animation: msgIn 0.2s ease-out;
+    }
+    .no-key-banner strong { color: var(--accent); }
+    .no-key-banner a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+    .no-key-banner .no-key-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 12px; padding: 8px 18px;
+      background: var(--accent-gradient, var(--accent));
+      color: #fff; font-weight: 700; font-size: 12px;
+      border: none; border-radius: 8px; cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .no-key-banner .no-key-btn:hover { opacity: 0.85; }
     .welcome-hint-tip {
       background: rgba(255,255,255,0.02);
       border: 1px solid rgba(255,255,255,0.05);
@@ -3908,6 +3930,7 @@
     });
 
     let hadSavedKey = false;
+    let _hasApiKey = false;
     function showApiKeySaved() {
       hadSavedKey = true;
       apiKeySavedState.style.display = 'block';
@@ -3965,11 +3988,14 @@
       if (!key) return;
       vscode.postMessage({ type: 'setApiKey', key });
       settingsApiKey.value = '';
+      _hasApiKey = true;
       showApiKeySaved();
       const hint = document.getElementById('welcomeApiHint');
       if (hint) hint.style.display = 'none';
       const cards = document.getElementById('welcomeCardsSection');
       if (cards) cards.style.display = '';
+      const banner = document.getElementById('noKeyBanner');
+      if (banner) banner.remove();
     });
 
     settingsApiUrlSave.addEventListener('click', () => {
@@ -4277,6 +4303,13 @@
         pendingFiles = [];
         renderImagePreviews();
         renderFilePreviews();
+        _sendMessageBusy = false;
+        return;
+      }
+
+      if (!_hasApiKey) {
+        // Open settings so user can enter API key
+        document.getElementById('settingsBtnBottom').click();
         _sendMessageBusy = false;
         return;
       }
@@ -4775,15 +4808,29 @@
           }
           if (msg.apiUrl) settingsApiUrl.value = msg.apiUrl;
           if (msg.hasApiKey) {
+            _hasApiKey = true;
             showApiKeySaved();
             if (msg.userName) showUserInfo(msg.userName);
           } else {
+            _hasApiKey = false;
             showApiKeyEdit();
             hideUserInfo();
             const hint = document.getElementById('welcomeApiHint');
             if (hint) hint.style.display = 'block';
             const cards = document.getElementById('welcomeCardsSection');
             if (cards) cards.style.display = 'none';
+            // Insert persistent no-key banner before welcome
+            if (!document.getElementById('noKeyBanner')) {
+              const banner = document.createElement('div');
+              banner.id = 'noKeyBanner';
+              banner.className = 'no-key-banner';
+              banner.innerHTML = '<strong>API kljuc nije podesen</strong><br>' +
+                'Da bi koristio VajbAgent, unesi API kljuc:<br>' +
+                '1. Napravi nalog na <a href="https://vajbagent.com" target="_blank">vajbagent.com</a> (dobijes $2 na poklon)<br>' +
+                '2. Kopiraj API kljuc iz dashboarda<br>' +
+                '<button class="no-key-btn" onclick="document.getElementById(\'settingsBtnBottom\').click()">⚙️ Otvori podesavanja i unesi kljuc</button>';
+              messagesEl.insertBefore(banner, messagesEl.firstChild);
+            }
           }
           renderMcpStatus(msg.mcpServers, msg.mcpTotalTools, false);
           break;
