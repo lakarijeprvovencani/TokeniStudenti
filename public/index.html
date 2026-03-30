@@ -100,7 +100,8 @@ section{max-width:1100px;margin:0 auto;padding:90px 24px}
 .feat-highlights{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:32px}
 .feat-hl{background:var(--surface2);border:1px solid var(--border2);border-radius:16px;padding:30px 26px;border-left:4px solid var(--orange);transition:all .2s}
 .feat-hl:hover{border-color:rgba(249,115,22,.4);box-shadow:0 6px 24px rgba(0,0,0,.25)}
-.feat-hl .fi-icon{font-size:1.5rem;margin-bottom:14px;display:block}
+.feat-hl .fi-icon{margin-bottom:14px;display:flex;width:44px;height:44px;align-items:center;justify-content:center;border-radius:12px;background:var(--orange-dim);border:1px solid rgba(249,115,22,.15)}
+.feat-hl .fi-icon svg{width:22px;height:22px;stroke:var(--orange);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .feat-hl h4{font-size:1rem;font-weight:700;margin-bottom:8px;color:var(--text)}
 .feat-hl p{font-size:.85rem;color:var(--text2);line-height:1.65}
 
@@ -140,7 +141,7 @@ section{max-width:1100px;margin:0 auto;padding:90px 24px}
 .dm-plan{font-size:.65rem;background:rgba(249,115,22,.15);color:var(--orange);padding:3px 8px;border-radius:4px;font-weight:700}
 .dm-undo{font-size:.65rem;background:rgba(249,115,22,.15);color:var(--orange);padding:3px 8px;border-radius:4px;font-weight:700}
 .dm-bubble{padding:10px 14px;border-radius:10px;line-height:1.55;max-width:92%}
-.dm-user{background:var(--orange);color:#000;font-weight:600;align-self:flex-end;border-radius:10px 10px 3px 10px;font-size:.82rem}
+.dm-user{background:var(--surface2);color:var(--text);font-weight:500;align-self:flex-end;border-radius:10px 10px 3px 10px;font-size:.82rem;border:1px solid var(--border2)}
 .dm-agent{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:10px 10px 10px 3px;font-size:.82rem}
 .dm-tool{font-size:.72rem;color:var(--text3);background:transparent;border:none;border-radius:0;padding:4px 8px;display:flex;align-items:center;gap:8px}
 .dm-tool-dot{width:7px;height:7px;border-radius:50%;background:#66BB6A;flex-shrink:0}
@@ -174,6 +175,17 @@ section{max-width:1100px;margin:0 auto;padding:90px 24px}
 .dm-send-btn svg{width:14px;height:14px}
 .dm-input-placeholder{flex:1;font-size:.72rem;color:var(--text3);opacity:.5;padding:0 8px}
 @media(max-width:800px){.demo-grid{grid-template-columns:1fr}}
+
+.ss-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.ss-card{background:var(--surface);border:1px solid var(--border2);border-radius:14px;overflow:hidden;transition:all .25s}
+.ss-card:hover{border-color:rgba(249,115,22,.4);box-shadow:0 8px 32px rgba(0,0,0,.3);transform:translateY(-2px)}
+.ss-card.ss-wide{grid-column:span 3}
+.ss-card img{width:100%;height:auto;display:block;object-fit:cover}
+.ss-card.ss-wide img{max-height:520px;object-fit:contain;background:#0d0d0d}
+.ss-card:not(.ss-wide) img{aspect-ratio:9/16;object-fit:cover;object-position:top}
+.ss-caption{padding:12px 16px;font-size:.78rem;color:var(--text2);font-weight:500}
+@media(max-width:800px){.ss-grid{grid-template-columns:1fr 1fr}.ss-card.ss-wide{grid-column:span 2}}
+@media(max-width:500px){.ss-grid{grid-template-columns:1fr}.ss-card.ss-wide{grid-column:span 1}}
 
 .sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 .sum-card{background:var(--surface2);border:1px solid var(--border2);border-radius:16px;padding:28px 26px;border-left:4px solid var(--orange)}
@@ -314,17 +326,17 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
   <!-- Highlight cards — top 3 -->
   <div class="feat-highlights">
     <div class="feat-hl">
-      <span class="fi-icon">🤖</span>
+      <span class="fi-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
       <h4>Chat sa AI agentom</h4>
       <p>Pričaš sa agentom u panelu editora. On čita tvoje fajlove, piše novi kod, menja postojeći, pokreće komande — sve kroz konverzaciju. Streaming odgovori u realnom vremenu.</p>
     </div>
     <div class="feat-hl">
-      <span class="fi-icon">📋</span>
+      <span class="fi-icon"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg></span>
       <h4>Plan Mode</h4>
       <p>Za složenije zadatke, agent napravi plan sa fazama. Ti kontrolišeš tempo — izvršavaš fazu po fazu ili sve odjednom. Pregled pre izvršavanja.</p>
     </div>
     <div class="feat-hl">
-      <span class="fi-icon">↩️</span>
+      <span class="fi-icon"><svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></span>
       <h4>Checkpoint & Undo</h4>
       <p>Svaka izmena se čuva. Ako ti se ne svidi rezultat — jedan klik i vratiš sve na prethodno stanje. Po fajlu ili sve odjednom.</p>
     </div>
@@ -509,6 +521,44 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
   </div>
 </section>
 
+<!-- Screenshoti -->
+<section id="screenshoti">
+  <div class="stag">Kako izgleda</div>
+  <div class="stitle">Pogledaj ekstenziju <em>izbliza</em></div>
+  <div class="ssub">Pravi screenshotovi iz VS Code-a — ovo je ono što vidiš kad otvoriš VajbAgent panel.</div>
+
+  <div class="ss-grid">
+    <div class="ss-card ss-wide">
+      <img src="/img/screenshots/ss-chat-full.png" alt="VajbAgent chat — kompletan razgovor sa agentom" loading="lazy">
+      <div class="ss-caption">Chat sa agentom — zadaješ projekat, agent radi korak po korak</div>
+    </div>
+    <div class="ss-card">
+      <img src="/img/screenshots/ss-slash.png" alt="VajbAgent slash komande" loading="lazy">
+      <div class="ss-caption">Slash komande za brze akcije</div>
+    </div>
+    <div class="ss-card">
+      <img src="/img/screenshots/ss-modeli.png" alt="VajbAgent izbor modela" loading="lazy">
+      <div class="ss-caption">7 modela — biraš jednim klikom</div>
+    </div>
+    <div class="ss-card">
+      <img src="/img/screenshots/ss-settings.png" alt="VajbAgent podešavanja" loading="lazy">
+      <div class="ss-caption">API ključ, MCP serveri, pravila projekta</div>
+    </div>
+    <div class="ss-card">
+      <img src="/img/screenshots/ss-rezim.png" alt="VajbAgent režimi rada" loading="lazy">
+      <div class="ss-caption">3 režima: Pitaj pre izmena, Auto edit, Plan mode</div>
+    </div>
+    <div class="ss-card">
+      <img src="/img/screenshots/ss-plan.png" alt="VajbAgent plan mode" loading="lazy">
+      <div class="ss-caption">Plan mode — agent istražuje pre nego što menja</div>
+    </div>
+    <div class="ss-card">
+      <img src="/img/screenshots/ss-plus.png" alt="VajbAgent dodaj kontekst" loading="lazy">
+      <div class="ss-caption">Dodaj slike i fajlove kao kontekst</div>
+    </div>
+  </div>
+</section>
+
 <!-- Modeli -->
 <section id="modeli">
   <div class="stag">Modeli</div>
@@ -674,39 +724,39 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 
 <!-- Zasto VajbAgent -->
 <section id="zasto-vajb">
-  <div class="stag">Česta pitanja</div>
+  <div class="stag">Zašto VajbAgent</div>
   <div class="stitle">Zašto VajbAgent ako mogu <em>sam da napravim API ključ?</em></div>
-  <div class="ssub">Možeš sam da praviš API ključeve kod provajdera. Ali evo zašto ljudi biraju VajbAgent.</div>
+  <div class="ssub">Možeš sam da praviš API ključeve kod provajdera. Ali evo šta dobijaš sa VajbAgent-om.</div>
   <div class="benefits" style="grid-template-columns:repeat(3,1fr);max-width:1000px;margin:0 auto">
     <div class="bcard">
       <div class="bcard-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-      <h3>Jedan ključ, svi modeli</h3>
-      <p>Umesto da praviš naloge kod više provajdera — pristupaš svim modelima kroz jedan VajbAgent ključ.</p>
+      <h3>Jedan ključ, 7 modela</h3>
+      <p>Lite, Turbo, Pro, Max, Power, Ultra, Architect — menjaš model jednim klikom. Bez 4 različita API naloga.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
-      <h3>Native tool calling</h3>
-      <p>VajbAgent koristi native JSON tool calling — troši do 2x manje tokena od alternativa sa XML formatom.</p>
+      <h3>2x manje tokena po zadatku</h3>
+      <p>Native JSON tool calling umesto XML formata. Isti zadatak troši duplo manje tokena — duplo više koda za isti novac.</p>
     </div>
     <div class="bcard">
-      <div class="bcard-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
-      <h3>Bez komplikacija sa plaćanjem</h3>
-      <p>Ne moraš karticu na 3 sajta. Uplatiš ovde koliko hoćeš, koristiš dok traje.</p>
+      <div class="bcard-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+      <h3>MCP serveri za sve</h3>
+      <p>Supabase, GitHub, fajl sistem, baze podataka — agent se povezuje na eksterne servise i radi sa njima direktno.</p>
     </div>
     <div class="bcard">
-      <div class="bcard-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg></div>
-      <h3>$2 besplatno za probu</h3>
-      <p>Napraviš nalog, dobiješ $2 kredita. Probaš bez rizika. Ako ti se ne svidi — nisi ništa izgubio.</p>
+      <div class="bcard-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></div>
+      <h3>Checkpoint na svaki korak</h3>
+      <p>Svaka izmena se automatski čuva. Undo po fajlu ili sve odjednom — nemaš šanse da izgubiš rad.</p>
     </div>
     <div class="bcard">
       <div class="bcard-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
       <h3>Sve na srpskom</h3>
-      <p>Dashboard, uputstva, podrška — sve na našem jeziku. Lakše je kad ne moraš da se boriš sa engleskim.</p>
+      <p>Interfejs, slash komande, opisi modela, podrška — sve na srpskom. Bez prevođenja i googlanja.</p>
     </div>
     <div class="bcard">
-      <div class="bcard-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
-      <h3>Jednostavan pregled potrošnje</h3>
-      <p>Vidiš tačno koliko si potrošio, na šta, kada. Ne moraš da računaš tokene i cene po milion.</p>
+      <div class="bcard-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg></div>
+      <h3>$2 besplatno za probu</h3>
+      <p>Napraviš nalog, dobiješ $2 kredita odmah. Probaš bez rizika — dovoljno za ~200 zahteva na Lite modelu.</p>
     </div>
   </div>
 </section>
