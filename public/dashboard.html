@@ -255,7 +255,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     <!-- PREGLED -->
     <div class="page active" id="pg-overview">
       <div class="page-title">Pregled</div>
-      <p class="overview-intro">Tvoj kredit i upotreba u jednom mestu. Stanje se osvežava pri učitavanju.</p>
+      <p class="overview-intro">Tvoj kredit i upotreba u jednom mestu. Stanje se osvežava pri učitavanju. <br>Nemaš još ekstenziju? <a href="#" onclick="document.querySelector('.nav-item[data-page=\'setup\']').click();return false" style="color:#f97316;font-weight:600;text-decoration:underline;text-underline-offset:3px;">Preuzmi je i instaliraj u Podešavanjima →</a></p>
       <div class="pay-banner pay-ok" id="payOk" style="display:none">&#10003; Uplata uspešna! Krediti su dodati na tvoj nalog.<button class="close-b" onclick="closeBanner('payOk')">&times;</button></div>
       <div class="pay-banner pay-fail" id="payFail" style="display:none">Plaćanje je otkazano. Krediti nisu naplaćeni.<button class="close-b" onclick="closeBanner('payFail')">&times;</button></div>
       <div class="hero-bal">
