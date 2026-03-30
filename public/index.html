@@ -176,16 +176,21 @@ section{max-width:1100px;margin:0 auto;padding:90px 24px}
 .dm-input-placeholder{flex:1;font-size:.72rem;color:var(--text3);opacity:.5;padding:0 8px}
 @media(max-width:800px){.demo-grid{grid-template-columns:1fr}}
 
-.ss-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.ss-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;max-width:1000px;margin:0 auto}
 .ss-card{background:var(--surface);border:1px solid var(--border2);border-radius:14px;overflow:hidden;transition:all .25s}
 .ss-card:hover{border-color:rgba(249,115,22,.4);box-shadow:0 8px 32px rgba(0,0,0,.3);transform:translateY(-2px)}
-.ss-card.ss-wide{grid-column:span 3}
-.ss-card img{width:100%;height:auto;display:block;object-fit:cover}
-.ss-card.ss-wide img{max-height:520px;object-fit:contain;background:#0d0d0d}
-.ss-card:not(.ss-wide) img{aspect-ratio:9/16;object-fit:cover;object-position:top}
-.ss-caption{padding:12px 16px;font-size:.78rem;color:var(--text2);font-weight:500}
-@media(max-width:800px){.ss-grid{grid-template-columns:1fr 1fr}.ss-card.ss-wide{grid-column:span 2}}
-@media(max-width:500px){.ss-grid{grid-template-columns:1fr}.ss-card.ss-wide{grid-column:span 1}}
+.ss-card img{width:100%;height:100%;display:block;object-fit:cover;object-position:top}
+.ss-caption{padding:12px 16px;font-size:.78rem;color:var(--text2);font-weight:500;background:var(--surface)}
+.ss-c1{grid-column:span 4;grid-row:span 2}
+.ss-c2{grid-column:span 4;grid-row:span 2}
+.ss-c3{grid-column:span 4;grid-row:span 2}
+.ss-c1 img,.ss-c2 img,.ss-c3 img{aspect-ratio:9/18;object-fit:cover;object-position:top}
+.ss-c4{grid-column:span 4}
+.ss-c5{grid-column:span 4}
+.ss-c6{grid-column:span 4}
+.ss-c4 img,.ss-c5 img,.ss-c6 img{aspect-ratio:4/3;object-fit:cover;object-position:center}
+@media(max-width:800px){.ss-grid{grid-template-columns:repeat(6,1fr)}.ss-c1,.ss-c2,.ss-c3{grid-column:span 2;grid-row:span 1}.ss-c1 img,.ss-c2 img,.ss-c3 img{aspect-ratio:9/16}.ss-c4,.ss-c5,.ss-c6{grid-column:span 3}}
+@media(max-width:500px){.ss-grid{grid-template-columns:1fr 1fr;gap:10px}.ss-c1,.ss-c2,.ss-c3{grid-column:span 1;grid-row:span 1}.ss-c1 img,.ss-c2 img,.ss-c3 img{aspect-ratio:9/16}.ss-c4,.ss-c5,.ss-c6{grid-column:span 1}.ss-c4 img,.ss-c5 img,.ss-c6 img{aspect-ratio:1/1}}
 
 .sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 .sum-card{background:var(--surface2);border:1px solid var(--border2);border-radius:16px;padding:28px 26px;border-left:4px solid var(--orange)}
@@ -528,33 +533,29 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
   <div class="ssub">Pravi screenshotovi iz VS Code-a — ovo je ono što vidiš kad otvoriš VajbAgent panel.</div>
 
   <div class="ss-grid">
-    <div class="ss-card ss-wide">
-      <img src="/img/screenshots/ss-chat-full.png" alt="VajbAgent chat — kompletan razgovor sa agentom" loading="lazy">
-      <div class="ss-caption">Chat sa agentom — zadaješ projekat, agent radi korak po korak</div>
+    <div class="ss-card ss-c1">
+      <img src="/img/screenshots/ss-chat.png" alt="VajbAgent chat — agent završio portfolio projekat" loading="lazy">
+      <div class="ss-caption">Agent završava ceo projekat korak po korak</div>
     </div>
-    <div class="ss-card">
-      <img src="/img/screenshots/ss-slash.png" alt="VajbAgent slash komande" loading="lazy">
-      <div class="ss-caption">Slash komande za brze akcije</div>
+    <div class="ss-card ss-c2">
+      <img src="/img/screenshots/ss-welcome.png" alt="VajbAgent welcome screen" loading="lazy">
+      <div class="ss-caption">Welcome screen — spreman za prvi zadatak</div>
     </div>
-    <div class="ss-card">
+    <div class="ss-card ss-c3">
       <img src="/img/screenshots/ss-modeli.png" alt="VajbAgent izbor modela" loading="lazy">
       <div class="ss-caption">7 modela — biraš jednim klikom</div>
     </div>
-    <div class="ss-card">
-      <img src="/img/screenshots/ss-settings.png" alt="VajbAgent podešavanja" loading="lazy">
-      <div class="ss-caption">API ključ, MCP serveri, pravila projekta</div>
+    <div class="ss-card ss-c4">
+      <img src="/img/screenshots/ss-settings.png" alt="VajbAgent podešavanja — API ključ, MCP serveri" loading="lazy">
+      <div class="ss-caption">API ključ, MCP serveri, pravila</div>
     </div>
-    <div class="ss-card">
+    <div class="ss-card ss-c5">
       <img src="/img/screenshots/ss-rezim.png" alt="VajbAgent režimi rada" loading="lazy">
-      <div class="ss-caption">3 režima: Pitaj pre izmena, Auto edit, Plan mode</div>
+      <div class="ss-caption">Auto edit, Plan mode, Pitaj pre izmena</div>
     </div>
-    <div class="ss-card">
-      <img src="/img/screenshots/ss-plan.png" alt="VajbAgent plan mode" loading="lazy">
-      <div class="ss-caption">Plan mode — agent istražuje pre nego što menja</div>
-    </div>
-    <div class="ss-card">
-      <img src="/img/screenshots/ss-plus.png" alt="VajbAgent dodaj kontekst" loading="lazy">
-      <div class="ss-caption">Dodaj slike i fajlove kao kontekst</div>
+    <div class="ss-card ss-c6">
+      <img src="/img/screenshots/ss-prompt.png" alt="VajbAgent user prompt" loading="lazy">
+      <div class="ss-caption">Opiši zadatak — agent radi ostalo</div>
     </div>
   </div>
 </section>
