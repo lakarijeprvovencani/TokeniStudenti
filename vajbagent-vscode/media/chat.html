@@ -3973,6 +3973,7 @@
     apiKeyDeleteBtn.addEventListener('click', () => {
       vscode.postMessage({ type: 'setApiKey', key: '' });
       hadSavedKey = false;
+      _hasApiKey = false;
       showApiKeyEdit();
       hideUserInfo();
       apiKeyStatus.textContent = 'Kljuc obrisan';
@@ -3981,6 +3982,18 @@
       if (hint) hint.style.display = 'block';
       const cards = document.getElementById('welcomeCardsSection');
       if (cards) cards.style.display = 'none';
+      // Show no-key banner
+      if (!document.getElementById('noKeyBanner')) {
+        const banner = document.createElement('div');
+        banner.id = 'noKeyBanner';
+        banner.className = 'no-key-banner';
+        banner.innerHTML = '<strong>API kljuc nije podesen</strong><br>' +
+          'Da bi koristio VajbAgent, unesi API kljuc:<br>' +
+          '1. Napravi nalog na <a href="https://vajbagent.com" target="_blank">vajbagent.com</a> (dobijes $2 na poklon)<br>' +
+          '2. Kopiraj API kljuc iz dashboarda<br>' +
+          '<button class="no-key-btn" onclick="document.getElementById(\'settingsBtnBottom\').click()">⚙️ Otvori podesavanja i unesi kljuc</button>';
+        messagesEl.insertBefore(banner, messagesEl.firstChild);
+      }
     });
 
     settingsApiKeySave.addEventListener('click', () => {
@@ -4885,6 +4898,22 @@
           mcpGuideOverlay.classList.remove('visible');
           settingsPanel.classList.remove('open');
           messagesEl.innerHTML = '';
+          // Check if API key state was sent with newSession
+          if (msg.hasApiKey !== undefined) {
+            _hasApiKey = !!msg.hasApiKey;
+          }
+          // Show no-key banner if needed
+          if (!_hasApiKey) {
+            const banner = document.createElement('div');
+            banner.id = 'noKeyBanner';
+            banner.className = 'no-key-banner';
+            banner.innerHTML = '<strong>API kljuc nije podesen</strong><br>' +
+              'Da bi koristio VajbAgent, unesi API kljuc:<br>' +
+              '1. Napravi nalog na <a href="https://vajbagent.com" target="_blank">vajbagent.com</a> (dobijes $2 na poklon)<br>' +
+              '2. Kopiraj API kljuc iz dashboarda<br>' +
+              '<button class="no-key-btn" onclick="document.getElementById(\'settingsBtnBottom\').click()">⚙️ Otvori podesavanja i unesi kljuc</button>';
+            messagesEl.appendChild(banner);
+          }
           const w = document.createElement('div');
           w.className = 'welcome-msg';
           w.innerHTML = '<div class="welcome-brand"><span class="v">&lt;</span>VajbAgent<span class="v">/&gt;</span></div><h3>Sta kreiramo danas?</h3><div class="welcome-powered">Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski · Kreirao <strong>Nemanja Lakic</strong></div>';

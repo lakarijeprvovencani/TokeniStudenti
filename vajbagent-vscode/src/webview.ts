@@ -45,11 +45,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     );
   }
 
-  public newSession() {
+  public async newSession() {
     this._agent.abort();
     this._agent.clearHistory();
     clearCheckpoints();
-    this._view?.webview.postMessage({ type: 'newSession' });
+    const keyOnNew = await getApiKey(this._context.secrets);
+    this._view?.webview.postMessage({ type: 'newSession', hasApiKey: !!keyOnNew });
   }
 
   public stopGeneration() {
@@ -151,11 +152,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this._agent.abort();
         this._view?.webview.postMessage({ type: 'generationStopped' });
         break;
-      case 'newSession':
+      case 'newSession': {
         this._agent.abort();
         this._agent.clearHistory();
-        this._view?.webview.postMessage({ type: 'newSession' });
+        const keyOnNew = await getApiKey(this._context.secrets);
+        this._view?.webview.postMessage({ type: 'newSession', hasApiKey: !!keyOnNew });
         break;
+      }
       case 'diffResponse':
         handleDiffResponse(message.accepted as boolean);
         if (message.accepted && message.fullPath) {

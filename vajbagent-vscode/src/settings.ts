@@ -33,7 +33,11 @@ export async function getApiKey(secrets: vscode.SecretStorage): Promise<string |
 }
 
 export async function setApiKey(secrets: vscode.SecretStorage, key: string): Promise<void> {
-  await secrets.store(SECRET_KEY, key);
+  if (key) {
+    await secrets.store(SECRET_KEY, key);
+  } else {
+    await secrets.delete(SECRET_KEY);
+  }
 }
 
 export interface AutoApproveSettings {
