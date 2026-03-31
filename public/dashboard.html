@@ -285,10 +285,13 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
         <p class="api-key-note"><strong>Ovaj ključ ti je potreban za:</strong> logovanje na dashboard i povezivanje sa tvojim IDE-om (VS Code, Cursor...). Sačuvaj ga na sigurno mesto ili preuzmi kao fajl.</p>
       </div>
       <div class="card">
-        <div class="card-title card-title-light">Detalji</div>
-        <div class="detail-row"><span class="detail-label">Poslednja upotreba</span><span class="detail-val" id="vLast">-</span></div>
-        <div class="detail-row"><span class="detail-label">Ukupno potrošeno</span><span class="detail-val" id="vCost">$0.00</span></div>
+        <div class="card-title card-title-light">Potrošnja</div>
+        <div class="detail-row"><span class="detail-label">Potrošeno kredita</span><span class="detail-val" id="vCost">$0.00</span></div>
+        <div class="detail-row"><span class="detail-label">Ulazni tokeni</span><span class="detail-val" id="vInDetail">0</span></div>
+        <div class="detail-row"><span class="detail-label">Izlazni tokeni</span><span class="detail-val" id="vOutDetail">0</span></div>
         <div class="detail-row"><span class="detail-label">Ukupno tokena</span><span class="detail-val" id="vTotal">0</span></div>
+        <div class="detail-row"><span class="detail-label">Broj zahteva</span><span class="detail-val" id="vReqsDetail">0</span></div>
+        <div class="detail-row"><span class="detail-label">Poslednja upotreba</span><span class="detail-val" id="vLast">-</span></div>
       </div>
     </div>
 
@@ -562,6 +565,9 @@ function render(d){
   $('vLast').textContent=fmtD(d.last_used);
   $('vCost').textContent='$'+(d.estimated_cost_usd??0).toFixed(2);
   $('vTotal').textContent=fmt((d.input_tokens||0)+(d.output_tokens||0));
+  $('vInDetail').textContent=fmt(d.input_tokens||0);
+  $('vOutDetail').textContent=fmt(d.output_tokens||0);
+  $('vReqsDetail').textContent=fmt(d.requests||0);
   $('topBal').textContent='$'+(d.balance_usd??0).toFixed(2);
   $('dashKey').textContent=apiKey;
   $('setupKeyExt').textContent=apiKey;
