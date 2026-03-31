@@ -751,6 +751,22 @@ const chatCompletionsHandler = [
       });
     }
 
+    // Free tier: only Lite model allowed
+    if (resolved.id !== 'vajb-agent-lite') {
+      const totalDep = await getTotalDeposited(keyId);
+      const regBonus = parseFloat(process.env.SELF_REGISTER_BONUS) || 2;
+      if (totalDep <= regBonus) {
+        const baseUrl = process.env.BASE_URL || 'https://vajbagent.com';
+        return res.status(403).json({
+          error: {
+            message: `Model "${resolved.name}" je dostupan samo uz dopunu kredita. Besplatan nalog koristi Lite model. Dopuni na: ${baseUrl}/dashboard`,
+            code: 'free_tier_model_locked',
+            dashboard_url: `${baseUrl.replace(/\/$/, '')}/dashboard`,
+          },
+        });
+      }
+    }
+
     if (!acquireConcurrency(keyId)) {
       return res.status(429).json({
         error: {
@@ -1217,9 +1233,12 @@ app.get('/me', authLimiter, requireStudentAuth, asyncHandler(async (req, res) =>
   const balanceUsd = await getBalance(keyId);
   const totalDeposited = await getTotalDeposited(keyId);
   const data = await getUsageForKey(keyId);
+  const regBonus = parseFloat(process.env.SELF_REGISTER_BONUS) || 2;
+  const freeTier = totalDeposited <= regBonus;
   if (!data) {
     return res.json({
       key_id: keyId, name, balance_usd: balanceUsd, total_deposited: totalDeposited,
+      free_tier: freeTier,
       input_tokens: 0, output_tokens: 0, requests: 0, last_used: null, estimated_cost_usd: 0,
     });
   }
@@ -1229,6 +1248,7 @@ app.get('/me', authLimiter, requireStudentAuth, asyncHandler(async (req, res) =>
   const estimatedCost = costUsd(input, output, lastModel, keyId);
   res.json({
     key_id: keyId, name, balance_usd: balanceUsd, total_deposited: totalDeposited,
+    free_tier: freeTier,
     input_tokens: input, output_tokens: output,
     requests: data.requests || 0, last_used: data.last_used || null,
     estimated_cost_usd: Math.round(estimatedCost * 100) / 100,

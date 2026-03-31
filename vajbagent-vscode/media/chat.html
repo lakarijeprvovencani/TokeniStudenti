@@ -74,14 +74,14 @@
       gap: 4px;
       padding: 3px 8px;
       border-radius: 6px;
-      border: 1px solid rgba(255,255,255,0.08);
-      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
       color: var(--vscode-foreground);
       font-size: 11px;
       font-weight: 500;
       cursor: pointer;
       transition: background 0.15s, opacity 0.15s, border-color 0.15s;
-      opacity: 0.9;
+      opacity: 1;
       white-space: nowrap;
     }
     .model-picker-btn:hover { opacity: 1; background: rgba(255,255,255,0.1); border-color: var(--accent-border); }
@@ -96,8 +96,8 @@
 
     .drag-hint {
       font-size: 11px;
-      opacity: 0.7;
-      color: var(--vscode-foreground);
+      opacity: 0.9;
+      color: #fff;
       margin-left: 8px;
     }
     .drag-hint kbd {
@@ -162,6 +162,11 @@
     }
     .model-option.active .model-option-check { opacity: 1; }
     .model-option.active .model-option-name { color: var(--accent); }
+    .model-option.locked { opacity: 0.4; cursor: default; }
+    .model-option.locked:hover { background: none; }
+    .model-option-lock { font-size: 10px; color: var(--accent); opacity: 0; margin-left: auto; white-space: nowrap; }
+    .model-option.locked .model-option-lock { opacity: 1; }
+    .model-option.locked .model-option-check { display: none; }
 
     /* Settings popup (same style as mode/model menu) */
     .settings-popup {
@@ -309,14 +314,15 @@
       cursor: pointer;
       padding: 4px;
       border-radius: 6px;
-      opacity: 0.45;
+      opacity: 0.85;
+      color: #fff;
       line-height: 1;
       transition: opacity 0.15s, background 0.15s;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-    .icon-btn:hover { opacity: 0.9; background: var(--vscode-toolbar-hoverBackground); }
+    .icon-btn:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
     .icon-btn svg { width: 18px; height: 18px; }
 
     /* Context bar */
@@ -353,7 +359,8 @@
       font-family: var(--vscode-editor-font-family);
       font-weight: 500;
       font-size: 11px;
-      opacity: 0.7;
+      color: #fff;
+      opacity: 0.9;
       padding: 1px 6px;
       border-radius: 4px;
       background: rgba(255,255,255,0.06);
@@ -363,7 +370,8 @@
       white-space: nowrap;
       font-family: var(--vscode-editor-font-family);
       font-weight: 500;
-      color: var(--vscode-foreground);
+      color: #fff;
+      opacity: 0.85;
     }
     .context-new-session {
       display: none;
@@ -1326,9 +1334,14 @@
       background: rgba(255, 255, 255, 0.06);
     }
     .mention-item .mention-icon {
-      opacity: 0.6;
+      opacity: 0.85;
       flex-shrink: 0;
       font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
     }
     .cmd-svg-icon {
       flex-shrink: 0;
@@ -1353,10 +1366,11 @@
       opacity: 1;
     }
     .mention-item .mention-path {
-      opacity: 0.35;
+      opacity: 0.5;
       font-size: 12px;
       margin-left: auto;
       flex-shrink: 0;
+      color: #fff;
     }
     .mention-item .mention-name {
       color: rgba(255, 255, 255, 0.9);
@@ -1422,11 +1436,11 @@
     .toolbar-btn {
       background: none;
       border: none;
-      color: var(--vscode-foreground);
+      color: #fff;
       cursor: pointer;
       padding: 4px 6px;
       border-radius: 6px;
-      opacity: 0.4;
+      opacity: 0.85;
       transition: opacity 0.15s, background 0.15s;
       display: flex;
       align-items: center;
@@ -2936,7 +2950,7 @@
 
       <div id="welcomeApiHint" class="welcome-hint welcome-hint-api" style="display:none;">
         <strong style="color:var(--accent);">Prvo ti treba API kljuc</strong><br>
-        1. Napravi nalog na <a href="https://vajbagent.com" style="color:var(--accent);text-decoration:underline;" target="_blank">vajbagent.com</a> (dobijes $2 na poklon)<br>
+        1. Napravi nalog na <a href="https://vajbagent.com" style="color:var(--accent);text-decoration:underline;" target="_blank">vajbagent.com</a> (dobijes besplatan kredit)<br>
         2. Kopiraj API kljuc iz emaila ili dashboarda<br>
         3. Klikni na ⚙️ gore desno → nalepi kljuc i sacuvaj
       </div>
@@ -3171,15 +3185,26 @@
       }
     }
 
+    const _svgFile = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+    const _svgFolder = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
+    const _svgCode = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>';
+    const _svgGlobe = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>';
+    const _svgStyle = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="19" cy="13" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="12" cy="19" r="2.5"/></svg>';
+    const _svgGear = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>';
+    const _svgDoc = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>';
     function getFileIcon(name) {
+      if (name.endsWith('/')) return _svgFolder;
       const ext = name.split('.').pop().toLowerCase();
       const map = {
-        js: '📄', jsx: '⚛', ts: '📘', tsx: '⚛', py: '🐍', html: '🌐',
-        css: '🎨', scss: '🎨', json: '📋', md: '📝', yml: '⚙', yaml: '⚙',
-        sh: '⚡', sql: '🗃', go: '🔷', rs: '🦀', java: '☕', vue: '💚',
-        svelte: '🔥', php: '🐘', rb: '💎', swift: '🍎', kt: '🟣',
+        js: _svgCode, jsx: _svgCode, ts: _svgCode, tsx: _svgCode, py: _svgCode,
+        html: _svgGlobe, htm: _svgGlobe, vue: _svgCode, svelte: _svgCode, php: _svgCode,
+        css: _svgStyle, scss: _svgStyle, less: _svgStyle,
+        json: _svgGear, yml: _svgGear, yaml: _svgGear, toml: _svgGear,
+        md: _svgDoc, txt: _svgDoc, pdf: _svgDoc,
+        sh: _svgCode, go: _svgCode, rs: _svgCode, java: _svgCode, rb: _svgCode, swift: _svgCode, kt: _svgCode,
+        sql: _svgFile, env: _svgGear,
       };
-      return map[ext] || '📄';
+      return map[ext] || _svgFile;
     }
 
     function showMentionDropdown() {
@@ -3196,11 +3221,13 @@
 
       mentionSelected = Math.min(mentionSelected, matches.length - 1);
       mentionDropdown.innerHTML = matches.map((f, i) => {
-        const name = f.split('/').pop();
-        const dir = f.includes('/') ? f.substring(0, f.lastIndexOf('/')) : '';
+        const isFolder = f.endsWith('/');
+        const clean = isFolder ? f.slice(0, -1) : f;
+        const name = clean.split('/').pop() || clean;
+        const dir = clean.includes('/') ? clean.substring(0, clean.lastIndexOf('/')) : '';
         return '<div class="mention-item' + (i === mentionSelected ? ' active' : '') + '" data-file="' + escapeHtml(f) + '">'
-          + '<span class="mention-icon">' + getFileIcon(name) + '</span>'
-          + '<span class="mention-name">' + escapeHtml(name) + '</span>'
+          + '<span class="mention-icon">' + getFileIcon(isFolder ? name + '/' : name) + '</span>'
+          + '<span class="mention-name">' + escapeHtml(name) + (isFolder ? '/' : '') + '</span>'
           + (dir ? '<span class="mention-path">' + escapeHtml(dir) + '</span>' : '')
           + '</div>';
       }).join('');
@@ -3530,6 +3557,7 @@
 
     modelMenuEl.querySelectorAll('.model-option').forEach(function(opt) {
       opt.addEventListener('click', function() {
+        if (opt.classList.contains('locked')) return;
         var modelId = opt.dataset.model;
         var prevModel = modelSelect.value;
         modelSelect.value = modelId;
@@ -3931,6 +3959,26 @@
 
     let hadSavedKey = false;
     let _hasApiKey = false;
+    let _freeTier = false;
+
+    function applyFreeTierLocks() {
+      modelMenuEl.querySelectorAll('.model-option').forEach(function(opt) {
+        const isLite = opt.dataset.model === 'vajb-agent-lite';
+        if (_freeTier && !isLite) {
+          opt.classList.add('locked');
+          if (!opt.querySelector('.model-option-lock')) {
+            const lock = document.createElement('span');
+            lock.className = 'model-option-lock';
+            lock.textContent = 'Dopuni kredite';
+            opt.appendChild(lock);
+          }
+        } else {
+          opt.classList.remove('locked');
+          const lock = opt.querySelector('.model-option-lock');
+          if (lock) lock.remove();
+        }
+      });
+    }
     function showApiKeySaved() {
       hadSavedKey = true;
       apiKeySavedState.style.display = 'block';
@@ -3992,7 +4040,7 @@
         banner.className = 'no-key-banner';
         banner.innerHTML = '<strong>API kljuc nije podesen</strong><br>' +
           'Da bi koristio VajbAgent, unesi API kljuc:<br>' +
-          '1. Napravi nalog na <a href="https://vajbagent.com" target="_blank">vajbagent.com</a> (dobijes $2 na poklon)<br>' +
+          '1. Napravi nalog na <a href="https://vajbagent.com" target="_blank">vajbagent.com</a> (dobijes besplatan kredit)<br>' +
           '2. Kopiraj API kljuc iz dashboarda<br>' +
           '3. Klikni na <strong>⚙️</strong> dole u toolbar-u i nalepi kljuc';
         const powered = welcomeElDel.querySelector('.welcome-powered');
@@ -4292,6 +4340,7 @@
     var _sendMessageBusyTimer = null;
 
     async function sendMessage() {
+      _userScrolledUp = false;
       const text = userInput.value.trim();
       if (!text && pendingImages.length === 0 && pendingFiles.length === 0) return;
       if (_sendMessageBusy) {
@@ -4723,14 +4772,31 @@
       }
     }
 
-    function scrollToBottom() {
-      const doScroll = () => { messagesEl.scrollTop = messagesEl.scrollHeight + 500; };
-      doScroll();
-      requestAnimationFrame(doScroll);
-      setTimeout(doScroll, 50);
-      setTimeout(doScroll, 150);
-      setTimeout(doScroll, 400);
-      setTimeout(doScroll, 800);
+    let _userScrolledUp = false;
+
+    // Detect scroll direction: UP = user wants to read, DOWN near bottom = resume auto-scroll
+    messagesEl.addEventListener('wheel', (e) => {
+      if (e.deltaY < 0) {
+        // Scrolling UP — user wants to stay up
+        _userScrolledUp = true;
+      } else if (e.deltaY > 0) {
+        // Scrolling DOWN — check if near bottom, then resume
+        setTimeout(() => {
+          const dist = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+          if (dist < 30) _userScrolledUp = false;
+        }, 50);
+      }
+    }, { passive: true });
+    messagesEl.addEventListener('touchmove', () => {
+      setTimeout(() => {
+        const dist = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+        _userScrolledUp = dist > 40;
+      }, 50);
+    }, { passive: true });
+
+    function scrollToBottom(force) {
+      if (_userScrolledUp && !force) return;
+      messagesEl.scrollTop = messagesEl.scrollHeight + 500;
     }
 
     const approvalBar = document.getElementById('approvalBar');
@@ -4848,13 +4914,15 @@
               banner.className = 'no-key-banner';
               banner.innerHTML = '<strong>API kljuc nije podesen</strong><br>' +
                 'Da bi koristio VajbAgent, unesi API kljuc:<br>' +
-                '1. Napravi nalog na <a href="https://vajbagent.com" target="_blank">vajbagent.com</a> (dobijes $2 na poklon)<br>' +
+                '1. Napravi nalog na <a href="https://vajbagent.com" target="_blank">vajbagent.com</a> (dobijes besplatan kredit)<br>' +
                 '2. Kopiraj API kljuc iz dashboarda<br>' +
                 '3. Klikni na <strong>⚙️</strong> dole u toolbar-u i nalepi kljuc';
               const powered = welcomeEl2.querySelector('.welcome-powered');
               welcomeEl2.insertBefore(banner, powered);
             }
           }
+          _freeTier = msg.freeTier ?? false;
+          applyFreeTierLocks();
           renderMcpStatus(msg.mcpServers, msg.mcpTotalTools, false);
           break;
 
@@ -4864,6 +4932,10 @@
 
         case 'userInfo':
           if (msg.name) showUserInfo(msg.name);
+          if (msg.freeTier !== undefined) {
+            _freeTier = msg.freeTier;
+            applyFreeTierLocks();
+          }
           break;
 
         case 'fileList':
@@ -4918,7 +4990,7 @@
             w.innerHTML = '<div class="welcome-brand"><span class="v">&lt;</span>VajbAgent<span class="v">/&gt;</span></div>' +
               '<div class="no-key-banner"><strong>API kljuc nije podesen</strong><br>' +
               'Da bi koristio VajbAgent, unesi API kljuc:<br>' +
-              '1. Napravi nalog na <a href="https://vajbagent.com" target="_blank">vajbagent.com</a> (dobijes $2 na poklon)<br>' +
+              '1. Napravi nalog na <a href="https://vajbagent.com" target="_blank">vajbagent.com</a> (dobijes besplatan kredit)<br>' +
               '2. Kopiraj API kljuc iz dashboarda<br>' +
               '3. Klikni na <strong>⚙️</strong> dole u toolbar-u i nalepi kljuc</div>' +
               '<div class="welcome-powered">Powered by <strong>Vajb &lt;kodiranje/&gt;</strong> Mentorski · Kreirao <strong>Nemanja Lakic</strong></div>';

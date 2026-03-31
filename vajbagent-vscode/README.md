@@ -4,7 +4,7 @@ Tvoj licni AI partner za kodiranje, direktno u VS Code-u i Cursoru. Pise, menja,
 
 ## Kako poceti
 
-1. **Napravi nalog** na [vajbagent.com/dashboard](https://vajbagent.com/dashboard) — dobijes API kljuc + $2 kredita na poklon
+1. **Napravi nalog** na [vajbagent.com/dashboard](https://vajbagent.com/dashboard) — dobijes API kljuc + besplatan kredit na poklon
 2. **Instaliraj ekstenziju** — otvori VajbAgent panel u sidebar-u
 3. **Unesi API kljuc** — klikni ⚙️ u toolbar-u dole, nalepi kljuc, sacuvaj
 4. **Pitaj bilo sta** — agent istrazuje projekat, pise kod, i pokrece komande za tebe
@@ -125,7 +125,7 @@ Biras rezim jednim klikom u toolbar-u dole desno.
 
 Bez mesecne pretplate. Bez ugovora. Platis koliko koristis.
 
-$2 na poklon pri registraciji — dovoljno za ~200 zahteva sa Lite modelom.
+Besplatan kredit pri registraciji — dovoljno za probanje na Lite modelu.
 
 Vise informacija i registracija: [vajbagent.com](https://vajbagent.com)
 

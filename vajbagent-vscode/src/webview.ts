@@ -98,12 +98,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const mcpStatus = this._mcpManager.getStatus();
         const mcpTotalTools = mcpStatus.reduce((s, c) => s + c.toolCount, 0);
         let userName: string | undefined;
+        let freeTier = true;
         if (existingKey) {
           try {
             const resp = await fetch(`${getApiUrl()}/me`, { headers: { 'Authorization': `Bearer ${existingKey}` } });
             if (resp.ok) {
-              const data = await resp.json() as { name?: string };
+              const data = await resp.json() as { name?: string; free_tier?: boolean };
               userName = data.name;
+              freeTier = data.free_tier ?? true;
             }
           } catch { /* ignore network errors */ }
         }
@@ -115,6 +117,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           apiUrl: getApiUrl(),
           hasApiKey: !!existingKey,
           userName,
+          freeTier,
           mcpServers: mcpStatus,
           mcpTotalTools,
         });
@@ -181,10 +184,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           try {
             const resp = await fetch(`${getApiUrl()}/me`, { headers: { 'Authorization': `Bearer ${newKey}` } });
             if (resp.ok) {
-              const data = await resp.json() as { name?: string };
-              if (data.name) {
-                this._view?.webview.postMessage({ type: 'userInfo', name: data.name });
-              }
+              const data = await resp.json() as { name?: string; free_tier?: boolean };
+              this._view?.webview.postMessage({ type: 'userInfo', name: data.name, freeTier: data.free_tier ?? true });
             }
           } catch { /* ignore */ }
         }
