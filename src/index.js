@@ -1215,10 +1215,11 @@ app.get('/me', authLimiter, requireStudentAuth, asyncHandler(async (req, res) =>
   const keyId = req.studentKeyId;
   const name = req.studentName || 'Unknown';
   const balanceUsd = await getBalance(keyId);
+  const totalDeposited = await getTotalDeposited(keyId);
   const data = await getUsageForKey(keyId);
   if (!data) {
     return res.json({
-      key_id: keyId, name, balance_usd: balanceUsd,
+      key_id: keyId, name, balance_usd: balanceUsd, total_deposited: totalDeposited,
       input_tokens: 0, output_tokens: 0, requests: 0, last_used: null, estimated_cost_usd: 0,
     });
   }
@@ -1227,7 +1228,7 @@ app.get('/me', authLimiter, requireStudentAuth, asyncHandler(async (req, res) =>
   const lastModel = data.model || 'gpt-5-mini';
   const estimatedCost = costUsd(input, output, lastModel, keyId);
   res.json({
-    key_id: keyId, name, balance_usd: balanceUsd,
+    key_id: keyId, name, balance_usd: balanceUsd, total_deposited: totalDeposited,
     input_tokens: input, output_tokens: output,
     requests: data.requests || 0, last_used: data.last_used || null,
     estimated_cost_usd: Math.round(estimatedCost * 100) / 100,

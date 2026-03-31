@@ -563,7 +563,8 @@ function render(d){
   $('vIn').textContent=fmt(d.input_tokens||0);
   $('vOut').textContent=fmt(d.output_tokens||0);
   $('vLast').textContent=fmtD(d.last_used);
-  $('vCost').textContent='$'+(d.estimated_cost_usd??0).toFixed(2);
+  const spent = Math.max(0, (d.total_deposited ?? 0) - (d.balance_usd ?? 0));
+  $('vCost').textContent='$'+spent.toFixed(2);
   $('vTotal').textContent=fmt((d.input_tokens||0)+(d.output_tokens||0));
   $('vInDetail').textContent=fmt(d.input_tokens||0);
   $('vOutDetail').textContent=fmt(d.output_tokens||0);
