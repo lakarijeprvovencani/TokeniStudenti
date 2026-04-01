@@ -162,9 +162,9 @@
     }
     .model-option.active .model-option-check { opacity: 1; }
     .model-option.active .model-option-name { color: var(--accent); }
-    .model-option.locked { opacity: 0.4; cursor: default; }
-    .model-option.locked:hover { background: none; }
-    .model-option-lock { font-size: 10px; color: var(--accent); opacity: 0; margin-left: auto; white-space: nowrap; }
+    .model-option.locked { opacity: 0.55; cursor: pointer; }
+    .model-option.locked:hover { background: rgba(250,115,21,0.06); }
+    .model-option-lock { font-size: 11px; color: var(--accent); opacity: 0; margin-left: auto; white-space: nowrap; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
     .model-option.locked .model-option-lock { opacity: 1; }
     .model-option.locked .model-option-check { display: none; }
 
@@ -3557,7 +3557,12 @@
 
     modelMenuEl.querySelectorAll('.model-option').forEach(function(opt) {
       opt.addEventListener('click', function() {
-        if (opt.classList.contains('locked')) return;
+        if (opt.classList.contains('locked')) {
+          vscode.postMessage({ type: 'openUrl', url: settingsApiUrl.value.replace(/\/$/, '') + '/dashboard' });
+          modelMenuEl.classList.remove('open');
+          modelPickerBtn.classList.remove('open');
+          return;
+        }
         var modelId = opt.dataset.model;
         var prevModel = modelSelect.value;
         modelSelect.value = modelId;

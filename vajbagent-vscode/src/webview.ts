@@ -162,6 +162,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this._view?.webview.postMessage({ type: 'newSession', hasApiKey: !!keyOnNew });
         break;
       }
+      case 'openUrl': {
+        const url = message.url as string;
+        if (url) vscode.env.openExternal(vscode.Uri.parse(url));
+        break;
+      }
       case 'diffResponse':
         handleDiffResponse(message.accepted as boolean);
         if (message.accepted && message.fullPath) {
