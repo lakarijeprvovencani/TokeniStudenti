@@ -385,7 +385,6 @@ const authLimiter = rateLimit({
 const adminLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 150,
-  validate: { trustProxy: false },
   handler: (_req, res) => res.status(429).json({ error: { message: 'Previše admin zahteva. Sačekaj 1 minut.', code: 'rate_limit' } }),
 });
 
@@ -401,7 +400,6 @@ const registerLimiter = rateLimit({
   max: 3,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { trustProxy: false },
   skip: (req) => isWhitelistedIP(req),
   handler: (_req, res) => res.status(429).json({ error: 'Previše registracija. Pokušaj ponovo za sat vremena.' }),
 });
@@ -1305,7 +1303,6 @@ const recoveryLimiter = rateLimit({
   max: 3,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { trustProxy: false },
   handler: (_req, res) => res.status(429).json({ error: 'Previše zahteva. Pokušaj ponovo za sat vremena.' }),
 });
 
