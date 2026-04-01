@@ -82,7 +82,7 @@ You receive rich auto-context with every message. USE IT to work faster and smar
 - <git_status>: Current branch, uncommitted changes, recent commits. Use this for git operations instead of running git status/log.
 - <editor_state>: Open tabs and detected project stack (React, Next.js, Express, etc.). The open tabs tell you what the user has been working on. The project stack tells you which frameworks/libraries to use — follow their conventions.
 - <project_memory>: The .vajbagent/CONTEXT.md contents. This has project history and decisions — respect them.
-- <terminal_output>: The output of the last execute_command. This shows REAL results — errors, success messages, server logs. ALWAYS check this before debugging or assuming what happened. If it shows an error, READ IT and fix the exact issue. Do NOT ignore terminal output and guess.
+- <terminal_output>: The output of the last execute_command. This shows REAL results — errors, success messages, server logs. ALWAYS check this before debugging or assuming what happened. If it shows an error, READ IT and fix the exact issue. Do NOT ignore terminal output and guess. If terminal output contains errors or warnings and the user hasn't mentioned them — PROACTIVELY mention them and offer to fix.
 
 CRITICAL — READ EVERY TOOL RESULT:
 After EVERY tool call (especially execute_command), you MUST read the FULL tool result before writing your next response or making your next tool call. This is non-negotiable:
@@ -111,7 +111,7 @@ EFFICIENCY RULES:
 - Do NOT call read_file on the active editor file just to see what the user sees — it's already in <active_editor>.
 - Do NOT call read_file on CONTEXT.md — its content is already in <project_memory>.
 - Do NOT run git status/log if <git_status> already has the info you need.
-- DO call read_file when you need the FULL content of a file (workspace_index only shows first ~8 lines).
+- DO call read_file when you need the FULL content of a file (workspace_index only shows first ~8 lines). When the user references a file by name, READ IT immediately — don't ask them to attach it.
 - DO call list_files when you need to explore a specific subdirectory in detail.
 - SAVE tool calls. Every unnecessary tool call wastes the user's time and money. Each tool call costs tokens.
 </context_awareness>
@@ -1601,10 +1601,13 @@ export class Agent {
                   this._history.pop();
                 }
               }
+              const userMsg = is403
+                ? 'Zahtev je odbijen (403). Moguc razlog: prevelik kontekst ili privremeno ogranicenje. Pokusaj ponovo ili otvori novu sesiju (+) da resetujes kontekst.'
+                : errorMsg;
               this._provider.postMessage({
                 type: 'error',
-                text: errorMsg,
-                retryable: isRetryable,
+                text: userMsg,
+                retryable: true,
               });
               return;
             }
@@ -1703,10 +1706,14 @@ export class Agent {
             this._provider.postMessage({ type: 'status', phase: 'thinking', text: 'Popravljam grešku...' });
           }
 
+          let toolContent = result.output;
+          if (toolContent.length > 8000) {
+            toolContent = toolContent.substring(0, 4000) + '\n\n... (sredina skraćena, prikazano prvih 4000 i poslednjih 2000 karaktera) ...\n\n' + toolContent.substring(toolContent.length - 2000);
+          }
           this._history.push({
             role: 'tool',
             tool_call_id: tc.id,
-            content: result.output.substring(0, 15000),
+            content: toolContent,
           });
         }
 
