@@ -401,12 +401,36 @@ function resolveWorkspacePath(filePath: string): string {
 }
 
 // ── read_file ──
+const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg']);
+const IMAGE_MIME: Record<string, string> = {
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp', '.svg': 'image/svg+xml',
+};
+
 async function toolReadFile(args: Record<string, unknown>): Promise<ToolCallResult> {
   const filePath = resolveWorkspacePath(args.path as string);
   const startLine = args.start_line as number | undefined;
   const endLine = args.end_line as number | undefined;
+  const ext = path.extname(filePath).toLowerCase();
 
   try {
+    // Image files: return as base64 for visual inspection
+    if (IMAGE_EXTS.has(ext) && !startLine && !endLine) {
+      const buf = fs.readFileSync(filePath);
+      const sizeKB = Math.round(buf.length / 1024);
+      if (sizeKB > 2048) {
+        return { success: true, output: `Image file: ${path.basename(filePath)} (${sizeKB}KB) — too large to display inline. File exists at: ${filePath}` };
+      }
+      const base64 = buf.toString('base64');
+      const mime = IMAGE_MIME[ext] || 'image/png';
+      const result: ToolCallResult & { imageData?: { mime: string; base64: string } } = {
+        success: true,
+        output: `Image file: ${path.basename(filePath)} (${sizeKB}KB). Visual content attached below.`,
+      };
+      result.imageData = { mime, base64 };
+      return result;
+    }
+
     const content = fs.readFileSync(filePath, 'utf-8');
     let lines = content.split('\n');
 

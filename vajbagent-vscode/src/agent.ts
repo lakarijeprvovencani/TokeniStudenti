@@ -1706,8 +1706,14 @@ export class Agent {
             this._provider.postMessage({ type: 'status', phase: 'thinking', text: 'Popravljam grešku...' });
           }
 
-          let toolContent = result.output;
-          if (toolContent.length > 8000) {
+          let toolContent: string | ContentPart[] = result.output;
+          const imgData = (result as any).imageData as { mime: string; base64: string } | undefined;
+          if (imgData) {
+            toolContent = [
+              { type: 'text' as const, text: result.output },
+              { type: 'image_url' as const, image_url: { url: `data:${imgData.mime};base64,${imgData.base64}` } },
+            ];
+          } else if (typeof toolContent === 'string' && toolContent.length > 8000) {
             toolContent = toolContent.substring(0, 4000) + '\n\n... (sredina skraćena, prikazano prvih 4000 i poslednjih 2000 karaktera) ...\n\n' + toolContent.substring(toolContent.length - 2000);
           }
           this._history.push({
