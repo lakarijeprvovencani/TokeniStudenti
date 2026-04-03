@@ -23,6 +23,7 @@ let _pendingDiffResolve: ApprovalCallback | null = null;
 let _pendingCommandResolve: ApprovalCallback | null = null;
 let _apiCredentials: { apiUrl: string; apiKey: string } | null = null;
 const _checkpoints: Map<string, FileCheckpoint> = new Map();
+const _redoData: Map<string, string> = new Map(); // stores agent's version after undo
 
 let _vajbTerminal: vscode.Terminal | null = null;
 let _vajbWriteEmitter: vscode.EventEmitter<string> | null = null;
@@ -80,6 +81,12 @@ export function revertCheckpoint(filePath: string): boolean {
   const cp = _checkpoints.get(filePath);
   if (!cp) return false;
   try {
+    // Save current (agent's) content for redo before reverting
+    if (fs.existsSync(filePath)) {
+      _redoData.set(filePath, fs.readFileSync(filePath, 'utf-8'));
+    } else {
+      _redoData.set(filePath, '');
+    }
     if (cp.originalContent === '') {
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     } else {
@@ -96,6 +103,32 @@ export function revertAllCheckpoints(): number {
     if (revertCheckpoint(fp)) count++;
   }
   return count;
+}
+
+export function redoAllCheckpoints(): number {
+  let count = 0;
+  for (const [filePath, content] of _redoData) {
+    try {
+      if (content === '') {
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      } else {
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(filePath, content, 'utf-8');
+      }
+      count++;
+    } catch { /* skip */ }
+  }
+  _redoData.clear();
+  return count;
+}
+
+export function hasRedoData(): boolean {
+  return _redoData.size > 0;
+}
+
+export function clearRedoData() {
+  _redoData.clear();
 }
 
 export function clearCheckpoints() {

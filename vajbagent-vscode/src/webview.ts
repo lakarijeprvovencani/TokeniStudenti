@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { getModel, setModel, getApiKey, setApiKey, getApiUrl, setApiUrl, promptForApiKey, MODEL_INFO, getAutoApprove, setAutoApprove, AutoApproveSettings } from './settings';
 import { Agent } from './agent';
-import { setPostMessage, handleDiffResponse, handleCommandResponse, clearCheckpoints, getCheckpoints, revertAllCheckpoints, revertCheckpoint } from './tools';
+import { setPostMessage, handleDiffResponse, handleCommandResponse, clearCheckpoints, getCheckpoints, revertAllCheckpoints, revertCheckpoint, redoAllCheckpoints, hasRedoData, clearRedoData } from './tools';
 import { McpManager, McpServerConfig } from './mcp';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
@@ -415,7 +415,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           break;
         }
         const count = revertAllCheckpoints();
-        this._view?.webview.postMessage({ type: 'revertResult', count, msg: `Vraceno ${count} fajl(ova) na originale.` });
+        this._view?.webview.postMessage({ type: 'revertResult', count, msg: `Vraceno ${count} fajl(ova) na originale.`, hasRedo: hasRedoData() });
+        break;
+      }
+      case 'redoAll': {
+        if (!hasRedoData()) {
+          this._view?.webview.postMessage({ type: 'redoResult', count: 0, msg: 'Nema promena za ponavljanje.' });
+          break;
+        }
+        const redoCount = redoAllCheckpoints();
+        this._view?.webview.postMessage({ type: 'redoResult', count: redoCount, msg: `Ponovo primenjeno ${redoCount} fajl(ova).` });
         break;
       }
       case 'revertFile': {
