@@ -361,8 +361,8 @@ app.use(helmet({
 app.use(cors());
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 120,
+  windowMs: 5 * 60 * 1000,
+  max: 200,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
@@ -371,7 +371,7 @@ const authLimiter = rateLimit({
     return 'ip:' + (req.ip || 'unknown');
   },
   validate: false,
-  handler: (_req, res) => res.status(429).json({ error: { message: 'Previše zahteva. Pokušaj ponovo za 15 minuta.', code: 'rate_limit' } }),
+  handler: (_req, res) => res.status(429).json({ error: { message: 'Previše zahteva. Pokušaj ponovo za par minuta.', code: 'rate_limit' } }),
 });
 
 const adminLimiter = rateLimit({
