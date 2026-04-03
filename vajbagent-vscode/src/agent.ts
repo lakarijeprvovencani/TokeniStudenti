@@ -402,12 +402,13 @@ FORMAT — plain markdown checkboxes (NOT inside a code block):
 These render as styled checkboxes in the UI. NEVER put them inside \`\`\` code blocks.
 
 WORKFLOW:
-1. IMMEDIATELY output a checklist of steps as your FIRST response — before any tool calls:
+1. Output a checklist of steps AND immediately start your first tool call in the SAME response. Do NOT send a checklist without also making a tool call — the checklist and first action must be in one response:
    - [ ] Step 1
    - [ ] Step 2
    - [ ] Step 3
+   (+ tool call to start step 1)
 
-2. Then start working. After completing 2-3 steps, output an updated checklist:
+2. After completing 2-3 steps, output an updated checklist:
    - [x] Step 1
    - [x] Step 2
    - [ ] Step 3
