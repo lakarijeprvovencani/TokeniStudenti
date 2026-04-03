@@ -6173,18 +6173,26 @@
           }
         });
       });
-      // Make bold file names clickable (e.g. **package.json**, **.env**)
+      // Make bold file names clickable (e.g. **package.json**, **README.md (README.md)**)
       container.querySelectorAll('strong:not([data-linked])').forEach(el => {
         const text = (el.textContent || '').trim();
-        if (/^[.\w\-\/]+\.\w{1,10}$/.test(text)) {
+        // Match: file.ext, path/file.ext, or "file.ext (file.ext)" format
+        var fileMatch = text.match(/^([.\w\-\/]+\.\w{1,10})(?:\s*\([^)]*\))?$/);
+        if (fileMatch) {
+          var filePath = fileMatch[1];
           el.dataset.linked = '1';
           el.style.cursor = 'pointer';
           el.style.textDecoration = 'underline';
           el.style.textDecorationStyle = 'dotted';
           el.style.textUnderlineOffset = '2px';
           el.addEventListener('click', () => {
-            vscode.postMessage({ type: 'openFile', path: text });
+            vscode.postMessage({ type: 'openFile', path: filePath });
           });
+        }
+        // Also match directory paths like "src/", "agent-test/"
+        if (!fileMatch && /^[.\w\-\/]+\/$/.test(text)) {
+          el.dataset.linked = '1';
+          el.style.opacity = '0.8';
         }
       });
     }
