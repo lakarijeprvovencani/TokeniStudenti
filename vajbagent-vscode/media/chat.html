@@ -4774,54 +4774,31 @@
     // One icon for all statuses — the VajbAgent sparkle
     function getStatusIcon() { return VAJB_SPARKLE; }
 
-    // Status messages — context-aware, branded, natural
+    // Status messages — neutral while thinking, specific only during tool execution
     const STATUS_MESSAGES = {
+      // Neutral/thinking — used BEFORE any tool call starts (agent is just thinking)
       default: [
         'Vajbujem...',
         'Razmisljam...',
-        'Analiziram...',
+        'Osmisljavam...',
         'Planiram pristup...',
         'Sklapam resenje...',
-        'Osmisljavam...',
       ],
-      code: [
-        'Vajbujem kod...',
-        'Citam strukturu...',
-        'Analiziram fajlove...',
-        'Planiram izmene...',
-        'Pripremam resenje...',
-      ],
-      debug: [
-        'Vajbujem debug...',
-        'Trazim uzrok greske...',
-        'Analiziram error...',
-        'Ispitujem kod...',
-        'Dijagnostikujem...',
-        'Pronalazim fix...',
-      ],
-      search: [
-        'Pretrazujem projekat...',
-        'Vajbujem pretragu...',
-        'Skeniram fajlove...',
-        'Trazim po kodu...',
-      ],
-      web: [
-        'Vajbujem web...',
-        'Pretrazujem internet...',
-        'Ucitavam stranicu...',
-        'Analiziram rezultate...',
-      ],
-      build: [
-        'Vajbujem build...',
-        'Kompajliram...',
-        'Proveravam greske...',
-        'Pripremam deploy...',
-      ],
-      server: [
-        'Vajbujem server...',
-        'Pokrecem...',
-        'Cekam odgovor...',
-        'Proveravam status...',
+      // These are used ONLY when a tool is actively running (set by toolCallStart)
+      reading: ['Citam fajl...'],
+      writing: ['Pisem kod...'],
+      command: ['Izvrsavam komandu...'],
+      searching: ['Pretrazujem...'],
+      web: ['Ucitavam stranicu...'],
+      images: ['Trazim slike...'],
+      download: ['Preuzimam fajl...'],
+      mcp: ['MCP alat...'],
+      // Thinking between tool calls — neutral again
+      thinking: [
+        'Vajbujem...',
+        'Razmisljam...',
+        'Planiram sledeci korak...',
+        'Analiziram rezultat...',
       ],
     };
     let _statusRotateTimer = null;
@@ -4829,13 +4806,11 @@
     let _statusContext = 'default';
 
     function detectStatusContext(userText) {
-      if (!userText) return 'default';
-      var t = userText.toLowerCase();
-      if (/gresk|error|bug|fix|ne radi|pokvari|crash|fail/i.test(t)) return 'debug';
-      if (/pretrazi|search|nadji|find|google/i.test(t)) return 'search';
-      if (/http|url|sajt|stranica|link|web/i.test(t)) return 'web';
-      if (/build|kompajl|deploy|push/i.test(t)) return 'build';
-      if (/pokreni|start|server|run|pusti/i.test(t)) return 'server';
+      // Always start neutral — specific context comes from toolCallStart
+      return 'default';
+      // Legacy detection kept as comment for reference:
+      // if (/gresk|error|bug/i.test(t)) return 'debug';
+      // if (/pretrazi|search/i.test(t)) return 'search';
       return 'code';
     }
 
