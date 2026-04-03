@@ -183,7 +183,7 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
       <!-- ROW 2: Troškovi (moji) -->
       <div class="summary" style="grid-template-columns:repeat(3,1fr)">
         <div class="sum-card"><div class="sum-label">Ukupni API trošak</div><div class="sum-val c-red" id="sCost">$0</div><div class="sum-sub" id="sCostD"></div></div>
-        <div class="sum-card" style="border-left:3px solid #10a37f"><div class="sum-label">OpenAI</div><div class="sum-val" style="color:#34d399" id="sOpenAI">$0</div><div class="sum-sub">GPT-5 Mini, GPT-5, GPT-5.4, o4-mini</div></div>
+        <div class="sum-card" style="border-left:3px solid #10a37f"><div class="sum-label">OpenAI</div><div class="sum-val" style="color:#34d399" id="sOpenAI">$0</div><div class="sum-sub">GPT-5 Mini, GPT-5, GPT-5.4, GPT-4.1</div></div>
         <div class="sum-card" style="border-left:3px solid var(--orange)"><div class="sum-label">Anthropic</div><div class="sum-val c-orange" id="sAnthropic">$0</div><div class="sum-sub">Claude Sonnet 4.6, Opus 4.6</div></div>
       </div>
 
@@ -293,7 +293,7 @@ let DATA={models:[],users:[],markup:1,students:[],model_stats:{},first_use:null,
 let lastKey='';
 // Fallback ako overview još nije učitan (koristi se DATA.prices iz backend-a)
 const PRICES_FALLBACK={
-  'gpt-5-mini':{in:0.25,out:2},'o4-mini':{in:1.1,out:4.4},'gpt-5':{in:1.25,out:10},'gpt-5.4':{in:2.5,out:15},
+  'gpt-5-mini':{in:0.25,out:2},'gpt-4.1':{in:2,out:8},'gpt-5':{in:1.25,out:10},'gpt-5.4':{in:2.5,out:15},
   'claude-sonnet-4-6':{in:3,out:15},'claude-opus-4-6':{in:5,out:25},
   'gpt-4.1-mini':{in:.4,out:1.6},'gpt-4.1':{in:2,out:8},
   'gpt-4o-mini':{in:.15,out:.6},'gpt-4o':{in:2.5,out:10},
