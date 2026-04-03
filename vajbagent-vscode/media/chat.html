@@ -2582,7 +2582,7 @@
       <svg class="model-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
     </div>
     <div class="model-option" data-model="vajb-agent-turbo">
-      <div class="model-option-name">Turbo <span class="model-option-desc">— reasoning, odlican za logiku</span></div>
+      <div class="model-option-name">Turbo <span class="model-option-desc">— brz i precizan, jak u kodiranju</span></div>
       <svg class="model-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
     </div>
     <div class="model-option" data-model="vajb-agent-pro">
@@ -2896,7 +2896,7 @@
           <div class="guide-section-title">Izbor modela</div>
           <div class="guide-section-desc">
             <strong style="color:#4FC3F7;">Lite</strong> — brz i jeftin, idealan za svakodnevno kodiranje i brza pitanja.<br>
-            <strong style="color:#4FC3F7;">Turbo</strong> — reasoning model, odlican za logiku, debugging i matematiku.<br>
+            <strong style="color:#4FC3F7;">Turbo</strong> — brz i precizan, jak u kodiranju, 1M kontekst.<br>
             <strong style="color:#81C784;">Pro</strong> — jak i pametan, za ozbiljnije projekte i kompleksniji kod.<br>
             <strong style="color:var(--accent);">Max</strong> — kompleksni zadaci, planiranje, refaktor. Preporucen za Plan Mode.<br>
             <strong style="color:#CE93D8;">Power</strong> — najjaci OpenAI model, za flagship kvalitet.<br>
@@ -2952,6 +2952,7 @@
     <span class="context-label" id="contextLabel">0K / 128K</span>
     <span class="balance-label" id="balanceLabel" style="display:none" title="Preostali krediti"></span>
     <button class="undo-btn" id="undoBtn" title="Vrati sve promene agenta na stanje pre izmena" style="display:none" data-count="0">↩ Undo</button>
+    <button class="undo-btn" id="redoBtn" title="Vrati promene koje su ponistene" style="display:none">↪ Redo</button>
     <button class="context-new-session" id="contextNewSession">Novi chat</button>
   </div>
   <div class="toast" id="toastNotif">
@@ -3811,6 +3812,9 @@
 
     var undoBtnEl = document.getElementById('undoBtn');
     if (undoBtnEl) undoBtnEl.addEventListener('click', function() { window.confirmRevertAll(); });
+
+    var redoBtnEl = document.getElementById('redoBtn');
+    if (redoBtnEl) redoBtnEl.addEventListener('click', function() { vscode.postMessage({ type: 'redoAll' }); });
 
     planModeOff.onclick = function() {
       togglePlanMode(false);
@@ -4786,7 +4790,6 @@
         'Analiziram fajlove...',
         'Planiram izmene...',
         'Pripremam resenje...',
-        'Pisem kod...',
       ],
       debug: [
         'Vajbujem debug...',
@@ -5247,11 +5250,11 @@
           var startLabel = (function(n) {
             switch (n) {
               case 'read_file':       return { label: 'Citam fajl', phase: 'reading' };
-              case 'write_file':      return { label: 'Pisem fajl', phase: 'writing' };
-              case 'replace_in_file': return { label: 'Menjam fajl', phase: 'writing' };
-              case 'list_files':      return { label: 'Listam fajlove', phase: 'searching' };
-              case 'search_files':    return { label: 'Pretrazujem kod', phase: 'searching' };
-              case 'execute_command': return { label: 'Izvrsavam komandu', phase: 'command' };
+              case 'write_file':      return { label: 'Pisem kod', phase: 'writing' };
+              case 'replace_in_file': return { label: 'Menjam kod', phase: 'writing' };
+              case 'list_files':      return { label: 'Gledam strukturu', phase: 'searching' };
+              case 'search_files':    return { label: 'Pretrazujem', phase: 'searching' };
+              case 'execute_command': return { label: 'Pokrecem komandu', phase: 'command' };
               case 'fetch_url':       return { label: 'Ucitavam stranicu', phase: 'web' };
               case 'web_search':      return { label: 'Pretrazujem web', phase: 'web' };
               case 'search_images':   return { label: 'Trazim slike', phase: 'images' };
@@ -5315,11 +5318,11 @@
             }
             switch (msg.name) {
               case 'read_file':       return { label: 'Citam fajl', detail: short + lineInfo, phase: 'reading' };
-              case 'write_file':      return { label: 'Pisem fajl', detail: short, phase: 'writing' };
-              case 'replace_in_file': return { label: 'Menjam fajl', detail: short, phase: 'writing' };
-              case 'list_files':      return { label: 'Listam fajlove', detail: short || parsedArgs.path || '', phase: 'searching' };
-              case 'search_files':    return { label: 'Pretrazujem kod', detail: parsedArgs.pattern ? '"' + parsedArgs.pattern + '"' : '', phase: 'searching' };
-              case 'execute_command': return { label: 'Izvrsavam komandu', detail: (parsedArgs.command || '').substring(0, 60), phase: 'command' };
+              case 'write_file':      return { label: 'Pisem kod', detail: short, phase: 'writing' };
+              case 'replace_in_file': return { label: 'Menjam kod', detail: short, phase: 'writing' };
+              case 'list_files':      return { label: 'Gledam strukturu', detail: short || parsedArgs.path || '', phase: 'searching' };
+              case 'search_files':    return { label: 'Pretrazujem', detail: parsedArgs.pattern ? '"' + parsedArgs.pattern + '"' : '', phase: 'searching' };
+              case 'execute_command': return { label: 'Pokrecem komandu', detail: (parsedArgs.command || '').substring(0, 60), phase: 'command' };
               case 'fetch_url':       return { label: 'Ucitavam stranicu', detail: (parsedArgs.url || '').substring(0, 50), phase: 'web' };
               case 'web_search':      return { label: 'Pretrazujem web', detail: parsedArgs.query ? '"' + parsedArgs.query + '"' : '', phase: 'web' };
               case 'search_images':   return { label: 'Trazim slike', detail: parsedArgs.query ? '"' + parsedArgs.query + '"' : '', phase: 'images' };
@@ -5773,8 +5776,29 @@
         case 'revertResult': {
           const undoBtn2 = document.getElementById('undoBtn');
           if (undoBtn2) { undoBtn2.style.display = 'none'; }
+          const redoBtn2 = document.getElementById('redoBtn');
           if (msg.count > 0) {
             addMessageBubble('assistant', '✅ ' + msg.msg);
+            if (redoBtn2) { redoBtn2.style.display = 'inline-block'; }
+          } else {
+            addMessageBubble('assistant', msg.msg);
+            if (redoBtn2) { redoBtn2.style.display = 'none'; }
+          }
+          scrollToBottom();
+          break;
+        }
+
+        case 'redoResult': {
+          const redoBtn3 = document.getElementById('redoBtn');
+          if (redoBtn3) { redoBtn3.style.display = 'none'; }
+          const undoBtn3 = document.getElementById('undoBtn');
+          if (msg.count > 0) {
+            addMessageBubble('assistant', '✅ ' + msg.msg);
+            if (undoBtn3) {
+              undoBtn3.style.display = 'inline-block';
+              undoBtn3.textContent = '↩ Undo (' + msg.count + ')';
+              undoBtn3.dataset.count = String(msg.count);
+            }
           } else {
             addMessageBubble('assistant', msg.msg);
           }
