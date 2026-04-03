@@ -148,7 +148,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'sendMessage': {
         const text = (message.text as string) || '';
         const images = (message.images as Array<{ base64: string; mimeType: string }>) || [];
-        await this._agent.sendMessage(text, images);
+        const skill = (message.skill as string) || null;
+        await this._agent.sendMessage(text, images, skill);
         break;
       }
       case 'stopGeneration':

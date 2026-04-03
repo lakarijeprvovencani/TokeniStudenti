@@ -1365,6 +1365,21 @@
       stroke: #E07820;
       opacity: 1;
     }
+    .slash-section-header {
+      padding: 6px 12px 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: rgba(200, 104, 26, 0.6);
+      pointer-events: none;
+      user-select: none;
+    }
+    .slash-section-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.08);
+      margin: 4px 12px;
+    }
     .mention-item .mention-path {
       opacity: 0.5;
       font-size: 12px;
@@ -3300,27 +3315,56 @@
     // ---- / slash command autocomplete ----
     const slashDropdown = document.getElementById('slashDropdown');
     const SLASH_COMMANDS = [
-      { cmd: '/test', desc: 'Generisi testove', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M9 9h6M9 15h6"></path></svg>' },
-      { cmd: '/fix', desc: 'Popravi greske', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"></path></svg>' },
-      { cmd: '/doc', desc: 'Dodaj dokumentaciju', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="9" y1="13" x2="15" y2="13"></line><line x1="9" y1="17" x2="15" y2="17"></line></svg>' },
-      { cmd: '/commit', desc: 'Predlog commit poruke', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="15" cy="12" r="1"></circle><path d="M9 6a3 3 0 0 1 6 0"></path><path d="M9 18a3 3 0 0 1 6 0"></path></svg>' },
-      { cmd: '/explain', desc: 'Objasni kod', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>' },
-      { cmd: '/refactor', desc: 'Refaktorisi kod', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="12 1 3 6 3 18 12 23 21 18 21 6 12 1"></polyline><line x1="12" y1="12.5" x2="12" y2="12.5"></line></svg>' },
+      // ── Komande ──
+      { cmd: '/test', desc: 'Generisi testove', type: 'command', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M9 9h6M9 15h6"></path></svg>' },
+      { cmd: '/fix', desc: 'Popravi greske', type: 'command', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"></path></svg>' },
+      { cmd: '/doc', desc: 'Dodaj dokumentaciju', type: 'command', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="9" y1="13" x2="15" y2="13"></line><line x1="9" y1="17" x2="15" y2="17"></line></svg>' },
+      { cmd: '/commit', desc: 'Predlog commit poruke', type: 'command', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="15" cy="12" r="1"></circle><path d="M9 6a3 3 0 0 1 6 0"></path><path d="M9 18a3 3 0 0 1 6 0"></path></svg>' },
+      { cmd: '/explain', desc: 'Objasni kod', type: 'command', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>' },
+      { cmd: '/refactor', desc: 'Refaktorisi kod', type: 'command', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="12 1 3 6 3 18 12 23 21 18 21 6 12 1"></polyline><line x1="12" y1="12.5" x2="12" y2="12.5"></line></svg>' },
+      // ── Skills ──
+      { cmd: '/dizajn', desc: 'UI/CSS dizajn ekspert', type: 'skill', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>' },
+      { cmd: '/api', desc: 'REST/backend endpoint', type: 'skill', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></svg>' },
+      { cmd: '/baza', desc: 'SQL/Prisma/baza podataka', type: 'skill', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>' },
+      { cmd: '/perf', desc: 'Optimizacija performansi', type: 'skill', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>' },
+      { cmd: '/security', desc: 'Provera bezbednosti', type: 'skill', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>' },
+      { cmd: '/convert', desc: 'Konverzija koda', type: 'skill', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>' },
+      { cmd: '/style', desc: 'Coding style i konvencije', type: 'skill', svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3"></path><path d="M9 20h6"></path><path d="M12 4v16"></path></svg>' },
     ];
     let slashActive = false;
     let slashQuery = '';
     let slashSelected = 0;
+    let slashStart = 0;
     let slashDropdownShownAt = 0;
 
     function showSlashDropdown() {
       const matches = SLASH_COMMANDS.filter(c => c.cmd.startsWith('/' + slashQuery));
       if (matches.length === 0) { hideSlashDropdown(); return; }
       slashSelected = Math.min(slashSelected, matches.length - 1);
-      slashDropdown.innerHTML = matches.map((c, i) =>
-        '<div class="mention-item' + (i === slashSelected ? ' selected' : '') + '" data-cmd="' + c.cmd + '">' +
-        '<span class="cmd-svg-icon">' + c.svg + '</span><strong>' + c.cmd + '</strong>' +
-        '<span style="opacity:0.5;margin-left:8px;font-size:11px;">' + c.desc + '</span></div>'
-      ).join('');
+      const commands = matches.filter(c => c.type === 'command');
+      const skills = matches.filter(c => c.type === 'skill');
+      let html = '';
+      let idx = 0;
+      if (commands.length > 0) {
+        html += '<div class="slash-section-header">Komande</div>';
+        for (const c of commands) {
+          html += '<div class="mention-item' + (idx === slashSelected ? ' selected' : '') + '" data-cmd="' + c.cmd + '">' +
+            '<span class="cmd-svg-icon">' + c.svg + '</span><strong>' + c.cmd + '</strong>' +
+            '<span style="opacity:0.5;margin-left:8px;font-size:11px;">' + c.desc + '</span></div>';
+          idx++;
+        }
+      }
+      if (skills.length > 0) {
+        if (commands.length > 0) html += '<div class="slash-section-divider"></div>';
+        html += '<div class="slash-section-header">Skills</div>';
+        for (const c of skills) {
+          html += '<div class="mention-item' + (idx === slashSelected ? ' selected' : '') + '" data-cmd="' + c.cmd + '">' +
+            '<span class="cmd-svg-icon">' + c.svg + '</span><strong>' + c.cmd + '</strong>' +
+            '<span style="opacity:0.5;margin-left:8px;font-size:11px;">' + c.desc + '</span></div>';
+          idx++;
+        }
+      }
+      slashDropdown.innerHTML = html;
       slashDropdown.classList.add('open');
       slashDropdownShownAt = Date.now();
       slashDropdown.querySelectorAll('.mention-item').forEach(item => {
@@ -3338,9 +3382,12 @@
     }
 
     function insertSlashCommand(cmd) {
-      userInput.value = cmd + ' ';
-      userInput.selectionStart = cmd.length + 1;
-      userInput.selectionEnd = cmd.length + 1;
+      const before = userInput.value.substring(0, slashStart);
+      const after = userInput.value.substring(userInput.selectionStart);
+      userInput.value = before + cmd + ' ' + after;
+      const newPos = before.length + cmd.length + 1;
+      userInput.selectionStart = newPos;
+      userInput.selectionEnd = newPos;
       userInput.focus();
       hideSlashDropdown();
     }
@@ -3348,14 +3395,22 @@
     const origInputHandler = userInput.oninput;
     userInput.addEventListener('input', () => {
       const val = userInput.value;
-      if (val.startsWith('/') && !val.includes('\n')) {
-        const query = val.substring(1).split(' ')[0];
-        if (val.indexOf(' ') === -1) {
-          slashActive = true;
-          slashQuery = query;
-          slashSelected = 0;
-          showSlashDropdown();
-          return;
+      const pos = userInput.selectionStart;
+      const textBefore = val.substring(0, pos);
+      const slIdx = textBefore.lastIndexOf('/');
+
+      if (slIdx >= 0) {
+        const charBefore = slIdx > 0 ? textBefore[slIdx - 1] : ' ';
+        if (charBefore === ' ' || charBefore === '\n' || slIdx === 0) {
+          const queryPart = textBefore.substring(slIdx + 1);
+          if (!queryPart.includes(' ') && !queryPart.includes('\n')) {
+            slashActive = true;
+            slashStart = slIdx;
+            slashQuery = queryPart;
+            slashSelected = 0;
+            showSlashDropdown();
+            return;
+          }
         }
       }
       if (slashActive) hideSlashDropdown();
@@ -3513,7 +3568,14 @@
 
     // Slash button — opens slash command dropdown
     document.getElementById('slashBtn').addEventListener('click', function() {
-      userInput.value = '/';
+      const pos = userInput.selectionStart || userInput.value.length;
+      const before = userInput.value.substring(0, pos);
+      const after = userInput.value.substring(pos);
+      const needSpace = before.length > 0 && before[before.length - 1] !== ' ' && before[before.length - 1] !== '\n';
+      userInput.value = before + (needSpace ? ' ' : '') + '/' + after;
+      const newPos = pos + (needSpace ? 2 : 1);
+      userInput.selectionStart = newPos;
+      userInput.selectionEnd = newPos;
       userInput.focus();
       userInput.dispatchEvent(new Event('input'));
     });
@@ -4434,10 +4496,11 @@
         sendText = fileContext + '\n\n' + sendText;
       }
 
-      const slashMatch = text.match(/^\/(\w+)\s*(.*)?$/);
+      const slashMatch = text.match(/(^|\s)\/(\w+)(?:\s+(.*))?$/s);
       if (slashMatch) {
-        const cmd = slashMatch[1].toLowerCase();
-        const arg = (slashMatch[2] || '').trim();
+        const cmd = slashMatch[2].toLowerCase();
+        const arg = (slashMatch[3] || '').trim();
+        const textBeforeSlash = text.substring(0, slashMatch.index + (slashMatch[1] === '' ? 0 : 1)).trim();
         const slashCommands = {
           test: 'Generisi unit testove za ' + (arg || 'trenutno otvoreni fajl. Koristi testing framework koji projekat vec koristi (Jest, Vitest, Mocha, itd). Ako nema testing framework-a, predlozi i instaliraj odgovarajuci.'),
           fix: 'Pronadji i popravi sve greske i upozerenja u ' + (arg || 'trenutno otvorenom fajlu. Pogledaj <diagnostics> za poznate greske.'),
@@ -4445,9 +4508,23 @@
           commit: 'Pogledaj git status i napravi odgovarajucu commit poruku za trenutne izmene. Koristi konvencionalni format (feat/fix/refactor/docs). Prikazi predlog poruke.',
           explain: 'Objasni detaljno kako radi ' + (arg || 'kod u trenutno otvorenom fajlu') + '. Objasni arhitekturu, tok podataka i kljucne delove.',
           refactor: 'Refaktorisi i poboljsaj ' + (arg || 'trenutno otvoreni fajl') + '. Objasni sta menjas i zasto.',
+          // Skills
+          dizajn: (arg || 'trenutno otvoreni fajl') + ' — fokusiraj se na UI dizajn i vizuelni kvalitet. Pogledaj kod i primeni najbolje dizajn prakse.',
+          api: (arg || 'trenutno otvoreni fajl') + ' — napravi ili analiziraj REST API endpoint. Prati RESTful konvencije projekta.',
+          baza: (arg || 'trenutno otvoreni fajl') + ' — radi sa bazom podataka: schema, upiti, migracije ili relacije.',
+          perf: 'Analiziraj performanse u ' + (arg || 'trenutno otvorenom fajlu') + '. Identifikuj uska grla i predlozi konkretne optimizacije.',
+          security: 'Skeniraj ' + (arg || 'trenutno otvoreni fajl') + ' za bezbednosne ranjivosti. Proveri OWASP Top 10 kategorije.',
+          convert: 'Konvertuj ' + (arg || 'kod u trenutno otvorenom fajlu') + '. Sacuvaj istu funkcionalnost, prilagodi sintaksu i idiome ciljnog jezika/framework-a.',
+          style: 'Analiziraj coding style u ' + (arg || 'trenutno otvorenom fajlu') + '. Primeni konzistentne konvencije imenovanja, formatiranje i strukturu.',
         };
+        // Detect if this is a skill (not a regular command)
+        var detectedSkill = null;
+        const skillNames = ['dizajn', 'api', 'baza', 'perf', 'security', 'convert', 'style'];
+        if (slashCommands[cmd] && skillNames.indexOf(cmd) >= 0) {
+          detectedSkill = cmd;
+        }
         if (slashCommands[cmd]) {
-          sendText = slashCommands[cmd];
+          sendText = textBeforeSlash ? textBeforeSlash + '\n\n' + slashCommands[cmd] : slashCommands[cmd];
         }
       }
 
@@ -4470,11 +4547,13 @@
           imagesPayload.push({ base64: shrunk, mimeType: mt });
         }
 
-        vscode.postMessage({
+        var msgPayload = {
           type: 'sendMessage',
           text: sendText,
           images: imagesPayload,
-        });
+        };
+        if (detectedSkill) msgPayload.skill = detectedSkill;
+        vscode.postMessage(msgPayload);
 
         userInput.value = '';
         userInput.style.height = 'auto';
@@ -4556,16 +4635,27 @@
       }
       // Detect expanded slash command prompts saved in history
       const slashPatterns = [
-        { pattern: /^Generisi unit testove za (.+)$/s, cmd: 'test' },
-        { pattern: /^Pronadji i popravi sve greske[\s\S]*$/s, cmd: 'fix' },
-        { pattern: /^Dodaj dokumentaciju[\s\S]*$/s, cmd: 'doc' },
-        { pattern: /^Pogledaj git status[\s\S]*$/s, cmd: 'commit' },
-        { pattern: /^Objasni detaljno kako radi (.+?)\.[\s\S]*$/s, cmd: 'explain' },
-        { pattern: /^Refaktorisi i poboljsaj (.+?)\.[\s\S]*$/s, cmd: 'refactor' },
+        { pattern: /(?:^|[\s\S]*?\n\n)Generisi unit testove za (.+)$/s, cmd: 'test' },
+        { pattern: /(?:^|[\s\S]*?\n\n)Pronadji i popravi sve greske[\s\S]*$/s, cmd: 'fix' },
+        { pattern: /(?:^|[\s\S]*?\n\n)Dodaj dokumentaciju[\s\S]*$/s, cmd: 'doc' },
+        { pattern: /(?:^|[\s\S]*?\n\n)Pogledaj git status[\s\S]*$/s, cmd: 'commit' },
+        { pattern: /(?:^|[\s\S]*?\n\n)Objasni detaljno kako radi (.+?)\.[\s\S]*$/s, cmd: 'explain' },
+        { pattern: /(?:^|[\s\S]*?\n\n)Refaktorisi i poboljsaj (.+?)\.[\s\S]*$/s, cmd: 'refactor' },
+        // Skills
+        { pattern: /(?:^|[\s\S]*?\n\n).+ — fokusiraj se na UI dizajn[\s\S]*$/s, cmd: 'dizajn' },
+        { pattern: /(?:^|[\s\S]*?\n\n).+ — napravi ili analiziraj REST API[\s\S]*$/s, cmd: 'api' },
+        { pattern: /(?:^|[\s\S]*?\n\n).+ — radi sa bazom podataka[\s\S]*$/s, cmd: 'baza' },
+        { pattern: /(?:^|[\s\S]*?\n\n)Analiziraj performanse[\s\S]*$/s, cmd: 'perf' },
+        { pattern: /(?:^|[\s\S]*?\n\n)Skeniraj .+ za bezbednosne[\s\S]*$/s, cmd: 'security' },
+        { pattern: /(?:^|[\s\S]*?\n\n)Konvertuj [\s\S]*$/s, cmd: 'convert' },
+        { pattern: /(?:^|[\s\S]*?\n\n)Analiziraj coding style[\s\S]*$/s, cmd: 'style' },
       ];
       for (const sp of slashPatterns) {
-        if (sp.pattern.test(text)) {
-          return '<span class="slash-cmd-tag">/' + sp.cmd + '</span>';
+        const spMatch = text.match(sp.pattern);
+        if (spMatch) {
+          const before = text.substring(0, spMatch.index).trim();
+          const beforeHtml = before ? before.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/@([\w.\/\-]+)/g, '<span class="mention-tag">@$1</span>') + ' ' : '';
+          return beforeHtml + '<span class="slash-cmd-tag">/' + sp.cmd + '</span>';
         }
       }
 
@@ -4573,13 +4663,9 @@
       // Style @mentions
       html = html.replace(/@([\w.\/\-]+)/g, '<span class="mention-tag">@$1</span>');
       // Style slash commands typed by user
-      const slashMatch = text.match(/^\/(\w+)(\s+.*)?$/);
-      if (slashMatch) {
-        const cmdName = slashMatch[1];
-        const cmdArg = (slashMatch[2] || '').trim();
-        const argHtml = cmdArg ? ' ' + cmdArg.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/@([\w.\/\-]+)/g, '<span class="mention-tag">@$1</span>') : '';
-        html = '<span class="slash-cmd-tag">/' + cmdName + '</span>' + argHtml;
-      }
+      html = html.replace(/(^|\s)(\/\w+)/g, function(m, space, cmd) {
+        return space + '<span class="slash-cmd-tag">' + cmd + '</span>';
+      });
       return html;
     }
 
