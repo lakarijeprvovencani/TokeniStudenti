@@ -1598,6 +1598,42 @@ app.post('/v1/web-search', authLimiter, requireStudentAuth, asyncHandler(async (
   }
 }));
 
+// ---- Voice transcription (Whisper) ----
+app.post('/v1/audio/transcribe', authLimiter, requireStudentAuth, asyncHandler(async (req, res) => {
+  const { audio, format } = req.body || {};
+  if (!audio || typeof audio !== 'string') {
+    return res.status(400).json({ error: { message: 'Parametar "audio" (base64) je obavezan.', code: 'invalid_audio' } });
+  }
+
+  // Use first available OpenAI key for Whisper
+  if (openaiPool.length === 0) {
+    return res.status(503).json({ error: { message: 'Whisper nije konfigurisan.', code: 'whisper_not_configured' } });
+  }
+
+  const poolEntry = openaiPool[0];
+
+  try {
+    const audioBuffer = Buffer.from(audio, 'base64');
+    const ext = format === 'webm' ? 'webm' : 'webm';
+    const file = new File([audioBuffer], `voice.${ext}`, { type: `audio/${ext}` });
+
+    const transcription = await poolEntry.client.audio.transcriptions.create({
+      model: 'whisper-1',
+      file: file,
+      language: 'sr',
+    });
+
+    // Log usage
+    const userId = req.studentId || 'unknown';
+    console.log(`Whisper transcription: user=${userId}, size=${audioBuffer.length}b, text="${(transcription.text || '').substring(0, 50)}..."`);
+
+    res.json({ text: transcription.text || '' });
+  } catch (err) {
+    console.error('Whisper error:', err.message);
+    res.status(502).json({ error: { message: 'Greska pri transkripciji zvuka.', code: 'whisper_error' } });
+  }
+}));
+
 // ---- 404 ----
 app.use((req, res) => {
   res.status(404).json({ error: { message: 'Not found' } });
