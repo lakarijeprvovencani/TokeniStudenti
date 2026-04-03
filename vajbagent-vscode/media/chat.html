@@ -5778,7 +5778,12 @@
           if (undoBtn2) { undoBtn2.style.display = 'none'; }
           const redoBtn2 = document.getElementById('redoBtn');
           if (msg.count > 0) {
-            addMessageBubble('assistant', '✅ ' + msg.msg);
+            var revertAllDiv = document.createElement('div');
+            revertAllDiv.className = 'msg msg-assistant';
+            revertAllDiv.innerHTML = '<span>✅ ' + escapeHtml(msg.msg) + '</span> <button style="margin-left:8px;padding:3px 10px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.12);border-radius:5px;cursor:pointer;font-size:0.8rem" class="inline-redo-btn">↪ Redo</button>';
+            var inlineRedoAll = revertAllDiv.querySelector('.inline-redo-btn');
+            if (inlineRedoAll) inlineRedoAll.addEventListener('click', function() { vscode.postMessage({ type: 'redoAll' }); });
+            messagesEl.appendChild(revertAllDiv);
             if (redoBtn2) { redoBtn2.style.display = 'inline-block'; }
           } else {
             addMessageBubble('assistant', msg.msg);
@@ -5841,8 +5846,14 @@
           }
           if (msg.success) {
             const short = msg.filePath.replace(/\\/g, '/').split('/').slice(-2).join('/');
-            addMessageBubble('assistant', '↩ Vracen: ' + short);
-            // Show redo button after individual file revert
+            // Show revert message with inline redo button
+            var revertDiv = document.createElement('div');
+            revertDiv.className = 'msg msg-assistant';
+            revertDiv.innerHTML = '<span>↩ Vracen: ' + escapeHtml(short) + '</span> <button style="margin-left:8px;padding:3px 10px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.12);border-radius:5px;cursor:pointer;font-size:0.8rem" class="inline-redo-btn">↪ Redo</button>';
+            var inlineRedoBtn = revertDiv.querySelector('.inline-redo-btn');
+            if (inlineRedoBtn) inlineRedoBtn.addEventListener('click', function() { vscode.postMessage({ type: 'redoAll' }); });
+            messagesEl.appendChild(revertDiv);
+            // Also show top redo button
             var redoBtnFile = document.getElementById('redoBtn');
             if (redoBtnFile) redoBtnFile.style.display = 'inline-block';
             scrollToBottom();
