@@ -204,12 +204,12 @@ export const TOOL_DEFINITIONS = [
     type: 'function' as const,
     function: {
       name: 'write_file',
-      description: 'Create or overwrite a file. User will see a diff preview and must approve.',
+      description: 'Create or overwrite a file. REPLACES the entire file — content must be COMPLETE (every line, every function). Never use placeholder comments like "// rest of code" — they delete real code. User sees diff preview.',
       parameters: {
         type: 'object',
         properties: {
           path: { type: 'string', description: 'Absolute or workspace-relative file path' },
-          content: { type: 'string', description: 'The full file content to write' },
+          content: { type: 'string', description: 'The COMPLETE file content. Must contain every line — omitted code is permanently deleted.' },
         },
         required: ['path', 'content'],
       },
