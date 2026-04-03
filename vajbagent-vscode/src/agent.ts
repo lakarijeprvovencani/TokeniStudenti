@@ -2414,6 +2414,35 @@ OGRANICENJA:
     if (this._activeSkill && Agent.SKILL_PROMPTS[this._activeSkill]) {
       systemPrompt += '\n\n' + Agent.SKILL_PROMPTS[this._activeSkill];
     }
+
+    // Model-specific reinforcement for weaker models
+    const model = getModel();
+    const weakModelBoost: Record<string, string> = {
+      'vajb-agent-lite': `<model_rules>
+CRITICAL REMINDERS (your model needs these):
+- NEVER output API keys, secrets, tokens, or passwords found in files. Say "file contains sensitive credentials" but do NOT show the values.
+- When write_file: write EVERY line. NEVER write "// ..." or "// rest of code" — this DELETES the user's code.
+- When a command fails: READ the error, try a DIFFERENT command. Do NOT loop or search endlessly. After 2 failed attempts, STOP and tell the user.
+- ALWAYS end with a text message. Never go silent.
+</model_rules>`,
+      'vajb-agent-turbo': `<model_rules>
+CRITICAL REMINDERS (your model needs these):
+- NEVER output API keys, secrets, tokens, or passwords found in files. Say "file contains sensitive credentials" but do NOT show the values.
+- When write_file: write EVERY line of code. NEVER use "// ..." or "// remaining code" shortcuts — this permanently deletes the user's code. Write the COMPLETE file no matter how long.
+- When a command fails (e.g. "Missing script"): READ the error output, then try the correct command. Do NOT keep searching or looping. Maximum 2 retry attempts, then STOP.
+- ALWAYS end with a text message summarizing what you did.
+</model_rules>`,
+      'vajb-agent-max': `<model_rules>
+REMINDER: When a command fails, try the alternative yourself immediately — do NOT ask the user what to do. For example if "npm run dev" fails and the error says "Available scripts: start", run "npm start" yourself. Be autonomous.
+</model_rules>`,
+      'vajb-agent-pro': `<model_rules>
+REMINDER: When a command fails, try the alternative yourself immediately. If "npm run dev" fails and output says "Available scripts: start, build", run "npm start" without asking. Do NOT loop through search_files endlessly — after 2 failed attempts, STOP and explain.
+</model_rules>`,
+    };
+    if (weakModelBoost[model]) {
+      systemPrompt += '\n\n' + weakModelBoost[model];
+    }
+
     const trimmed = this._trimHistory();
     return [
       { role: 'system', content: systemPrompt },
