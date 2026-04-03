@@ -70,7 +70,7 @@ const MAX_OUTPUT = {
 
 const VAJB_MODELS = [
   { id: 'vajb-agent-lite',      name: 'VajbAgent Lite',      backend: 'openai',    backendModel: 'gpt-5-mini',      desc: 'GPT-5 Mini — svakodnevno kodiranje, best value' },
-  { id: 'vajb-agent-turbo',     name: 'VajbAgent Turbo',     backend: 'openai',    backendModel: 'o4-mini',          desc: 'o4 Mini — reasoning model, logika i debugging' },
+  { id: 'vajb-agent-turbo',     name: 'VajbAgent Turbo',     backend: 'openai',    backendModel: 'gpt-4.1',          desc: 'GPT-4.1 — brz i precizan, jak u kodiranju' },
   { id: 'vajb-agent-pro',       name: 'VajbAgent Pro',       backend: 'openai',    backendModel: 'gpt-5',            desc: 'GPT-5 — ozbiljniji projekti, jak i pametan' },
   { id: 'vajb-agent-max',       name: 'VajbAgent Max',       backend: 'anthropic', backendModel: 'claude-sonnet-4-6', desc: 'Claude Sonnet — kompleksni zadaci' },
   { id: 'vajb-agent-power',     name: 'VajbAgent Power',     backend: 'openai',    backendModel: 'gpt-5.4',          desc: 'GPT-5.4 — najjači OpenAI, flagship' },

@@ -4,7 +4,7 @@ const SECRET_KEY = 'vajbagent.apiKey';
 
 export const MODEL_INFO: Record<string, { label: string; description: string }> = {
   'vajb-agent-lite': { label: 'Lite', description: 'GPT-5 Mini — najjeftiniji' },
-  'vajb-agent-turbo': { label: 'Turbo', description: 'o4-mini — brz reasoning' },
+  'vajb-agent-turbo': { label: 'Turbo', description: 'GPT-4.1 — brz i precizan' },
   'vajb-agent-pro': { label: 'Pro', description: 'GPT-5 — jak generalist' },
   'vajb-agent-max': { label: 'Max', description: 'Claude Sonnet 4.6 — balansiran' },
   'vajb-agent-power': { label: 'Power', description: 'GPT-5.4 — najjaci GPT' },
