@@ -5842,6 +5842,9 @@
           if (msg.success) {
             const short = msg.filePath.replace(/\\/g, '/').split('/').slice(-2).join('/');
             addMessageBubble('assistant', '↩ Vracen: ' + short);
+            // Show redo button after individual file revert
+            var redoBtnFile = document.getElementById('redoBtn');
+            if (redoBtnFile) redoBtnFile.style.display = 'inline-block';
             scrollToBottom();
           }
           break;
