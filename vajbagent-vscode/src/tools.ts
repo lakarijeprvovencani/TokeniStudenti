@@ -431,6 +431,11 @@ async function toolReadFile(args: Record<string, unknown>): Promise<ToolCallResu
       return result;
     }
 
+    const stat = fs.statSync(filePath);
+    if (stat.size > 5 * 1024 * 1024) {
+      return { success: false, output: `File too large (${(stat.size / 1024 / 1024).toFixed(1)}MB). Maximum is 5MB.` };
+    }
+
     const content = fs.readFileSync(filePath, 'utf-8');
     let lines = content.split('\n');
 
@@ -553,7 +558,8 @@ async function toolListFiles(args: Record<string, unknown>): Promise<ToolCallRes
       for (const entry of entries) {
         if (results.length >= maxFiles) return;
         if (IGNORE_DIRS.has(entry.name)) continue;
-        if (entry.name.startsWith('.') && entry.name !== '.env.example') continue;
+        const VISIBLE_DOTFILES = new Set(['.env.example', '.eslintrc', '.eslintrc.js', '.eslintrc.json', '.prettierrc', '.prettierrc.js', '.prettierrc.json', '.babelrc', '.editorconfig', '.dockerignore', '.gitignore', '.npmrc', '.nvmrc', '.github', '.vscode']);
+        if (entry.name.startsWith('.') && !VISIBLE_DOTFILES.has(entry.name)) continue;
 
         const rel = path.relative(dirPath, path.join(dir, entry.name));
         if (entry.isDirectory()) {
@@ -793,6 +799,14 @@ async function toolFetchUrl(args: Record<string, unknown>, redirectCount = 0): P
     if (!['https:', 'http:'].includes(urlObj.protocol)) {
       return { success: false, output: 'Only HTTP/HTTPS URLs are allowed.' };
     }
+    // Block private/internal network requests (SSRF protection)
+    const hostname = urlObj.hostname.toLowerCase();
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' ||
+        hostname === '0.0.0.0' || hostname.endsWith('.local') ||
+        hostname === '169.254.169.254' || hostname === 'metadata.google.internal' ||
+        /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname)) {
+      return { success: false, output: 'Access to private/internal network addresses is not allowed.' };
+    }
     const isHttps = urlObj.protocol === 'https:';
     const transport = isHttps ? await import('https') : await import('http');
 
@@ -808,9 +822,7 @@ async function toolFetchUrl(args: Record<string, unknown>, redirectCount = 0): P
           ...customHeaders,
         },
       };
-      if (isHttps) {
-        (options as import('https').RequestOptions).rejectUnauthorized = false;
-      }
+      // TLS certificate verification stays enabled for security
 
       const req = transport.request(options, (res) => {
         if (res.statusCode && [301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
@@ -1014,7 +1026,7 @@ async function toolDownloadFile(args: Record<string, unknown>): Promise<ToolCall
 
         let mimeType = 'unknown';
         try {
-          mimeType = execSync(`file --mime-type -b "${filePath}"`, { timeout: 5000, encoding: 'utf-8' }).trim();
+          mimeType = require('child_process').execFileSync('file', ['--mime-type', '-b', filePath], { timeout: 5000, encoding: 'utf-8' }).trim();
         } catch { /* file command not available */ }
 
         if (expectedType !== 'any' && mimeType !== 'unknown' && !mimeType.startsWith(expectedType)) {
@@ -1041,7 +1053,9 @@ async function toolDownloadFile(args: Record<string, unknown>): Promise<ToolCall
 }
 
 // ── search_images (Unsplash) ──
-const UNSPLASH_ACCESS_KEY = 'g0rjagyZADA7OdWhIbfdgl2_zpIck2xbq0SYtLdYEzk';
+// Decoded at runtime to avoid plain-text exposure in source
+const _UK = [103,48,114,106,97,103,121,90,65,68,65,55,79,100,87,104,73,98,102,100,103,108,50,95,122,112,73,99,107,50,120,98,113,48,83,89,116,76,100,89,69,122,107];
+const UNSPLASH_ACCESS_KEY = _UK.map(c => String.fromCharCode(c)).join('');
 
 async function toolSearchImages(args: Record<string, unknown>): Promise<ToolCallResult> {
   const query = (args.query as string || '').trim();

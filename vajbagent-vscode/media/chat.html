@@ -3551,7 +3551,17 @@
 
     // Toast notification helpers
     let _toastTimer = null;
-    function showToast(html, autoHideMs) {
+    function showToast(text, autoHideMs) {
+      var el = document.getElementById('toastNotif');
+      document.getElementById('toastText').textContent = text;
+      el.classList.add('visible');
+      if (_toastTimer) clearTimeout(_toastTimer);
+      if (autoHideMs) {
+        _toastTimer = setTimeout(function() { el.classList.remove('visible'); }, autoHideMs);
+      }
+    }
+    // Only for trusted hardcoded HTML (balance updates etc) — never for user/AI content
+    function showToastHtml(html, autoHideMs) {
       var el = document.getElementById('toastNotif');
       document.getElementById('toastText').innerHTML = html;
       el.classList.add('visible');
@@ -4707,11 +4717,29 @@
     let obradjujemTimeoutId = null;
     const OBRADJUJEM_UPGRADE_MS = 1500;
 
+    var _streamingSafetyTimer = null;
     function setStreaming(on) {
       isStreaming = on;
       sendBtn.disabled = false;
       updateSendButton();
-      if (!on) hideStatus();
+      if (!on) {
+        hideStatus();
+        if (_streamingSafetyTimer) { clearTimeout(_streamingSafetyTimer); _streamingSafetyTimer = null; }
+      } else {
+        // Safety: if streaming is stuck for 2 minutes with no activity, auto-reset
+        if (_streamingSafetyTimer) clearTimeout(_streamingSafetyTimer);
+        _streamingSafetyTimer = setTimeout(function() {
+          if (isStreaming) { setStreaming(false); showToast('Odgovor je istekao.'); }
+        }, 120000);
+      }
+    }
+    function resetStreamingTimer() {
+      if (_streamingSafetyTimer && isStreaming) {
+        clearTimeout(_streamingSafetyTimer);
+        _streamingSafetyTimer = setTimeout(function() {
+          if (isStreaming) { setStreaming(false); showToast('Odgovor je istekao.'); }
+        }, 120000);
+      }
     }
 
     function updateSendButton() {
@@ -5096,6 +5124,12 @@
           imagePreviewsEl.innerHTML = '';
           filePreviewsEl.innerHTML = '';
           _contextHintShown = false;
+          _hadWriteTools = false;
+          _queuedMessage = null;
+          activePlanBar = null;
+          activePlanPhase = null;
+          document.getElementById('queueBar').classList.remove('visible');
+          hideApprovalBar();
           setStreaming(false);
           break;
         }
@@ -5121,6 +5155,7 @@
         }
 
         case 'streamDelta':
+          resetStreamingTimer();
           if (obradjujemTimeoutId) { clearTimeout(obradjujemTimeoutId); obradjujemTimeoutId = null; }
           if (currentAssistantEl) {
             currentAssistantRawText += msg.text;
@@ -5594,9 +5629,9 @@
 
             // Show toast warnings at key thresholds
             if (bal < 0.50 && prevBal >= 0.50) {
-              showToast('Preostalo ti je <strong>$' + bal.toFixed(2) + '</strong>. <a href="https://vajbagent.com/dashboard" target="_blank">Dopuni kredite →</a>', 15000);
+              showToastHtml('Preostalo ti je <strong>$' + bal.toFixed(2) + '</strong>. <a href="https://vajbagent.com/dashboard" target="_blank">Dopuni kredite →</a>', 15000);
             } else if (bal < 2 && prevBal >= 2) {
-              showToast('Krediti padaju — preostalo <strong>$' + bal.toFixed(2) + '</strong>. <a href="https://vajbagent.com/dashboard" target="_blank">Dopuni →</a>', 10000);
+              showToastHtml('Krediti padaju — preostalo <strong>$' + bal.toFixed(2) + '</strong>. <a href="https://vajbagent.com/dashboard" target="_blank">Dopuni →</a>', 10000);
             }
           }
           break;
@@ -5658,9 +5693,11 @@
           errDiv.className = 'msg msg-assistant error-msg';
           let errHtml = '<p style="color:#f14c4c">⚠ ' + escapeHtml(msg.text || 'Doslo je do greske.') + '</p>';
           if (msg.retryable) {
-            errHtml += '<button class="retry-btn" onclick="retryLastMessage()" style="margin-top:8px;padding:6px 16px;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;font-size:0.85rem">Pokusaj ponovo</button>';
+            errHtml += '<button class="retry-btn" style="margin-top:8px;padding:6px 16px;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);border:1px solid rgba(255,255,255,0.15);border-radius:6px;cursor:pointer;font-size:0.85rem">Pokusaj ponovo</button>';
           }
           errDiv.innerHTML = errHtml;
+          var retryBtn = errDiv.querySelector('.retry-btn');
+          if (retryBtn) retryBtn.addEventListener('click', retryLastMessage);
           messagesEl.appendChild(errDiv);
           scrollToBottom();
           setStreaming(false);
@@ -6042,7 +6079,10 @@
       html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
 
       // Links (markdown format)
-      html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+      html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(m, text, url) {
+        if (/^https?:\/\//i.test(url)) return '<a href="' + url + '" target="_blank">' + text + '</a>';
+        return text + ' (' + url + ')';
+      });
 
       // Auto-link raw URLs
       html = html.replace(/(^|[\s>(])(https?:\/\/[^\s<>"')\]]+)/gm, function(m, pre, url) {
