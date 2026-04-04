@@ -744,7 +744,7 @@ async function toolExecuteCommand(args: Record<string, unknown>): Promise<ToolCa
     let stderr = '';
     let done = false;
 
-    const proc = exec(command, { cwd, timeout: NORMAL_TIMEOUT, maxBuffer: 10 * 1024 * 1024 });
+    const proc = exec(command, { cwd, timeout: isLikelyServer ? 0 : NORMAL_TIMEOUT, maxBuffer: 10 * 1024 * 1024 });
 
     const finishEarly = (msg: string) => {
       if (done) return;

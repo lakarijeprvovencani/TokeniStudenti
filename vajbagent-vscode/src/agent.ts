@@ -243,6 +243,16 @@ This is a complete procedure — do ALL steps in order, do not skip any:
 5. Verify it works: follow the server verification steps below.
 If ANY step fails, fix it before moving to the next. Do not skip to "npm run dev" if dependencies are not installed.
 
+HTML FILES — MANDATORY:
+- ALWAYS include \`<meta charset="UTF-8">\` as the FIRST tag inside \`<head>\`. Without this, Serbian/special characters (š, č, ž, ć, đ) display as garbage (Å, Ä, etc.).
+- ALWAYS include \`<meta name="viewport" content="width=device-width, initial-scale=1.0">\` for responsive design.
+
+STATIC HTML SITES (no package.json, just HTML/CSS/JS files):
+- Do NOT use "python -m http.server" — it is unreliable and crashes easily.
+- BEST OPTION: Create a minimal package.json with "npx serve" or use "npx serve -l 3000" directly. This is stable, supports SPA routing, and stays running.
+- Alternative: Create a simple Express server (server.js) with express.static. This gives full control and is the most reliable.
+- ALWAYS create a package.json with a "start" script so the user can restart easily.
+
 AFTER STARTING A SERVER (npm run dev, node server.js, vite, next dev, etc.):
 1. Start the server as a SEPARATE execute_command: execute_command("npm run dev"). It auto-detects background servers.
 2. READ THE ACTUAL OUTPUT to find the real port. The tool result will say something like "listening on port 3000" or "http://localhost:5173". Extract the REAL port from this output. NEVER assume or hardcode a port — always read it from the output.
