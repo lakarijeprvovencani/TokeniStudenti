@@ -489,10 +489,15 @@ async function toolWriteFile(args: Record<string, unknown>): Promise<ToolCallRes
     return { success: false, output: 'Error: write_file requires a "path" parameter (string). The model sent empty or missing arguments — this usually means the file content was too large for a single tool call. Try writing the file in smaller parts or use execute_command with heredoc.' };
   }
   const filePath = resolveWorkspacePath(args.path as string);
-  const newContent = (args.content as string) ?? '';
+  let newContent = (args.content as string) ?? '';
 
   if (typeof newContent !== 'string') {
     return { success: false, output: 'Error: content must be a string.' };
+  }
+
+  // Fix double-escaped newlines from model (literal \n instead of real newlines)
+  if (newContent.includes('\\n') && !newContent.includes('\n')) {
+    newContent = newContent.replace(/\\n/g, '\n');
   }
 
   try {
