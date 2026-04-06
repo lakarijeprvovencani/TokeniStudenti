@@ -4,10 +4,12 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 export interface McpServerConfig {
-  command: string;
+  command?: string;
   args?: string[];
   env?: Record<string, string>;
   disabled?: boolean;
+  url?: string;
+  headers?: Record<string, string>;
 }
 
 export interface McpTool {
@@ -76,30 +78,32 @@ class McpConnection {
       ...(this._config.env || {}),
     };
 
-    this._process = spawn(this._config.command, this._config.args || [], {
+    const cmd = this._config.command!;
+    this._process = spawn(cmd, this._config.args || [], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env,
       shell: process.platform === 'win32',
     });
 
-    log(`[MCP ${this._serverName}] spawning: ${this._config.command} ${(this._config.args || []).join(' ')}`);
+    log(`[MCP ${this._serverName}] spawning: ${cmd} ${(this._config.args || []).join(' ')}`);
 
-    this._process.stdout?.on('data', (chunk: Buffer) => {
+    const proc = this._process;
+    proc.stdout?.on('data', (chunk: Buffer) => {
       const str = chunk.toString();
       log(`[MCP ${this._serverName}] stdout: ${str.substring(0, 300)}`);
       this._onData(str);
     });
 
-    this._process.stderr?.on('data', (chunk: Buffer) => {
+    proc.stderr?.on('data', (chunk: Buffer) => {
       log(`[MCP ${this._serverName}] stderr: ${chunk.toString().trim()}`);
     });
 
-    this._process.on('error', (err) => {
+    proc.on('error', (err) => {
       log(`[MCP ${this._serverName}] process error: ${err.message}`);
       this._cleanup();
     });
 
-    this._process.on('exit', (code) => {
+    proc.on('exit', (code) => {
       log(`[MCP ${this._serverName}] exited with code ${code}`);
       this._cleanup();
     });
@@ -236,8 +240,152 @@ class McpConnection {
   }
 }
 
+class McpHttpConnection {
+  private _tools: McpTool[] = [];
+  private _ready = false;
+  private _serverName: string;
+  private _url: string;
+  private _headers: Record<string, string>;
+  private _sessionId: string | null = null;
+  private _nextId = 1;
+
+  constructor(serverName: string, url: string, headers?: Record<string, string>) {
+    this._serverName = serverName;
+    this._url = url;
+    this._headers = headers || {};
+  }
+
+  get name() { return this._serverName; }
+  get tools() { return this._tools; }
+  get ready() { return this._ready; }
+
+  async start(): Promise<void> {
+    await this._initialize();
+    await this._discoverTools();
+    this._ready = true;
+    log(`[MCP-HTTP ${this._serverName}] ready, ${this._tools.length} tools`);
+  }
+
+  stop() {
+    this._ready = false;
+    this._sessionId = null;
+  }
+
+  private async _send(method: string, params?: Record<string, unknown>): Promise<unknown> {
+    const id = this._nextId++;
+    const body = JSON.stringify({
+      jsonrpc: '2.0',
+      id,
+      method,
+      ...(params !== undefined && { params }),
+    });
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
+      ...this._headers,
+    };
+    if (this._sessionId) {
+      headers['Mcp-Session-Id'] = this._sessionId;
+    }
+
+    log(`[MCP-HTTP ${this._serverName}] POST ${method} id=${id}`);
+
+    const resp = await fetch(this._url, { method: 'POST', headers, body });
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      throw new Error(`HTTP ${resp.status}: ${text.substring(0, 200)}`);
+    }
+
+    // Capture session ID from response
+    const sid = resp.headers.get('mcp-session-id');
+    if (sid) this._sessionId = sid;
+
+    const contentType = resp.headers.get('content-type') || '';
+
+    if (contentType.includes('text/event-stream')) {
+      return this._parseSSE(await resp.text());
+    }
+
+    if (resp.status === 202) return undefined;
+
+    const json = await resp.json() as JsonRpcResponse;
+    if (json.error) throw new Error(json.error.message);
+    return json.result;
+  }
+
+  private _parseSSE(text: string): unknown {
+    // Extract JSON-RPC result from SSE stream
+    const lines = text.split('\n');
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.substring(6).trim();
+        if (!data || data === '[DONE]') continue;
+        try {
+          const msg = JSON.parse(data) as JsonRpcResponse;
+          if (msg.error) throw new Error(msg.error.message);
+          if (msg.result !== undefined) return msg.result;
+        } catch (e) {
+          if (e instanceof SyntaxError) continue;
+          throw e;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private async _initialize(): Promise<void> {
+    log(`[MCP-HTTP ${this._serverName}] connecting to ${this._url}`);
+    await this._send('initialize', {
+      protocolVersion: '2024-11-05',
+      capabilities: {},
+      clientInfo: { name: 'vajbagent', version: '0.3.0' },
+    });
+
+    // Send initialized notification (fire and forget)
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...this._headers,
+    };
+    if (this._sessionId) headers['Mcp-Session-Id'] = this._sessionId;
+
+    fetch(this._url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }),
+    }).catch(() => {});
+  }
+
+  private async _discoverTools(): Promise<void> {
+    const result = await this._send('tools/list') as { tools?: Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }> };
+    this._tools = (result?.tools || []).map(t => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema,
+      serverName: this._serverName,
+    }));
+  }
+
+  async callTool(toolName: string, args: Record<string, unknown>): Promise<string> {
+    if (!this._ready) throw new Error(`MCP server "${this._serverName}" is not ready`);
+
+    const result = await this._send('tools/call', {
+      name: toolName,
+      arguments: args,
+    }) as { content?: Array<{ type: string; text?: string }> };
+
+    if (!result?.content) return '(empty result)';
+
+    return result.content
+      .filter(c => c.type === 'text' && c.text)
+      .map(c => c.text)
+      .join('\n') || '(empty result)';
+  }
+}
+
 export class McpManager {
-  private _connections = new Map<string, McpConnection>();
+  private _connections = new Map<string, McpConnection | McpHttpConnection>();
   private _onChanged: (() => void) | null = null;
 
   onToolsChanged(cb: () => void) {
@@ -249,7 +397,9 @@ export class McpManager {
       this._connections.get(name)!.stop();
     }
 
-    const conn = new McpConnection(name, config);
+    const conn = config.url
+      ? new McpHttpConnection(name, config.url, config.headers)
+      : new McpConnection(name, config);
     this._connections.set(name, conn);
 
     try {
@@ -348,8 +498,8 @@ export class McpManager {
         log(`[MCP] Skipping disabled server: ${name}`);
         continue;
       }
-      if (!serverConfig.command) {
-        log(`[MCP] Skipping server with no command: ${name}`);
+      if (!serverConfig.command && !serverConfig.url) {
+        log(`[MCP] Skipping server with no command or url: ${name}`);
         continue;
       }
 
@@ -420,5 +570,37 @@ export class McpManager {
 
     fs.writeFileSync(configPath, JSON.stringify(template, null, 2), 'utf-8');
     return configPath;
+  }
+
+  static addServerToConfig(name: string, config: McpServerConfig): { ok: boolean; replaced?: boolean; error?: string } {
+    const configPath = McpManager.getConfigPath();
+    if (!configPath) return { ok: false, error: 'Otvori folder u editoru prvo.' };
+
+    const dir = path.dirname(configPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    const { servers, parseError } = McpManager.readConfigFile();
+    if (parseError) return { ok: false, error: parseError };
+
+    const replaced = !!servers[name];
+    servers[name] = config;
+    fs.writeFileSync(configPath, JSON.stringify({ mcpServers: servers }, null, 2), 'utf-8');
+    return { ok: true, replaced };
+  }
+
+  static removeServerFromConfig(name: string): { ok: boolean; error?: string } {
+    const configPath = McpManager.getConfigPath();
+    if (!configPath) return { ok: false, error: 'Otvori folder u editoru prvo.' };
+
+    const { servers, parseError } = McpManager.readConfigFile();
+    if (parseError) return { ok: false, error: parseError };
+
+    if (!servers[name]) return { ok: false, error: `Server "${name}" ne postoji.` };
+
+    delete servers[name];
+    fs.writeFileSync(configPath, JSON.stringify({ mcpServers: servers }, null, 2), 'utf-8');
+    return { ok: true };
   }
 }

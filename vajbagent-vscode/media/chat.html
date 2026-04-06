@@ -172,21 +172,35 @@
     .settings-popup {
       display: none;
       position: fixed;
-      bottom: 0;
-      left: 0;
-      min-width: 280px;
-      max-width: 320px;
-      background: var(--vscode-editor-background, #1e1e1e);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-      padding: 6px;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--vscode-sideBar-background);
       z-index: 9000;
-      animation: dropIn 0.15s ease-out;
+      flex-direction: column;
+      overflow: hidden;
     }
-    .settings-popup.open { display: block; }
+    .settings-popup.open { display: flex; }
+    .settings-popup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      flex-shrink: 0;
+    }
+    .settings-popup-header-title {
+      font-weight: 700;
+      font-size: 12px;
+      opacity: 0.85;
+    }
+    .settings-popup-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 10px 20px;
+    }
+    .settings-popup-scroll::-webkit-scrollbar { width: 5px; }
+    .settings-popup-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
     .settings-popup-title {
-      padding: 8px 10px 4px;
+      padding: 12px 4px 6px;
       font-size: 11px;
       font-weight: 600;
       opacity: 0.5;
@@ -196,13 +210,13 @@
     .settings-popup-divider {
       height: 1px;
       background: rgba(255,255,255,0.06);
-      margin: 4px 6px;
+      margin: 8px 0;
     }
     .settings-row {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 7px 10px;
+      padding: 9px 8px;
       border-radius: 8px;
       cursor: pointer;
       transition: background 0.1s;
@@ -235,8 +249,8 @@
     .settings-row-status.warn { color: #cca700; opacity: 1; }
     .settings-input-row {
       display: flex;
-      gap: 4px;
-      padding: 4px 10px 8px;
+      gap: 6px;
+      padding: 4px 4px 10px;
     }
     .settings-input {
       flex: 1;
@@ -264,8 +278,9 @@
     .settings-save-btn:hover { background: rgba(255,255,255,0.12); }
     .settings-actions {
       display: flex;
-      gap: 4px;
-      padding: 2px 10px 6px;
+      gap: 6px;
+      padding: 4px 4px 8px;
+      flex-wrap: wrap;
     }
     .settings-action-btn {
       font-size: 10.5px;
@@ -289,9 +304,9 @@
     .settings-mcp-server {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 3px 10px;
-      font-size: 11px;
+      gap: 8px;
+      padding: 5px 8px;
+      font-size: 12px;
     }
     .settings-mcp-dot {
       width: 6px; height: 6px;
@@ -2304,7 +2319,7 @@
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
       background: var(--vscode-sideBar-background);
-      z-index: 200;
+      z-index: 9000;
       flex-direction: column;
       overflow: hidden;
     }
@@ -2404,7 +2419,7 @@
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
       background: var(--vscode-sideBar-background);
-      z-index: 200;
+      z-index: 9000;
       flex-direction: column;
       overflow: hidden;
     }
@@ -2437,11 +2452,15 @@
     }
     .guide-section:last-of-type { border-bottom: none; }
     .guide-section-icon {
-      font-size: 18px;
       flex-shrink: 0;
-      width: 28px;
-      text-align: center;
+      width: 22px;
+      height: 22px;
+      opacity: 0.5;
       padding-top: 1px;
+    }
+    .guide-section-icon svg {
+      width: 22px;
+      height: 22px;
     }
     .guide-section-title {
       font-size: 12px;
@@ -2470,7 +2489,7 @@
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
       background: var(--vscode-sideBar-background);
-      z-index: 200;
+      z-index: 9000;
       flex-direction: column;
       overflow: hidden;
     }
@@ -2540,10 +2559,10 @@
     }
     .mcp-guide-code .copy-guide-btn:hover { opacity: 1; }
     .mcp-guide-note {
-      font-size: 10px;
-      opacity: 0.5;
+      font-size: 10.5px;
+      opacity: 0.65;
       margin-top: 4px;
-      line-height: 1.3;
+      line-height: 1.4;
     }
     .mcp-guide-steps {
       font-size: 11px;
@@ -2572,6 +2591,129 @@
       margin: 12px 0;
       opacity: 0.3;
     }
+    .mcp-add-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--vscode-sideBar-background);
+      z-index: 9000;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .mcp-add-overlay.visible { display: flex; }
+    .mcp-add-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+    }
+    .mcp-add-card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .mcp-add-card-icon { flex-shrink: 0; width: 20px; height: 20px; opacity: 0.7; }
+    .mcp-add-card-icon svg { width: 20px; height: 20px; }
+    .mcp-add-card-info { flex: 1; }
+    .mcp-add-card-name { font-size: 12px; font-weight: 700; }
+    .mcp-add-card-desc { font-size: 10px; opacity: 0.4; margin-top: 1px; }
+    .mcp-add-card-arrow {
+      font-size: 10px;
+      opacity: 0.3;
+      transition: transform 0.15s;
+    }
+    .mcp-add-card.open .mcp-add-card-arrow { transform: rotate(90deg); }
+    .mcp-add-card-body {
+      display: none;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    .mcp-add-card.open .mcp-add-card-body { display: block; }
+    .mcp-add-field {
+      margin-bottom: 6px;
+    }
+    .mcp-add-field label {
+      display: block;
+      font-size: 10.5px;
+      opacity: 0.6;
+      margin-bottom: 3px;
+    }
+    .mcp-add-field input {
+      width: 100%;
+      box-sizing: border-box;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 11px;
+      color: var(--vscode-foreground);
+      outline: none;
+      font-family: var(--vscode-editor-font-family);
+    }
+    .mcp-add-field input:focus { border-color: rgba(255,255,255,0.2); }
+    .mcp-add-card-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .mcp-add-card-actions .mcp-add-btn {
+      padding: 4px 14px;
+      font-size: 11px;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .mcp-add-card-actions .mcp-add-btn:hover { opacity: 0.85; }
+    .mcp-add-card-actions .mcp-add-btn:disabled { opacity: 0.4; cursor: default; }
+    .mcp-add-status {
+      font-size: 10px;
+      flex: 1;
+    }
+    .mcp-add-card-badge {
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(76,175,80,0.12);
+      color: #4CAF50;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .mcp-add-field-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .mcp-add-field-row input { flex: 1; }
+    .mcp-add-reveal-btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      color: var(--vscode-foreground);
+      cursor: pointer;
+      padding: 4px 6px;
+      font-size: 10px;
+      opacity: 0.5;
+      flex-shrink: 0;
+    }
+    .mcp-add-reveal-btn:hover { opacity: 0.8; }
+    .mcp-add-card-actions .mcp-remove-btn {
+      padding: 4px 12px;
+      font-size: 11px;
+      cursor: pointer;
+      background: rgba(244,67,54,0.08);
+      color: #e57373;
+      border: 1px solid rgba(244,67,54,0.15);
+      border-radius: 6px;
+      font-weight: 500;
+    }
+    .mcp-add-card-actions .mcp-remove-btn:hover { background: rgba(244,67,54,0.15); }
   </style>
 </head>
 <body>
@@ -2608,7 +2750,14 @@
   </div>
 
   <div class="settings-popup" id="settingsPopup">
-    <div id="userInfoBar" style="display:none;padding:8px 10px 4px;font-size:11px;color:var(--vscode-foreground);">
+    <div class="settings-popup-header">
+      <span class="settings-popup-header-title">Podesavanja</span>
+      <button class="history-close" id="settingsCloseBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="settings-popup-scroll">
+    <div id="userInfoBar" style="display:none;padding:8px 4px 4px;font-size:11px;color:var(--vscode-foreground);">
       <div style="display:flex;align-items:center;gap:6px;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span style="opacity:0.5;">Ulogovan kao</span> <strong id="userDisplayName" style="font-size:11px;"></strong>
@@ -2649,7 +2798,8 @@
     </div>
     <div class="settings-actions">
       <button id="mcpRestartBtn" class="settings-action-btn">Restartuj</button>
-      <button id="mcpConfigBtn" class="settings-action-btn primary">Konfiguriši</button>
+      <button id="mcpAddOpenBtn" class="settings-action-btn primary">Dodaj server</button>
+      <button id="mcpConfigBtn" class="settings-action-btn">Konfiguriši</button>
       <button id="mcpGuideBtn" class="settings-action-btn" style="opacity:0.6;">Kako dodati?</button>
     </div>
 
@@ -2666,6 +2816,7 @@
     <input type="checkbox" id="autoWriteFile" style="display:none">
     <input type="checkbox" id="autoReplaceInFile" style="display:none">
     <input type="checkbox" id="autoExecuteCommand" style="display:none">
+    </div><!-- /settings-popup-scroll -->
   </div>
 
   <div class="mode-menu" id="modeMenu">
@@ -2836,29 +2987,195 @@
 
       <hr class="mcp-guide-divider">
 
-      <!-- VERCEL -->
-      <div class="mcp-guide-section">
-        <div class="mcp-guide-section-title">▲ Vercel (deploy, hosting)</div>
-        <ol class="mcp-guide-steps">
-          <li>Idi na <a href="https://vercel.com/account/tokens" target="_blank">vercel.com/account/tokens</a></li>
-          <li>Kreiraj novi token</li>
-        </ol>
-        <div class="mcp-guide-code" id="guideVercel">{
-  "vercel": {
-    "command": "npx",
-    "args": ["-y", "vercel", "mcp", "start"],
-    "env": {
-      "VERCEL_TOKEN": "TVOJ_VERCEL_TOKEN"
-    }
-  }
-}<button class="copy-guide-btn" data-target="guideVercel">Copy</button></div>
+      <div class="mcp-guide-desc" style="margin-top:8px;opacity:0.4;text-align:center;">
+        Posle dodavanja, klikni <strong>Restartuj</strong> u podesavanjima.<br>
+        Svaki servis ce dobiti zelenu tacku kad je spreman.
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MCP Add Server overlay -->
+  <div class="mcp-add-overlay" id="mcpAddOverlay">
+    <div class="mcp-guide-header">
+      <span class="mcp-guide-header-title">Dodaj MCP server</span>
+      <button class="history-close" id="mcpAddClose">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="mcp-guide-content">
+      <div class="mcp-guide-desc" style="margin-bottom:12px;">Izaberi servis koji zelis da povezes. Popuni polja i klikni <strong>Dodaj</strong> — server ce biti automatski dodat u mcp.json i pokrenut.</div>
+
+      <!-- Filesystem -->
+      <div class="mcp-add-card" data-preset="filesystem">
+        <div class="mcp-add-card-header">
+          <span class="mcp-add-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>
+          <div class="mcp-add-card-info">
+            <div class="mcp-add-card-name">File System</div>
+            <div class="mcp-add-card-desc">Pristup fajlovima na tvom racunaru</div>
+          </div>
+          <span class="mcp-add-card-arrow">▶</span>
+        </div>
+        <div class="mcp-add-card-body">
+          <div class="mcp-add-field">
+            <label>Putanja do foldera koji agent moze da cita</label>
+            <input type="text" data-key="path" placeholder="/Users/ime/Documents">
+          </div>
+          <div class="mcp-guide-note" style="margin-bottom:6px;">Primer: <code>/Users/ime/Documents</code> (Mac) ili <code>C:\Users\ime\Documents</code> (Win)</div>
+          <div class="mcp-add-card-actions">
+            <button class="mcp-add-btn">Dodaj</button>
+            <span class="mcp-add-status"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Supabase -->
+      <div class="mcp-add-card" data-preset="supabase">
+        <div class="mcp-add-card-header">
+          <span class="mcp-add-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
+          <div class="mcp-add-card-info">
+            <div class="mcp-add-card-name">Supabase</div>
+            <div class="mcp-add-card-desc">Baza podataka, auth, storage</div>
+          </div>
+          <span class="mcp-add-card-arrow">▶</span>
+        </div>
+        <div class="mcp-add-card-body">
+          <div class="mcp-guide-note" style="margin-bottom:8px;">Token: <a href="https://supabase.com/dashboard/account/tokens" style="color:var(--accent);">supabase.com/dashboard/account/tokens</a> → Generate new token<br>Project Ref: iz URL-a dashboarda — <code>supabase.com/dashboard/project/<strong>REF</strong></code></div>
+          <div class="mcp-add-field">
+            <label>Project Ref</label>
+            <input type="text" data-key="projectRef" placeholder="abcdefghijklmnop">
+          </div>
+          <div class="mcp-add-field">
+            <label>Access Token</label>
+            <div class="mcp-add-field-row">
+              <input type="password" data-key="accessToken" placeholder="sbp_xxxxxxxxxxxxxxxx">
+              <button class="mcp-add-reveal-btn" type="button">Prikazi</button>
+            </div>
+          </div>
+          <div class="mcp-add-card-actions">
+            <button class="mcp-add-btn">Dodaj</button>
+            <button class="mcp-remove-btn" style="display:none;">Obrisi</button>
+            <span class="mcp-add-status"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- GitHub -->
+      <div class="mcp-add-card" data-preset="github">
+        <div class="mcp-add-card-header">
+          <span class="mcp-add-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 00-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 004 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg></span>
+          <div class="mcp-add-card-info">
+            <div class="mcp-add-card-name">GitHub</div>
+            <div class="mcp-add-card-desc">Repozitorijumi, issues, pull requests</div>
+          </div>
+          <span class="mcp-add-card-arrow">▶</span>
+        </div>
+        <div class="mcp-add-card-body">
+          <div class="mcp-guide-note" style="margin-bottom:8px;"><a href="https://github.com/settings/tokens" style="color:var(--accent);">github.com/settings/tokens</a> → Generate new token (classic) → ukljuci <code>repo</code> i <code>read:org</code></div>
+          <div class="mcp-add-field">
+            <label>Personal Access Token</label>
+            <div class="mcp-add-field-row">
+              <input type="password" data-key="token" placeholder="ghp_xxxxxxxxxxxxxxxx">
+              <button class="mcp-add-reveal-btn" type="button">Prikazi</button>
+            </div>
+          </div>
+          <div class="mcp-add-card-actions">
+            <button class="mcp-add-btn">Dodaj</button>
+            <button class="mcp-remove-btn" style="display:none;">Obrisi</button>
+            <span class="mcp-add-status"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Netlify -->
+      <div class="mcp-add-card" data-preset="netlify">
+        <div class="mcp-add-card-header">
+          <span class="mcp-add-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></span>
+          <div class="mcp-add-card-info">
+            <div class="mcp-add-card-name">Netlify</div>
+            <div class="mcp-add-card-desc">Deploy i hosting</div>
+          </div>
+          <span class="mcp-add-card-arrow">▶</span>
+        </div>
+        <div class="mcp-add-card-body">
+          <div class="mcp-guide-note" style="margin-bottom:8px;"><a href="https://app.netlify.com/user/applications#personal-access-tokens" style="color:var(--accent);">app.netlify.com → User Settings → Applications</a> → kreiraj Personal Access Token</div>
+          <div class="mcp-add-field">
+            <label>Personal Access Token</label>
+            <div class="mcp-add-field-row">
+              <input type="password" data-key="token" placeholder="nfp_xxxxxxxxxxxxxxxx">
+              <button class="mcp-add-reveal-btn" type="button">Prikazi</button>
+            </div>
+          </div>
+          <div class="mcp-add-card-actions">
+            <button class="mcp-add-btn">Dodaj</button>
+            <button class="mcp-remove-btn" style="display:none;">Obrisi</button>
+            <span class="mcp-add-status"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vercel -->
+      <div class="mcp-add-card" data-preset="vercel">
+        <div class="mcp-add-card-header">
+          <span class="mcp-add-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 22 20 2 20"/></svg></span>
+          <div class="mcp-add-card-info">
+            <div class="mcp-add-card-name">Vercel</div>
+            <div class="mcp-add-card-desc">Deploy i hosting</div>
+          </div>
+          <span class="mcp-add-card-arrow">▶</span>
+        </div>
+        <div class="mcp-add-card-body">
+          <div class="mcp-guide-note" style="margin-bottom:8px;"><a href="https://vercel.com/account/tokens" style="color:var(--accent);">vercel.com/account/tokens</a> → kreiraj novi token</div>
+          <div class="mcp-add-field">
+            <label>Vercel Token</label>
+            <div class="mcp-add-field-row">
+              <input type="password" data-key="token" placeholder="xxxxxxxxxxxxxxxx">
+              <button class="mcp-add-reveal-btn" type="button">Prikazi</button>
+            </div>
+          </div>
+          <div class="mcp-add-card-actions">
+            <button class="mcp-add-btn">Dodaj</button>
+            <button class="mcp-remove-btn" style="display:none;">Obrisi</button>
+            <span class="mcp-add-status"></span>
+          </div>
+        </div>
       </div>
 
       <hr class="mcp-guide-divider">
 
-      <div class="mcp-guide-desc" style="margin-top:8px;opacity:0.4;text-align:center;">
-        Posle dodavanja, klikni <strong>Restartuj</strong> u podesavanjima.<br>
-        Svaki servis ce dobiti zelenu tacku kad je spreman.
+      <!-- Custom -->
+      <div class="mcp-add-card" data-preset="custom">
+        <div class="mcp-add-card-header">
+          <span class="mcp-add-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span>
+          <div class="mcp-add-card-info">
+            <div class="mcp-add-card-name">Drugi server</div>
+            <div class="mcp-add-card-desc">Dodaj bilo koji MCP server rucno</div>
+          </div>
+          <span class="mcp-add-card-arrow">▶</span>
+        </div>
+        <div class="mcp-add-card-body">
+          <div class="mcp-guide-note" style="margin-bottom:8px;">Pronadji MCP server na <a href="https://github.com/modelcontextprotocol/servers" style="color:var(--accent);">github.com/modelcontextprotocol/servers</a> i unesi podatke iz README-a.</div>
+          <div class="mcp-add-field">
+            <label>Naziv servera</label>
+            <input type="text" data-key="name" placeholder="npr. my-server">
+          </div>
+          <div class="mcp-add-field">
+            <label>Komanda</label>
+            <input type="text" data-key="command" placeholder="npr. npx">
+          </div>
+          <div class="mcp-add-field">
+            <label>Argumenti (razdvojeni razmakom)</label>
+            <input type="text" data-key="args" placeholder="npr. -y @some/mcp-server">
+          </div>
+          <div class="mcp-add-field">
+            <label>Environment varijable (opciono, KEY=val KEY2=val2)</label>
+            <input type="text" data-key="env" placeholder="npr. API_KEY=xxx SECRET=yyy">
+          </div>
+          <div class="mcp-add-card-actions">
+            <button class="mcp-add-btn">Dodaj</button>
+            <span class="mcp-add-status"></span>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -2875,7 +3192,7 @@
     <div class="guide-content">
 
       <div class="guide-section">
-        <div class="guide-section-icon">🎯</div>
+        <div class="guide-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
         <div>
           <div class="guide-section-title">Budi konkretan</div>
           <div class="guide-section-desc">Umesto "napravi mi sajt", reci "napravi mi landing page sa hero sekcijom, tamnom temom i kontakt formom". Sto preciznije opises — bolji rezultat dobijes.</div>
@@ -2883,7 +3200,7 @@
       </div>
 
       <div class="guide-section">
-        <div class="guide-section-icon">📋</div>
+        <div class="guide-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg></div>
         <div>
           <div class="guide-section-title">Plan Mode za velike zadatke</div>
           <div class="guide-section-desc">Kad imas kompleksan zadatak (cela aplikacija, refaktor, integracija), ukljuci <strong style="color:var(--accent);">Plan Mode</strong> (dugme dole levo). Agent ce prvo napraviti detaljan plan i sacekati tvoje odobrenje pre nego sto menja kod.</div>
@@ -2891,23 +3208,23 @@
       </div>
 
       <div class="guide-section">
-        <div class="guide-section-icon">🧠</div>
+        <div class="guide-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 7V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v3"/></svg></div>
         <div>
           <div class="guide-section-title">Izbor modela</div>
           <div class="guide-section-desc">
-            <strong style="color:#4FC3F7;">Lite</strong> — brz i jeftin, idealan za svakodnevno kodiranje i brza pitanja.<br>
-            <strong style="color:#4FC3F7;">Turbo</strong> — brz i precizan, jak u kodiranju, 1M kontekst.<br>
-            <strong style="color:#81C784;">Pro</strong> — jak i pametan, za ozbiljnije projekte i kompleksniji kod.<br>
+            <strong style="color:var(--accent);">Lite</strong> — brz i jeftin, idealan za svakodnevno kodiranje i brza pitanja.<br>
+            <strong style="color:var(--accent);">Turbo</strong> — brz i precizan, jak u kodiranju, 1M kontekst.<br>
+            <strong style="color:var(--accent);">Pro</strong> — jak i pametan, za ozbiljnije projekte i kompleksniji kod.<br>
             <strong style="color:var(--accent);">Max</strong> — kompleksni zadaci, planiranje, refaktor. Preporucen za Plan Mode.<br>
-            <strong style="color:#CE93D8;">Power</strong> — najjaci OpenAI model, za flagship kvalitet.<br>
-            <strong style="color:#CE93D8;">Ultra</strong> — premium Anthropic model, za najzahtevnije zadatke.<br>
-            <strong style="color:#FF7043;">Architect</strong> — full-stack arhitekta, za cele aplikacije od nule.
+            <strong style="color:var(--accent);">Power</strong> — najjaci OpenAI model, za flagship kvalitet.<br>
+            <strong style="color:var(--accent);">Ultra</strong> — premium Anthropic model, za najzahtevnije zadatke.<br>
+            <strong style="color:var(--accent);">Architect</strong> — full-stack arhitekta, za cele aplikacije od nule.
           </div>
         </div>
       </div>
 
       <div class="guide-section">
-        <div class="guide-section-icon">💬</div>
+        <div class="guide-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
         <div>
           <div class="guide-section-title">Iterativno radi</div>
           <div class="guide-section-desc">Ne moras sve odjednom. Pocni sa osnovom, testiraj, pa trazi poboljsanja korak po korak. Agent pamti kontekst unutar sesije.</div>
@@ -2915,17 +3232,17 @@
       </div>
 
       <div class="guide-section">
-        <div class="guide-section-icon">🔌</div>
+        <div class="guide-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 22h2a2 2 0 002-2V7.5L14.5 2H6a2 2 0 00-2 2v3"/><polyline points="14 2 14 8 20 8"/><path d="M3 15h6"/><path d="M6 12v6"/></svg></div>
         <div>
           <div class="guide-section-title">Povezi eksterne servise (MCP)</div>
-          <div class="guide-section-desc">Preko MCP mozes povezati Supabase, GitHub, Netlify, Vercel i druge servise. Otvori <strong>Podesavanja → Kako dodati?</strong> za detaljan vodic.</div>
+          <div class="guide-section-desc">Preko MCP mozes povezati Supabase, GitHub, Netlify, Vercel i druge servise. Otvori <strong style="color:var(--accent);">Podesavanja → Kako dodati?</strong> za detaljan vodic.</div>
         </div>
       </div>
 
       <div class="guide-section">
-        <div class="guide-section-icon">⚡</div>
+        <div class="guide-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
         <div>
-          <div class="guide-section-title">Saveti za uštedu tokena</div>
+          <div class="guide-section-title">Saveti za ustedu tokena</div>
           <div class="guide-section-desc">
             Koristi <strong>novu sesiju</strong> (+) kad prelazis na potpuno novi zadatak — stara sesija trosi kontekst.<br>
             Auto-Approve ukljuci za brzi rad bez stalnih potvrda.
@@ -2934,15 +3251,11 @@
       </div>
 
       <div class="guide-section">
-        <div class="guide-section-icon">📸</div>
+        <div class="guide-section-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
         <div>
           <div class="guide-section-title">Slike kao kontekst</div>
           <div class="guide-section-desc">Mozes poslati screenshot dizajna ili greske — klikni ikonicu za sliku pored input polja. Agent razume slike i moze na osnovu njih pisati kod.</div>
         </div>
-      </div>
-
-      <div class="guide-footer">
-        <span style="opacity:0.4;">VajbAgent — AI coding assistant za studente</span>
       </div>
     </div>
   </div>
@@ -3159,6 +3472,9 @@
     const mcpGuideBtn = document.getElementById('mcpGuideBtn');
     const mcpGuideOverlay = document.getElementById('mcpGuideOverlay');
     const mcpGuideClose = document.getElementById('mcpGuideClose');
+    const mcpAddOverlay = document.getElementById('mcpAddOverlay');
+    const mcpAddClose = document.getElementById('mcpAddClose');
+    const mcpAddOpenBtn = document.getElementById('mcpAddOpenBtn');
     const guideBtn = document.getElementById('guideBtn');
     const guideOverlay = document.getElementById('guideOverlay');
     const guideClose = document.getElementById('guideClose');
@@ -3171,6 +3487,8 @@
       historyOverlay.classList.remove('visible');
       guideOverlay.classList.remove('visible');
       mcpGuideOverlay.classList.remove('visible');
+      mcpAddOverlay.classList.remove('visible');
+      document.getElementById('settingsPopup').classList.remove('open');
       settingsPanel.classList.remove('open');
     }
 
@@ -3690,27 +4008,18 @@
     var settingsPopup = document.getElementById('settingsPopup');
     function toggleSettings(e) {
       e.stopPropagation();
-      guideOverlay.classList.remove('visible');
-      historyOverlay.classList.remove('visible');
-      modelMenuEl.classList.remove('open');
-      modelPickerBtn.classList.remove('open');
       var isOpen = settingsPopup.classList.contains('open');
+      closeAllOverlays();
       if (!isOpen) {
-        var rect = settingsBtnBottom.getBoundingClientRect();
-        settingsPopup.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
-        settingsPopup.style.left = Math.max(8, rect.left - 20) + 'px';
         vscode.postMessage({ type: 'getRulesStatus' });
+        settingsPopup.classList.add('open');
       }
-      settingsPopup.classList.toggle('open', !isOpen);
     }
     settingsBtn.addEventListener('click', toggleSettings);
     settingsBtnBottom.addEventListener('click', toggleSettings);
-    document.addEventListener('click', (e) => {
-      if (!settingsPopup.contains(e.target) && e.target !== settingsBtn && !settingsBtnBottom.contains(e.target)) {
-        settingsPopup.classList.remove('open');
-      }
+    document.getElementById('settingsCloseBtn').addEventListener('click', function() {
+      settingsPopup.classList.remove('open');
     });
-    settingsPopup.addEventListener('click', (e) => { e.stopPropagation(); });
 
     autoWriteFile.addEventListener('change', () => {
       vscode.postMessage({ type: 'setAutoApprove', key: 'writeFile', value: autoWriteFile.checked });
@@ -3770,6 +4079,7 @@
       vscode.postMessage({ type: 'openMcpSettings' });
     };
 
+
     const rulesEditBtn = document.getElementById('rulesEditBtn');
     const rulesStatus = document.getElementById('rulesStatus');
     rulesEditBtn.onclick = function() {
@@ -3777,14 +4087,212 @@
     };
 
     mcpGuideBtn.onclick = function() {
-      settingsPopup.classList.remove('open');
-      guideOverlay.classList.remove('visible');
-      historyOverlay.classList.remove('visible');
+      closeAllOverlays();
       mcpGuideOverlay.classList.add('visible');
     };
     mcpGuideClose.onclick = function() {
       mcpGuideOverlay.classList.remove('visible');
     };
+
+    // MCP Add overlay
+    mcpAddOpenBtn.onclick = function() {
+      closeAllOverlays();
+      mcpAddOverlay.classList.add('visible');
+      vscode.postMessage({ type: 'getMcpConfig' });
+    };
+    mcpAddClose.onclick = function() {
+      mcpAddOverlay.classList.remove('visible');
+    };
+
+    // Accordion — expand/collapse cards
+    mcpAddOverlay.querySelectorAll('.mcp-add-card-header').forEach(function(header) {
+      header.addEventListener('click', function() {
+        var card = header.closest('.mcp-add-card');
+        var wasOpen = card.classList.contains('open');
+        mcpAddOverlay.querySelectorAll('.mcp-add-card').forEach(function(c) { c.classList.remove('open'); });
+        if (!wasOpen) card.classList.add('open');
+      });
+    });
+
+    // Preset configs
+    var mcpPresets = {
+      filesystem: function(inputs) {
+        var p = inputs.path;
+        if (!p) return null;
+        return { name: 'filesystem', config: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', p] } };
+      },
+      supabase: function(inputs) {
+        var ref = inputs.projectRef, tok = inputs.accessToken;
+        if (!ref || !tok) return null;
+        return { name: 'supabase', config: { command: 'npx', args: ['-y', '@supabase/mcp-server-supabase', '--project-ref', ref], env: { SUPABASE_ACCESS_TOKEN: tok } } };
+      },
+      github: function(inputs) {
+        var tok = inputs.token;
+        if (!tok) return null;
+        return { name: 'github', config: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-github'], env: { GITHUB_PERSONAL_ACCESS_TOKEN: tok } } };
+      },
+      netlify: function(inputs) {
+        var tok = inputs.token;
+        if (!tok) return null;
+        return { name: 'netlify', config: { command: 'npx', args: ['-y', '@netlify/mcp'], env: { NETLIFY_PERSONAL_ACCESS_TOKEN: tok } } };
+      },
+      vercel: function(inputs) {
+        var tok = inputs.token;
+        if (!tok) return null;
+        return { name: 'vercel', config: { url: 'https://mcp.vercel.com', headers: { 'Authorization': 'Bearer ' + tok } } };
+      },
+      custom: function(inputs) {
+        var nm = inputs.name, cmd = inputs.command;
+        if (!nm || !cmd) return null;
+        var args = inputs.args ? inputs.args.trim().split(/\s+/) : [];
+        var env = undefined;
+        if (inputs.env) {
+          env = {};
+          inputs.env.trim().split(/\s+/).forEach(function(pair) {
+            var eq = pair.indexOf('=');
+            if (eq > 0) env[pair.substring(0, eq)] = pair.substring(eq + 1);
+          });
+        }
+        return { name: nm, config: { command: cmd, args: args, env: env } };
+      }
+    };
+
+    // Add button handlers
+    mcpAddOverlay.querySelectorAll('.mcp-add-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var card = btn.closest('.mcp-add-card');
+        var preset = card.getAttribute('data-preset');
+        var statusEl = card.querySelector('.mcp-add-status');
+
+        // Collect inputs
+        var inputs = {};
+        card.querySelectorAll('.mcp-add-field input').forEach(function(inp) {
+          inputs[inp.getAttribute('data-key')] = inp.value.trim();
+        });
+
+        var builder = mcpPresets[preset];
+        if (!builder) return;
+        var result = builder(inputs);
+        if (!result) {
+          statusEl.textContent = 'Popuni sva polja.';
+          statusEl.style.color = '#cca700';
+          return;
+        }
+
+        btn.disabled = true;
+        statusEl.textContent = 'Dodajem...';
+        statusEl.style.color = '';
+
+        // Store which card is pending so we can update it on response
+        mcpAddOverlay._pendingCard = card;
+
+        vscode.postMessage({
+          type: 'addMcpServer',
+          serverName: result.name,
+          config: result.config
+        });
+      });
+    });
+
+    // Reveal/hide toggle for password fields
+    mcpAddOverlay.querySelectorAll('.mcp-add-reveal-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var input = btn.parentElement.querySelector('input');
+        if (input.type === 'password') {
+          input.type = 'text';
+          btn.textContent = 'Sakrij';
+        } else {
+          input.type = 'password';
+          btn.textContent = 'Prikazi';
+        }
+      });
+    });
+
+    // Remove button handlers
+    mcpAddOverlay.querySelectorAll('.mcp-remove-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var card = btn.closest('.mcp-add-card');
+        var preset = card.getAttribute('data-preset');
+        var serverName = preset === 'custom' ? card.querySelector('[data-key="name"]').value.trim() : preset;
+        if (!serverName) return;
+        btn.disabled = true;
+        btn.textContent = '...';
+        vscode.postMessage({ type: 'removeMcpServer', serverName: serverName });
+        mcpAddOverlay._pendingRemoveCard = card;
+      });
+    });
+
+    // Extract existing values from server config for each preset
+    var mcpExtractors = {
+      filesystem: function(cfg) {
+        return { path: (cfg.args && cfg.args[2]) || '' };
+      },
+      supabase: function(cfg) {
+        var ref = '';
+        if (cfg.args) {
+          var idx = cfg.args.indexOf('--project-ref');
+          if (idx >= 0 && cfg.args[idx + 1]) ref = cfg.args[idx + 1];
+        }
+        return {
+          projectRef: ref,
+          accessToken: (cfg.env && cfg.env.SUPABASE_ACCESS_TOKEN) || ''
+        };
+      },
+      github: function(cfg) {
+        return { token: (cfg.env && cfg.env.GITHUB_PERSONAL_ACCESS_TOKEN) || '' };
+      },
+      netlify: function(cfg) {
+        return { token: (cfg.env && cfg.env.NETLIFY_PERSONAL_ACCESS_TOKEN) || '' };
+      },
+      vercel: function(cfg) {
+        var tok = '';
+        if (cfg.headers && cfg.headers.Authorization) {
+          tok = cfg.headers.Authorization.replace('Bearer ', '');
+        } else if (cfg.env && cfg.env.VERCEL_TOKEN) {
+          tok = cfg.env.VERCEL_TOKEN;
+        }
+        return { token: tok };
+      }
+    };
+
+    function updateMcpAddCards(servers) {
+      mcpAddOverlay.querySelectorAll('.mcp-add-card').forEach(function(card) {
+        var preset = card.getAttribute('data-preset');
+        if (preset === 'custom') return;
+
+        var addBtn = card.querySelector('.mcp-add-btn');
+        var removeBtn = card.querySelector('.mcp-remove-btn');
+        var arrow = card.querySelector('.mcp-add-card-arrow');
+        var existingBadge = card.querySelector('.mcp-add-card-badge');
+        if (existingBadge) existingBadge.remove();
+
+        var cfg = servers[preset];
+        if (cfg) {
+          // Server exists — show badge, populate fields, change buttons
+          var badge = document.createElement('span');
+          badge.className = 'mcp-add-card-badge';
+          badge.textContent = 'Dodato';
+          arrow.parentElement.insertBefore(badge, arrow);
+
+          var extractor = mcpExtractors[preset];
+          if (extractor) {
+            var vals = extractor(cfg);
+            Object.keys(vals).forEach(function(key) {
+              var input = card.querySelector('[data-key="' + key + '"]');
+              if (input) input.value = vals[key];
+            });
+          }
+
+          addBtn.textContent = 'Azuriraj';
+          if (removeBtn) removeBtn.style.display = '';
+        } else {
+          // Server not configured — reset
+          addBtn.textContent = 'Dodaj';
+          if (removeBtn) removeBtn.style.display = 'none';
+          card.querySelectorAll('.mcp-add-field input').forEach(function(inp) { inp.value = ''; });
+        }
+      });
+    }
 
     guideBtn.addEventListener('click', () => {
       settingsPopup.classList.remove('open');
@@ -5026,6 +5534,47 @@
         case 'mcpStatus':
           renderMcpStatus(msg.servers, msg.totalTools, msg.loading || false);
           break;
+
+        case 'mcpServerAdded': {
+          var pendingCard = mcpAddOverlay._pendingCard;
+          if (pendingCard) {
+            var addBtn = pendingCard.querySelector('.mcp-add-btn');
+            var statusEl = pendingCard.querySelector('.mcp-add-status');
+            addBtn.disabled = false;
+            if (msg.ok) {
+              statusEl.textContent = msg.replaced ? 'Azurirano!' : 'Dodato!';
+              statusEl.style.color = '#4CAF50';
+              setTimeout(function() { statusEl.textContent = ''; }, 3000);
+              // Refresh cards to show updated state
+              vscode.postMessage({ type: 'getMcpConfig' });
+            } else {
+              statusEl.textContent = msg.error || 'Greska.';
+              statusEl.style.color = '#f44336';
+            }
+            mcpAddOverlay._pendingCard = null;
+          }
+          break;
+        }
+
+        case 'mcpConfig':
+          if (msg.servers) updateMcpAddCards(msg.servers);
+          break;
+
+        case 'mcpServerRemoved': {
+          var rmCard = mcpAddOverlay._pendingRemoveCard;
+          if (rmCard) {
+            var rmBtn = rmCard.querySelector('.mcp-remove-btn');
+            rmBtn.disabled = false;
+            rmBtn.textContent = 'Obrisi';
+            if (msg.ok) {
+              // Refresh cards and MCP status
+              vscode.postMessage({ type: 'getMcpConfig' });
+              rmCard.classList.remove('open');
+            }
+            mcpAddOverlay._pendingRemoveCard = null;
+          }
+          break;
+        }
 
         case 'userInfo':
           if (msg.name) showUserInfo(msg.name);

@@ -360,6 +360,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'getMcpStatus':
         this._sendMcpStatus();
         break;
+      case 'getMcpConfig': {
+        const { servers } = McpManager.readConfigFile();
+        this._view?.webview.postMessage({ type: 'mcpConfig', servers });
+        break;
+      }
       case 'restartMcp':
         await this._restartMcp();
         break;
@@ -371,6 +376,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         } else {
           vscode.window.showWarningMessage('Otvori folder u editoru da bi konfigurisao MCP servere.');
         }
+        break;
+      }
+      case 'addMcpServer': {
+        const serverName = message.serverName as string;
+        const serverConfig = message.config as { command: string; args?: string[]; env?: Record<string, string> };
+        const result = McpManager.addServerToConfig(serverName, serverConfig);
+        if (result.ok) {
+          this._mcpManager.stopAll();
+          await this._mcpManager.startFromConfig();
+          this._sendMcpStatus();
+          this._view?.webview.postMessage({ type: 'mcpServerAdded', ok: true, serverName, replaced: result.replaced });
+        } else {
+          this._view?.webview.postMessage({ type: 'mcpServerAdded', ok: false, error: result.error });
+        }
+        break;
+      }
+      case 'removeMcpServer': {
+        const rmName = message.serverName as string;
+        const rmResult = McpManager.removeServerFromConfig(rmName);
+        if (rmResult.ok) {
+          this._mcpManager.stopServer(rmName);
+          this._sendMcpStatus();
+        }
+        this._view?.webview.postMessage({ type: 'mcpServerRemoved', ok: rmResult.ok, error: rmResult.error });
         break;
       }
       case 'getRulesStatus': {
