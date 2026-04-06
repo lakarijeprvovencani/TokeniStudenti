@@ -255,6 +255,13 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
         <table><thead><tr><th>VajbAgent ID</th><th>Ime</th><th>Backend</th><th>Model</th><th>Input $/MTok</th><th>Output $/MTok</th><th>~$/zahtev</th></tr></thead>
         <tbody id="modBody"></tbody></table>
       </div>
+      <div class="card">
+        <div class="card-title">Markup po modelu</div>
+        <p style="font-size:.78rem;color:var(--text);margin-bottom:10px;">Koliko puta skuplje student plaća u odnosu na API cenu. Vrednost 1.50 = 50% marža. Promene važe odmah (runtime), ali se resetuju pri restartu servera — za trajno podesi ENV na Renderu.</p>
+        <table><thead><tr><th>Model</th><th>ENV varijabla</th><th>Markup (x)</th><th>Efektivna cena studenta</th><th></th></tr></thead>
+        <tbody id="markupBody"></tbody></table>
+        <div id="markupRes" style="font-size:.82rem;margin-top:8px;"></div>
+      </div>
     </div>
 
     <!-- ZARADA -->
@@ -337,7 +344,7 @@ document.querySelectorAll('.nav-item').forEach(el=>{
   };
 });
 
-function renderAll(){renderOverview();renderStudents();renderModels();renderEarnings()}
+function renderAll(){renderOverview();renderStudents();renderModels();renderMarkups();renderEarnings()}
 
 function refresh(){
   Promise.all([
@@ -571,6 +578,39 @@ function renderModels(){
       <td>$${p.in.toFixed(2)}</td><td>$${p.out.toFixed(2)}</td>
       <td>$${cost.toFixed(4)}</td>
     </tr>`;
+  });
+}
+
+// ====== MARKUP ======
+function renderMarkups(){
+  const tb=$('markupBody');if(!tb)return;tb.innerHTML='';
+  if(!DATA.markup||!DATA.markup.perModel)return;
+  const prices=PRICES();
+  Object.keys(DATA.markup.perModel).forEach(model=>{
+    const mk=DATA.markup.perModel[model];
+    const p=prices[model]||{in:0,out:0};
+    const envKey='MARKUP_'+model.toUpperCase().replace(/[\.\-]/g,'_');
+    const studentIn=(p.in*mk).toFixed(2);
+    const studentOut=(p.out*mk).toFixed(2);
+    tb.innerHTML+=`<tr>
+      <td class="mono">${model}</td>
+      <td class="mono" style="font-size:.72rem;opacity:.5">${envKey}</td>
+      <td><input type="number" step="0.05" min="1" value="${mk}" style="width:70px;padding:4px 6px;font-size:.82rem;background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:4px;" data-model="${model}" class="markup-input"></td>
+      <td style="font-size:.78rem;opacity:.6">$${studentIn} / $${studentOut} per MTok</td>
+      <td><button class="btn btn-sm" onclick="updateMarkup('${model}',this)" style="padding:2px 10px;font-size:.72rem;">Sačuvaj</button></td>
+    </tr>`;
+  });
+}
+function updateMarkup(model,btn){
+  const input=btn.closest('tr').querySelector('.markup-input');
+  const val=parseFloat(input.value);
+  if(!val||val<1){toast('Markup mora biti >= 1');return}
+  btn.disabled=true;btn.textContent='...';
+  api('PATCH','/admin/markups',{model,value:val}).then(d=>{
+    btn.disabled=false;btn.textContent='Sačuvaj';
+    if(d.error){toast(d.error);return}
+    toast(model+' markup: '+d.effective+'x');
+    DATA.markup.perModel[model]=d.effective;
   });
 }
 

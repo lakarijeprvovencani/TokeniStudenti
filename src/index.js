@@ -1352,6 +1352,36 @@ app.patch('/admin/students/:key/markup', adminLimiter, requireAdmin, asyncHandle
   res.json(result.student);
 }));
 
+// ---- Admin: markup management ----
+app.get('/admin/markups', adminLimiter, requireAdmin, (_req, res) => {
+  const prices = getPrices();
+  const models = Object.keys(prices);
+  const markups = {};
+  for (const model of models) {
+    const envKey = 'MARKUP_' + model.toUpperCase().replace(/[\.\-]/g, '_');
+    markups[model] = {
+      envKey,
+      value: getStudentMarkup(model),
+      envValue: process.env[envKey] || null,
+    };
+  }
+  res.json({ markups, fallback: getStudentMarkup() });
+});
+
+app.patch('/admin/markups', adminLimiter, requireAdmin, (req, res) => {
+  const { model, value } = req.body || {};
+  if (!model || typeof model !== 'string') {
+    return res.status(400).json({ error: 'Body: { "model": "gpt-5", "value": 1.6 }' });
+  }
+  const num = parseFloat(value);
+  if (!Number.isFinite(num) || num < 1) {
+    return res.status(400).json({ error: 'value mora biti broj >= 1' });
+  }
+  const envKey = 'MARKUP_' + model.toUpperCase().replace(/[\.\-]/g, '_');
+  process.env[envKey] = String(num);
+  res.json({ ok: true, envKey, value: num, effective: getStudentMarkup(model) });
+});
+
 // ---- Admin: email list export ----
 app.get('/admin/emails', adminLimiter, requireAdmin, asyncHandler(async (_req, res) => {
   const allStudents = await getAllStudents();
@@ -1431,6 +1461,9 @@ app.get('/admin/api/overview', adminLimiter, asyncHandler(async (req, res) => {
       openai: getStudentMarkup('gpt-5'),
       anthropic: getStudentMarkup('claude-sonnet-4-6'),
       fallback: getStudentMarkup(),
+      perModel: Object.fromEntries(
+        Object.keys(getPrices()).map(m => [m, getStudentMarkup(m)])
+      ),
     },
     totals: {
       provider_cost_usd: Math.round(totalProviderCost * 1e6) / 1e6,
