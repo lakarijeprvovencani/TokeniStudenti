@@ -218,6 +218,13 @@ export function providerCostUsd(inputTokens, outputTokens, model) {
 export const anthropicCostUsd = providerCostUsd;
 
 export function getStudentMarkup(model) {
+  // 1. Per-model markup (e.g. MARKUP_GPT_5_MINI=1.50, MARKUP_CLAUDE_OPUS_4_6=1.35)
+  if (model) {
+    const envKey = 'MARKUP_' + model.toUpperCase().replace(/[\.\-]/g, '_');
+    const perModel = parseFloat(process.env[envKey]);
+    if (Number.isFinite(perModel) && perModel >= 1) return perModel;
+  }
+  // 2. Per-provider markup (OPENAI_MARKUP / ANTHROPIC_MARKUP)
   if (model && (model.includes('claude') || model.includes('anthropic'))) {
     const a = parseFloat(process.env.ANTHROPIC_MARKUP);
     if (Number.isFinite(a) && a >= 1) return a;
@@ -225,6 +232,7 @@ export function getStudentMarkup(model) {
     const o = parseFloat(process.env.OPENAI_MARKUP);
     if (Number.isFinite(o) && o >= 1) return o;
   }
+  // 3. Global fallback
   const v = parseFloat(process.env.STUDENT_MARKUP);
   return Number.isFinite(v) && v >= 1 ? v : 1;
 }
