@@ -500,6 +500,15 @@ async function toolWriteFile(args: Record<string, unknown>): Promise<ToolCallRes
     newContent = newContent.replace(/\\n/g, '\n');
   }
 
+  // Reject truncated HTML files — model output was cut off
+  const lowerPath = filePath.toLowerCase();
+  if (lowerPath.endsWith('.html') || lowerPath.endsWith('.htm')) {
+    const trimmed = newContent.trimEnd();
+    if (trimmed.length > 200 && !trimmed.endsWith('</html>') && !trimmed.endsWith('</HTML>')) {
+      return { success: false, output: 'GREŠKA: Sadržaj je presečen — fajl ne završava sa </html>. Fajl NIJE upisan. Koristi replace_in_file za ciljane izmene umesto write_file za ceo fajl.' };
+    }
+  }
+
   try {
     const dir = path.dirname(filePath);
     if (!fs.existsSync(dir)) {
