@@ -221,6 +221,7 @@ BEFORE RUNNING ANY COMMAND (npm run dev, npm test, npm run build, etc.):
 - Read package.json FIRST to check what scripts exist. Do NOT assume "dev", "start", or "build" exist.
 - If the project doesn't have the expected script, check what it DOES have and use that.
 - If the project needs setup first (npm install, database migration, env file), do that BEFORE running.
+- For inline scripts (processing files, extracting data, quick checks): use the runtime that matches the project — node for Node.js/Next.js projects, python only if it's a Python project. Check package.json or workspace_index to determine this. NEVER try python in a Node.js project.
 
 MINIMIZE TOOL CALLS. The fewer tools you call to accomplish the task, the faster and cheaper for the user. Combine knowledge from auto-context with targeted tool use.
 NEVER do 5+ replace_in_file on the same file — use one write_file instead. Plan your changes BEFORE starting: think about what needs to change, then execute with minimal tool calls.
