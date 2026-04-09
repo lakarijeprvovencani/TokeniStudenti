@@ -514,9 +514,9 @@ async function toolWriteFile(args: Record<string, unknown>): Promise<ToolCallRes
     const lineCount = newContent.split('\n').length;
     const charCount = newContent.length;
 
-    // Block files over 200 lines OR 8000 chars — force splitting into components
-    if (lineCount > 200 || charCount > 8000) {
-      return { success: false, output: `GREŠKA: Fajl ima ${lineCount} linija / ${charCount} karaktera — prevelik i BICE PRESECEN. Fajl NIJE upisan. MORAS da razdvojis kod u vise manjih fajlova (npr. komponente: Header.tsx, Feed.tsx, PostCard.tsx, Profile.tsx itd). Svaki fajl MORA biti ispod 150 linija. NE POKUSAVAJ ponovo sa istim velikim fajlom — nece proci.` };
+    // Block files over 150 lines OR 5000 chars — force splitting into components
+    if (lineCount > 150 || charCount > 5000) {
+      return { success: false, output: `GREŠKA: Fajl ima ${lineCount} linija / ${charCount} karaktera — PREVISE. Fajl NIJE upisan. MORAS razdvojiti u vise fajlova po max 120 linija. NE POKUSAVAJ ponovo sa ovim fajlom. Napravi plan: koji fajlovi, sta svaki sadrzi, koliko linija otprilike, pa tek onda pisi jedan po jedan.` };
     }
 
     // Detect truncation via unbalanced braces
