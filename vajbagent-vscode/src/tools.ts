@@ -237,7 +237,7 @@ export const TOOL_DEFINITIONS = [
     type: 'function' as const,
     function: {
       name: 'write_file',
-      description: 'Create or overwrite a file. REPLACES the entire file — content must be COMPLETE (every line, every function). Never use placeholder comments like "// rest of code" — they delete real code. User sees diff preview.',
+      description: 'Create a NEW file or fully rewrite a SMALL existing file (under 50 lines). For editing existing files, use replace_in_file instead — it is cheaper and safer. REPLACES the entire file — content must be COMPLETE. Never use placeholder comments. User sees diff preview.',
       parameters: {
         type: 'object',
         properties: {
@@ -252,13 +252,13 @@ export const TOOL_DEFINITIONS = [
     type: 'function' as const,
     function: {
       name: 'replace_in_file',
-      description: 'Replace a specific section of a file. User will see a diff preview and must approve.',
+      description: 'DEFAULT tool for editing existing files. Replaces a specific section — sends only the diff, saving tokens. Use this instead of write_file for all edits to existing files. User sees diff preview.',
       parameters: {
         type: 'object',
         properties: {
           path: { type: 'string', description: 'Absolute or workspace-relative file path' },
-          old_text: { type: 'string', description: 'The exact text to find and replace' },
-          new_text: { type: 'string', description: 'The replacement text' },
+          old_text: { type: 'string', description: 'The exact text to find and replace. Must match file content exactly including whitespace. Include enough surrounding lines to be unique.' },
+          new_text: { type: 'string', description: 'The replacement text. Can be empty string to delete the section.' },
         },
         required: ['path', 'old_text', 'new_text'],
       },
@@ -592,11 +592,33 @@ async function toolReplaceInFile(args: Record<string, unknown>): Promise<ToolCal
     }
 
     const content = fs.readFileSync(filePath, 'utf-8');
+    let matchedOldText = oldText;
+
     if (!content.includes(oldText)) {
-      return { success: false, output: `Text not found in ${filePath}. Make sure old_text matches exactly.` };
+      // Fuzzy fallback: trim trailing whitespace per line and retry
+      const contentLines = content.split('\n');
+      const oldLines = oldText.split('\n');
+      const normContent = contentLines.map(l => l.trimEnd());
+      const normOld = oldLines.map(l => l.trimEnd());
+
+      let matchStart = -1;
+      for (let i = 0; i <= normContent.length - normOld.length; i++) {
+        let found = true;
+        for (let j = 0; j < normOld.length; j++) {
+          if (normContent[i + j] !== normOld[j]) { found = false; break; }
+        }
+        if (found) { matchStart = i; break; }
+      }
+
+      if (matchStart < 0) {
+        return { success: false, output: `Text not found in ${filePath}. Make sure old_text matches exactly (including whitespace and indentation). Re-read the file to see current content.` };
+      }
+
+      // Use original lines (with their real whitespace) for replacement
+      matchedOldText = contentLines.slice(matchStart, matchStart + oldLines.length).join('\n');
     }
 
-    const newContent = content.replace(oldText, newText);
+    const newContent = content.replace(matchedOldText, newText);
     const accepted = await requestDiffApproval('replace_in_file', filePath, content, newContent);
 
     if (accepted) {
