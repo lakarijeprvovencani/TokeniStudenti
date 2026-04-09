@@ -308,7 +308,7 @@ When the user needs images for a specific topic (dental clinic, restaurant, gym,
   1. Call search_images with a descriptive English query (e.g. "dental clinic smiling woman", "modern restaurant interior")
   2. search_images returns direct Unsplash URLs and photographer credits
   3. Use download_file for each image URL to save it locally
-  4. Include photographer credit in an HTML comment or page footer (Unsplash license requirement)
+  4. Include VISIBLE photographer credit near each image (Unsplash license requirement). Use the attribution format from search_images output — small subtle text with link to photographer profile. NEVER hide credits in HTML comments only — they MUST be visible on the page.
   5. If search_images fails (rate limit), fall back to placehold.co with descriptive text
 
 For a website build, call search_images MULTIPLE times with different queries for different sections:

@@ -1214,13 +1214,26 @@ async function toolSearchImages(args: Record<string, unknown>): Promise<ToolCall
               const alt = photo.alt_description || photo.description || query;
               const photographer = photo.user?.name || 'Unknown';
               const profileUrl = photo.user?.links?.html || '';
+              const utmProfile = profileUrl ? `${profileUrl}?utm_source=vajbagent&utm_medium=referral` : '';
               lines.push(`${i + 1}. ${alt}`);
               lines.push(`   URL: ${imgUrl}`);
-              lines.push(`   Credit: Photo by ${photographer} on Unsplash${profileUrl ? ` (${profileUrl})` : ''}`);
+              lines.push(`   Credit: Photo by ${photographer} on Unsplash`);
+              lines.push(`   Profile: ${utmProfile}`);
               lines.push('');
+
+              // Trigger Unsplash download tracking (fire-and-forget, required by API guidelines)
+              const dlUrl = photo.links?.download_location;
+              if (dlUrl) {
+                try {
+                  https.get(`${dlUrl}?client_id=${UNSPLASH_ACCESS_KEY}`, () => {});
+                } catch { /* silent */ }
+              }
             }
             lines.push('Use download_file to save each image locally, then reference it in the code.');
-            lines.push('Include photographer credit in an HTML comment or page footer (Unsplash license requirement).');
+            lines.push('IMPORTANT — Unsplash attribution (REQUIRED, visible on page):');
+            lines.push('Add a small, subtle credit below or near each image:');
+            lines.push('  <p style="font-size:0.7rem;color:#999;margin-top:4px">Photo by <a href="PROFILE_URL" target="_blank" style="color:#999">NAME</a> on <a href="https://unsplash.com?utm_source=vajbagent&utm_medium=referral" target="_blank" style="color:#999">Unsplash</a></p>');
+            lines.push('Use the Profile URL from above for each photographer. This MUST be visible, not just an HTML comment.');
 
             resolve({ success: true, output: lines.join('\n') });
           } catch (parseErr) {
