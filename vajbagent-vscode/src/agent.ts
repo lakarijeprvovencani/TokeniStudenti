@@ -1902,7 +1902,50 @@ export class Agent {
               this._provider.postMessage({ type: 'status', phase: 'thinking', text: `Pokušavam ponovo (${attempt}/${MAX_RETRIES})...` });
               await new Promise(r => setTimeout(r, delay));
             }
-            const result = await this._streamRequest(apiKey, messages);
+            let result = await this._streamRequest(apiKey, messages);
+
+            // Streaming continuation: if output was truncated (finish_reason: "length"),
+            // ask model to continue and concatenate the response. Max 3 continuations.
+            if (result.finishReason === 'length' && result.toolCalls.length > 0) {
+              const MAX_CONTINUATIONS = 3;
+              for (let cont = 0; cont < MAX_CONTINUATIONS; cont++) {
+                if (this._abortController?.signal.aborted) return;
+                console.log(`[Agent] Output truncated (finish_reason: length), continuation ${cont + 1}/${MAX_CONTINUATIONS}`);
+                this._provider.postMessage({ type: 'status', phase: 'thinking', text: 'Nastavljam generisanje...' });
+
+                // Build partial assistant message with what we have so far
+                const partialArgs = result.toolCalls.map(tc => tc.function.arguments).join('');
+                const contMessages: Message[] = [
+                  ...messages,
+                  { role: 'assistant', content: result.content, tool_calls: result.toolCalls },
+                  { role: 'user', content: '[SYSTEM] Your previous response was cut off (output token limit reached). The last tool call arguments ended with: "...' + partialArgs.slice(-200) + '"\n\nContinue generating ONLY the remaining part of the tool call arguments, starting exactly where you left off. Do NOT repeat what was already generated.' },
+                ];
+
+                try {
+                  const contResult = await this._streamRequest(apiKey, contMessages);
+
+                  // Concatenate: if continuation has tool calls, append arguments to last tool call
+                  if (contResult.toolCalls.length > 0) {
+                    const lastTc = result.toolCalls[result.toolCalls.length - 1];
+                    lastTc.function.arguments += contResult.toolCalls[0].function.arguments;
+                  } else if (contResult.content) {
+                    // Model returned text instead of tool call — append to last tool call args
+                    const lastTc = result.toolCalls[result.toolCalls.length - 1];
+                    lastTc.function.arguments += contResult.content;
+                  }
+
+                  // If this continuation finished normally, we're done
+                  if (contResult.finishReason !== 'length') {
+                    console.log(`[Agent] Continuation complete after ${cont + 1} attempts`);
+                    break;
+                  }
+                } catch (contErr) {
+                  console.log(`[Agent] Continuation failed: ${(contErr as Error).message}`);
+                  break;
+                }
+              }
+            }
+
             assistantContent = result.content;
             toolCalls = result.toolCalls;
             lastErr = null;
@@ -2505,8 +2548,19 @@ REMINDER: When a command fails, try the alternative yourself immediately. If "np
     // Phase 2: If still over threshold, drop oldest from the copy
     const trimmedTokens = Math.ceil(trimmed.reduce((sum, m) => sum + (typeof m.content === 'string' ? m.content.length : 100), 0) / 3.5);
     if (trimmedTokens > limit * 0.85 && trimmed.length > 20) {
-      const dropCount = Math.min(Math.floor(trimmed.length * 0.3), trimmed.length - 20);
+      let dropCount = Math.min(Math.floor(trimmed.length * 0.3), trimmed.length - 20);
       if (dropCount > 0) {
+        // Ensure we don't break tool_call/tool response pairs
+        while (dropCount < trimmed.length) {
+          const msg = trimmed[dropCount];
+          if (msg.role === 'tool') {
+            dropCount++; // skip orphaned tool response
+          } else if (msg.role === 'assistant' && msg.tool_calls) {
+            dropCount++; // skip assistant with tool_calls (its tool responses follow)
+          } else {
+            break; // safe to cut here
+          }
+        }
         trimmed = trimmed.slice(dropCount);
       }
     }
@@ -2553,7 +2607,7 @@ REMINDER: When a command fails, try the alternative yourself immediately. If "np
   private async _streamRequest(
     apiKey: string,
     messages: Message[]
-  ): Promise<{ content: string; toolCalls: ToolCall[] }> {
+  ): Promise<{ content: string; toolCalls: ToolCall[]; finishReason: string | null }> {
     const apiUrl = getApiUrl();
     const model = getModel();
 
@@ -2655,6 +2709,7 @@ REMINDER: When a command fails, try the alternative yourself immediately. If "np
           const toolCallStartSent: Set<number> = new Set();
           let buffer = '';
           let streamStartSent = false;
+          let finishReason: string | null = null;
 
           let streamDone = false;
 
@@ -2677,9 +2732,13 @@ REMINDER: When a command fails, try the alternative yourself immediately. If "np
               } catch { continue; }
 
               const choice = parsed.choices?.[0];
-              if (!choice?.delta) continue;
+              if (!choice?.delta && !choice?.finish_reason) continue;
 
-              if (choice.delta.content) {
+              if (choice.finish_reason) {
+                finishReason = choice.finish_reason;
+              }
+
+              if (choice.delta && choice.delta.content) {
                 if (!streamStartSent) {
                   this._provider.postMessage({ type: 'streamStart' });
                   streamStartSent = true;
@@ -2691,7 +2750,7 @@ REMINDER: When a command fails, try the alternative yourself immediately. If "np
                 });
               }
 
-              if (choice.delta.tool_calls) {
+              if (choice.delta && choice.delta.tool_calls) {
                 if (!streamStartSent) {
                   this._provider.postMessage({ type: 'streamStart' });
                   streamStartSent = true;
@@ -2748,7 +2807,7 @@ REMINDER: When a command fails, try the alternative yourself immediately. If "np
               finish(reject, new Error('Stream prekinut pre nego sto je odgovor stigao. Probaj ponovo.'));
               return;
             }
-            finish(resolve, { content, toolCalls });
+            finish(resolve, { content, toolCalls, finishReason });
           });
 
           res.on('error', (err) => { finish(reject, err); });
