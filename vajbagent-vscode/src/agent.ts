@@ -2470,29 +2470,54 @@ OGRANICENJA:
     if (customRules) {
       systemPrompt += '\n\n<custom_instructions>\nThe user has defined the following project-specific rules. Follow them strictly:\n\n' + customRules + '\n</custom_instructions>';
     }
-    const wsIndex = this._buildWorkspaceIndex();
-    if (wsIndex) {
-      systemPrompt += '\n\n<workspace_index>\n' + wsIndex + '\n</workspace_index>';
+    // Smart context: only inject heavy context blocks when relevant
+    const userMessages = this._history.filter(m => m.role === 'user');
+    const isFirstMessage = userMessages.length <= 1;
+    const lastUserMsg = userMessages[userMessages.length - 1];
+    const userText = (typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : '').toLowerCase();
+
+    // workspace_index: first message OR user asks about structure/files
+    const needsWsIndex = isFirstMessage || /struktur|fajlov|folder|gde je|where is|find|pronađi|pronadji|list|import|componen/i.test(userText);
+    if (needsWsIndex) {
+      const wsIndex = this._buildWorkspaceIndex();
+      if (wsIndex) {
+        systemPrompt += '\n\n<workspace_index>\n' + wsIndex + '\n</workspace_index>';
+      }
     }
+
+    // active_editor: always (cheap and often relevant when user says "this"/"ovo")
     const editorCtx = this._savedEditorContext || this._getActiveEditorContext() || this._lastEditorContext;
     if (editorCtx) {
       systemPrompt += '\n\n<active_editor>\n' + editorCtx + '\n</active_editor>';
     }
+
+    // diagnostics: only if there are actual errors (skip empty)
     const c = this._loopContextCache;
     const diagCtx = c ? c.diag : this._getDiagnosticsContext();
-    if (diagCtx) {
+    if (diagCtx && diagCtx.trim().length > 0) {
       systemPrompt += '\n\n<diagnostics>\n' + diagCtx + '\n</diagnostics>';
     }
-    const gitCtx = c ? c.git : this._getGitContext();
-    if (gitCtx) {
-      systemPrompt += '\n\n<git_status>\n' + gitCtx + '\n</git_status>';
+
+    // git_status: first message OR user mentions git-related words
+    const needsGit = isFirstMessage || /git|commit|push|pull|branch|grana|deploy|verzij|version|stash|merge|rebase|diff/i.test(userText);
+    if (needsGit) {
+      const gitCtx = c ? c.git : this._getGitContext();
+      if (gitCtx) {
+        systemPrompt += '\n\n<git_status>\n' + gitCtx + '\n</git_status>';
+      }
     }
-    const tabsCtx = c ? c.tabs : this._getOpenTabsContext();
-    const projType = c ? c.proj : this._detectProjectType();
-    if (tabsCtx || projType) {
-      const extra = [tabsCtx, projType].filter(Boolean).join('\n');
-      systemPrompt += '\n\n<editor_state>\n' + extra + '\n</editor_state>';
+
+    // editor_state (tabs + project type): first message only
+    if (isFirstMessage) {
+      const tabsCtx = c ? c.tabs : this._getOpenTabsContext();
+      const projType = c ? c.proj : this._detectProjectType();
+      if (tabsCtx || projType) {
+        const extra = [tabsCtx, projType].filter(Boolean).join('\n');
+        systemPrompt += '\n\n<editor_state>\n' + extra + '\n</editor_state>';
+      }
     }
+
+    // terminal_output: always (already conditional on existence)
     const lastTermOutput = getLastCommandOutput();
     if (lastTermOutput) {
       systemPrompt += '\n\n<terminal_output>\nLast command output (visible in VajbAgent terminal):\n' + lastTermOutput.substring(0, 3000) + '\n</terminal_output>';
