@@ -500,12 +500,37 @@ async function toolWriteFile(args: Record<string, unknown>): Promise<ToolCallRes
     newContent = newContent.replace(/\\n/g, '\n');
   }
 
-  // Reject truncated HTML files — model output was cut off
+  // Reject truncated files — model output was cut off
   const lowerPath = filePath.toLowerCase();
   if (lowerPath.endsWith('.html') || lowerPath.endsWith('.htm')) {
     const trimmed = newContent.trimEnd();
     if (trimmed.length > 200 && !trimmed.endsWith('</html>') && !trimmed.endsWith('</HTML>')) {
-      return { success: false, output: 'GREŠKA: Sadržaj je presečen — fajl ne završava sa </html>. Fajl NIJE upisan. Koristi replace_in_file za ciljane izmene umesto write_file za ceo fajl.' };
+      return { success: false, output: 'GREŠKA: HTML je presečen — nedostaje </html>. Fajl NIJE upisan. Ako je fajl velik, razdvoji kod u manje komponente/fajlove ili koristi replace_in_file za ciljane izmene.' };
+    }
+  }
+
+  // Reject truncated JS/JSX/TS/TSX/CSS files (unbalanced braces = truncated)
+  if (/\.(jsx?|tsx?|css|scss|vue|svelte)$/i.test(lowerPath) && newContent.length > 500) {
+    let opens = 0, closes = 0;
+    for (const ch of newContent) {
+      if (ch === '{') opens++;
+      else if (ch === '}') closes++;
+    }
+    if (opens > closes && (opens - closes) >= 2) {
+      const existing = fs.existsSync(filePath);
+      const hint = existing
+        ? 'Koristi replace_in_file za ciljane izmene umesto write_file za ceo fajl.'
+        : 'Razdvoji kod u manje komponente/fajlove (svaka komponenta u svoj fajl) pa ih piši pojedinačno.';
+      return { success: false, output: `GREŠKA: Kod je presečen — ${opens} otvorenih zagrada vs ${closes} zatvorenih. Fajl NIJE upisan. ${hint}` };
+    }
+  }
+
+  // Block write_file on large existing files — force replace_in_file
+  if (fs.existsSync(filePath)) {
+    const existingContent = fs.readFileSync(filePath, 'utf-8');
+    const lineCount = existingContent.split('\n').length;
+    if (lineCount > 100 && /\.(jsx?|tsx?|html?|css|scss|vue|svelte|py)$/i.test(lowerPath)) {
+      return { success: false, output: `GREŠKA: Fajl "${path.basename(filePath)}" ima ${lineCount} linija. Za postojeće fajlove preko 100 linija koristi replace_in_file za ciljane izmene — write_file seče velike fajlove.` };
     }
   }
 
