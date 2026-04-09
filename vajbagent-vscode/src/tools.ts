@@ -512,10 +512,11 @@ async function toolWriteFile(args: Record<string, unknown>): Promise<ToolCallRes
   // Reject truncated OR too-large JS/JSX/TS/TSX/CSS files
   if (/\.(jsx?|tsx?|css|scss|vue|svelte)$/i.test(lowerPath)) {
     const lineCount = newContent.split('\n').length;
+    const charCount = newContent.length;
 
-    // Block files over 200 lines — force splitting into components BEFORE truncation happens
-    if (lineCount > 200) {
-      return { success: false, output: `GREŠKA: Fajl ima ${lineCount} linija — prevelik i BICE PRESECEN. Fajl NIJE upisan. MORAS da razdvojis kod u vise manjih fajlova (npr. komponente: Header.tsx, Feed.tsx, PostCard.tsx, Profile.tsx itd). Svaki fajl MORA biti ispod 150 linija. NE POKUSAVAJ ponovo sa istim velikim fajlom — nece proci.` };
+    // Block files over 200 lines OR 8000 chars — force splitting into components
+    if (lineCount > 200 || charCount > 8000) {
+      return { success: false, output: `GREŠKA: Fajl ima ${lineCount} linija / ${charCount} karaktera — prevelik i BICE PRESECEN. Fajl NIJE upisan. MORAS da razdvojis kod u vise manjih fajlova (npr. komponente: Header.tsx, Feed.tsx, PostCard.tsx, Profile.tsx itd). Svaki fajl MORA biti ispod 150 linija. NE POKUSAVAJ ponovo sa istim velikim fajlom — nece proci.` };
     }
 
     // Detect truncation via unbalanced braces
