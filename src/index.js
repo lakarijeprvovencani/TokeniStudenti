@@ -1487,6 +1487,15 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'vajb-agent' });
 });
 
+app.get('/api/version', (_req, res) => {
+  try {
+    const extPkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'vajbagent-vscode', 'package.json'), 'utf-8'));
+    res.json({ version: extPkg.version, download: '/vajbagent-latest.vsix' });
+  } catch {
+    res.json({ version: '2.0.0', download: '/vajbagent-latest.vsix' });
+  }
+});
+
 // ---- Static pages ----
 app.get('/dashboard', (_req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html'));

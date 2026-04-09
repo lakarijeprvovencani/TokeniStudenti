@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
 import { ChatViewProvider } from './webview';
-import { promptForApiKey } from './settings';
+import { getApiUrl, promptForApiKey } from './settings';
 import { McpManager } from './mcp';
 import { revertAllCheckpoints, getCheckpoints, clearCheckpoints } from './tools';
+import * as https from 'https';
+import * as http from 'http';
 
 let mcpManager: McpManager | null = null;
 
@@ -96,6 +98,9 @@ export function activate(context: vscode.ExtensionContext) {
     console.error('[MCP] Auto-start failed:', err.message);
   });
 
+  // Check for new version after 10s (non-blocking)
+  setTimeout(() => checkForUpdate(), 10000);
+
   const mcpConfigGlob = new vscode.RelativePattern(
     vscode.workspace.workspaceFolders?.[0] || '',
     '.vajbagent/mcp.json'
@@ -114,6 +119,49 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 let chatProvider: ChatViewProvider | null = null;
+
+function checkForUpdate() {
+  try {
+    const ext = vscode.extensions.getExtension('VajbAgent.vajbagent');
+    const localVersion = ext?.packageJSON?.version || '0.0.0';
+    const apiUrl = getApiUrl();
+
+    const url = new URL('/api/version', apiUrl);
+    const transport = url.protocol === 'https:' ? https : http;
+
+    const req = transport.get(url.toString(), { timeout: 5000 }, (res) => {
+      let data = '';
+      res.on('data', (chunk: Buffer) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const { version, download } = JSON.parse(data);
+          if (version && version !== localVersion && isNewer(version, localVersion)) {
+            const downloadUrl = new URL(download || '/vajbagent-latest.vsix', apiUrl).toString();
+            vscode.window.showInformationMessage(
+              `Nova verzija VajbAgent-a je dostupna: v${version} (imaš v${localVersion})`,
+              'Preuzmi'
+            ).then(choice => {
+              if (choice === 'Preuzmi') {
+                vscode.env.openExternal(vscode.Uri.parse(downloadUrl));
+              }
+            });
+          }
+        } catch { /* ignore parse errors */ }
+      });
+    });
+    req.on('error', () => { /* silent — no network is fine */ });
+  } catch { /* silent */ }
+}
+
+function isNewer(remote: string, local: string): boolean {
+  const r = remote.split('.').map(Number);
+  const l = local.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((r[i] || 0) > (l[i] || 0)) return true;
+    if ((r[i] || 0) < (l[i] || 0)) return false;
+  }
+  return false;
+}
 
 export function deactivate() {
   chatProvider?.dispose();
