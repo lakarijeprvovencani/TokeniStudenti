@@ -514,8 +514,8 @@ async function toolWriteFile(args: Record<string, unknown>): Promise<ToolCallRes
     const lineCount = newContent.split('\n').length;
 
     // Block files over 200 lines — force splitting into components BEFORE truncation happens
-    if (lineCount > 200 && !fs.existsSync(filePath)) {
-      return { success: false, output: `GREŠKA: Fajl ima ${lineCount} linija — prevelik za jedan fajl i BICE PRESECEN. Fajl NIJE upisan. MORAS da razdvojis kod u vise manjih fajlova (npr. komponente: Header.tsx, Feed.tsx, PostCard.tsx, Profile.tsx itd). Svaki fajl MORA biti ispod 150 linija. NE POKUSAVAJ ponovo sa istim velikim fajlom.` };
+    if (lineCount > 200) {
+      return { success: false, output: `GREŠKA: Fajl ima ${lineCount} linija — prevelik i BICE PRESECEN. Fajl NIJE upisan. MORAS da razdvojis kod u vise manjih fajlova (npr. komponente: Header.tsx, Feed.tsx, PostCard.tsx, Profile.tsx itd). Svaki fajl MORA biti ispod 150 linija. NE POKUSAVAJ ponovo sa istim velikim fajlom — nece proci.` };
     }
 
     // Detect truncation via unbalanced braces
