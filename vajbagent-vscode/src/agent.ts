@@ -2555,22 +2555,29 @@ REMINDER: When a command fails, try the alternative yourself immediately. If "np
   }
 
   private _trimHistory(): Message[] {
-    const limit = this._getContextLimit();
-    const threshold = limit * 0.65;
-    const estimated = this._estimateTokens();
-    if (estimated < threshold) return this._history;
-
     // Work on a COPY so we never corrupt the original history
     let trimmed = this._history.map(m => ({ ...m }));
     const keepRecent = Math.min(10, trimmed.length);
     const trimZone = trimmed.length - keepRecent;
 
-    // Phase 1: Truncate content in older messages (copy only)
+    // Phase 0 (ALWAYS): Compact old tool results to save tokens on every call
+    // This runs regardless of token count — old file contents waste input tokens
     for (let i = 0; i < trimZone; i++) {
       const msg = trimmed[i];
       if (msg.role === 'tool' && typeof msg.content === 'string' && msg.content.length > 500) {
-        trimmed[i] = { ...msg, content: msg.content.substring(0, 200) + '\n... (trimmed)' };
+        // Keep first 300 chars (file path + first few lines) so agent knows what it read
+        trimmed[i] = { ...msg, content: msg.content.substring(0, 300) + '\n... (earlier result trimmed to save tokens)' };
       }
+    }
+
+    const limit = this._getContextLimit();
+    const threshold = limit * 0.65;
+    const estimated = this._estimateTokens();
+    if (estimated < threshold) return trimmed;
+
+    // Phase 1: Truncate assistant messages in older zone (copy only)
+    for (let i = 0; i < trimZone; i++) {
+      const msg = trimmed[i];
       if (msg.role === 'assistant' && typeof msg.content === 'string' && msg.content.length > 2000) {
         trimmed[i] = { ...msg, content: msg.content.substring(0, 800) + '\n... (trimmed)' };
       }

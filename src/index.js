@@ -956,11 +956,17 @@ async function handleAnthropic(req, res, keyId, resolved, messages, openAITools,
   const modelMax = MAX_OUTPUT[resolved.backendModel] || 16384;
   const maxTokens = Math.min(Math.max(Number(max_tokens) || 4096, 1), modelMax);
 
+  // Anthropic prompt caching: send system as structured block with cache_control
+  // Cached system prompt tokens cost 90% less on repeat calls
+  const systemPayload = mergedSystem
+    ? [{ type: 'text', text: mergedSystem, cache_control: { type: 'ephemeral' } }]
+    : undefined;
+
   const payload = {
     model: resolved.backendModel,
     max_tokens: maxTokens,
     messages: anthropicMessages,
-    ...(mergedSystem && { system: mergedSystem }),
+    ...(systemPayload && { system: systemPayload }),
     ...(anthropicTools.length > 0 && { tools: anthropicTools }),
   };
 
