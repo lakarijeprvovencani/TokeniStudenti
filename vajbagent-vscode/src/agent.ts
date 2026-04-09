@@ -226,6 +226,7 @@ BEFORE RUNNING ANY COMMAND (npm run dev, npm test, npm run build, etc.):
 MINIMIZE TOOL CALLS. The fewer tools you call to accomplish the task, the faster and cheaper for the user. Combine knowledge from auto-context with targeted tool use.
 For EXISTING files over 100 lines: ALWAYS use replace_in_file for targeted edits. NEVER rewrite the entire file with write_file — model output gets truncated on large files and produces broken code. Plan your changes BEFORE starting and batch related edits into fewer replace_in_file calls.
 Use write_file ONLY for: creating new files, or small files under 100 lines that need a full rewrite.
+CRITICAL: Every file you create MUST be under 150 lines. If a feature needs more code, split it into multiple smaller files (e.g. separate components: Header.tsx, Feed.tsx, PostCard.tsx, ProfilePanel.tsx). write_file WILL BE REJECTED for files over 200 lines — plan your file structure BEFORE you start writing code.
 
 IMPORTANT: When execute_command runs, the output is ALREADY VISIBLE to the user in the VS Code "VajbAgent" terminal tab. Do NOT repeat or paste raw command output in the chat. Instead:
 - Summarize the result briefly ("Instalacija uspesna", "Server pokrenut na portu 3000", "Build prosao bez gresaka")
