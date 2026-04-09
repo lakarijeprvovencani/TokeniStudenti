@@ -509,19 +509,29 @@ async function toolWriteFile(args: Record<string, unknown>): Promise<ToolCallRes
     }
   }
 
-  // Reject truncated JS/JSX/TS/TSX/CSS files (unbalanced braces = truncated)
-  if (/\.(jsx?|tsx?|css|scss|vue|svelte)$/i.test(lowerPath) && newContent.length > 500) {
-    let opens = 0, closes = 0;
-    for (const ch of newContent) {
-      if (ch === '{') opens++;
-      else if (ch === '}') closes++;
+  // Reject truncated OR too-large JS/JSX/TS/TSX/CSS files
+  if (/\.(jsx?|tsx?|css|scss|vue|svelte)$/i.test(lowerPath)) {
+    const lineCount = newContent.split('\n').length;
+
+    // Block files over 200 lines — force splitting into components BEFORE truncation happens
+    if (lineCount > 200 && !fs.existsSync(filePath)) {
+      return { success: false, output: `GREŠKA: Fajl ima ${lineCount} linija — prevelik za jedan fajl i BICE PRESECEN. Fajl NIJE upisan. MORAS da razdvojis kod u vise manjih fajlova (npr. komponente: Header.tsx, Feed.tsx, PostCard.tsx, Profile.tsx itd). Svaki fajl MORA biti ispod 150 linija. NE POKUSAVAJ ponovo sa istim velikim fajlom.` };
     }
-    if (opens > closes && (opens - closes) >= 2) {
-      const existing = fs.existsSync(filePath);
-      const hint = existing
-        ? 'Koristi replace_in_file za ciljane izmene umesto write_file za ceo fajl.'
-        : 'Razdvoji kod u manje komponente/fajlove (svaka komponenta u svoj fajl) pa ih piši pojedinačno.';
-      return { success: false, output: `GREŠKA: Kod je presečen — ${opens} otvorenih zagrada vs ${closes} zatvorenih. Fajl NIJE upisan. ${hint}` };
+
+    // Detect truncation via unbalanced braces
+    if (newContent.length > 500) {
+      let opens = 0, closes = 0;
+      for (const ch of newContent) {
+        if (ch === '{') opens++;
+        else if (ch === '}') closes++;
+      }
+      if (opens > closes && (opens - closes) >= 2) {
+        const existing = fs.existsSync(filePath);
+        const hint = existing
+          ? 'Koristi replace_in_file za ciljane izmene umesto write_file za ceo fajl.'
+          : 'MORAS da razdvojis kod u vise manjih fajlova (svaka komponenta u svoj fajl, maks 150 linija). NE POKUSAVAJ ponovo da upises veliki fajl.';
+        return { success: false, output: `GREŠKA: Kod je presečen — ${opens} otvorenih zagrada vs ${closes} zatvorenih. Fajl NIJE upisan. ${hint}` };
+      }
     }
   }
 
