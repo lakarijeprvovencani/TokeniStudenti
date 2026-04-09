@@ -1980,7 +1980,15 @@ export class Agent {
           try {
             args = JSON.parse(tc.function.arguments);
           } catch {
-            // JSON parse failed — try recovery with parseToolCallArguments
+            // For write_file: NEVER recover from truncated JSON — it always produces broken files
+            if (tc.function.name === 'write_file') {
+              const truncMsg = 'GREŠKA: Sadržaj fajla je presečen (JSON isečen). Fajl NIJE upisan. MORAS da razdvojis kod u vise manjih fajlova — svaki ispod 120 linija. Napravi plan koji fajlovi su potrebni pa ih piši jedan po jedan.';
+              this._provider.postMessage({ type: 'toolCallReady', id: tc.id, name: tc.function.name, args: '(presečeno — prevelik fajl)', status: 'error' });
+              this._provider.postMessage({ type: 'toolResult', id: tc.id, result: truncMsg, success: false });
+              this._history.push({ role: 'tool', tool_call_id: tc.id, content: truncMsg });
+              continue;
+            }
+            // Other tools: try recovery with parseToolCallArguments
             const recovered = parseToolCallArguments(tc.function.arguments);
             if (recovered && Object.keys(recovered).length > 0) {
               args = recovered;
@@ -1991,12 +1999,12 @@ export class Agent {
             }
           }
 
-          // Detect truncated write_file — content too short or empty after recovery
-          if (wasRecovered && (tc.function.name === 'write_file' || tc.function.name === 'replace_in_file')) {
-            const recoveredContent = (args.content as string) || (args.new_text as string) || '';
+          // Detect truncated replace_in_file — content too short after recovery
+          if (wasRecovered && tc.function.name === 'replace_in_file') {
+            const recoveredContent = (args.new_text as string) || '';
             if (recoveredContent.length < 50) {
-              const truncMsg = 'Error: The file content was truncated because it was too large for a single tool call. You MUST split the work: first write_file with just the HTML structure (head + body skeleton), then use replace_in_file to add sections one at a time. Do NOT try to write the entire file in one call.';
-              this._provider.postMessage({ type: 'toolCallReady', id: tc.id, name: tc.function.name, args: '(truncated — too large)', status: 'error' });
+              const truncMsg = 'GREŠKA: replace_in_file sadržaj je presečen. Probaj sa manjom izmenom.';
+              this._provider.postMessage({ type: 'toolCallReady', id: tc.id, name: tc.function.name, args: '(presečeno)', status: 'error' });
               this._provider.postMessage({ type: 'toolResult', id: tc.id, result: truncMsg, success: false });
               this._history.push({ role: 'tool', tool_call_id: tc.id, content: truncMsg });
               continue;
