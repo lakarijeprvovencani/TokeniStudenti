@@ -5140,7 +5140,9 @@
 
     let _lastUserText = '';
     function retryLastMessage() {
-      if (!_lastUserText || isStreaming) return;
+      if (!_lastUserText) return;
+      // Force-reset streaming state in case it got stuck after SSL/network error
+      if (isStreaming) setStreaming(false);
       document.querySelectorAll('.error-msg').forEach(el => el.remove());
       vscode.postMessage({ type: 'sendMessage', text: _lastUserText, images: [] });
       setStreaming(true);

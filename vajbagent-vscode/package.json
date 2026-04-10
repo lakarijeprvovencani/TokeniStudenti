@@ -2,7 +2,7 @@
   "name": "vajbagent",
   "displayName": "Vajb Agent",
   "description": "AI coding asistent: 7 modela (Lite do Architect), chat u VS Code, razume projekat, pise i menja kod, pokrece komande, Plan Mode, checklist, web pretraga, MCP, attach fajlova (PDF, slike), checkpoint/undo, auto-approve opcije. Bez pretplate.",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "publisher": "VajbAgent",
   "engines": {
     "vscode": "^1.85.0"
