@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { scrypt, timingSafeEqual } from 'crypto';
 import { fileURLToPath } from 'url';
 import { getRedis, isRedisConfigured } from './redis.js';
 
@@ -263,4 +264,74 @@ export async function getRegistrationCount(ip) {
   if (!ip) return 0;
   const regs = await readRegistrations();
   return regs[ip] || 0;
+}
+
+// ─── Password hashing (scrypt, zero dependencies) ───────────────────────────
+
+function scryptHash(password, salt) {
+  return new Promise((resolve, reject) => {
+    scrypt(password, salt, 64, (err, key) => {
+      if (err) reject(err);
+      else resolve(key.toString('hex'));
+    });
+  });
+}
+
+export async function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = await scryptHash(password, salt);
+  return `${salt}:${hash}`;
+}
+
+export async function verifyPassword(password, stored) {
+  if (!stored || !stored.includes(':')) return false;
+  const [salt, hash] = stored.split(':');
+  const hashBuffer = Buffer.from(hash, 'hex');
+  const derived = await scryptHash(password, salt);
+  const derivedBuffer = Buffer.from(derived, 'hex');
+  return timingSafeEqual(hashBuffer, derivedBuffer);
+}
+
+export async function setStudentPassword(key, password) {
+  if (!password || password.length < 6) {
+    return { error: 'Lozinka mora imati najmanje 6 karaktera.' };
+  }
+  const students = await readStudents();
+  const student = students.find(s => s.key === key);
+  if (!student) return { error: 'Student ne postoji.' };
+  student.password_hash = await hashPassword(password);
+  await writeStudents(students);
+  return { ok: true };
+}
+
+export async function authenticateWithPassword(email, password) {
+  if (!email || !password) return null;
+  const student = await findByEmail(email);
+  if (!student || !student.active) return null;
+  if (!student.password_hash) return null;
+  const valid = await verifyPassword(password, student.password_hash);
+  return valid ? student : null;
+}
+
+export async function addStudentWithPassword(name, email, password) {
+  if (!password || typeof password !== 'string' || password.length < 6) {
+    return { error: 'Lozinka mora imati najmanje 6 karaktera.' };
+  }
+  const result = await addStudent(name, email);
+  if (result.error) return result;
+  // Set password on the newly created student
+  result.student.password_hash = await hashPassword(password);
+  const students = await readStudents();
+  const idx = students.findIndex(s => s.key === result.student.key);
+  if (idx !== -1) {
+    students[idx] = result.student;
+    await writeStudents(students);
+  }
+  return result;
+}
+
+export async function studentHasPassword(email) {
+  if (!email) return false;
+  const student = await findByEmail(email);
+  return !!(student && student.password_hash);
 }

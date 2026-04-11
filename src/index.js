@@ -14,7 +14,7 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { requireStudentAuth } from './auth.js';
+import { requireStudentAuth, requireAuth, createSession, destroySession, setSessionCookie, clearSessionCookie, parseCookies } from './auth.js';
 import {
   openAIToAnthropicMessages,
   openAIToolsToAnthropic,
@@ -30,7 +30,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { logUsage, getUsageSummary, getUsageForKey, getModelStats } from './usage.js';
 import { getBalance, deductBalance, costUsd, addBalance, getTotalDeposited, loadStudentMarkupFlags, setStudentNoMarkup, getStudentMarkup, providerCostUsd, getPrices } from './balance.js';
-import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP } from './students.js';
+import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP, addStudentWithPassword, authenticateWithPassword, setStudentPassword, studentHasPassword } from './students.js';
 import { sendWelcomeEmail, sendRecoveryEmail, isEmailConfigured } from './email.js';
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -306,7 +306,17 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-app.use(cors());
+const ALLOWED_ORIGINS = (process.env.WEB_ORIGINS || 'http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177').split(',').map(s => s.trim());
+app.use(cors({
+  origin: (origin, cb) => {
+    // Allow requests with no origin (extensions, curl, server-to-server)
+    if (!origin) return cb(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    // Fallback: allow any origin for API key auth (extensions)
+    cb(null, true);
+  },
+  credentials: true,
+}));
 
 const authLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
@@ -527,6 +537,133 @@ function verifyRegisterToken(token) {
   return { valid: true };
 }
 
+// ─── Web App Auth Routes ────────────────────────────────────────────────────
+
+app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
+  const { first_name, last_name, email, password } = req.body || {};
+
+  if (!first_name || typeof first_name !== 'string' || first_name.trim().length < 2) {
+    return res.status(400).json({ error: 'Ime mora imati najmanje 2 karaktera.' });
+  }
+  if (!last_name || typeof last_name !== 'string' || last_name.trim().length < 2) {
+    return res.status(400).json({ error: 'Prezime mora imati najmanje 2 karaktera.' });
+  }
+  if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    return res.status(400).json({ error: 'Unesite ispravnu email adresu.' });
+  }
+  if (!password || typeof password !== 'string' || password.length < 6) {
+    return res.status(400).json({ error: 'Lozinka mora imati najmanje 6 karaktera.' });
+  }
+
+  const clientIP = normalizeIP(req.ip || req.connection?.remoteAddress || 'unknown');
+  const canReg = await canRegisterFromIP(clientIP);
+  if (!canReg) {
+    return res.status(403).json({ error: 'Maksimalan broj naloga sa ove adrese je dostignut.' });
+  }
+
+  const fullName = first_name.trim() + ' ' + last_name.trim();
+  const result = await addStudentWithPassword(fullName, email.trim(), password);
+  if (result.error) {
+    return res.status(400).json({ error: result.error });
+  }
+
+  if (REGISTER_BONUS > 0) {
+    await addBalance(result.student.key, REGISTER_BONUS);
+  }
+  await trackRegistrationIP(clientIP);
+
+  // Create session & set cookie
+  const session = createSession(result.student.key);
+  setSessionCookie(res, session.token);
+
+  console.log(`[Auth] Registered: "${fullName}" <${result.student.email}> [IP: ${clientIP}]`);
+  const regBal = await getBalance(result.student.key);
+  const regDep = await getTotalDeposited(result.student.key);
+  const regBonusVal = parseFloat(process.env.SELF_REGISTER_BONUS) || 2;
+  res.json({
+    name: result.student.name,
+    email: result.student.email,
+    balance_usd: regBal,
+    free_tier: regDep <= regBonusVal,
+  });
+}));
+
+app.post('/auth/login', authLimiter, asyncHandler(async (req, res) => {
+  const { email, password } = req.body || {};
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email i lozinka su obavezni.' });
+  }
+
+  const student = await authenticateWithPassword(email.trim(), password);
+  if (!student) {
+    // Check if student exists but has no password (old account)
+    const exists = await findByEmail(email.trim());
+    if (exists && !exists.password_hash) {
+      return res.status(400).json({ error: 'Ovaj nalog nema postavljenu lozinku. Koristi "Postavi lozinku" opciju.' });
+    }
+    return res.status(401).json({ error: 'Pogrešan email ili lozinka.' });
+  }
+
+  const session = createSession(student.key);
+  setSessionCookie(res, session.token);
+
+  console.log(`[Auth] Login: "${student.name}" <${student.email}>`);
+  const loginBal = await getBalance(student.key);
+  const loginDep = await getTotalDeposited(student.key);
+  const loginBonusVal = parseFloat(process.env.SELF_REGISTER_BONUS) || 2;
+  res.json({
+    name: student.name,
+    email: student.email,
+    balance_usd: loginBal,
+    free_tier: loginDep <= loginBonusVal,
+  });
+}));
+
+app.post('/auth/logout', (_req, res) => {
+  const cookies = parseCookies(_req);
+  if (cookies.vajb_session) destroySession(cookies.vajb_session);
+  clearSessionCookie(res);
+  res.json({ ok: true });
+});
+
+app.get('/auth/me', authLimiter, requireAuth, asyncHandler(async (req, res) => {
+  const balance = await getBalance(req.studentApiKey);
+  const deposited = await getTotalDeposited(req.studentApiKey);
+  const regBonus = parseFloat(process.env.SELF_REGISTER_BONUS) || 2;
+  res.json({
+    name: req.studentName,
+    balance_usd: balance,
+    free_tier: deposited <= regBonus,
+    api_key: req.studentApiKey,
+  });
+}));
+
+app.post('/auth/set-password', authLimiter, asyncHandler(async (req, res) => {
+  const { email, current_key, new_password } = req.body || {};
+
+  if (!email || !current_key || !new_password) {
+    return res.status(400).json({ error: 'Email, API ključ i nova lozinka su obavezni.' });
+  }
+
+  const student = await findByEmail(email.trim());
+  if (!student || student.key !== current_key.trim()) {
+    return res.status(401).json({ error: 'Pogrešan email ili API ključ.' });
+  }
+
+  const result = await setStudentPassword(student.key, new_password);
+  if (result.error) return res.status(400).json({ error: result.error });
+
+  // Create session & set cookie
+  const session = createSession(student.key);
+  setSessionCookie(res, session.token);
+
+  console.log(`[Auth] Password set: "${student.name}" <${student.email}>`);
+  res.json({ ok: true, name: student.name });
+}));
+
+// ─── Legacy Registration (extension/landing page) ───────────────────────────
+
 app.get('/register/token', registerLimiter, (_req, res) => {
   res.json({ token: createRegisterToken() });
 });
@@ -636,7 +773,7 @@ function releaseConcurrency(keyId) {
 // ---- Chat completions handler ----
 const chatCompletionsHandler = [
   authLimiter,
-  requireStudentAuth,
+  requireAuth,
   async (req, res) => {
     const body = req.body || {};
     let { messages, stream = false, max_tokens = 4096, model, tools: openAITools } = body;
@@ -1171,7 +1308,7 @@ async function handleAnthropicStream(res, keyId, resolved, payload, client) {
 }
 
 // ---- Usage + balance for current key (dashboard) ----
-app.get('/me', authLimiter, requireStudentAuth, asyncHandler(async (req, res) => {
+app.get('/me', authLimiter, requireAuth, asyncHandler(async (req, res) => {
   const keyId = req.studentKeyId;
   const name = req.studentName || 'Unknown';
   const balanceUsd = await getBalance(keyId);
@@ -1179,20 +1316,26 @@ app.get('/me', authLimiter, requireStudentAuth, asyncHandler(async (req, res) =>
   const data = await getUsageForKey(keyId);
   const regBonus = parseFloat(process.env.SELF_REGISTER_BONUS) || 2;
   const freeTier = totalDeposited <= regBonus;
+
+  // Include API key only for cookie-based auth (web app needs it for display)
+  const cookies = parseCookies(req);
+  const includeKey = !!cookies.vajb_session;
+
+  const base = {
+    key_id: keyId, name, balance_usd: balanceUsd, total_deposited: totalDeposited,
+    free_tier: freeTier,
+    ...(includeKey && { api_key: req.studentApiKey }),
+  };
+
   if (!data) {
-    return res.json({
-      key_id: keyId, name, balance_usd: balanceUsd, total_deposited: totalDeposited,
-      free_tier: freeTier,
-      input_tokens: 0, output_tokens: 0, requests: 0, last_used: null, estimated_cost_usd: 0,
-    });
+    return res.json({ ...base, input_tokens: 0, output_tokens: 0, requests: 0, last_used: null, estimated_cost_usd: 0 });
   }
   const input = data.input_tokens || 0;
   const output = data.output_tokens || 0;
   const lastModel = data.model || 'gpt-5-mini';
   const estimatedCost = costUsd(input, output, lastModel, keyId);
   res.json({
-    key_id: keyId, name, balance_usd: balanceUsd, total_deposited: totalDeposited,
-    free_tier: freeTier,
+    ...base,
     input_tokens: input, output_tokens: output,
     requests: data.requests || 0, last_used: data.last_used || null,
     estimated_cost_usd: Math.round(estimatedCost * 100) / 100,
@@ -1200,7 +1343,7 @@ app.get('/me', authLimiter, requireStudentAuth, asyncHandler(async (req, res) =>
 }));
 
 // ---- Stripe checkout ----
-app.post('/create-checkout', authLimiter, requireStudentAuth, asyncHandler(async (req, res) => {
+app.post('/create-checkout', authLimiter, requireAuth, asyncHandler(async (req, res) => {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) {
     return res.status(503).json({ error: 'Plaćanje nije konfigurisano.' });

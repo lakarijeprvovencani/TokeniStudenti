@@ -18,6 +18,69 @@ function safeMatch(candidate, list) {
   return matched;
 }
 
+// ─── Session management ─────────────────────────────────────────────────────
+
+const sessions = new Map(); // token → { studentKey, expires }
+const SESSION_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+export function createSession(studentKey) {
+  const token = crypto.randomBytes(32).toString('hex');
+  const expires = Date.now() + SESSION_TTL;
+  sessions.set(token, { studentKey, expires });
+  return { token, expires };
+}
+
+export function validateSession(token) {
+  if (!token) return null;
+  const session = sessions.get(token);
+  if (!session) return null;
+  if (Date.now() > session.expires) {
+    sessions.delete(token);
+    return null;
+  }
+  return session;
+}
+
+export function destroySession(token) {
+  sessions.delete(token);
+}
+
+export function parseCookies(req) {
+  const header = req.headers.cookie || '';
+  const cookies = {};
+  header.split(';').forEach(c => {
+    const [name, ...rest] = c.split('=');
+    if (name) cookies[name.trim()] = rest.join('=').trim();
+  });
+  return cookies;
+}
+
+// ─── Cookie helper ──────────────────────────────────────────────────────────
+
+const isProd = process.env.NODE_ENV === 'production';
+
+export function setSessionCookie(res, token) {
+  res.cookie('vajb_session', token, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
+    maxAge: SESSION_TTL,
+    path: '/',
+  });
+}
+
+export function clearSessionCookie(res) {
+  res.cookie('vajb_session', '', {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
+    maxAge: 0,
+    path: '/',
+  });
+}
+
+// ─── Auth middleware: API key only (for extension) ──────────────────────────
+
 export async function requireStudentAuth(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Bearer ')) {
@@ -54,4 +117,34 @@ export async function requireStudentAuth(req, res, next) {
     console.error('Auth error:', err.message);
     return res.status(500).json({ error: { message: 'Greška pri autentifikaciji.' } });
   }
+}
+
+// ─── Combined auth: API key OR session cookie (for web + extension) ─────────
+
+export async function requireAuth(req, res, next) {
+  // 1. Try Bearer token (extension)
+  const auth = req.headers.authorization;
+  if (auth && auth.startsWith('Bearer ')) {
+    return requireStudentAuth(req, res, next);
+  }
+
+  // 2. Try session cookie (web app)
+  const cookies = parseCookies(req);
+  const sessionToken = cookies.vajb_session;
+  if (sessionToken) {
+    const session = validateSession(sessionToken);
+    if (session) {
+      const student = await findByKey(session.studentKey);
+      if (student && student.active) {
+        req.studentApiKey = student.key;
+        req.studentKeyId = keyId(student.key);
+        req.studentName = student.name;
+        return next();
+      }
+    }
+  }
+
+  return res.status(401).json({
+    error: { message: 'Autentifikacija je potrebna. Uloguj se ili koristi API ključ.' },
+  });
 }
