@@ -1,0 +1,243 @@
+/* ── Markdown body ── */
+.md-body {
+  font-family: var(--font);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.md-body > *:first-child {
+  margin-top: 0;
+}
+
+.md-body > *:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Paragraphs ── */
+.md-paragraph {
+  margin: 6px 0;
+}
+
+/* ── Headings ── */
+.md-heading {
+  color: var(--text);
+  font-weight: 700;
+  margin: 12px 0 6px;
+  line-height: 1.3;
+}
+
+h1.md-heading { font-size: 1.1rem; }
+h2.md-heading { font-size: 1rem; }
+h3.md-heading { font-size: 0.92rem; }
+h4.md-heading { font-size: 0.88rem; }
+h5.md-heading { font-size: 0.85rem; }
+
+/* ── Inline code ── */
+.md-inline-code {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.82em;
+  color: var(--orange2);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.md-file-link {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--orange);
+}
+
+.md-file-link:hover {
+  background: var(--orange-dim);
+  color: var(--orange);
+}
+
+/* ── Code blocks ── */
+.md-code-block {
+  margin: 8px 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.md-code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border);
+}
+
+.md-code-lang {
+  font-size: 0.68rem;
+  color: var(--text3);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.code-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: var(--text3);
+  background: transparent;
+  padding: 3px 8px;
+  border-radius: 6px;
+  transition: all 150ms ease;
+}
+
+.code-copy-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.md-code-pre {
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+.md-code-pre code {
+  font-family: inherit;
+}
+
+/* ── Syntax highlighting ── */
+.sh-keyword { color: #c678dd; }
+.sh-string { color: #98c379; }
+.sh-comment { color: #5c6370; font-style: italic; }
+.sh-number { color: #d19a66; }
+.sh-tag { color: #e06c75; }
+.sh-attr { color: #d19a66; }
+
+/* ── Tables ── */
+.md-table-wrap {
+  margin: 8px 0;
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.md-table th,
+.md-table td {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.md-table th {
+  background: rgba(255, 255, 255, 0.03);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.md-table td {
+  color: var(--text2);
+}
+
+/* ── Lists ── */
+.md-list {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.md-list li {
+  margin: 3px 0;
+  color: var(--text2);
+}
+
+.md-list li strong {
+  color: var(--text);
+}
+
+/* ── Checklists ── */
+.md-checklist {
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-left: -20px;
+}
+
+.md-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.md-checklist:not(.checked) .md-check {
+  border: 1px solid var(--border2);
+  color: var(--text3);
+}
+
+.md-checklist.checked .md-check {
+  background: var(--orange);
+  color: #000;
+  font-weight: 700;
+}
+
+/* ── Blockquotes ── */
+.md-blockquote {
+  margin: 8px 0;
+  padding: 8px 14px;
+  border-left: 3px solid var(--orange);
+  background: rgba(249, 115, 22, 0.04);
+  color: var(--text2);
+  border-radius: 0 8px 8px 0;
+}
+
+/* ── Horizontal rule ── */
+.md-hr {
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border2), transparent);
+  margin: 12px 0;
+}
+
+/* ── Links ── */
+.md-body a {
+  color: var(--orange2);
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+
+.md-body a:hover {
+  color: var(--orange3);
+  text-decoration: underline;
+}
+
+/* ── Bold/Italic ── */
+.md-body strong {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.md-body em {
+  font-style: italic;
+}

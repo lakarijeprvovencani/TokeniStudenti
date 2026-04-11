@@ -1,0 +1,122 @@
+.cmd-palette {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin-bottom: 6px;
+  background: rgba(15, 15, 18, 0.92);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--glass-border2);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 8px 40px rgba(0, 0, 0, 0.5),
+    0 0 60px rgba(249, 115, 22, 0.03);
+  max-height: 380px;
+  overflow-y: auto;
+  z-index: 50;
+}
+
+.cmd-list {
+  padding: 6px;
+}
+
+.cmd-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text3);
+  padding: 10px 10px 5px;
+  letter-spacing: 0.08em;
+}
+
+.cmd-section-icon {
+  opacity: 0.7;
+}
+
+.cmd-section-skills {
+  color: var(--orange);
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 12px;
+}
+
+.cmd-section-skills .cmd-section-icon {
+  color: var(--orange);
+  opacity: 0.85;
+}
+
+.cmd-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  text-align: left;
+  color: var(--text);
+  transition: all 150ms ease;
+  position: relative;
+}
+
+.cmd-item:hover,
+.cmd-item.selected {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.cmd-item.selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--orange);
+  animation: fadeIn 0.15s ease;
+}
+
+.cmd-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  flex-shrink: 0;
+  transition: all 150ms ease;
+}
+
+.cmd-icon-skill {
+  background: var(--orange-dim);
+  border-color: var(--orange-border);
+  color: var(--orange);
+}
+
+.cmd-item.selected .cmd-icon,
+.cmd-item:hover .cmd-icon {
+  border-color: var(--orange-border);
+  background: var(--orange-dim);
+  color: var(--orange);
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.08);
+}
+
+.cmd-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.cmd-desc {
+  font-size: 0.72rem;
+  color: var(--text3);
+  margin-left: auto;
+  white-space: nowrap;
+}
