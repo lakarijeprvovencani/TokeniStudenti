@@ -164,6 +164,34 @@ export const TOOL_DEFINITIONS = [
   {
     type: 'function' as const,
     function: {
+      name: 'supabase_get_auth_config',
+      description: 'Get the user\'s Supabase auth configuration: site URL, redirect URLs, enabled OAuth providers (Google, GitHub, etc.), email confirmation settings, JWT expiry, password requirements. Use to check current auth setup before making changes.',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'supabase_update_auth_config',
+      description: 'Update Supabase auth configuration. Pass a config object with fields you want to change. Common fields: SITE_URL (string), URI_ALLOW_LIST (string with comma-separated URLs), DISABLE_SIGNUP (boolean), MAILER_AUTOCONFIRM (boolean - skip email verification), EXTERNAL_GOOGLE_ENABLED (boolean), EXTERNAL_GOOGLE_CLIENT_ID (string), EXTERNAL_GOOGLE_SECRET (string), EXTERNAL_GITHUB_ENABLED, EXTERNAL_GITHUB_CLIENT_ID, EXTERNAL_GITHUB_SECRET, JWT_EXP (number, seconds), PASSWORD_MIN_LENGTH (number), MAILER_OTP_EXP (number).',
+      parameters: {
+        type: 'object',
+        properties: {
+          config: {
+            type: 'object',
+            description: 'Partial auth config object — only fields you want to change',
+          },
+        },
+        required: ['config'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'supabase_sql',
       description: 'Execute SQL directly on the user\'s Supabase database. Use for: CREATE TABLE, ALTER TABLE, INSERT, UPDATE, DELETE, SELECT, CREATE INDEX, ENABLE RLS, CREATE POLICY, etc. Returns rows or success status. This runs on the real database — be careful with destructive operations.',
       parameters: {

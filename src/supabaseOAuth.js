@@ -301,6 +301,18 @@ export async function listTables(studentKey, projectRef) {
   return runSql(studentKey, projectRef, query);
 }
 
+// ─── Auth Configuration ─────────────────────────────────────────────────────
+
+/** Get auth configuration (site URL, providers, email settings, etc.) */
+export async function getAuthConfig(studentKey, projectRef) {
+  return apiCall(studentKey, 'GET', `/projects/${projectRef}/config/auth`);
+}
+
+/** Update auth configuration. Accepts partial config (PATCH-style merge). */
+export async function updateAuthConfig(studentKey, projectRef, config) {
+  return apiCall(studentKey, 'PATCH', `/projects/${projectRef}/config/auth`, config);
+}
+
 /**
  * Describe a table's columns.
  */

@@ -198,6 +198,16 @@ export async function executeToolCall(
         return { tool_call_id: tc.id, role: 'tool', content: result }
       }
 
+      case 'supabase_get_auth_config': {
+        const result = await handleSupabaseGetAuthConfig()
+        return { tool_call_id: tc.id, role: 'tool', content: result }
+      }
+
+      case 'supabase_update_auth_config': {
+        const result = await handleSupabaseUpdateAuthConfig(args)
+        return { tool_call_id: tc.id, role: 'tool', content: result }
+      }
+
       case 'fetch_url': {
         const result = await handleFetchUrl(args)
         return { tool_call_id: tc.id, role: 'tool', content: result }
@@ -576,6 +586,67 @@ async function handleSupabaseSql(args: Record<string, unknown>): Promise<string>
       return `Query executed. Returned ${result.length} row(s)${result.length > 20 ? ' (showing first 20)' : ''}:\n${json}`
     }
     return `Query executed successfully.\n${JSON.stringify(result).substring(0, 1500)}`
+  } catch (err) {
+    return `Greska: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+async function handleSupabaseGetAuthConfig(): Promise<string> {
+  const projectRef = getSupabaseProjectRef()
+  if (!projectRef) return 'GRESKA: Nema povezanog Supabase projekta.'
+  try {
+    const res = await callSupabaseApi(`/api/supabase/auth-config/${projectRef}`)
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '')
+      return `Get auth config failed: HTTP ${res.status} ${txt.substring(0, 500)}`
+    }
+    const data = await res.json()
+    const cfg = data.config || {}
+    // Show only the most important fields to keep context small
+    const important: Record<string, unknown> = {
+      SITE_URL: cfg.SITE_URL,
+      URI_ALLOW_LIST: cfg.URI_ALLOW_LIST,
+      DISABLE_SIGNUP: cfg.DISABLE_SIGNUP,
+      MAILER_AUTOCONFIRM: cfg.MAILER_AUTOCONFIRM,
+      EXTERNAL_EMAIL_ENABLED: cfg.EXTERNAL_EMAIL_ENABLED,
+      EXTERNAL_GOOGLE_ENABLED: cfg.EXTERNAL_GOOGLE_ENABLED,
+      EXTERNAL_GITHUB_ENABLED: cfg.EXTERNAL_GITHUB_ENABLED,
+      EXTERNAL_FACEBOOK_ENABLED: cfg.EXTERNAL_FACEBOOK_ENABLED,
+      EXTERNAL_APPLE_ENABLED: cfg.EXTERNAL_APPLE_ENABLED,
+      JWT_EXP: cfg.JWT_EXP,
+      PASSWORD_MIN_LENGTH: cfg.PASSWORD_MIN_LENGTH,
+      MAILER_OTP_EXP: cfg.MAILER_OTP_EXP,
+      SMTP_HOST: cfg.SMTP_HOST ? '(custom SMTP set)' : '(default Supabase mailer)',
+    }
+    return `Supabase Auth Configuration:\n${JSON.stringify(important, null, 2)}\n\nFull config has more fields — ask via supabase_update_auth_config to change any field.`
+  } catch (err) {
+    return `Greska: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+async function handleSupabaseUpdateAuthConfig(args: Record<string, unknown>): Promise<string> {
+  const projectRef = getSupabaseProjectRef()
+  if (!projectRef) return 'GRESKA: Nema povezanog Supabase projekta.'
+  const config = args.config as Record<string, unknown>
+  if (!config || typeof config !== 'object') {
+    return 'GRESKA: "config" parametar mora biti objekat sa poljima koje hoces da promenis.'
+  }
+  try {
+    const res = await callSupabaseApi(`/api/supabase/auth-config/${projectRef}`, {
+      method: 'PATCH',
+      body: JSON.stringify(config),
+    })
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '')
+      let errMsg = `HTTP ${res.status}`
+      try {
+        const parsed = JSON.parse(txt)
+        errMsg = parsed.error || errMsg
+      } catch { errMsg = txt.substring(0, 500) || errMsg }
+      return `Update auth config failed: ${errMsg}`
+    }
+    const updated = Object.keys(config).join(', ')
+    return `Auth config updated successfully. Changed: ${updated}`
   } catch (err) {
     return `Greska: ${err instanceof Error ? err.message : String(err)}`
   }

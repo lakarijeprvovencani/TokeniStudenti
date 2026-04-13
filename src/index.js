@@ -820,6 +820,30 @@ app.get('/api/supabase/describe/:projectRef/:tableName', requireAuth, asyncHandl
   }
 }));
 
+// Get auth configuration (site URL, providers, email, etc.)
+app.get('/api/supabase/auth-config/:projectRef', requireAuth, asyncHandler(async (req, res) => {
+  try {
+    const config = await supabaseOAuth.getAuthConfig(req.studentApiKey, req.params.projectRef);
+    res.json({ config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// Update auth configuration
+app.patch('/api/supabase/auth-config/:projectRef', requireAuth, asyncHandler(async (req, res) => {
+  const config = req.body || {};
+  if (!config || typeof config !== 'object') {
+    return res.status(400).json({ error: 'config object required' });
+  }
+  try {
+    const result = await supabaseOAuth.updateAuthConfig(req.studentApiKey, req.params.projectRef, config);
+    res.json({ result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
 // ─── Legacy Registration (extension/landing page) ───────────────────────────
 
 app.get('/register/token', registerLimiter, (_req, res) => {
