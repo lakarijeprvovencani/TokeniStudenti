@@ -665,6 +665,11 @@ app.post('/auth/set-password', authLimiter, asyncHandler(async (req, res) => {
 
 // ─── Supabase OAuth Integration ─────────────────────────────────────────────
 
+// Public check — no auth required, just "is OAuth enabled on this server"
+app.get('/api/supabase/config-check', (_req, res) => {
+  res.json({ configured: supabaseOAuth.isSupabaseOAuthConfigured() });
+});
+
 // Start OAuth flow — redirects user to Supabase login
 app.get('/auth/supabase/start', requireAuth, asyncHandler(async (req, res) => {
   if (!supabaseOAuth.isSupabaseOAuthConfigured()) {
