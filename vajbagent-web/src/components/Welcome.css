@@ -450,15 +450,16 @@
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(6px);
   z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
 }
 
 .templates-modal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  position: relative;
   width: min(880px, 92vw);
-  max-height: 80vh;
+  max-height: 85vh;
   background: rgba(15, 15, 20, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;

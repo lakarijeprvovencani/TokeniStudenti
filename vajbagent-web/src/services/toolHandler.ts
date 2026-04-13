@@ -183,6 +183,21 @@ export async function executeToolCall(
         return { tool_call_id: tc.id, role: 'tool', content: result }
       }
 
+      case 'supabase_list_tables': {
+        const result = await handleSupabaseListTables()
+        return { tool_call_id: tc.id, role: 'tool', content: result }
+      }
+
+      case 'supabase_describe_table': {
+        const result = await handleSupabaseDescribe(args)
+        return { tool_call_id: tc.id, role: 'tool', content: result }
+      }
+
+      case 'supabase_sql': {
+        const result = await handleSupabaseSql(args)
+        return { tool_call_id: tc.id, role: 'tool', content: result }
+      }
+
       case 'fetch_url': {
         const result = await handleFetchUrl(args)
         return { tool_call_id: tc.id, role: 'tool', content: result }
@@ -452,5 +467,116 @@ async function handleDownloadFile(
     return `Downloaded OK: ${path}\nSize: ${truncated.length} chars | Type: ${contentType}\nURL: ${url}`
   } catch (err) {
     return `Download FAILED from: ${url}\nError: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+// ─── Supabase tools ──────────────────────────────────────────────────────────
+
+function getSupabaseProjectRef(): string | null {
+  return localStorage.getItem('vajb_supabase_project_ref')
+}
+
+async function callSupabaseApi(path: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(`${API_URL}${path}`, {
+    ...init,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init.headers || {}),
+    },
+  })
+}
+
+async function handleSupabaseListTables(): Promise<string> {
+  const projectRef = getSupabaseProjectRef()
+  if (!projectRef) {
+    return 'GRESKA: Nema povezanog Supabase projekta. Korisnik treba da ide u Settings → Integracije → Supabase → "Poveži Supabase" i izabere projekat pre nego što agent može da koristi bazu.'
+  }
+  try {
+    const res = await callSupabaseApi(`/api/supabase/tables/${projectRef}`)
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '')
+      return `Supabase list_tables failed: HTTP ${res.status} ${txt.substring(0, 500)}`
+    }
+    const data = await res.json()
+    const tables = data.tables
+    if (!Array.isArray(tables) || tables.length === 0) {
+      return 'Baza je prazna — nema tabela u public schemi. Koristi supabase_sql sa CREATE TABLE da napraviš nove tabele.'
+    }
+    const lines = ['Tabele u Supabase bazi (public schema):']
+    for (const t of tables) {
+      lines.push(`- ${t.table_name} (${t.column_count} kolona)`)
+    }
+    lines.push('\nKoristi supabase_describe_table da vidiš kolone neke tabele.')
+    return lines.join('\n')
+  } catch (err) {
+    return `Greska: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+async function handleSupabaseDescribe(args: Record<string, unknown>): Promise<string> {
+  const projectRef = getSupabaseProjectRef()
+  if (!projectRef) return 'GRESKA: Nema povezanog Supabase projekta.'
+  const table = (args.table as string || '').trim()
+  if (!table) return 'GRESKA: "table" parametar je obavezan'
+
+  try {
+    const res = await callSupabaseApi(`/api/supabase/describe/${projectRef}/${encodeURIComponent(table)}`)
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '')
+      return `Supabase describe failed: HTTP ${res.status} ${txt.substring(0, 500)}`
+    }
+    const data = await res.json()
+    const columns = data.columns
+    if (!Array.isArray(columns) || columns.length === 0) {
+      return `Tabela "${table}" nema kolona ili ne postoji.`
+    }
+    const lines = [`Tabela: ${table}`, '']
+    for (const c of columns) {
+      const nullable = c.is_nullable === 'YES' ? 'NULL' : 'NOT NULL'
+      const def = c.column_default ? ` DEFAULT ${c.column_default}` : ''
+      lines.push(`- ${c.column_name}: ${c.data_type} ${nullable}${def}`)
+    }
+    return lines.join('\n')
+  } catch (err) {
+    return `Greska: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+async function handleSupabaseSql(args: Record<string, unknown>): Promise<string> {
+  const projectRef = getSupabaseProjectRef()
+  if (!projectRef) {
+    return 'GRESKA: Nema povezanog Supabase projekta. Korisnik treba da ide u Settings → Integracije → Supabase → "Poveži Supabase" i izabere projekat.'
+  }
+  const query = (args.query as string || '').trim()
+  if (!query) return 'GRESKA: "query" parametar je obavezan'
+
+  try {
+    const res = await callSupabaseApi('/api/supabase/sql', {
+      method: 'POST',
+      body: JSON.stringify({ projectRef, query }),
+    })
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '')
+      let errMsg = `HTTP ${res.status}`
+      try {
+        const parsed = JSON.parse(txt)
+        errMsg = parsed.error || errMsg
+      } catch { errMsg = txt.substring(0, 500) || errMsg }
+      return `Supabase SQL failed: ${errMsg}\n\nQuery was:\n${query.substring(0, 500)}`
+    }
+    const data = await res.json()
+    const result = data.result
+
+    // Format result for agent
+    if (Array.isArray(result)) {
+      if (result.length === 0) return 'Query executed successfully. 0 rows returned.'
+      const preview = result.slice(0, 20)
+      const json = JSON.stringify(preview, null, 2).substring(0, 2500)
+      return `Query executed. Returned ${result.length} row(s)${result.length > 20 ? ' (showing first 20)' : ''}:\n${json}`
+    }
+    return `Query executed successfully.\n${JSON.stringify(result).substring(0, 1500)}`
+  } catch (err) {
+    return `Greska: ${err instanceof Error ? err.message : String(err)}`
   }
 }

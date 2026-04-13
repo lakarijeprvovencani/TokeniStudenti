@@ -786,6 +786,40 @@ app.get('/api/supabase/credentials/:projectRef', requireAuth, asyncHandler(async
   }
 }));
 
+// Run SQL against a project (for agent tools)
+app.post('/api/supabase/sql', requireAuth, asyncHandler(async (req, res) => {
+  const { projectRef, query } = req.body || {};
+  if (!projectRef || !query) {
+    return res.status(400).json({ error: 'projectRef and query are required' });
+  }
+  try {
+    const result = await supabaseOAuth.runSql(req.studentApiKey, projectRef, query);
+    res.json({ result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// List tables in a project (agent helper)
+app.get('/api/supabase/tables/:projectRef', requireAuth, asyncHandler(async (req, res) => {
+  try {
+    const tables = await supabaseOAuth.listTables(req.studentApiKey, req.params.projectRef);
+    res.json({ tables });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// Describe a table's columns
+app.get('/api/supabase/describe/:projectRef/:tableName', requireAuth, asyncHandler(async (req, res) => {
+  try {
+    const columns = await supabaseOAuth.describeTable(req.studentApiKey, req.params.projectRef, req.params.tableName);
+    res.json({ columns });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
 // ─── Legacy Registration (extension/landing page) ───────────────────────────
 
 app.get('/register/token', registerLimiter, (_req, res) => {

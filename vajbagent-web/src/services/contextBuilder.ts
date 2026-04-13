@@ -191,8 +191,14 @@ export function buildIntegrationContext(): string | null {
 
   const supabaseUrl = localStorage.getItem('vajb_supabase_url')
   const supabaseKey = localStorage.getItem('vajb_supabase_key')
+  const supabaseProjectRef = localStorage.getItem('vajb_supabase_project_ref')
+  const supabaseProjectName = localStorage.getItem('vajb_supabase_project_name')
   if (supabaseUrl && supabaseKey) {
-    parts.push(`[Supabase] URL: ${supabaseUrl} | Anon Key: ${supabaseKey} — use createClient(url, key) from @supabase/supabase-js. Install with: npm i @supabase/supabase-js`)
+    const projectInfo = supabaseProjectName ? ` (project: ${supabaseProjectName})` : ''
+    parts.push(`[Supabase]${projectInfo} URL: ${supabaseUrl} | Anon Key: ${supabaseKey} — use createClient(url, key) from @supabase/supabase-js. Install with: npm i @supabase/supabase-js`)
+    if (supabaseProjectRef) {
+      parts.push(`[Supabase Tools AVAILABLE] The user has connected Supabase via OAuth. You have DIRECT access to the database through these tools: supabase_list_tables (list all tables), supabase_describe_table (get columns of a table), supabase_sql (run ANY SQL directly — CREATE TABLE, INSERT, SELECT, UPDATE, DELETE, ALTER, CREATE POLICY, etc). When the user asks about their database or wants to add tables/data, USE THESE TOOLS IMMEDIATELY — do NOT ask for SQL files or migration paths. You can see and modify the REAL database directly.`)
+    }
   }
 
   const stripePk = localStorage.getItem('vajb_stripe_pk')

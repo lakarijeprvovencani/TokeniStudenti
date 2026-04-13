@@ -1,4 +1,5 @@
 import { useState, useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, Check, Loader2, Plus, Trash2, Eye, EyeOff, Copy,
@@ -173,6 +174,9 @@ export default function Settings({ open, onClose }: SettingsProps) {
       const creds = await supa.getCredentials(project.ref)
       localStorage.setItem('vajb_supabase_url', creds.url)
       localStorage.setItem('vajb_supabase_key', creds.anon_key)
+      // Save project ref so agent tools can target this project for SQL operations
+      localStorage.setItem('vajb_supabase_project_ref', project.ref)
+      localStorage.setItem('vajb_supabase_project_name', project.name)
       addSecret('SUPABASE_URL', creds.url)
       addSecret('SUPABASE_ANON_KEY', creds.anon_key)
       addSecret('VITE_SUPABASE_URL', creds.url)
@@ -260,23 +264,23 @@ export default function Settings({ open, onClose }: SettingsProps) {
 
   const currentIntegration = activeIntegration ? INTEGRATIONS.find(i => i.key === activeIntegration) : null
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
-        <>
-          <motion.div
-            className="settings-overlay-v2"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
+        <motion.div
+          className="settings-overlay-v2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+        >
           <motion.div
             className="settings-modal-v2"
             initial={{ opacity: 0, scale: 0.96, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 10 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* ── Sidebar ── */}
             <aside className="settings-sidebar">
@@ -688,8 +692,9 @@ export default function Settings({ open, onClose }: SettingsProps) {
               )}
             </main>
           </motion.div>
-        </>
+        </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }

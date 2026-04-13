@@ -9,13 +9,14 @@
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
 }
 
 .settings-modal-v2 {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  position: relative;
   width: min(960px, 92vw);
   height: min(680px, 88vh);
   background: linear-gradient(180deg, rgba(18, 18, 24, 0.98), rgba(12, 12, 16, 0.98));

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Code2, Globe, Layout, ArrowUp, Plus, Paperclip, Loader2, LogIn, UserPlus, Key, FolderOpen, Trash2, Clock, Settings as SettingsIcon, LogOut, Sparkles } from 'lucide-react'
 import { login, register, setPassword as setPasswordApi, logout, checkSession, type UserInfo } from '../services/userService'
@@ -189,8 +190,8 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
 
   const handleUseTemplate = (template: Template) => {
     setTemplatesOpen(false)
-    if (!user) return
-    onStart(template.prompt)
+    setText(template.prompt)
+    setTimeout(() => inputRef.current?.focus(), 100)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -339,10 +340,6 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
                     onChange={handleImagePick}
                   />
                   <ModelSelector value={model} onChange={onModelChange} freeTier={freeTier} />
-                  <a href="https://vajbagent.com/dashboard" target="_blank" rel="noopener" className="user-badge">
-                    <span className="user-badge-name">{user.name.split(' ')[0]}</span>
-                    <span className={`user-badge-balance ${user.balance < 0.5 ? 'low' : ''}`}>${user.balance.toFixed(2)}</span>
-                  </a>
                 </div>
                 <button
                   className={`send-btn ${text.trim() ? 'active' : ''}`}
@@ -535,23 +532,24 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
       {/* First-time user onboarding */}
       {showOnboarding && <Onboarding onComplete={() => setShowOnboarding(false)} />}
 
-      {/* ── Templates Modal ── */}
-      <AnimatePresence>
-        {templatesOpen && (
-          <>
+      {/* ── Templates Modal (portaled to body) ── */}
+      {createPortal(
+        <AnimatePresence>
+          {templatesOpen && (
             <motion.div
               className="templates-overlay"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setTemplatesOpen(false)}
-            />
+            >
             <motion.div
               className="templates-modal"
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="templates-header">
                 <div>
@@ -593,9 +591,11 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
                 ))}
               </div>
             </motion.div>
-          </>
+          </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+        document.body
+      )}
     </div>
   )
 }

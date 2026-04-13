@@ -139,6 +139,45 @@ export const TOOL_DEFINITIONS = [
   {
     type: 'function' as const,
     function: {
+      name: 'supabase_list_tables',
+      description: 'List all tables in the user\'s connected Supabase database (public schema). Use this to see what tables exist in the database. Only works if user has connected Supabase via OAuth and selected a project.',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'supabase_describe_table',
+      description: 'Get column details (name, type, nullable, default) for a specific table in the Supabase database. Use before writing code that queries a table to know its schema.',
+      parameters: {
+        type: 'object',
+        properties: {
+          table: { type: 'string', description: 'Table name' },
+        },
+        required: ['table'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'supabase_sql',
+      description: 'Execute SQL directly on the user\'s Supabase database. Use for: CREATE TABLE, ALTER TABLE, INSERT, UPDATE, DELETE, SELECT, CREATE INDEX, ENABLE RLS, CREATE POLICY, etc. Returns rows or success status. This runs on the real database — be careful with destructive operations.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'SQL query to execute (PostgreSQL syntax)' },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'download_file',
       description: 'Download a file (image, font, etc.) from a URL and save it to the project. Use this for binary files like images from Unsplash, icons, fonts, etc.',
       parameters: {

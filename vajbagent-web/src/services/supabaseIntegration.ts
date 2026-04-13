@@ -64,6 +64,8 @@ export async function getStatus(): Promise<SupabaseStatus> {
 
 /**
  * Open OAuth popup. Resolves when the popup notifies success via postMessage.
+ * Uses polling on connection status as fallback in case postMessage fails
+ * (cross-origin, cookie issues, etc.).
  */
 export async function startOAuthFlow(): Promise<void> {
   const { url } = await api<{ url: string }>('/auth/supabase/start')
@@ -74,29 +76,71 @@ export async function startOAuthFlow(): Promise<void> {
       reject(new Error('Pop-up blokiran. Dozvoli pop-up prozore i pokušaj ponovo.'))
       return
     }
+    // TypeScript narrowing: capture non-null reference
+    const popupWin: Window = popup
+
+    let settled = false
+    const startTime = Date.now()
+    // Give user at least 90s to complete the flow before giving up
+    const MAX_WAIT = 180_000
+    // Don't trust popupWin.closed in the first 3s (cross-origin nav can briefly show closed=true)
+    const MIN_WAIT_BEFORE_CLOSED_CHECK = 3000
+
+    function done(success: boolean, errMsg?: string) {
+      if (settled) return
+      settled = true
+      window.removeEventListener('message', messageHandler)
+      clearInterval(pollInterval)
+      try { if (!popupWin.closed) popupWin.close() } catch { /* ignore */ }
+      if (success) resolve()
+      else reject(new Error(errMsg || 'Povezivanje otkazano'))
+    }
 
     const messageHandler = (e: MessageEvent) => {
       if (e.data?.type === 'supabase-connected') {
-        cleanup()
-        resolve()
+        done(true)
       }
     }
 
-    const checkClosed = setInterval(() => {
-      if (popup.closed) {
-        cleanup()
-        // Try to fetch status to see if it actually succeeded
-        getStatus().then(s => {
-          if (s.connected) resolve()
-          else reject(new Error('Povezivanje otkazano'))
-        }).catch(() => reject(new Error('Povezivanje otkazano')))
-      }
-    }, 500)
+    // Poll backend status every 2s — this catches success even if postMessage fails
+    const pollInterval = setInterval(async () => {
+      if (settled) return
+      const elapsed = Date.now() - startTime
 
-    function cleanup() {
-      window.removeEventListener('message', messageHandler)
-      clearInterval(checkClosed)
-    }
+      // Check backend first (source of truth)
+      try {
+        const s = await getStatus()
+        if (s.connected) {
+          done(true)
+          return
+        }
+      } catch { /* ignore */ }
+
+      // Then check if popup closed (only after grace period)
+      if (elapsed > MIN_WAIT_BEFORE_CLOSED_CHECK) {
+        try {
+          if (popupWin.closed) {
+            // Wait one more poll cycle for backend to catch up
+            setTimeout(async () => {
+              if (settled) return
+              try {
+                const finalStatus = await getStatus()
+                if (finalStatus.connected) done(true)
+                else done(false)
+              } catch {
+                done(false)
+              }
+            }, 1500)
+            return
+          }
+        } catch { /* cross-origin, popup still alive */ }
+      }
+
+      // Hard timeout
+      if (elapsed > MAX_WAIT) {
+        done(false, 'Isteklo vreme za povezivanje. Pokušaj ponovo.')
+      }
+    }, 2000)
 
     window.addEventListener('message', messageHandler)
   })

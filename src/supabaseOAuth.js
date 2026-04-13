@@ -274,6 +274,52 @@ export async function listOrganizations(studentKey) {
   return apiCall(studentKey, 'GET', '/organizations');
 }
 
+/**
+ * Run a SQL query against a Supabase project's database.
+ * Uses the Management API's /database/query endpoint.
+ */
+export async function runSql(studentKey, projectRef, query) {
+  if (!projectRef) throw new Error('projectRef required');
+  if (!query || typeof query !== 'string') throw new Error('query required');
+  return apiCall(studentKey, 'POST', `/projects/${projectRef}/database/query`, { query });
+}
+
+/**
+ * List all tables in the public schema of a Supabase project.
+ */
+export async function listTables(studentKey, projectRef) {
+  const query = `
+    SELECT
+      table_name,
+      (SELECT count(*) FROM information_schema.columns
+       WHERE table_schema = 'public' AND columns.table_name = tables.table_name) as column_count
+    FROM information_schema.tables tables
+    WHERE table_schema = 'public'
+      AND table_type = 'BASE TABLE'
+    ORDER BY table_name;
+  `;
+  return runSql(studentKey, projectRef, query);
+}
+
+/**
+ * Describe a table's columns.
+ */
+export async function describeTable(studentKey, projectRef, tableName) {
+  const safeTable = String(tableName).replace(/[^a-zA-Z0-9_]/g, '');
+  const query = `
+    SELECT
+      column_name,
+      data_type,
+      is_nullable,
+      column_default
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = '${safeTable}'
+    ORDER BY ordinal_position;
+  `;
+  return runSql(studentKey, projectRef, query);
+}
+
 export async function listProjects(studentKey) {
   return apiCall(studentKey, 'GET', '/projects');
 }
