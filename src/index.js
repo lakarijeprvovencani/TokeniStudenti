@@ -32,6 +32,7 @@ import { logUsage, getUsageSummary, getUsageForKey, getModelStats } from './usag
 import { getBalance, deductBalance, costUsd, addBalance, getTotalDeposited, loadStudentMarkupFlags, setStudentNoMarkup, getStudentMarkup, providerCostUsd, getPrices } from './balance.js';
 import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP, addStudentWithPassword, authenticateWithPassword, setStudentPassword, studentHasPassword } from './students.js';
 import { sendWelcomeEmail, sendRecoveryEmail, isEmailConfigured } from './email.js';
+import * as supabaseOAuth from './supabaseOAuth.js';
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -660,6 +661,124 @@ app.post('/auth/set-password', authLimiter, asyncHandler(async (req, res) => {
 
   console.log(`[Auth] Password set: "${student.name}" <${student.email}>`);
   res.json({ ok: true, name: student.name });
+}));
+
+// ─── Supabase OAuth Integration ─────────────────────────────────────────────
+
+// Start OAuth flow — redirects user to Supabase login
+app.get('/auth/supabase/start', requireAuth, asyncHandler(async (req, res) => {
+  if (!supabaseOAuth.isSupabaseOAuthConfigured()) {
+    return res.status(503).json({ error: 'Supabase OAuth not configured on backend' });
+  }
+  try {
+    const url = supabaseOAuth.buildAuthorizeUrl(req.studentApiKey);
+    res.json({ url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// OAuth callback — Supabase redirects user back here after authorization
+app.get('/auth/supabase/callback', asyncHandler(async (req, res) => {
+  const { code, state, error: oauthError } = req.query;
+
+  if (oauthError) {
+    return res.send(`
+      <html><body style="font-family:system-ui;padding:40px;background:#0a0a0a;color:#fff;text-align:center">
+        <h2>❌ Supabase autorizacija odbijena</h2>
+        <p>${oauthError}</p>
+        <p><a href="/" style="color:#f97316">Vrati se</a></p>
+      </body></html>
+    `);
+  }
+
+  if (!code || !state) {
+    return res.status(400).send('Missing code or state');
+  }
+
+  try {
+    await supabaseOAuth.handleCallback(String(code), String(state));
+    // Success — show a page that closes itself and notifies the opener
+    res.send(`
+      <html><body style="font-family:system-ui;padding:40px;background:#0a0a0a;color:#fff;text-align:center">
+        <h2 style="color:#22c55e">✅ Supabase je povezan!</h2>
+        <p>Možeš zatvoriti ovaj prozor.</p>
+        <script>
+          if (window.opener) {
+            window.opener.postMessage({ type: 'supabase-connected' }, '*');
+            setTimeout(() => window.close(), 1500);
+          } else {
+            setTimeout(() => { window.location.href = '/'; }, 1500);
+          }
+        </script>
+      </body></html>
+    `);
+  } catch (err) {
+    console.error('[Supabase OAuth] Callback error:', err.message);
+    res.status(500).send(`
+      <html><body style="font-family:system-ui;padding:40px;background:#0a0a0a;color:#fff;text-align:center">
+        <h2>❌ Greška pri povezivanju</h2>
+        <p>${err.message}</p>
+        <p><a href="/" style="color:#f97316">Pokušaj ponovo</a></p>
+      </body></html>
+    `);
+  }
+}));
+
+// Check connection status
+app.get('/api/supabase/status', requireAuth, asyncHandler(async (req, res) => {
+  const connected = await supabaseOAuth.isConnected(req.studentApiKey);
+  res.json({ connected, configured: supabaseOAuth.isSupabaseOAuthConfigured() });
+}));
+
+// Disconnect
+app.post('/api/supabase/disconnect', requireAuth, asyncHandler(async (req, res) => {
+  await supabaseOAuth.disconnect(req.studentApiKey);
+  res.json({ ok: true });
+}));
+
+// List user's organizations
+app.get('/api/supabase/organizations', requireAuth, asyncHandler(async (req, res) => {
+  try {
+    const orgs = await supabaseOAuth.listOrganizations(req.studentApiKey);
+    res.json({ organizations: orgs });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// List user's existing projects
+app.get('/api/supabase/projects', requireAuth, asyncHandler(async (req, res) => {
+  try {
+    const projects = await supabaseOAuth.listProjects(req.studentApiKey);
+    res.json({ projects });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// Create a new project
+app.post('/api/supabase/create-project', requireAuth, asyncHandler(async (req, res) => {
+  const { orgId, name, region } = req.body || {};
+  if (!orgId || !name) {
+    return res.status(400).json({ error: 'orgId and name are required' });
+  }
+  try {
+    const project = await supabaseOAuth.createProject(req.studentApiKey, { orgId, name, region });
+    res.json({ project });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// Get credentials (URL + anon key) for a specific project
+app.get('/api/supabase/credentials/:projectRef', requireAuth, asyncHandler(async (req, res) => {
+  try {
+    const creds = await supabaseOAuth.getProjectCredentials(req.studentApiKey, req.params.projectRef);
+    res.json(creds);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 }));
 
 // ─── Legacy Registration (extension/landing page) ───────────────────────────

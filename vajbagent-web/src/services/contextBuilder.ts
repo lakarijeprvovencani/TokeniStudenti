@@ -1,4 +1,5 @@
 import { listFiles, readFile } from './webcontainer'
+import { getSecretKeys } from './secretsStore'
 
 // ─── Workspace Index ─────────────────────────────────────────────────────────
 
@@ -166,7 +167,7 @@ CRITICAL REMINDERS:
 - ALWAYS end with a text message. Never go silent.
 - Do NOT create style2.css or split files unnecessarily — keep it simple.
 - ALWAYS respond in the same language the user writes in. If user writes in Serbian, respond in Serbian.
-- For React/Vite/Node projects: ALWAYS run execute_command("npm install") and then execute_command("npm run build") AFTER creating files. This is MANDATORY — the user needs to see the result in preview.
+- For ANY npm project (React, Vite, Next.js, etc.): ALWAYS run execute_command("npm install") and then execute_command("npm run build") AFTER creating files. This is MANDATORY — the user needs to see the result in preview. NEVER stop after just creating files.
 - Keep file count LOW (max 5-6 files). Combine styles into one file. Do not over-engineer.
 </model_rules>`,
 
@@ -212,6 +213,12 @@ export function buildIntegrationContext(): string | null {
   const netlifyToken = localStorage.getItem('vajb_netlify_token')
   if (netlifyToken) {
     parts.push(`[Netlify] Token konfigurisan — deploy koristi autentifikovani API.`)
+  }
+
+  // Environment secrets — list of keys available in .env file
+  const secretKeys = getSecretKeys()
+  if (secretKeys.length > 0) {
+    parts.push(`[Env Secrets] User-defined env vars in .env file: ${secretKeys.join(', ')} — access via process.env.KEY in Node, or import.meta.env.VITE_KEY (must start with VITE_) in Vite frontend. The .env file is auto-created — do NOT overwrite it.`)
   }
 
   if (parts.length === 0) return null

@@ -1,8 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { Code2, Globe, Layout, ArrowUp, Plus, Paperclip, Loader2, LogIn, UserPlus, Key } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Code2, Globe, Layout, ArrowUp, Plus, Paperclip, Loader2, LogIn, UserPlus, Key, FolderOpen, Trash2, Clock, Settings as SettingsIcon, LogOut, Sparkles } from 'lucide-react'
 import { login, register, setPassword as setPasswordApi, logout, checkSession, type UserInfo } from '../services/userService'
+import { listProjects, deleteProject, type SavedProject } from '../services/projectStore'
+import { TEMPLATES, TEMPLATE_CATEGORIES, type Template } from '../templates'
 import ModelSelector from './ModelSelector'
+import Settings from './Settings'
+import Onboarding, { shouldShowOnboarding } from './Onboarding'
 import './Welcome.css'
 
 const QUICK_STARTS = [
@@ -13,6 +17,7 @@ const QUICK_STARTS = [
 
 interface WelcomeProps {
   onStart: (prompt: string) => void
+  onResume: (project: SavedProject) => void
   model: string
   onModelChange: (model: string) => void
   onAuth: (user: UserInfo) => void
@@ -22,10 +27,57 @@ interface WelcomeProps {
 
 type AuthTab = 'login' | 'register' | 'apikey'
 
-export default function Welcome({ onStart, model, onModelChange, onAuth, user, freeTier }: WelcomeProps) {
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'upravo'
+  if (mins < 60) return `pre ${mins} min`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `pre ${hours}h`
+  const days = Math.floor(hours / 24)
+  return `pre ${days}d`
+}
+
+const TEXT_EXTS = /\.(ts|tsx|js|jsx|py|html|css|json|md|txt|yaml|yml|sql|sh|csv|xml|toml|env)$/i
+
+export default function Welcome({ onStart, onResume, model, onModelChange, onAuth, user, freeTier }: WelcomeProps) {
   const [text, setText] = useState('')
   const [focused, setFocused] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
+  // Handle text file attach (+ button)
+  const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    let added = ''
+    for (const file of files) {
+      if (!TEXT_EXTS.test(file.name)) continue
+      const content = await file.text()
+      added += `\n\n[Fajl: ${file.name}]\n\`\`\`\n${content.slice(0, 15000)}\n\`\`\``
+    }
+    if (added) {
+      setText(prev => prev + added)
+      inputRef.current?.focus()
+    }
+    e.target.value = ''
+  }
+
+  // Handle image attach (Paperclip button) — converts to data URL and adds note
+  const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    // For simplicity on welcome screen, just note that images were attached
+    // The actual image data goes via session/initialPrompt but Welcome doesn't support that yet
+    // So we tell the user to use the chat panel for images
+    if (files.length > 0) {
+      alert('Slike možeš da prikačiš direktno u chat panel kad uđeš u projekat — prevuci ih ili pejstuj.')
+    }
+    e.target.value = ''
+  }
 
   // Auth state
   const [authTab, setAuthTab] = useState<AuthTab>('login')
@@ -38,6 +90,13 @@ export default function Welcome({ onStart, model, onModelChange, onAuth, user, f
   const [authError, setAuthError] = useState('')
   const [checkingSession, setCheckingSession] = useState(true)
 
+  // Projects state
+  const [projects, setProjects] = useState<SavedProject[]>([])
+  const [loadingProjects, setLoadingProjects] = useState(false)
+  const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [templateCategory, setTemplateCategory] = useState<'web' | 'app' | 'tool' | 'fun'>('web')
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
   // Check existing session on mount
   useEffect(() => {
     checkSession().then(info => {
@@ -45,6 +104,27 @@ export default function Welcome({ onStart, model, onModelChange, onAuth, user, f
       setCheckingSession(false)
     })
   }, [])
+
+  // Load saved projects when user is logged in
+  useEffect(() => {
+    if (!user) return
+    setLoadingProjects(true)
+    listProjects()
+      .then(list => setProjects(list))
+      .catch(() => {})
+      .finally(() => setLoadingProjects(false))
+    // Show onboarding on first login
+    if (shouldShowOnboarding()) {
+      setShowOnboarding(true)
+    }
+  }, [user])
+
+  const handleDeleteProject = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!confirm('Obriši ovaj projekat?')) return
+    await deleteProject(id)
+    setProjects(prev => prev.filter(p => p.id !== id))
+  }
 
   const handleLogin = async () => {
     if (!email.trim() || !password) return
@@ -79,7 +159,6 @@ export default function Welcome({ onStart, model, onModelChange, onAuth, user, f
     const result = await setPasswordApi(email.trim(), apiKey.trim(), password)
     setAuthLoading(false)
     if (result.ok) {
-      // Now login with the new password
       const loginResult = await login(email.trim(), password)
       if (loginResult.ok) {
         onAuth({ name: loginResult.name!, balance: loginResult.balance!, freeTier: false })
@@ -108,6 +187,12 @@ export default function Welcome({ onStart, model, onModelChange, onAuth, user, f
     onStart(trimmed)
   }
 
+  const handleUseTemplate = (template: Template) => {
+    setTemplatesOpen(false)
+    if (!user) return
+    onStart(template.prompt)
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -121,6 +206,41 @@ export default function Welcome({ onStart, model, onModelChange, onAuth, user, f
     <div className="welcome">
       <div className="welcome-glow" />
       <div className="welcome-glow-secondary" />
+
+      {/* Top-right user controls */}
+      {isLoggedIn && (
+        <div className="welcome-topbar">
+          <button className="welcome-icon-btn" onClick={() => setSettingsOpen(true)} title="Podešavanja">
+            <SettingsIcon size={16} />
+          </button>
+          <div className="welcome-user-wrap">
+            <button className="welcome-user-btn" onClick={() => setUserMenuOpen(!userMenuOpen)}>
+              <span className="welcome-user-initials">
+                {user.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+              </span>
+            </button>
+            {userMenuOpen && (
+              <>
+                <div className="welcome-menu-backdrop" onClick={() => setUserMenuOpen(false)} />
+                <div className="welcome-user-menu">
+                  <div className="welcome-menu-header">
+                    <span className="welcome-menu-name">{user.name}</span>
+                    <span className="welcome-menu-balance">${user.balance.toFixed(2)}</span>
+                  </div>
+                  <div className="welcome-menu-divider" />
+                  <a href="https://vajbagent.com/dashboard" target="_blank" rel="noopener" className="welcome-menu-item">
+                    Dopuni kredite
+                  </a>
+                  <button className="welcome-menu-item logout" onClick={async () => { await logout(); window.location.reload() }}>
+                    <LogOut size={14} />
+                    Odjavi se
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <motion.div
         className="welcome-logo"
@@ -157,6 +277,13 @@ export default function Welcome({ onStart, model, onModelChange, onAuth, user, f
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
           >
+            <button
+              className="quick-pill quick-pill-templates"
+              onClick={() => setTemplatesOpen(true)}
+            >
+              <Sparkles size={16} />
+              Templejti
+            </button>
             {QUICK_STARTS.map((qs) => (
               <button
                 key={qs.label}
@@ -189,12 +316,28 @@ export default function Welcome({ onStart, model, onModelChange, onAuth, user, f
               />
               <div className="input-actions">
                 <div className="input-left-actions">
-                  <button className="attach-btn" title="Dodaj fajl">
+                  <button className="attach-btn" title="Dodaj fajl" onClick={() => fileInputRef.current?.click()}>
                     <Plus size={16} />
                   </button>
-                  <button className="attach-btn" title="Prikači sliku">
+                  <button className="attach-btn" title="Prikači sliku" onClick={() => imageInputRef.current?.click()}>
                     <Paperclip size={16} />
                   </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".ts,.tsx,.js,.jsx,.py,.html,.css,.json,.md,.txt,.yaml,.yml,.sql,.sh,.csv,.xml,.toml,.env"
+                    style={{ display: 'none' }}
+                    onChange={handleFilePick}
+                  />
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleImagePick}
+                  />
                   <ModelSelector value={model} onChange={onModelChange} freeTier={freeTier} />
                   <a href="https://vajbagent.com/dashboard" target="_blank" rel="noopener" className="user-badge">
                     <span className="user-badge-name">{user.name.split(' ')[0]}</span>
@@ -211,6 +354,57 @@ export default function Welcome({ onStart, model, onModelChange, onAuth, user, f
               </div>
             </div>
           </motion.div>
+
+          {/* ── Saved Projects ── */}
+          <AnimatePresence>
+            {projects.length > 0 && (
+              <motion.div
+                className="saved-projects"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.6 }}
+              >
+                <div className="saved-projects-header">
+                  <FolderOpen size={14} />
+                  <span>Tvoji projekti</span>
+                </div>
+                <div className="saved-projects-list">
+                  {projects.slice(0, 6).map(project => (
+                    <button
+                      key={project.id}
+                      className="saved-project-card"
+                      onClick={() => onResume(project)}
+                    >
+                      <div className="project-card-info">
+                        <span className="project-card-name">
+                          {project.name.length > 50 ? project.name.slice(0, 50) + '...' : project.name}
+                        </span>
+                        <span className="project-card-meta">
+                          <Clock size={10} />
+                          {timeAgo(project.updatedAt)}
+                          {' · '}
+                          {Object.keys(project.files).filter(f => !f.endsWith('/')).length} fajlova
+                        </span>
+                      </div>
+                      <button
+                        className="project-card-delete"
+                        onClick={(e) => handleDeleteProject(project.id, e)}
+                        title="Obriši"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {loadingProjects && projects.length === 0 && (
+            <div className="saved-projects-loading">
+              <Loader2 size={14} className="spin" />
+            </div>
+          )}
         </>
       ) : (
         /* ── Auth form ── */
@@ -333,18 +527,75 @@ export default function Welcome({ onStart, model, onModelChange, onAuth, user, f
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.7 }}
       >
-        {isLoggedIn ? (
-          <span>
-            Ulogovan kao <span className="footer-brand">{user.name.split(' ')[0]}</span>
-            {' · '}
-            <button className="footer-logout" onClick={async () => { await logout(); window.location.reload() }}>
-              Odjavi se
-            </button>
-          </span>
-        ) : (
-          <>Powered by <span className="footer-brand">Vajb<span>Agent</span></span></>
-        )}
+        <>Powered by <span className="footer-brand">Vajb<span>Agent</span></span></>
       </motion.div>
+
+      <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      {/* First-time user onboarding */}
+      {showOnboarding && <Onboarding onComplete={() => setShowOnboarding(false)} />}
+
+      {/* ── Templates Modal ── */}
+      <AnimatePresence>
+        {templatesOpen && (
+          <>
+            <motion.div
+              className="templates-overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setTemplatesOpen(false)}
+            />
+            <motion.div
+              className="templates-modal"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <div className="templates-header">
+                <div>
+                  <h2>Templejti</h2>
+                  <p>Izaberi gotov template ili napravi sopstveni</p>
+                </div>
+                <button className="templates-close" onClick={() => setTemplatesOpen(false)}>
+                  <Trash2 size={16} style={{ display: 'none' }} />
+                  ✕
+                </button>
+              </div>
+
+              <div className="templates-tabs">
+                {TEMPLATE_CATEGORIES.map(cat => (
+                  <button
+                    key={cat.id}
+                    className={`templates-tab ${templateCategory === cat.id ? 'active' : ''}`}
+                    onClick={() => setTemplateCategory(cat.id as 'web' | 'app' | 'tool' | 'fun')}
+                  >
+                    <span>{cat.icon}</span>
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+
+              <div className="templates-grid">
+                {TEMPLATES.filter(t => t.category === templateCategory).map(template => (
+                  <button
+                    key={template.id}
+                    className="template-card"
+                    onClick={() => handleUseTemplate(template)}
+                  >
+                    <div className="template-icon">{template.icon}</div>
+                    <div className="template-info">
+                      <div className="template-name">{template.name}</div>
+                      <div className="template-desc">{template.description}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

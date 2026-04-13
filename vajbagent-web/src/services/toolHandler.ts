@@ -83,6 +83,36 @@ export async function executeToolCall(
           console.log('[Tool] Auto-patched vite.config with server.host = true')
         }
 
+        // Auto-patch: ensure next.config has output: 'export' + unoptimized images for WebContainers
+        if (/^next\.config\.(js|mjs|ts)$/.test(path)) {
+          if (!content.includes("output")) {
+            if (content.includes('module.exports')) {
+              content = content.replace(
+                /module\.exports\s*=\s*\{/,
+                "module.exports = {\n  output: 'export',"
+              )
+            } else if (content.includes('export default')) {
+              content = content.replace(
+                /export\s+default\s*\{/,
+                "export default {\n  output: 'export',"
+              )
+            } else if (content.includes('nextConfig')) {
+              content = content.replace(
+                /const\s+nextConfig\s*=\s*\{/,
+                "const nextConfig = {\n  output: 'export',"
+              )
+            }
+            console.log('[Tool] Auto-patched next.config with output: export')
+          }
+          if (!content.includes("unoptimized")) {
+            content = content.replace(
+              /output:\s*['"]export['"]\s*,?/,
+              "output: 'export',\n  images: { unoptimized: true },"
+            )
+            console.log('[Tool] Auto-patched next.config with images.unoptimized')
+          }
+        }
+
         const result = await writeFile(path, content)
         const allFiles = await getAllFiles()
         console.log('[Tool] write_file done:', path, '| total files:', Object.keys(allFiles).length)
@@ -122,18 +152,30 @@ export async function executeToolCall(
         const parts = command.split(' ')
         const result = await runCommand(parts[0], parts.slice(1))
 
-        // After build commands, refresh files so dist/ appears in preview
-        if (/\b(build|generate|export)\b/i.test(command)) {
+        // After build commands, refresh files so dist/ or out/ appears in preview
+        const isBuild = /\b(build|generate|export)\b/i.test(command)
+        if (isBuild) {
           try {
             const allFiles = await getAllFiles()
             onFileChange(allFiles)
-            console.log('[Tool] Post-build file refresh:', Object.keys(allFiles).filter(f => f.startsWith('dist/')).length, 'dist files')
+            const distCount = Object.keys(allFiles).filter(f => f.startsWith('dist/') || f.startsWith('out/')).length
+            console.log('[Tool] Post-build file refresh:', distCount, 'build output files')
           } catch (e) {
             console.warn('[Tool] Post-build file refresh failed:', e)
           }
         }
 
-        return { tool_call_id: tc.id, role: 'tool', content: result.substring(0, 3000) }
+        // Detect build/install failures and add a fix instruction for the agent
+        const trimmedResult = result.substring(0, 3000)
+        const failurePatterns = /(error|failed|missing|cannot find|not found|exit code: [1-9]|Module not found|SyntaxError|TypeError|ReferenceError|EACCES|ENOENT|MODULE_NOT_FOUND|Cannot resolve|Unexpected token|ENOTFOUND)/i
+        const isFailure = failurePatterns.test(trimmedResult) && (isBuild || /\b(install|test|start|dev)\b/i.test(command))
+
+        if (isFailure) {
+          const hint = `\n\n[BUILD FAILED] The command exited with errors. READ the error message above carefully, identify the root cause (missing import, syntax error, missing dependency, wrong file path, etc.), FIX it using write_file or replace_in_file, then run the command AGAIN. Do NOT stop. Do NOT ask the user. Fix it yourself and retry. If the same error happens 3 times in a row, then explain to the user what's wrong.`
+          return { tool_call_id: tc.id, role: 'tool', content: trimmedResult + hint }
+        }
+
+        return { tool_call_id: tc.id, role: 'tool', content: trimmedResult }
       }
 
       case 'search_files': {

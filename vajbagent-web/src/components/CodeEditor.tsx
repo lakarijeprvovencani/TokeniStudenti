@@ -57,10 +57,47 @@ export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile
     setOpenTabs(prev => prev.filter(t => fileKeys.includes(t)))
   }, [files])
 
-  const closeTab = (path: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setOpenTabs(prev => prev.filter(t => t !== path))
+  const closeTab = useCallback((path: string, e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    setOpenTabs(prev => {
+      const filtered = prev.filter(t => t !== path)
+      // If closing active tab, switch to next/prev tab
+      if (path === activeFile && filtered.length > 0) {
+        const idx = prev.indexOf(path)
+        const next = filtered[idx] || filtered[idx - 1] || filtered[0]
+        if (next) onSelectFile?.(next)
+      }
+      return filtered
+    })
+  }, [activeFile, onSelectFile])
+
+  // Middle-click closes tab
+  const handleTabAuxClick = (path: string, e: React.MouseEvent) => {
+    if (e.button === 1) {
+      e.preventDefault()
+      closeTab(path)
+    }
   }
+
+  // Ctrl+W to close active tab
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'w' && activeFile) {
+        e.preventDefault()
+        closeTab(activeFile)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [activeFile, closeTab])
+
+  // Auto-scroll active tab into view
+  const tabBarRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!activeFile || !tabBarRef.current) return
+    const el = tabBarRef.current.querySelector(`[data-tab="${CSS.escape(activeFile)}"]`) as HTMLElement
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+  }, [activeFile])
 
   // Monaco mount handler — track selection
   const handleEditorMount: OnMount = useCallback((editor) => {
@@ -178,12 +215,15 @@ export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile
     <div className="editor-panel">
       {/* Tab bar */}
       {openTabs.length > 0 && (
-        <div className="editor-tabs">
+        <div className="editor-tabs" ref={tabBarRef}>
           {openTabs.map(tab => (
             <button
               key={tab}
+              data-tab={tab}
               className={`editor-tab ${tab === activeFile ? 'active' : ''}`}
               onClick={() => onSelectFile?.(tab)}
+              onAuxClick={(e) => handleTabAuxClick(tab, e)}
+              title={tab}
             >
               {getFileIcon(tab)}
               <span className="tab-name">{tab.split('/').pop()}</span>

@@ -137,7 +137,7 @@ export async function listFiles(path: string = '.'): Promise<string[]> {
     for (const entry of entries) {
       const fullPath = path === '.' ? entry.name : `${path}/${entry.name}`
       if (entry.isDirectory()) {
-        if (entry.name === 'node_modules' || entry.name === '.git') continue
+        if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.next' || entry.name === '.cache') continue
         files.push(fullPath + '/')
         const subFiles = await listFiles(fullPath)
         files.push(...subFiles)
@@ -148,6 +148,30 @@ export async function listFiles(path: string = '.'): Promise<string[]> {
     return files
   } catch {
     return []
+  }
+}
+
+/** Clear all files from WebContainers filesystem (for new project) */
+export async function clearFilesystem(): Promise<void> {
+  const wc = await getWebContainer()
+  try {
+    const entries = await wc.fs.readdir('/', { withFileTypes: true })
+    for (const entry of entries) {
+      try {
+        if (entry.isDirectory()) {
+          await wc.fs.rm('/' + entry.name, { recursive: true })
+        } else {
+          await wc.fs.rm('/' + entry.name)
+        }
+      } catch { /* some system dirs can't be removed, that's fine */ }
+    }
+    // Reset dev server state
+    serverUrl = null
+    serverListenerAttached = false
+    serverReadyCallbacks = []
+    console.log('[WebContainer] Filesystem cleared')
+  } catch (err) {
+    console.warn('[WebContainer] Clear failed:', err)
   }
 }
 
@@ -195,9 +219,13 @@ export async function runCommand(cmd: string, args: string[]): Promise<string> {
   }
 
   // Regular command: wait for completion with timeout
+  // Build commands get longer timeout (90s) since Next.js/Vite builds can be slow in WebContainers
+  const isBuild = /\b(build|generate|export)\b/i.test(fullCmd)
+  const isInstall = /\b(install|ci)\b/i.test(fullCmd)
+  const timeoutMs = isBuild ? 180000 : isInstall ? 90000 : 30000
   const timeout = setTimeout(() => {
     try { process.kill() } catch {}
-  }, 30000)
+  }, timeoutMs)
 
   try {
     while (true) {

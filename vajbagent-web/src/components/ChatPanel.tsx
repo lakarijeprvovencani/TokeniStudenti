@@ -42,10 +42,14 @@ interface ChatPanelProps {
   onDone?: () => void
   onContextUpdate?: (used: number, limit: number) => void
   onStreamingChange?: (streaming: boolean) => void
+  onChatHistoryUpdate?: (history: unknown[], displayMessages: unknown[]) => void
   files: Record<string, string>
   activeFile: string | null
   selectionRef?: React.RefObject<string | null>
   freeTier?: boolean
+  resumeHistory?: unknown[]
+  resumeDisplayMessages?: unknown[]
+  resumeNeedsBuild?: boolean
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -235,7 +239,7 @@ function loadSession(): { history: Message[]; displayMessages: { role: string; c
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function ChatPanel({ initialPrompt, model, onModelChange, onFilesChanged, onDone, onContextUpdate, onStreamingChange, files, activeFile, selectionRef, freeTier }: ChatPanelProps) {
+export default function ChatPanel({ initialPrompt, model, onModelChange, onFilesChanged, onDone, onContextUpdate, onStreamingChange, onChatHistoryUpdate, files, activeFile, selectionRef, freeTier, resumeHistory, resumeDisplayMessages, resumeNeedsBuild }: ChatPanelProps) {
   const [displayMessages, setDisplayMessages] = useState<{ role: string; content: string }[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
@@ -252,14 +256,38 @@ export default function ChatPanel({ initialPrompt, model, onModelChange, onFiles
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const historyRef = useRef<Message[]>([])
+  const displayMessagesRef = useRef(displayMessages)
+  displayMessagesRef.current = displayMessages
   const didInit = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
   const queuedRef = useRef<string | null>(null)
+
+  // Sync chat history to parent for auto-save whenever displayMessages change
+  useEffect(() => {
+    if (displayMessages.length > 0) {
+      onChatHistoryUpdate?.(historyRef.current, displayMessages)
+    }
+  }, [displayMessages])
 
   // Restore session on mount
   useEffect(() => {
     if (didInit.current) return
     didInit.current = true
+
+    // Priority: resumeProject > localStorage session > fresh start
+    if (resumeHistory && resumeHistory.length > 0) {
+      historyRef.current = resumeHistory as Message[]
+      if (resumeDisplayMessages && resumeDisplayMessages.length > 0) {
+        setDisplayMessages(resumeDisplayMessages as { role: string; content: string }[])
+      }
+      // Auto-rebuild npm projects on resume
+      if (resumeNeedsBuild) {
+        setTimeout(() => {
+          sendMessage('Projekat je upravo otvoren iz istorije. Fajlovi su restartovani. Pokreni npm install && npm run build da bi preview radio. Ne menjaj ništa, samo pokreni build.')
+        }, 1500)
+      }
+      return
+    }
 
     const session = loadSession()
     if (session && session.history.length > 0 && !initialPrompt) {
@@ -698,7 +726,7 @@ export default function ChatPanel({ initialPrompt, model, onModelChange, onFiles
               setStreaming(false)
               onStreamingChange?.(false)
               setStatusText('')
-              saveSession(historyRef.current, [...displayMessages, { role: 'error', content: userErrMsg }], model)
+              saveSession(historyRef.current, [...displayMessagesRef.current, { role: 'error', content: userErrMsg }], model)
               return
             }
 
@@ -832,8 +860,9 @@ export default function ChatPanel({ initialPrompt, model, onModelChange, onFiles
       onStreamingChange?.(false)
       setStatusText('')
       abortRef.current = null
-      // Save session
-      saveSession(historyRef.current, displayMessages, model)
+      // Save session (use ref to get latest displayMessages, not stale closure)
+      saveSession(historyRef.current, displayMessagesRef.current, model)
+      onChatHistoryUpdate?.(historyRef.current, displayMessagesRef.current)
       // Refresh balance and warn at multiple levels
       fetchBalance().then(bal => {
         if (bal === null) return

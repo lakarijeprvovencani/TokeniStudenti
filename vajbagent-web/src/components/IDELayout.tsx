@@ -3,14 +3,16 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Settings as SettingsIcon, Download, Rocket,
   Sparkles, User, Zap, ChevronLeft, ChevronRight,
-  Terminal, GitBranch, Wallet, LogOut, Copy, Check,
+  Terminal, GitBranch, Wallet, LogOut, Copy, Check, Home,
 } from 'lucide-react'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
 import { deployToNetlify, deployToVercel } from '../services/deploy'
 import { pushToGitHub } from '../services/github'
-import { preboot, onServerReady, getServerUrl } from '../services/webcontainer'
+import { preboot, onServerReady, getServerUrl, writeFile as wcWriteFile, clearFilesystem } from '../services/webcontainer'
+import { buildEnvFile } from '../services/secretsStore'
 import { fetchUserInfo, logout, type UserInfo } from '../services/userService'
+import { saveProject, generateProjectId, type SavedProject } from '../services/projectStore'
 import FileExplorer from './FileExplorer'
 import Settings from './Settings'
 import CodeEditor from './CodeEditor'
@@ -24,6 +26,8 @@ interface IDELayoutProps {
   model: string
   onModelChange: (model: string) => void
   freeTier?: boolean
+  resumeProject?: SavedProject | null
+  onBackToWelcome?: () => void
 }
 
 const panelVariants = {
@@ -32,7 +36,7 @@ const panelVariants = {
   exit: { opacity: 0, scale: 0.98, transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } },
 }
 
-export default function IDELayout({ initialPrompt, model, onModelChange, freeTier }: IDELayoutProps) {
+export default function IDELayout({ initialPrompt, model, onModelChange, freeTier, resumeProject, onBackToWelcome }: IDELayoutProps) {
   const [files, setFiles] = useState<Record<string, string>>({})
   const [activeFile, setActiveFile] = useState<string | null>(null)
   const [contextUsed, setContextUsed] = useState(0)
@@ -44,7 +48,167 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
   const selectionRef = useRef<string | null>(null)
 
+  // ─── Project persistence ──────────────────────────────────────────────────
+  const projectIdRef = useRef<string>(resumeProject?.id || generateProjectId())
+  const projectNameRef = useRef<string>(resumeProject?.name || '')
+  const projectPromptRef = useRef<string>(resumeProject?.prompt || initialPrompt)
+  const projectCreatedAtRef = useRef<number>(resumeProject?.createdAt || Date.now())
+  const chatHistoryRef = useRef<unknown[]>(resumeProject?.chatHistory || [])
+  const displayMessagesRef = useRef<unknown[]>(resumeProject?.displayMessages || [])
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const filesRef = useRef(files)
+  filesRef.current = files
+
+  // Auto-derive project name from first user message or prompt
+  const deriveProjectName = useCallback((prompt: string) => {
+    if (projectNameRef.current) return // already set
+    const name = prompt.slice(0, 60).replace(/\n/g, ' ').trim()
+    if (name) projectNameRef.current = name
+  }, [])
+
+  // Set initial name from prompt
+  useEffect(() => {
+    if (initialPrompt) deriveProjectName(initialPrompt)
+    if (resumeProject?.name) projectNameRef.current = resumeProject.name
+  }, [])
+
+  // Filter out build artifacts, keeping source files + small build HTML/CSS for instant preview on resume
+  const SKIP_PATTERNS = /^(\.next\/|node_modules\/|\.cache\/|\.turbo\/|coverage\/)/
+  const SKIP_EXTENSIONS = /\.(pack|map|d\.ts|tsbuildinfo)$/
+
+  function filterSourceFiles(allFiles: Record<string, string>): Record<string, string> {
+    const filtered: Record<string, string> = {}
+    for (const [path, content] of Object.entries(allFiles)) {
+      if (SKIP_PATTERNS.test(path)) continue
+      if (SKIP_EXTENSIONS.test(path)) continue
+
+      // For build output dirs (dist/, out/): keep HTML + CSS, skip large JS bundles
+      const isBuildFile = /^(dist|out)\//.test(path)
+      if (isBuildFile) {
+        if (path.endsWith('.html') || path.endsWith('.css')) {
+          // Keep HTML and CSS for preview (they're small)
+          filtered[path] = content
+        }
+        // Skip JS bundles, images, source maps in build output
+        continue
+      }
+
+      // Skip very large files (likely minified bundles)
+      if (content.length > 100000) continue
+      filtered[path] = content
+    }
+    return filtered
+  }
+
+  // Auto-save project (debounced 5s)
+  const triggerAutoSave = useCallback(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      const currentFiles = filesRef.current
+      // Only save if there are files or chat messages
+      if (Object.keys(currentFiles).length === 0 && chatHistoryRef.current.length === 0) return
+
+      const sourceFiles = filterSourceFiles(currentFiles)
+      saveProject({
+        id: projectIdRef.current,
+        name: projectNameRef.current || 'Novi projekat',
+        files: sourceFiles,
+        chatHistory: chatHistoryRef.current,
+        displayMessages: displayMessagesRef.current,
+        model,
+        createdAt: projectCreatedAtRef.current,
+        updatedAt: Date.now(),
+        prompt: projectPromptRef.current,
+      }).catch(err => console.warn('[AutoSave] Failed:', err))
+    }, 5000)
+  }, [model])
+
+  // Trigger save when files change
+  useEffect(() => {
+    triggerAutoSave()
+  }, [files, triggerAutoSave])
+
+  // Save on unload
+  useEffect(() => {
+    const handleUnload = () => {
+      const currentFiles = filesRef.current
+      if (Object.keys(currentFiles).length === 0 && chatHistoryRef.current.length === 0) return
+      // Sync save before unload (best effort)
+      const sourceFiles = filterSourceFiles(currentFiles)
+      const data = JSON.stringify({
+        id: projectIdRef.current,
+        name: projectNameRef.current || 'Novi projekat',
+        files: sourceFiles,
+        chatHistory: chatHistoryRef.current,
+        displayMessages: displayMessagesRef.current,
+        model,
+        createdAt: projectCreatedAtRef.current,
+        updatedAt: Date.now(),
+        prompt: projectPromptRef.current,
+      })
+      // Use localStorage as emergency backup (IndexedDB may not complete)
+      localStorage.setItem('vajb_unsaved_project', data)
+    }
+    window.addEventListener('beforeunload', handleUnload)
+    return () => window.removeEventListener('beforeunload', handleUnload)
+  }, [model])
+
+  // Callback for ChatPanel to sync history for persistence
+  const handleChatHistoryUpdate = useCallback((history: unknown[], displayMsgs: unknown[]) => {
+    chatHistoryRef.current = history
+    displayMessagesRef.current = displayMsgs
+    triggerAutoSave()
+  }, [triggerAutoSave])
+
+  // ─── Resume project: restore files to WebContainers ───────────────────────
+  const GOOD_ACTIVE_FILE = /\.(tsx?|jsx?|css|html)$/
+
+  useEffect(() => {
+    if (!resumeProject?.files) return
+    const restoreFiles = async () => {
+      const entries = Object.entries(resumeProject.files)
+      if (entries.length === 0) return
+
+      console.log('[Resume] Restoring', entries.length, 'files to WebContainers')
+      for (const [path, content] of entries) {
+        if (path.endsWith('/')) continue
+        try {
+          await wcWriteFile(path, content)
+        } catch (err) {
+          console.warn('[Resume] Failed to write:', path, err)
+        }
+      }
+      setFiles(resumeProject.files)
+      // Set active file to a real source file (prefer App.tsx, index.html, etc.)
+      const preferred = ['src/App.tsx', 'src/App.jsx', 'src/main.tsx', 'index.html', 'pages/index.tsx', 'pages/index.jsx', 'app/page.tsx']
+      const activeCandidate =
+        preferred.find(p => resumeProject.files[p]) ||
+        entries.find(([p]) => GOOD_ACTIVE_FILE.test(p) && !p.includes('node_modules') && !p.startsWith('dist/') && !p.startsWith('out/') && !p.startsWith('.next/'))?.[0]
+      if (activeCandidate) setActiveFile(activeCandidate)
+      console.log('[Resume] Files restored, active:', activeCandidate)
+    }
+    restoreFiles()
+  }, [resumeProject])
+
+  // ─── Standard hooks ───────────────────────────────────────────────────────
+  // Clear filesystem for new projects (not resume)
+  useEffect(() => {
+    if (!resumeProject) {
+      clearFilesystem().catch(() => {})
+    }
+  }, [])
   useEffect(() => { preboot() }, [])
+
+  // Inject user's env secrets into WebContainers as .env file
+  useEffect(() => {
+    const envContent = buildEnvFile()
+    if (!envContent) return
+    // Wait a bit for boot, then write .env
+    const timer = setTimeout(() => {
+      wcWriteFile('.env', envContent).catch(err => console.warn('[Env] Failed to write .env:', err))
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [])
   useEffect(() => {
     fetchUserInfo().then(info => { if (info) setUserInfo(info) })
   }, [])
@@ -109,28 +273,26 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
     selectionRef.current = selection
   }, [])
 
-  // Use ref for files so handleAgentDone always sees latest
-  const filesRef = useRef(files)
-  filesRef.current = files
-
   const handleAgentDone = useCallback(() => {
     const currentFiles = Object.keys(filesRef.current)
     const hasHtmlNow = currentFiles.some(f => f.endsWith('.html'))
-    const hasBuildOutput = currentFiles.some(f => f === 'dist/index.html')
+    const hasBuildNow = currentFiles.some(f => f === 'dist/index.html' || f === 'out/index.html')
     const hasServer = !!getServerUrl()
-    // If dev server is already running, the server-ready listener handles preview switch
-    // Show preview for static HTML sites or build output
-    if ((hasHtmlNow || hasBuildOutput) && !hasServer) {
+    if ((hasHtmlNow || hasBuildNow) && !hasServer) {
       setShowPreviewReady(true)
       setTimeout(() => {
         setShowPreviewReady(false)
         setView('preview')
       }, 1800)
     }
-  }, [])
+    // Derive name from first prompt if not set yet
+    if (!projectNameRef.current && initialPrompt) {
+      deriveProjectName(initialPrompt)
+    }
+  }, [initialPrompt, deriveProjectName])
 
   const hasHtml = Object.keys(files).some(f => f.endsWith('.html'))
-  const hasBuildOutput = Object.keys(files).some(f => f === 'dist/index.html')
+  const hasBuildOutput = Object.keys(files).some(f => f === 'dist/index.html' || f === 'out/index.html')
   const hasPreview = hasHtml || hasDevServer || hasBuildOutput
   const hasFiles = Object.keys(files).filter(f => !f.endsWith('/')).length > 0
   const contextPercent = contextLimit > 0 ? contextUsed / contextLimit : 0
@@ -216,6 +378,11 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
       {/* ── Topbar ── */}
       <div className="ide-topbar">
         <div className="ide-topbar-left">
+          {onBackToWelcome && (
+            <button className="topbar-btn topbar-home" onClick={onBackToWelcome} title="Početna">
+              <Home size={15} />
+            </button>
+          )}
           <img src="/logo.svg" alt="VajbAgent" className="ide-logo" />
           <span className="ide-brand">Vajb<span>Agent</span></span>
         </div>
@@ -412,10 +579,14 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
             onDone={handleAgentDone}
             onContextUpdate={handleContextUpdate}
             onStreamingChange={handleStreamingChange}
+            onChatHistoryUpdate={handleChatHistoryUpdate}
             files={files}
             activeFile={activeFile}
             selectionRef={selectionRef}
             freeTier={freeTier}
+            resumeHistory={resumeProject?.chatHistory}
+            resumeDisplayMessages={resumeProject?.displayMessages}
+            resumeNeedsBuild={!!resumeProject?.files['package.json']}
           />
         </div>
       </div>
