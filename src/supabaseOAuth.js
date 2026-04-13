@@ -301,13 +301,43 @@ export async function getProjectApiKeys(studentKey, projectRef) {
 }
 
 /**
- * Get the project URL and anon key — what the frontend needs for .env
+ * Get the project URL and anon key — tries multiple endpoints for compatibility.
  */
 export async function getProjectCredentials(studentKey, projectRef) {
-  const keys = await getProjectApiKeys(studentKey, projectRef);
-  const anonKey = keys.find(k => k.name === 'anon')?.api_key;
-  return {
-    url: `https://${projectRef}.supabase.co`,
-    anon_key: anonKey,
-  };
+  const url = `https://${projectRef}.supabase.co`;
+
+  // Try 1: new api-keys endpoint (requires api_gateway_keys:read scope)
+  try {
+    const keys = await getProjectApiKeys(studentKey, projectRef);
+    if (Array.isArray(keys)) {
+      const anonKey = keys.find(k => k.name === 'anon' || k.tags?.includes('anon'))?.api_key;
+      if (anonKey) return { url, anon_key: anonKey };
+    }
+  } catch (err) {
+    console.warn('[Supabase] api-keys endpoint failed:', err.message);
+  }
+
+  // Try 2: legacy project endpoint (returns anon_key in project object)
+  try {
+    const project = await apiCall(studentKey, 'GET', `/projects/${projectRef}`);
+    if (project?.anon_key) return { url, anon_key: project.anon_key };
+    if (project?.api?.anon) return { url, anon_key: project.api.anon };
+  } catch (err) {
+    console.warn('[Supabase] project endpoint failed:', err.message);
+  }
+
+  // Try 3: list all projects and find this one
+  try {
+    const projects = await apiCall(studentKey, 'GET', '/projects');
+    const project = projects?.find?.(p => p.ref === projectRef || p.id === projectRef);
+    if (project?.anon_key) return { url, anon_key: project.anon_key };
+  } catch (err) {
+    console.warn('[Supabase] projects list failed:', err.message);
+  }
+
+  // All failed — return URL but indicate anon_key is missing
+  throw new Error(
+    'Nije moguće dobiti anon_key iz Supabase-a preko OAuth-a. ' +
+    'Idi na Supabase dashboard → Project Settings → API i kopiraj anon public key ručno u polje ispod.'
+  );
 }
