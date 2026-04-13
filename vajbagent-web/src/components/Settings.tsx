@@ -129,6 +129,22 @@ export default function Settings({ open, onClose }: SettingsProps) {
       setSupaStatus(s)
       if (s.connected) loadSupaData()
     }).catch(() => setSupaStatus({ connected: false, configured: false }))
+
+    // Background refresh — if user connects in another tab/popup, Settings picks it up
+    const refreshInterval = setInterval(async () => {
+      try {
+        const s = await supa.getStatus()
+        setSupaStatus(prev => {
+          // If it just transitioned to connected, reload projects
+          if (s.connected && prev && !prev.connected) {
+            loadSupaData()
+          }
+          return s
+        })
+      } catch { /* ignore */ }
+    }, 3000)
+
+    return () => clearInterval(refreshInterval)
   }, [open])
 
   const loadSupaData = async () => {
@@ -148,11 +164,17 @@ export default function Settings({ open, onClose }: SettingsProps) {
     setSupaError(null)
     setSupaLoading(true)
     try {
-      await supa.startOAuthFlow()
+      const { connected } = await supa.startOAuthFlow()
+      // Re-check status to get full state (configured flag etc.)
       const status = await supa.getStatus()
       setSupaStatus(status)
-      if (status.connected) await loadSupaData()
+      if (connected || status.connected) {
+        await loadSupaData()
+      }
+      // No error shown — if user closed popup before completing, it's not an error,
+      // they just weren't ready. They can click Poveži again.
     } catch (err) {
+      // Only real setup errors (popup blocked, network down) reach here
       setSupaError(err instanceof Error ? err.message : 'Greška')
     } finally {
       setSupaLoading(false)

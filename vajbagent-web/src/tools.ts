@@ -175,6 +175,48 @@ export const TOOL_DEFINITIONS = [
   {
     type: 'function' as const,
     function: {
+      name: 'supabase_list_functions',
+      description: 'List all edge functions deployed on the user\'s Supabase project. Returns array of { slug, name, status, version, created_at }. Use before deploying to check what exists.',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'supabase_deploy_function',
+      description: 'Deploy (create or update) a Supabase edge function (Deno runtime). Use for serverless backend logic: webhooks, API endpoints, scheduled tasks, Stripe webhooks, AI calls, etc. Function runs at https://{PROJECT_REF}.supabase.co/functions/v1/{slug}. Deno imports work via URLs (import { serve } from "https://deno.land/std/http/server.ts"). Use Deno.env.get("SUPABASE_URL") for env vars.',
+      parameters: {
+        type: 'object',
+        properties: {
+          slug: { type: 'string', description: 'Function slug (URL-safe name, e.g. "hello-world", "stripe-webhook")' },
+          name: { type: 'string', description: 'Human-readable name (optional, defaults to slug)' },
+          body: { type: 'string', description: 'Full TypeScript/Deno code. Must export default handler via serve() from std/http.' },
+          verify_jwt: { type: 'boolean', description: 'Require valid Supabase JWT to call this function (default true). Set false for public endpoints like webhooks.' },
+        },
+        required: ['slug', 'body'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'supabase_delete_function',
+      description: 'Delete an edge function by slug.',
+      parameters: {
+        type: 'object',
+        properties: {
+          slug: { type: 'string', description: 'Function slug to delete' },
+        },
+        required: ['slug'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'supabase_update_auth_config',
       description: 'Update Supabase auth configuration. Pass a config object with fields you want to change. Common fields: SITE_URL (string), URI_ALLOW_LIST (string with comma-separated URLs), DISABLE_SIGNUP (boolean), MAILER_AUTOCONFIRM (boolean - skip email verification), EXTERNAL_GOOGLE_ENABLED (boolean), EXTERNAL_GOOGLE_CLIENT_ID (string), EXTERNAL_GOOGLE_SECRET (string), EXTERNAL_GITHUB_ENABLED, EXTERNAL_GITHUB_CLIENT_ID, EXTERNAL_GITHUB_SECRET, JWT_EXP (number, seconds), PASSWORD_MIN_LENGTH (number), MAILER_OTP_EXP (number).',
       parameters: {

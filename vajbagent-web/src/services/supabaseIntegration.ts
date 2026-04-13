@@ -63,86 +63,68 @@ export async function getStatus(): Promise<SupabaseStatus> {
 }
 
 /**
- * Open OAuth popup. Resolves when the popup notifies success via postMessage.
- * Uses polling on connection status as fallback in case postMessage fails
- * (cross-origin, cookie issues, etc.).
+ * Open OAuth popup and wait for connection to complete.
+ *
+ * Design: no false errors, no auto-close. Backend status is the source of truth,
+ * polled every 2s. Returns once connected=true or the generous 5-min timeout hits.
+ * Popup stays open — user sees success page and closes it manually.
  */
-export async function startOAuthFlow(): Promise<void> {
+export async function startOAuthFlow(): Promise<{ connected: boolean }> {
   const { url } = await api<{ url: string }>('/auth/supabase/start')
 
   return new Promise((resolve, reject) => {
-    const popup = window.open(url, 'supabase-oauth', 'width=720,height=820')
+    const popup = window.open(url, 'supabase-oauth', 'width=760,height=860,menubar=no,toolbar=no')
     if (!popup) {
-      reject(new Error('Pop-up blokiran. Dozvoli pop-up prozore i pokušaj ponovo.'))
+      reject(new Error('Pop-up blokiran. Dozvoli pop-up prozore u browser-u i pokušaj ponovo.'))
       return
     }
-    // TypeScript narrowing: capture non-null reference
-    const popupWin: Window = popup
 
     let settled = false
     const startTime = Date.now()
-    // Give user at least 90s to complete the flow before giving up
-    const MAX_WAIT = 180_000
-    // Don't trust popupWin.closed in the first 3s (cross-origin nav can briefly show closed=true)
-    const MIN_WAIT_BEFORE_CLOSED_CHECK = 3000
+    const MAX_WAIT = 300_000 // 5 minutes — generous for scope selection, etc.
 
-    function done(success: boolean, errMsg?: string) {
+    function finish(connected: boolean) {
       if (settled) return
       settled = true
       window.removeEventListener('message', messageHandler)
       clearInterval(pollInterval)
-      try { if (!popupWin.closed) popupWin.close() } catch { /* ignore */ }
-      if (success) resolve()
-      else reject(new Error(errMsg || 'Povezivanje otkazano'))
+      resolve({ connected })
     }
 
     const messageHandler = (e: MessageEvent) => {
       if (e.data?.type === 'supabase-connected') {
-        done(true)
+        // Verify with backend (avoid false positives from spoofed messages)
+        getStatus()
+          .then(s => { if (s.connected) finish(true) })
+          .catch(() => { /* keep polling */ })
       }
     }
+    window.addEventListener('message', messageHandler)
 
-    // Poll backend status every 2s — this catches success even if postMessage fails
+    // Poll backend status every 2s — ONLY source of truth.
+    // Do NOT check popup.closed — that can false-positive during cross-origin nav,
+    // AND the popup stays open intentionally (user closes when ready).
     const pollInterval = setInterval(async () => {
       if (settled) return
-      const elapsed = Date.now() - startTime
 
-      // Check backend first (source of truth)
       try {
         const s = await getStatus()
         if (s.connected) {
-          done(true)
+          finish(true)
           return
         }
-      } catch { /* ignore */ }
-
-      // Then check if popup closed (only after grace period)
-      if (elapsed > MIN_WAIT_BEFORE_CLOSED_CHECK) {
-        try {
-          if (popupWin.closed) {
-            // Wait one more poll cycle for backend to catch up
-            setTimeout(async () => {
-              if (settled) return
-              try {
-                const finalStatus = await getStatus()
-                if (finalStatus.connected) done(true)
-                else done(false)
-              } catch {
-                done(false)
-              }
-            }, 1500)
-            return
-          }
-        } catch { /* cross-origin, popup still alive */ }
-      }
+      } catch { /* network blip, keep polling */ }
 
       // Hard timeout
-      if (elapsed > MAX_WAIT) {
-        done(false, 'Isteklo vreme za povezivanje. Pokušaj ponovo.')
+      if (Date.now() - startTime > MAX_WAIT) {
+        try {
+          const final = await getStatus()
+          finish(final.connected)
+        } catch {
+          finish(false)
+        }
       }
     }, 2000)
-
-    window.addEventListener('message', messageHandler)
   })
 }
 

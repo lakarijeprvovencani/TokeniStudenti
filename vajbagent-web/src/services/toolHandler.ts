@@ -208,6 +208,21 @@ export async function executeToolCall(
         return { tool_call_id: tc.id, role: 'tool', content: result }
       }
 
+      case 'supabase_list_functions': {
+        const result = await handleSupabaseListFunctions()
+        return { tool_call_id: tc.id, role: 'tool', content: result }
+      }
+
+      case 'supabase_deploy_function': {
+        const result = await handleSupabaseDeployFunction(args)
+        return { tool_call_id: tc.id, role: 'tool', content: result }
+      }
+
+      case 'supabase_delete_function': {
+        const result = await handleSupabaseDeleteFunction(args)
+        return { tool_call_id: tc.id, role: 'tool', content: result }
+      }
+
       case 'fetch_url': {
         const result = await handleFetchUrl(args)
         return { tool_call_id: tc.id, role: 'tool', content: result }
@@ -619,6 +634,86 @@ async function handleSupabaseGetAuthConfig(): Promise<string> {
       SMTP_HOST: cfg.SMTP_HOST ? '(custom SMTP set)' : '(default Supabase mailer)',
     }
     return `Supabase Auth Configuration:\n${JSON.stringify(important, null, 2)}\n\nFull config has more fields — ask via supabase_update_auth_config to change any field.`
+  } catch (err) {
+    return `Greska: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+async function handleSupabaseListFunctions(): Promise<string> {
+  const projectRef = getSupabaseProjectRef()
+  if (!projectRef) return 'GRESKA: Nema povezanog Supabase projekta.'
+  try {
+    const res = await callSupabaseApi(`/api/supabase/functions/${projectRef}`)
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '')
+      return `List functions failed: HTTP ${res.status} ${txt.substring(0, 500)}`
+    }
+    const data = await res.json()
+    const fns = data.functions
+    if (!Array.isArray(fns) || fns.length === 0) {
+      return 'Nema deploy-ovanih edge funkcija. Koristi supabase_deploy_function da napraviš novu.'
+    }
+    const lines = ['Edge funkcije u projektu:']
+    for (const f of fns) {
+      const status = f.status || 'unknown'
+      const ver = f.version ? ` v${f.version}` : ''
+      lines.push(`- ${f.slug}${ver} [${status}]${f.name && f.name !== f.slug ? ` — ${f.name}` : ''}`)
+    }
+    lines.push('\nFunkcije su dostupne na: https://<project>.supabase.co/functions/v1/<slug>')
+    return lines.join('\n')
+  } catch (err) {
+    return `Greska: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+async function handleSupabaseDeployFunction(args: Record<string, unknown>): Promise<string> {
+  const projectRef = getSupabaseProjectRef()
+  if (!projectRef) return 'GRESKA: Nema povezanog Supabase projekta.'
+  const slug = (args.slug as string || '').trim()
+  const body = (args.body as string || '').trim()
+  const name = (args.name as string || '').trim() || slug
+  const verify_jwt = args.verify_jwt !== false
+
+  if (!slug) return 'GRESKA: "slug" je obavezan'
+  if (!body) return 'GRESKA: "body" je obavezan (kod funkcije)'
+  if (!/^[a-z0-9][a-z0-9-_]*$/i.test(slug)) {
+    return 'GRESKA: slug mora biti lowercase, brojevi, crtica/underscore (npr. "hello-world")'
+  }
+
+  try {
+    const res = await callSupabaseApi(`/api/supabase/functions/${projectRef}/deploy`, {
+      method: 'POST',
+      body: JSON.stringify({ slug, name, body, verify_jwt }),
+    })
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '')
+      let errMsg = `HTTP ${res.status}`
+      try {
+        const parsed = JSON.parse(txt)
+        errMsg = parsed.error || errMsg
+      } catch { errMsg = txt.substring(0, 500) || errMsg }
+      return `Deploy function failed: ${errMsg}`
+    }
+    return `Edge function "${slug}" uspešno deploy-ovana!\nDostupna na: https://${projectRef}.supabase.co/functions/v1/${slug}\nJWT auth: ${verify_jwt ? 'ON' : 'OFF (public endpoint)'}`
+  } catch (err) {
+    return `Greska: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+async function handleSupabaseDeleteFunction(args: Record<string, unknown>): Promise<string> {
+  const projectRef = getSupabaseProjectRef()
+  if (!projectRef) return 'GRESKA: Nema povezanog Supabase projekta.'
+  const slug = (args.slug as string || '').trim()
+  if (!slug) return 'GRESKA: "slug" je obavezan'
+  try {
+    const res = await callSupabaseApi(`/api/supabase/functions/${projectRef}/${encodeURIComponent(slug)}`, {
+      method: 'DELETE',
+    })
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '')
+      return `Delete function failed: HTTP ${res.status} ${txt.substring(0, 500)}`
+    }
+    return `Edge function "${slug}" obrisana.`
   } catch (err) {
     return `Greska: ${err instanceof Error ? err.message : String(err)}`
   }

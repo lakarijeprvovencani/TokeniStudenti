@@ -303,6 +303,79 @@ export async function listTables(studentKey, projectRef) {
 
 // ─── Auth Configuration ─────────────────────────────────────────────────────
 
+// ─── Edge Functions ─────────────────────────────────────────────────────────
+
+/** List all edge functions in a project */
+export async function listFunctions(studentKey, projectRef) {
+  return apiCall(studentKey, 'GET', `/projects/${projectRef}/functions`);
+}
+
+/** Get a specific function's body (code) */
+export async function getFunctionBody(studentKey, projectRef, slug) {
+  const token = await getValidAccessToken(studentKey);
+  if (!token) throw new Error('Not connected to Supabase');
+  const resp = await fetch(`${API_BASE}/projects/${projectRef}/functions/${slug}/body`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Get function body failed: ${resp.status} ${errText}`);
+  }
+  return resp.text();
+}
+
+/**
+ * Deploy (create or update) an edge function.
+ * Supabase API: POST/PATCH /projects/{ref}/functions
+ */
+export async function deployFunction(studentKey, projectRef, { slug, name, body, verify_jwt = true }) {
+  if (!slug || !body) throw new Error('slug and body required');
+
+  // Try to update existing first, fall back to create
+  const token = await getValidAccessToken(studentKey);
+  if (!token) throw new Error('Not connected to Supabase');
+
+  // Check if function exists
+  let exists = false;
+  try {
+    const list = await listFunctions(studentKey, projectRef);
+    if (Array.isArray(list)) {
+      exists = list.some(f => f.slug === slug);
+    }
+  } catch { /* ignore */ }
+
+  const url = exists
+    ? `${API_BASE}/projects/${projectRef}/functions/${slug}`
+    : `${API_BASE}/projects/${projectRef}/functions`;
+  const method = exists ? 'PATCH' : 'POST';
+
+  const payload = exists
+    ? { body, verify_jwt, name: name || slug }
+    : { slug, name: name || slug, body, verify_jwt };
+
+  const resp = await fetch(url, {
+    method,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Deploy function failed: ${resp.status} ${errText}`);
+  }
+  return resp.json();
+}
+
+/** Delete an edge function */
+export async function deleteFunction(studentKey, projectRef, slug) {
+  return apiCall(studentKey, 'DELETE', `/projects/${projectRef}/functions/${slug}`);
+}
+
+// ─── Auth Configuration ─────────────────────────────────────────────────────
+
 /** Get auth configuration (site URL, providers, email settings, etc.) */
 export async function getAuthConfig(studentKey, projectRef) {
   return apiCall(studentKey, 'GET', `/projects/${projectRef}/config/auth`);

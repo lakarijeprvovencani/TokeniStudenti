@@ -687,46 +687,145 @@ app.get('/auth/supabase/start', requireAuth, asyncHandler(async (req, res) => {
 app.get('/auth/supabase/callback', asyncHandler(async (req, res) => {
   const { code, state, error: oauthError } = req.query;
 
+  const pageShell = (inner) => `<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<title>VajbAgent — Supabase</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: radial-gradient(circle at top, #1a1a1f 0%, #0a0a0d 60%);
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    max-width: 460px;
+    width: 100%;
+    background: rgba(24, 24, 30, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: 44px 36px;
+    text-align: center;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(20px);
+  }
+  .icon {
+    width: 72px; height: 72px;
+    margin: 0 auto 20px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 20px;
+    font-size: 38px;
+  }
+  .icon.success {
+    background: linear-gradient(135deg, rgba(62, 207, 142, 0.2), rgba(62, 207, 142, 0.05));
+    border: 1px solid rgba(62, 207, 142, 0.3);
+  }
+  .icon.error {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.05));
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    letter-spacing: -0.01em;
+  }
+  p {
+    font-size: 0.92rem;
+    color: #aaa;
+    line-height: 1.55;
+    margin-bottom: 24px;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #f97316, #ea580c);
+    color: white;
+    text-decoration: none;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s;
+    border: none;
+    cursor: pointer;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(249, 115, 22, 0.35); }
+  .small {
+    margin-top: 18px;
+    font-size: 0.76rem;
+    color: #666;
+  }
+  code {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.82em;
+    color: #f97316;
+  }
+</style>
+</head>
+<body>
+  <div class="card">${inner}</div>
+</body>
+</html>`;
+
   if (oauthError) {
-    return res.send(`
-      <html><body style="font-family:system-ui;padding:40px;background:#0a0a0a;color:#fff;text-align:center">
-        <h2>❌ Supabase autorizacija odbijena</h2>
-        <p>${oauthError}</p>
-        <p><a href="/" style="color:#f97316">Vrati se</a></p>
-      </body></html>
-    `);
+    return res.send(pageShell(`
+      <div class="icon error">⚠</div>
+      <h1>Autorizacija odbijena</h1>
+      <p>${String(oauthError).substring(0, 200)}</p>
+      <button class="btn" onclick="window.close()">Zatvori</button>
+    `));
   }
 
   if (!code || !state) {
-    return res.status(400).send('Missing code or state');
+    return res.status(400).send(pageShell(`
+      <div class="icon error">⚠</div>
+      <h1>Greška</h1>
+      <p>Nedostaje code ili state parametar. Pokušaj ponovo.</p>
+      <button class="btn" onclick="window.close()">Zatvori</button>
+    `));
   }
 
   try {
     await supabaseOAuth.handleCallback(String(code), String(state));
-    // Success — show a page that closes itself and notifies the opener
-    res.send(`
-      <html><body style="font-family:system-ui;padding:40px;background:#0a0a0a;color:#fff;text-align:center">
-        <h2 style="color:#22c55e">✅ Supabase je povezan!</h2>
-        <p>Možeš zatvoriti ovaj prozor.</p>
-        <script>
-          if (window.opener) {
-            window.opener.postMessage({ type: 'supabase-connected' }, '*');
-            setTimeout(() => window.close(), 1500);
-          } else {
-            setTimeout(() => { window.location.href = '/'; }, 1500);
+    // Success — notify opener, but DO NOT close automatically.
+    // User sees confirmation and clicks button to close.
+    res.send(pageShell(`
+      <div class="icon success">✓</div>
+      <h1>Supabase je povezan!</h1>
+      <p>Vraćam te u VajbAgent — možeš da nastaviš sa kreiranjem projekta. Ovaj prozor možeš zatvoriti.</p>
+      <button class="btn" onclick="window.close()">Zatvori prozor</button>
+      <div class="small">Ako dugme ne radi, samo zatvori tab ručno.</div>
+      <script>
+        // Notify opener multiple times to be safe (postMessage can fail on first try)
+        function notify() {
+          if (window.opener && !window.opener.closed) {
+            try { window.opener.postMessage({ type: 'supabase-connected' }, '*'); } catch (e) {}
           }
-        </script>
-      </body></html>
-    `);
+        }
+        notify();
+        setTimeout(notify, 500);
+        setTimeout(notify, 1500);
+        setTimeout(notify, 3000);
+      </script>
+    `));
   } catch (err) {
     console.error('[Supabase OAuth] Callback error:', err.message);
-    res.status(500).send(`
-      <html><body style="font-family:system-ui;padding:40px;background:#0a0a0a;color:#fff;text-align:center">
-        <h2>❌ Greška pri povezivanju</h2>
-        <p>${err.message}</p>
-        <p><a href="/" style="color:#f97316">Pokušaj ponovo</a></p>
-      </body></html>
-    `);
+    res.status(500).send(pageShell(`
+      <div class="icon error">✕</div>
+      <h1>Greška pri povezivanju</h1>
+      <p>${String(err.message).substring(0, 300)}</p>
+      <button class="btn" onclick="window.close()">Zatvori</button>
+    `));
   }
 }));
 
@@ -838,6 +937,57 @@ app.patch('/api/supabase/auth-config/:projectRef', requireAuth, asyncHandler(asy
   }
   try {
     const result = await supabaseOAuth.updateAuthConfig(req.studentApiKey, req.params.projectRef, config);
+    res.json({ result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// ─── Edge Functions ─────────────────────────────────────────────────────────
+
+// List all edge functions
+app.get('/api/supabase/functions/:projectRef', requireAuth, asyncHandler(async (req, res) => {
+  try {
+    const functions = await supabaseOAuth.listFunctions(req.studentApiKey, req.params.projectRef);
+    res.json({ functions });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// Get function body
+app.get('/api/supabase/functions/:projectRef/:slug/body', requireAuth, asyncHandler(async (req, res) => {
+  try {
+    const body = await supabaseOAuth.getFunctionBody(req.studentApiKey, req.params.projectRef, req.params.slug);
+    res.json({ body });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// Deploy (create or update) function
+app.post('/api/supabase/functions/:projectRef/deploy', requireAuth, asyncHandler(async (req, res) => {
+  const { slug, name, body, verify_jwt } = req.body || {};
+  if (!slug || !body) {
+    return res.status(400).json({ error: 'slug and body are required' });
+  }
+  try {
+    const result = await supabaseOAuth.deployFunction(req.studentApiKey, req.params.projectRef, {
+      slug,
+      name,
+      body,
+      verify_jwt: verify_jwt !== false,
+    });
+    res.json({ result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// Delete function
+app.delete('/api/supabase/functions/:projectRef/:slug', requireAuth, asyncHandler(async (req, res) => {
+  try {
+    const result = await supabaseOAuth.deleteFunction(req.studentApiKey, req.params.projectRef, req.params.slug);
     res.json({ result });
   } catch (err) {
     res.status(500).json({ error: err.message });
