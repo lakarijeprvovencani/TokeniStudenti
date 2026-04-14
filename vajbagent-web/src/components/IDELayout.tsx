@@ -134,6 +134,8 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
         createdAt: projectCreatedAtRef.current,
         updatedAt: Date.now(),
         prompt: projectPromptRef.current,
+        deployUrl: deployUrlRef.current,
+        nlSiteId: nlSiteIdRef.current,
       }
 
       const scope = getScope()
@@ -187,6 +189,8 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
         createdAt: projectCreatedAtRef.current,
         updatedAt: Date.now(),
         prompt: projectPromptRef.current,
+        deployUrl: deployUrlRef.current,
+        nlSiteId: nlSiteIdRef.current,
       })
       // Use localStorage as emergency backup (IndexedDB may not complete)
       const scope = getScope()
@@ -306,7 +310,8 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
 
   const [view, setView] = useState<'code' | 'preview' | 'split'>('code')
   const [deploying, setDeploying] = useState(false)
-  const [deployUrl, setDeployUrl] = useState<string | null>(null)
+  const [deployUrl, setDeployUrl] = useState<string | null>(resumeProject?.deployUrl || null)
+  const deployUrlRef = useRef(deployUrl)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [paywallBalance, setPaywallBalance] = useState(0)
@@ -351,7 +356,8 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
   const [ghUsername, setGhUsername] = useState<string | null>(null)
   const [ghModalOpen, setGhModalOpen] = useState(false)
   const [nlConnected, setNlConnected] = useState(false)
-  const [nlSiteId, setNlSiteId] = useState<string | null>(null)
+  const [nlSiteId, setNlSiteId] = useState<string | null>(resumeProject?.nlSiteId || null)
+  const nlSiteIdRef = useRef(nlSiteId)
   const [nlModalOpen, setNlModalOpen] = useState(false)
   const [secretFindings, setSecretFindings] = useState<SecretFinding[]>([])
   const pendingPushRef = useRef<{ repo: string; message: string; kept: Record<string, string>; skipped: string[] } | null>(null)
@@ -625,8 +631,9 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
         siteId: opts.siteId,
         siteName: opts.siteName,
       })
-      setNlSiteId(result.site_id)
-      setDeployUrl(result.url)
+      setNlSiteId(result.site_id); nlSiteIdRef.current = result.site_id
+      setDeployUrl(result.url); deployUrlRef.current = result.url
+      triggerAutoSave()
       setToast({ type: 'success', msg: 'Sajt je objavljen!', url: result.url })
       return { url: result.url, site_id: result.site_id }
     } finally {
@@ -981,7 +988,7 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
                     )}
                     <button
                       className="deploy-menu-item"
-                      onClick={() => { setDeployMenuOpen(false); setNlSiteId(null); setDeployUrl(null); handleDeploy() }}
+                      onClick={() => { setDeployMenuOpen(false); setNlSiteId(null); nlSiteIdRef.current = null; setDeployUrl(null); deployUrlRef.current = null; handleDeploy() }}
                     >
                       <Rocket size={13} />
                       Objavi kao novi sajt

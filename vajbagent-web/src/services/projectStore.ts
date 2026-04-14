@@ -51,6 +51,10 @@ export interface SavedProject {
   updatedAt: number
   /** First line of initial prompt — used as subtitle */
   prompt?: string
+  /** Last deploy URL (Netlify/Vercel) — survives refresh */
+  deployUrl?: string | null
+  /** Last Netlify site ID — reuse for subsequent deploys */
+  nlSiteId?: string | null
 }
 
 function openDbByName(name: string): Promise<IDBDatabase> {
