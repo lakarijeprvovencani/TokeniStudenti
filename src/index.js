@@ -33,6 +33,8 @@ import { getBalance, deductBalance, costUsd, addBalance, getTotalDeposited, load
 import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP, addStudentWithPassword, authenticateWithPassword, setStudentPassword, studentHasPassword } from './students.js';
 import { sendWelcomeEmail, sendRecoveryEmail, isEmailConfigured } from './email.js';
 import * as supabaseOAuth from './supabaseOAuth.js';
+import * as githubOAuth from './githubOAuth.js';
+import * as netlifyOAuth from './netlifyOAuth.js';
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -988,6 +990,166 @@ app.post('/api/supabase/functions/:projectRef/deploy', requireAuth, asyncHandler
 app.delete('/api/supabase/functions/:projectRef/:slug', requireAuth, asyncHandler(async (req, res) => {
   try {
     const result = await supabaseOAuth.deleteFunction(req.studentApiKey, req.params.projectRef, req.params.slug);
+    res.json({ result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// ─── GitHub OAuth Integration ───────────────────────────────────────────────
+
+app.get('/api/github/config-check', (_req, res) => {
+  res.json({ configured: githubOAuth.isGitHubOAuthConfigured() });
+});
+
+app.get('/auth/github/start', requireAuth, asyncHandler(async (req, res) => {
+  if (!githubOAuth.isGitHubOAuthConfigured()) {
+    return res.status(503).json({ error: 'GitHub OAuth not configured on backend' });
+  }
+  try {
+    const url = githubOAuth.buildAuthorizeUrl(req.studentApiKey);
+    res.json({ url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+app.get('/auth/github/callback', asyncHandler(async (req, res) => {
+  const { code, state, error: oauthError } = req.query;
+
+  const pageShell = (icon, title, msg, color = '#3ecf8e') => `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>VajbAgent — GitHub</title><style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, system-ui, sans-serif; background: radial-gradient(circle at top, #1a1a1f, #0a0a0d); color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.card { max-width: 460px; width: 100%; background: rgba(24, 24, 30, 0.9); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 44px 36px; text-align: center; backdrop-filter: blur(20px); }
+.icon { width: 72px; height: 72px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; border-radius: 20px; font-size: 38px; background: ${color}1a; border: 1px solid ${color}4d; color: ${color}; }
+h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 10px; }
+p { font-size: 0.92rem; color: #aaa; line-height: 1.55; margin-bottom: 24px; }
+.btn { display: inline-flex; gap: 8px; padding: 12px 24px; background: linear-gradient(135deg, #f97316, #ea580c); color: white; border: none; border-radius: 10px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+</style></head><body><div class="card"><div class="icon">${icon}</div><h1>${title}</h1><p>${msg}</p><button class="btn" onclick="window.close()">Zatvori prozor</button>
+<script>function n(){if(window.opener&&!window.opener.closed){try{window.opener.postMessage({type:'github-connected'},'*');}catch(e){}}}n();setTimeout(n,500);setTimeout(n,1500);setTimeout(n,3000);</script>
+</div></body></html>`;
+
+  if (oauthError) {
+    return res.send(pageShell('⚠', 'Autorizacija odbijena', String(oauthError).substring(0, 200), '#ef4444'));
+  }
+  if (!code || !state) return res.status(400).send(pageShell('⚠', 'Greška', 'Nedostaje code ili state', '#ef4444'));
+
+  try {
+    const result = await githubOAuth.handleCallback(String(code), String(state));
+    res.send(pageShell('✓', 'GitHub je povezan!', `Povezan kao <strong>@${result.username || ''}</strong>. Možeš zatvoriti ovaj prozor.`));
+  } catch (err) {
+    console.error('[GitHub OAuth] Callback error:', err.message);
+    res.status(500).send(pageShell('✕', 'Greška pri povezivanju', String(err.message).substring(0, 300), '#ef4444'));
+  }
+}));
+
+app.get('/api/github/status', requireAuth, asyncHandler(async (req, res) => {
+  const connected = await githubOAuth.isConnected(req.studentApiKey);
+  const info = connected ? await githubOAuth.getConnectionInfo(req.studentApiKey) : null;
+  res.json({ connected, configured: githubOAuth.isGitHubOAuthConfigured(), info });
+}));
+
+app.post('/api/github/disconnect', requireAuth, asyncHandler(async (req, res) => {
+  await githubOAuth.disconnect(req.studentApiKey);
+  res.json({ ok: true });
+}));
+
+app.get('/api/github/repos', requireAuth, asyncHandler(async (req, res) => {
+  try {
+    const repos = await githubOAuth.listRepos(req.studentApiKey);
+    res.json({ repos });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+app.post('/api/github/push', requireAuth, asyncHandler(async (req, res) => {
+  const { repo, files, message, branch, createIfMissing } = req.body || {};
+  if (!repo || !files) return res.status(400).json({ error: 'repo and files are required' });
+  try {
+    const result = await githubOAuth.pushFiles(req.studentApiKey, {
+      repo, files, message, branch, createIfMissing,
+    });
+    res.json({ result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// ─── Netlify OAuth Integration ──────────────────────────────────────────────
+
+app.get('/api/netlify/config-check', (_req, res) => {
+  res.json({ configured: netlifyOAuth.isNetlifyOAuthConfigured() });
+});
+
+app.get('/auth/netlify/start', requireAuth, asyncHandler(async (req, res) => {
+  if (!netlifyOAuth.isNetlifyOAuthConfigured()) {
+    return res.status(503).json({ error: 'Netlify OAuth not configured on backend' });
+  }
+  try {
+    const url = netlifyOAuth.buildAuthorizeUrl(req.studentApiKey);
+    res.json({ url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+app.get('/auth/netlify/callback', asyncHandler(async (req, res) => {
+  const { code, state, error: oauthError } = req.query;
+
+  const pageShell = (icon, title, msg, color = '#00ad9f') => `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>VajbAgent — Netlify</title><style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, system-ui, sans-serif; background: radial-gradient(circle at top, #1a1a1f, #0a0a0d); color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.card { max-width: 460px; width: 100%; background: rgba(24, 24, 30, 0.9); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 44px 36px; text-align: center; backdrop-filter: blur(20px); }
+.icon { width: 72px; height: 72px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; border-radius: 20px; font-size: 38px; background: ${color}1a; border: 1px solid ${color}4d; color: ${color}; }
+h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 10px; }
+p { font-size: 0.92rem; color: #aaa; line-height: 1.55; margin-bottom: 24px; }
+.btn { display: inline-flex; gap: 8px; padding: 12px 24px; background: linear-gradient(135deg, #f97316, #ea580c); color: white; border: none; border-radius: 10px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+</style></head><body><div class="card"><div class="icon">${icon}</div><h1>${title}</h1><p>${msg}</p><button class="btn" onclick="window.close()">Zatvori prozor</button>
+<script>function n(){if(window.opener&&!window.opener.closed){try{window.opener.postMessage({type:'netlify-connected'},'*');}catch(e){}}}n();setTimeout(n,500);setTimeout(n,1500);setTimeout(n,3000);</script>
+</div></body></html>`;
+
+  if (oauthError) {
+    return res.send(pageShell('⚠', 'Autorizacija odbijena', String(oauthError).substring(0, 200), '#ef4444'));
+  }
+  if (!code || !state) return res.status(400).send(pageShell('⚠', 'Greška', 'Nedostaje code ili state', '#ef4444'));
+
+  try {
+    const result = await netlifyOAuth.handleCallback(String(code), String(state));
+    res.send(pageShell('✓', 'Netlify je povezan!', `Povezan kao <strong>${result.email || ''}</strong>. Možeš zatvoriti ovaj prozor.`));
+  } catch (err) {
+    console.error('[Netlify OAuth] Callback error:', err.message);
+    res.status(500).send(pageShell('✕', 'Greška pri povezivanju', String(err.message).substring(0, 300), '#ef4444'));
+  }
+}));
+
+app.get('/api/netlify/status', requireAuth, asyncHandler(async (req, res) => {
+  const connected = await netlifyOAuth.isConnected(req.studentApiKey);
+  const info = connected ? await netlifyOAuth.getConnectionInfo(req.studentApiKey) : null;
+  res.json({ connected, configured: netlifyOAuth.isNetlifyOAuthConfigured(), info });
+}));
+
+app.post('/api/netlify/disconnect', requireAuth, asyncHandler(async (req, res) => {
+  await netlifyOAuth.disconnect(req.studentApiKey);
+  res.json({ ok: true });
+}));
+
+app.get('/api/netlify/sites', requireAuth, asyncHandler(async (req, res) => {
+  try {
+    const sites = await netlifyOAuth.listSites(req.studentApiKey);
+    res.json({ sites });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+app.post('/api/netlify/deploy', requireAuth, asyncHandler(async (req, res) => {
+  const { files, siteId, siteName } = req.body || {};
+  if (!files) return res.status(400).json({ error: 'files required' });
+  try {
+    const result = await netlifyOAuth.deploySite(req.studentApiKey, { files, siteId, siteName });
     res.json({ result });
   } catch (err) {
     res.status(500).json({ error: err.message });
