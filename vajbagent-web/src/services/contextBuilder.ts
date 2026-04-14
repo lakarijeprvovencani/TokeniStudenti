@@ -11,6 +11,31 @@ const CODE_EXT = new Set([
   '.sh', '.c', '.cpp', '.h', '.cs', '.swift', '.kt', '.prisma', '.proto',
 ])
 
+const IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.avif'])
+
+/**
+ * Collect the user-uploaded images in the project so the agent can see them
+ * in the system context and reference them in HTML/JSX instead of falling
+ * back to Unsplash stock photos.
+ */
+function buildUserAssetSection(files: Record<string, string>): string | null {
+  const assets: string[] = []
+  for (const [path, content] of Object.entries(files)) {
+    if (path.endsWith('/')) continue
+    const ext = '.' + (path.split('.').pop()?.toLowerCase() || '')
+    if (!IMAGE_EXT.has(ext)) continue
+    if (typeof content !== 'string' || !content.startsWith('data:')) continue
+    assets.push(path)
+    if (assets.length >= 40) break
+  }
+  if (assets.length === 0) return null
+  const lines = [
+    `[User uploaded images — ${assets.length} file(s) that the user dragged / pasted / picked into this project. ALWAYS prefer these over Unsplash stock photos when the user asks for "my photo", "njegovu/njenu sliku", "moju fotku", hero images, avatars, gallery items, or anything personal. Reference them as /<filename> in static HTML or /public/<filename>... wait, actually reference as the exact path shown below:]`,
+  ]
+  for (const a of assets) lines.push(`- ${a}`)
+  return lines.join('\n')
+}
+
 const MAX_FILES = 300
 const PREVIEW_LINES = 8
 const MAX_CHARS = 5000
@@ -77,7 +102,16 @@ export async function buildWorkspaceIndex(files?: Record<string, string>): Promi
     }
   }
 
-  if (fileList.length === 0) return null
+  // Append user-uploaded images section to the index so the agent always
+  // knows they exist — even if it doesn't explicitly run list_files.
+  const userAssets = files ? buildUserAssetSection(files) : null
+
+  if (fileList.length === 0 && !userAssets) return null
+  if (fileList.length === 0 && userAssets) {
+    cachedIndex = userAssets
+    cacheTime = Date.now()
+    return userAssets
+  }
 
   let result = `[Workspace index: ${fileList.length} files]\n`
   let chars = result.length
@@ -92,6 +126,10 @@ export async function buildWorkspaceIndex(files?: Record<string, string>): Promi
     }
     result += entry
     chars += entry.length
+  }
+
+  if (userAssets) {
+    result += '\n\n' + userAssets
   }
 
   cachedIndex = result
@@ -288,6 +326,16 @@ export async function buildFullContext(opts: {
     if (wsIndex) {
       parts.push(`<workspace_index>\n${wsIndex}\n</workspace_index>`)
     }
+  }
+
+  // User-uploaded images section is sent on EVERY message, not just the
+  // first, so the agent never forgets that the user has their own photos
+  // in the project and can reference them in any turn of the conversation.
+  const assets = buildUserAssetSection(opts.files)
+  if (assets && !needsIndex) {
+    // If we didn't push the full index this turn, surface the assets on
+    // their own so the agent still sees them.
+    parts.push(`<user_uploaded_images>\n${assets}\n</user_uploaded_images>`)
   }
 
   // Active editor: always (cheap and useful)

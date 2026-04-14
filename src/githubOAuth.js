@@ -276,10 +276,35 @@ export async function pushFiles(studentKey, { repo, files, message = 'Update fro
     if (/^id_(rsa|ed25519|ecdsa|dsa)(\..+)?$/.test(base)) continue;
     if (typeof content !== 'string') continue;
 
-    const blob = await ghApi(studentKey, 'POST', `/repos/${owner}/${repoName}/git/blobs`, {
-      content,
-      encoding: 'utf-8',
-    });
+    // User-uploaded binary assets (images, fonts) arrive as data URLs
+    // from the frontend. GitHub's blob API accepts base64 directly —
+    // strip the data URL prefix and forward the raw base64 so the image
+    // lands in the repo as a real binary, not a text dump.
+    let blob;
+    if (content.startsWith('data:')) {
+      const commaIdx = content.indexOf(',');
+      const header = commaIdx >= 0 ? content.slice(5, commaIdx) : '';
+      const isBase64 = header.includes(';base64');
+      const payload = commaIdx >= 0 ? content.slice(commaIdx + 1) : '';
+      if (isBase64) {
+        blob = await ghApi(studentKey, 'POST', `/repos/${owner}/${repoName}/git/blobs`, {
+          content: payload,
+          encoding: 'base64',
+        });
+      } else {
+        // URL-encoded (e.g. some SVGs) — decode and send as utf-8
+        const decoded = decodeURIComponent(payload);
+        blob = await ghApi(studentKey, 'POST', `/repos/${owner}/${repoName}/git/blobs`, {
+          content: Buffer.from(decoded, 'utf-8').toString('base64'),
+          encoding: 'base64',
+        });
+      }
+    } else {
+      blob = await ghApi(studentKey, 'POST', `/repos/${owner}/${repoName}/git/blobs`, {
+        content,
+        encoding: 'utf-8',
+      });
+    }
     blobs[path] = blob.sha;
   }
 

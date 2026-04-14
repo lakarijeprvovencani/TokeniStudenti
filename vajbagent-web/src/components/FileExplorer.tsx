@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FileText, FileCode, FileJson, Folder, Hash, ChevronRight, FolderOpen, Key, FilePlus, FolderPlus, RefreshCw, FoldVertical, Trash2, Edit3 } from 'lucide-react'
+import { FileText, FileCode, FileJson, Folder, Hash, ChevronRight, FolderOpen, Key, FilePlus, FolderPlus, RefreshCw, FoldVertical, Trash2, Edit3, ImagePlus, Image as ImageIcon } from 'lucide-react'
 import './FileExplorer.css'
 
 interface FileExplorerProps {
@@ -11,11 +11,20 @@ interface FileExplorerProps {
   onDeleteFile?: (path: string) => void | Promise<void>
   onRenameFile?: (oldPath: string, newPath: string) => void | Promise<void>
   onRefresh?: () => void
+  onUploadImages?: (files: File[]) => void | Promise<void>
 }
 
-function FileIcon({ name }: { name: string }) {
+const IMAGE_EXT_SET = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'avif'])
+
+function FileIcon({ name, preview }: { name: string; preview?: string }) {
   const base = name.split('/').pop() || name
   const ext = base.split('.').pop()?.toLowerCase() || ''
+
+  // User-uploaded images: show a live thumbnail so the explorer looks premium.
+  if (IMAGE_EXT_SET.has(ext) && preview && preview.startsWith('data:image/')) {
+    return <img src={preview} alt="" className="ficon-thumb" />
+  }
+  if (IMAGE_EXT_SET.has(ext)) return <ImageIcon size={14} className="ficon ficon-image" />
 
   // Env files — special orange key icon
   if (base === '.env' || base.startsWith('.env.')) return <Key size={13} className="ficon ficon-env" />
@@ -51,12 +60,14 @@ interface FileRowProps {
   displayName: string
   nested?: boolean
   active: boolean
+  /** Raw content for image thumbnails (data URL). Ignored for non-images. */
+  preview?: string
   onSelect: () => void
   onDelete?: () => void
   onRename?: (newName: string) => void
 }
 
-function FileRow({ path, displayName, nested, active, onSelect, onDelete, onRename }: FileRowProps) {
+function FileRow({ path, displayName, nested, active, preview, onSelect, onDelete, onRename }: FileRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(displayName)
@@ -83,7 +94,7 @@ function FileRow({ path, displayName, nested, active, onSelect, onDelete, onRena
   if (renaming) {
     return (
       <div className={`explorer-file ${nested ? 'nested' : ''}`}>
-        <FileIcon name={path} />
+        <FileIcon name={path} preview={preview} />
         <input
           ref={inputRef}
           className="rename-input"
@@ -111,7 +122,7 @@ function FileRow({ path, displayName, nested, active, onSelect, onDelete, onRena
         onClick={onSelect}
         onContextMenu={handleContextMenu}
       >
-        <FileIcon name={path} />
+        <FileIcon name={path} preview={preview} />
         <span className="file-name">{displayName}</span>
       </motion.button>
       {menuOpen && (
@@ -134,11 +145,12 @@ function FileRow({ path, displayName, nested, active, onSelect, onDelete, onRena
 }
 
 function FolderGroup({
-  folder, folderFiles, activeFile, onSelectFile, isCollapsed, onToggleCollapse, onDeleteFile, onRenameFile,
+  folder, folderFiles, activeFile, files, onSelectFile, isCollapsed, onToggleCollapse, onDeleteFile, onRenameFile,
 }: {
   folder: string
   folderFiles: string[]
   activeFile: string | null
+  files: Record<string, string>
   onSelectFile: (path: string) => void
   isCollapsed: boolean
   onToggleCollapse: () => void
@@ -182,6 +194,7 @@ function FolderGroup({
                   displayName={path.split('/').pop() || path}
                   nested
                   active={path === activeFile}
+                  preview={files[path]}
                   onSelect={() => onSelectFile(path)}
                   onDelete={onDeleteFile ? () => onDeleteFile(path) : undefined}
                   onRename={onRenameFile ? (newName: string) => {
@@ -199,7 +212,7 @@ function FolderGroup({
 }
 
 export default function FileExplorer({
-  files, activeFile, onSelectFile, onCreateFile, onDeleteFile, onRenameFile, onRefresh,
+  files, activeFile, onSelectFile, onCreateFile, onDeleteFile, onRenameFile, onRefresh, onUploadImages,
 }: FileExplorerProps) {
   const fileList = Object.keys(files).filter(f => !f.endsWith('/')).sort()
   const { folders, rootFiles } = buildTree(fileList)
@@ -209,6 +222,76 @@ export default function FileExplorer({
   const [newName, setNewName] = useState('')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const newInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const dragDepth = useRef(0)
+
+  const handleImageButtonClick = () => {
+    imageInputRef.current?.click()
+  }
+
+  const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files || [])
+    if (picked.length > 0 && onUploadImages) {
+      await onUploadImages(picked)
+    }
+    e.target.value = ''
+  }
+
+  // Drag & drop: highlight the panel when an image file is dragged over it,
+  // accept drops anywhere inside, ignore non-image drops so text file drag
+  // keeps whatever other handling the page has.
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (!onUploadImages) return
+    if (!Array.from(e.dataTransfer.items || []).some(i => i.kind === 'file')) return
+    e.preventDefault()
+    dragDepth.current++
+    setDragOver(true)
+  }
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!onUploadImages) return
+    e.preventDefault()
+    dragDepth.current = Math.max(0, dragDepth.current - 1)
+    if (dragDepth.current === 0) setDragOver(false)
+  }
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!onUploadImages) return
+    e.preventDefault()
+  }
+  const handleDrop = async (e: React.DragEvent) => {
+    if (!onUploadImages) return
+    e.preventDefault()
+    dragDepth.current = 0
+    setDragOver(false)
+    const dropped = Array.from(e.dataTransfer.files || []).filter(f => f.type.startsWith('image/'))
+    if (dropped.length > 0) await onUploadImages(dropped)
+  }
+
+  // Clipboard paste — Cmd/Ctrl+V anywhere while the explorer is the
+  // focused context pastes images from the clipboard into the project.
+  useEffect(() => {
+    if (!onUploadImages) return
+    const handler = async (e: ClipboardEvent) => {
+      // Never hijack paste when the user is typing somewhere.
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      const items = e.clipboardData?.items
+      if (!items) return
+      const pasted: File[] = []
+      for (const item of Array.from(items)) {
+        if (item.kind === 'file') {
+          const f = item.getAsFile()
+          if (f && f.type.startsWith('image/')) pasted.push(f)
+        }
+      }
+      if (pasted.length > 0) {
+        e.preventDefault()
+        await onUploadImages(pasted)
+      }
+    }
+    window.addEventListener('paste', handler)
+    return () => window.removeEventListener('paste', handler)
+  }, [onUploadImages])
 
   useEffect(() => {
     if (creating) {
@@ -257,12 +340,18 @@ export default function FileExplorer({
   }
 
   return (
-    <div className="explorer">
+    <div
+      className={`explorer ${dragOver ? 'drag-over' : ''}`}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <div className="explorer-header">
         <span>EXPLORER</span>
         <span className="explorer-count">{fileList.length}</span>
       </div>
-      {(onCreateFile || onRefresh) && (
+      {(onCreateFile || onRefresh || onUploadImages) && (
         <div className="explorer-toolbar">
           {onCreateFile && (
             <button className="explorer-tool-btn" onClick={handleNewFile} title="Novi fajl">
@@ -274,6 +363,11 @@ export default function FileExplorer({
               <FolderPlus size={13} />
             </button>
           )}
+          {onUploadImages && (
+            <button className="explorer-tool-btn" onClick={handleImageButtonClick} title="Dodaj sliku">
+              <ImagePlus size={13} />
+            </button>
+          )}
           {onRefresh && (
             <button className="explorer-tool-btn" onClick={onRefresh} title="Osveži">
               <RefreshCw size={13} />
@@ -282,6 +376,20 @@ export default function FileExplorer({
           <button className="explorer-tool-btn" onClick={handleCollapseAll} title="Sakrij sve foldere">
             <FoldVertical size={13} />
           </button>
+        </div>
+      )}
+      <input
+        ref={imageInputRef}
+        type="file"
+        multiple
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleImagePick}
+      />
+      {dragOver && (
+        <div className="explorer-drop-overlay">
+          <ImagePlus size={28} />
+          <span>Pusti sliku da je dodaš u projekat</span>
         </div>
       )}
       <div className="explorer-tree">
@@ -321,6 +429,7 @@ export default function FileExplorer({
                 folder={folder}
                 folderFiles={folderFiles}
                 activeFile={activeFile}
+                files={files}
                 onSelectFile={onSelectFile}
                 isCollapsed={collapsed.has(folder)}
                 onToggleCollapse={() => toggleFolder(folder)}
@@ -337,6 +446,7 @@ export default function FileExplorer({
                   path={path}
                   displayName={path}
                   active={path === activeFile}
+                  preview={files[path]}
                   onSelect={() => onSelectFile(path)}
                   onDelete={onDeleteFile ? () => onDeleteFile(path) : undefined}
                   onRename={onRenameFile ? (newName: string) => onRenameFile(path, newName) : undefined}

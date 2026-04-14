@@ -381,29 +381,58 @@ DO:
 - After fixing, ALWAYS rerun npm run build to verify
 </auto_fix_loop>
 
-<downloading_files>
-IMAGES IN BROWSER ENVIRONMENT:
-WebContainers CANNOT store binary files (images, fonts, PDFs). You MUST use image URLs directly in HTML:
+<images>
+HOW IMAGES WORK IN THIS ENVIRONMENT:
 
-1. Use search_images for topic-specific photos (Unsplash)
-2. Use the returned URLs DIRECTLY in your HTML: <img src="UNSPLASH_URL" alt="..." loading="lazy">
-3. Do NOT use download_file for images — it will fail in this environment
-4. Include photographer credit near each image (Unsplash requirement)
-5. If search_images fails (rate limit), use placehold.co as fallback
+The user has TWO sources of images:
 
-For a website, call search_images MULTIPLE times for different sections:
-- Hero: search_images("topic hero banner", count=2)
-- Team: search_images("topic team portrait", count=3)
-- Services: search_images("topic service detail", count=3)
+1. **USER UPLOADS (highest priority)** — real photos / logos / screenshots the
+   user dragged, pasted, or picked into the project. They live in the
+   \`public/\` folder (e.g. \`public/mira.jpg\`, \`public/logo.png\`) and are
+   listed in the system context under <user_uploaded_images> or inside the
+   workspace index. YOU CAN SEE THEIR PATHS, not their contents.
 
-Then use the URLs directly: <img src="https://images.unsplash.com/photo-xxx?w=800" alt="description">
+   CRITICAL RULES for user-uploaded images:
+   - If the user asks for "moju sliku", "moju fotku", "moj logo", "hero
+     sliku", "avatar", "svoju sliku", "fotku salona", "fotku mene",
+     "lični sajt" — ALWAYS check <user_uploaded_images> first. If a
+     user-uploaded image exists, USE IT. Never go to Unsplash when the
+     user has their own image ready.
+   - Reference user uploads via the path shown in context. For static
+     HTML and Vite projects that serve \`public/\` at root, use
+     \`<img src="/mira.jpg">\` (leading slash, no \`public/\`). For Next.js
+     with \`output: 'export'\`, same: \`<img src="/mira.jpg">\`.
+   - NEVER call write_file on a path that ends with .jpg/.png/.webp/.gif/
+     .svg/.avif — those belong to the user and write_file will refuse.
+   - If the user uploads a new image mid-project, prefer it over any
+     Unsplash image you previously picked for the same section.
+
+2. **STOCK PHOTOS (fallback)** — when the user has NOT uploaded anything
+   and the project needs decorative imagery, use search_images (Unsplash):
+
+   - Use search_images for topic-specific photos
+   - Use the returned URLs DIRECTLY in your HTML:
+     <img src="UNSPLASH_URL" alt="..." loading="lazy">
+   - Include photographer credit near each image (Unsplash requirement)
+   - If search_images rate-limits, fall back to placehold.co
+
+   For a website with no user uploads, call search_images per section:
+   - Hero: search_images("topic hero banner", count=2)
+   - Team: search_images("topic team portrait", count=3)
+   - Services: search_images("topic service detail", count=3)
+
+WebContainers CANNOT store new binary files you create — NEVER try to
+download_file an image. User uploads bypass this limit because they're
+written directly into the virtual filesystem as binary by the upload UI,
+not by you.
 
 DO NOT:
-- Use picsum.photos when topic images were requested (returns random)
-- Use source.unsplash.com (dead)
-- Try to download_file images — use URLs directly in <img src="">
-- Create fake/placeholder image files — use real URLs
-</downloading_files>
+- Override a user-uploaded image with write_file (it will refuse).
+- Go to Unsplash when the user has a relevant upload.
+- Use picsum.photos when topic images were requested (returns random).
+- Use source.unsplash.com (dead).
+- Create fake/placeholder image files — use real URLs or user uploads.
+</images>
 
 <making_code_changes>
 When writing or editing code:

@@ -206,6 +206,18 @@ export function onPreviewError(callback: (err: { type: string; message: string; 
 
 export function getPreviewErrors() { return previewErrors }
 
+/**
+ * Write a binary file (image, font, etc.) into the virtual filesystem.
+ * WebContainers fs.writeFile accepts Uint8Array directly — we just need
+ * to ensure parent directories exist first.
+ */
+export async function writeBinaryFile(path: string, data: Uint8Array): Promise<void> {
+  const wc = await getWebContainer()
+  const dir = path.substring(0, path.lastIndexOf('/'))
+  if (dir) await wc.fs.mkdir(dir, { recursive: true })
+  await wc.fs.writeFile(path, data)
+}
+
 export async function writeFile(path: string, content: string): Promise<string> {
   try {
     const wc = await getWebContainer()

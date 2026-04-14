@@ -201,7 +201,10 @@ export async function deploySite(studentKey, { files, siteId, siteName }) {
     siteUrl = site.ssl_url || site.url;
   }
 
-  // Compute SHA1 of each file and build digest
+  // Compute SHA1 of each file and build digest.
+  // fileContents stores either a string (text files) or a Buffer (user
+  // uploaded binary assets decoded from data URLs) — netlify's PUT endpoint
+  // accepts both and the digest must match the raw bytes that will be sent.
   const fileShas = {};
   const fileContents = {};
   for (const [path, content] of Object.entries(files)) {
@@ -215,10 +218,24 @@ export async function deploySite(studentKey, { files, siteId, siteName }) {
     if (/^id_(rsa|ed25519|ecdsa|dsa)(\..+)?$/.test(base)) continue;
     if (typeof content !== 'string') continue;
 
-    const sha = crypto.createHash('sha1').update(content).digest('hex');
+    // Data URL → Buffer of real bytes for binary assets.
+    let payload;
+    if (content.startsWith('data:')) {
+      const commaIdx = content.indexOf(',');
+      const header = commaIdx >= 0 ? content.slice(5, commaIdx) : '';
+      const isBase64 = header.includes(';base64');
+      const encoded = commaIdx >= 0 ? content.slice(commaIdx + 1) : '';
+      payload = isBase64
+        ? Buffer.from(encoded, 'base64')
+        : Buffer.from(decodeURIComponent(encoded), 'utf-8');
+    } else {
+      payload = content;
+    }
+
+    const sha = crypto.createHash('sha1').update(payload).digest('hex');
     const normalizedPath = path.startsWith('/') ? path : '/' + path;
     fileShas[normalizedPath] = sha;
-    fileContents[normalizedPath] = content;
+    fileContents[normalizedPath] = payload;
   }
 
   // POST deploy with file digest

@@ -1264,8 +1264,12 @@ app.get('/api/github/repos', requireAuth, asyncHandler(async (req, res) => {
 // Hard limits for push/deploy payloads — prevents OOM, abuse of GitHub/Netlify rate limits,
 // and protects against payloads full of junk files.
 const MAX_PUSH_FILES = 500;
-const MAX_PUSH_FILE_SIZE = 1_000_000; // 1 MB per file
-const MAX_PUSH_TOTAL_SIZE = 15_000_000; // 15 MB total
+// User-uploaded images arrive as base64 data URLs from the frontend, which
+// inflate file size ~33% over the actual binary. 4MB keeps room for a
+// ~2.8MB decoded image after resizeImage caps at 2MB. Total raised to 35MB
+// to accommodate a full portfolio project with several user photos.
+const MAX_PUSH_FILE_SIZE = 4_000_000;
+const MAX_PUSH_TOTAL_SIZE = 35_000_000;
 
 // Validates path: no absolute paths, no `..`, no leading slash, no null bytes.
 // Reject anything that would escape the intended repo root.
@@ -1298,11 +1302,11 @@ function validateAndLimitFiles(files) {
       return { error: `Sadržaj fajla ${p} mora biti tekst.` };
     }
     if (c.length > MAX_PUSH_FILE_SIZE) {
-      return { error: `Fajl ${p} je prevelik (maks 1MB).` };
+      return { error: `Fajl ${p} je prevelik (maks 4MB).` };
     }
     total += c.length;
     if (total > MAX_PUSH_TOTAL_SIZE) {
-      return { error: 'Ukupna veličina fajlova premašuje 15MB.' };
+      return { error: 'Ukupna veličina fajlova premašuje 35MB.' };
     }
   }
   return { ok: true };

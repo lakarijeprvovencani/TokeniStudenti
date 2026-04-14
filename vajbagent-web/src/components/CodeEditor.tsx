@@ -184,6 +184,28 @@ export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile
   // If the user has picked a file (even a brand-new empty one), fall through
   // to the real editor so they can type into it.
   const hasActiveFile = !!activeFile && activeFile in files
+
+  // If the active file is a user-uploaded image, render a centered preview
+  // with a subtle checker pattern so transparency is visible. Monaco can't
+  // show binary content, so we route around it entirely for images.
+  const IMAGE_RE = /\.(jpg|jpeg|png|webp|gif|svg|avif)$/i
+  if (hasActiveFile && activeFile && IMAGE_RE.test(activeFile)) {
+    const raw = files[activeFile] ?? ''
+    const src = raw.startsWith('data:') ? raw : ''
+    return (
+      <div className="editor-panel">
+        <div className="editor-image-preview">
+          {src ? (
+            <img src={src} alt={activeFile} />
+          ) : (
+            <div className="editor-image-missing">Slika nije u IndexedDB-u.</div>
+          )}
+          <div className="editor-image-caption">{activeFile}</div>
+        </div>
+      </div>
+    )
+  }
+
   if (!hasActiveFile) {
     return (
       <div className="editor-panel">

@@ -10,6 +10,7 @@ import { saveAs } from 'file-saver'
 import * as ghInt from '../services/githubIntegration'
 import * as nlInt from '../services/netlifyIntegration'
 import { preboot, onServerReady, getServerUrl, writeFile as wcWriteFile, clearFilesystem } from '../services/webcontainer'
+import { addImageFiles, hydrateImagesIntoWc, isImagePath, countImages, MAX_IMAGES_PER_PROJECT } from '../services/userAssets'
 import { buildEnvFile } from '../services/secretsStore'
 import { filterForPush, ensureGitignoreSafety, DEFAULT_GITIGNORE, scanForSecrets, redactSecrets, type SecretFinding } from '../services/pushFilter'
 import { fetchUserInfo, logout, revealApiKey, type UserInfo } from '../services/userService'
@@ -189,12 +190,18 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
       console.log('[Resume] Restoring', entries.length, 'files to WebContainers')
       for (const [path, content] of entries) {
         if (path.endsWith('/')) continue
+        // Binary images live as data URLs in the project store — feed them
+        // through the binary-aware hydrate below, not the text writeFile.
+        if (isImagePath(path) && typeof content === 'string' && content.startsWith('data:')) continue
         try {
           await wcWriteFile(path, content)
         } catch (err) {
           console.warn('[Resume] Failed to write:', path, err)
         }
       }
+      // Re-inflate any user-uploaded images back into the WC filesystem
+      // using the binary write path so the preview iframe actually renders them.
+      await hydrateImagesIntoWc(resumeProject.files)
       setFiles(resumeProject.files)
       // Set active file to a real source file (prefer App.tsx, index.html, etc.)
       const preferred = ['src/App.tsx', 'src/App.jsx', 'src/main.tsx', 'index.html', 'pages/index.tsx', 'pages/index.jsx', 'app/page.tsx']
@@ -348,12 +355,57 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
   }, [])
 
   const handleFileEdit = useCallback(async (path: string, content: string) => {
+    // Never overwrite a user-uploaded binary asset with text from the
+    // Monaco editor — if the user somehow triggers an edit event on an
+    // image row, just ignore it.
+    if (isImagePath(path)) return
     setFiles(prev => ({ ...prev, [path]: content }))
     try {
       const { writeFile } = await import('../services/webcontainer')
       await writeFile(path, content)
     } catch (err) {
       console.warn('[Editor] Failed to write:', path, err)
+    }
+  }, [])
+
+  /**
+   * Upload user images into the current project. Handles File[] from the
+   * file picker, drag&drop, and clipboard paste uniformly. Auto-resizes,
+   * slugifies filenames, writes into both WC fs and the React files map
+   * (which the autosave pipeline persists to IndexedDB).
+   */
+  const handleImageUpload = useCallback(async (rawFiles: File[]) => {
+    if (!rawFiles || rawFiles.length === 0) return
+    // Only keep files that look like images. Non-image drops should
+    // fall through to other handlers (text attach etc).
+    const imgs = rawFiles.filter(f => f.type.startsWith('image/'))
+    if (imgs.length === 0) return
+
+    const already = countImages(filesRef.current)
+    if (already >= MAX_IMAGES_PER_PROJECT) {
+      setToast({ type: 'error', msg: `Limit je ${MAX_IMAGES_PER_PROJECT} slika po projektu. Obriši neke pa pokušaj ponovo.` })
+      return
+    }
+
+    try {
+      const result = await addImageFiles(imgs, filesRef.current)
+      if (result.added.length > 0) {
+        setFiles(prev => {
+          const next = { ...prev }
+          for (const img of result.added) next[img.path] = img.dataUrl
+          return next
+        })
+        // Select the first new image so the preview opens it immediately.
+        setActiveFile(result.added[0].path)
+        setToast({ type: 'success', msg: result.added.length === 1 ? 'Slika dodata' : `Dodato ${result.added.length} slika` })
+      }
+      if (result.skipped.length > 0) {
+        const first = result.skipped[0]
+        setToast({ type: 'error', msg: `${first.name}: ${first.reason}${result.skipped.length > 1 ? ` (+${result.skipped.length - 1})` : ''}` })
+      }
+    } catch (err) {
+      console.warn('[Assets] Upload failed:', err)
+      setToast({ type: 'error', msg: 'Greška pri dodavanju slike.' })
     }
   }, [])
 
@@ -910,6 +962,7 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
             onDeleteFile={handleDeleteFile}
             onRenameFile={handleRenameFile}
             onRefresh={handleExplorerRefresh}
+            onUploadImages={handleImageUpload}
           />
         </div>
 

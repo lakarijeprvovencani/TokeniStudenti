@@ -63,6 +63,18 @@ export async function executeToolCall(
         const path = (args.path as string || '').replace(/^\/+/, '')
         let content = (args.content as string) || ''
 
+        // Protect user-uploaded binary assets — the agent must never
+        // stomp on a real image the user dragged in, even if it gets
+        // confused and tries to "write" over the path.
+        const IMAGE_RE = /\.(jpg|jpeg|png|webp|gif|svg|avif)$/i
+        if (IMAGE_RE.test(path)) {
+          return {
+            tool_call_id: tc.id,
+            role: 'tool',
+            content: `Ne možeš da prepišeš ${path} — to je korisnikova slika. Samo je referenciraj u HTML-u kao <img src="/${path.replace(/^public\//, '')}">.`,
+          }
+        }
+
         // Auto-patch: ensure vite.config has server.host = true for WebContainers
         if ((path === 'vite.config.ts' || path === 'vite.config.js') && !content.includes('host')) {
           if (content.includes('plugins:') && !content.includes('server:')) {
