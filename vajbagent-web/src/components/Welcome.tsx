@@ -6,7 +6,7 @@ import { logout, checkSession, type UserInfo } from '../services/userService'
 import AuthModal from './AuthModal'
 import PaywallModal from './PaywallModal'
 import { listProjects, deleteProject, type SavedProject } from '../services/projectStore'
-import { formatCredits } from '../services/credits'
+import { formatCredits, openPaywall } from '../services/credits'
 import { TEMPLATES, TEMPLATE_CATEGORIES, type Template } from '../templates'
 import ModelSelector from './ModelSelector'
 import Settings from './Settings'
@@ -86,6 +86,14 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [pendingPrompt, setPendingPrompt] = useState('')
   const [paySuccessToast, setPaySuccessToast] = useState('')
+
+  // Any "Dopuni kredite" button anywhere in the tree fires a global event
+  // so we don't have to thread callbacks through every component.
+  useEffect(() => {
+    const handler = () => setPaywallOpen(true)
+    window.addEventListener('vajb:open-paywall', handler)
+    return () => window.removeEventListener('vajb:open-paywall', handler)
+  }, [])
 
   // Handle Stripe return (?pay=ok|cancel) — webhook has already credited the
   // account server-side, we just need to refresh balance + show feedback.
@@ -215,9 +223,13 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
                     <span className="welcome-menu-balance">{formatCredits(user.balance)} kredita</span>
                   </div>
                   <div className="welcome-menu-divider" />
-                  <a href="https://vajbagent.com/dashboard" target="_blank" rel="noopener" className="welcome-menu-item">
+                  <button
+                    type="button"
+                    className="welcome-menu-item"
+                    onClick={() => { setUserMenuOpen(false); openPaywall() }}
+                  >
                     Dopuni kredite
-                  </a>
+                  </button>
                   <button className="welcome-menu-item logout" onClick={async () => { await logout(); window.location.reload() }}>
                     <LogOut size={14} />
                     Odjavi se

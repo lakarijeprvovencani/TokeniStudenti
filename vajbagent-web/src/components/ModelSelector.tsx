@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown, Cpu, Lock } from 'lucide-react'
 import { MODELS } from '../models'
+import { openPaywall } from '../services/credits'
 import './ModelSelector.css'
 
 interface ModelSelectorProps {
@@ -69,14 +70,13 @@ export default function ModelSelector({ value, onChange, compact, freeTier }: Mo
               )
             })}
             {freeTier && (
-              <a
-                href="https://vajbagent.com/dashboard"
-                target="_blank"
-                rel="noopener"
+              <button
+                type="button"
                 className="model-upgrade"
+                onClick={() => { setOpen(false); openPaywall() }}
               >
                 Otključaj sve modele
-              </a>
+              </button>
             )}
           </motion.div>
         )}

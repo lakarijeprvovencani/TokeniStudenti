@@ -1411,9 +1411,28 @@ app.post('/register', registerLimiter, asyncHandler(async (req, res) => {
 }));
 
 // ---- Balance warning (injected into AI response) ----
+// Extension-only: the web app has its own PaywallModal popup triggered by
+// client-side balance checks, so injecting a message into the stream would
+// duplicate the UX. When the request comes from a known web origin we skip
+// the injection entirely and let the frontend handle it.
 const LOW_BALANCE_THRESHOLD = 1.0;
 const _balanceWarningSent = new Map();
-async function getBalanceWarning(keyId, newBalance) {
+
+function isWebOrigin(req) {
+  if (!req) return false;
+  const origin = req.get?.('Origin') || req.get?.('Referer') || '';
+  if (!origin) return false;
+  const webOrigins = (process.env.WEB_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+  try {
+    const parsed = new URL(origin);
+    return webOrigins.includes(parsed.origin);
+  } catch { return false; }
+}
+
+async function getBalanceWarning(keyId, newBalance, req) {
+  // Web app handles its own low-balance UX via PaywallModal — don't double up.
+  if (isWebOrigin(req)) return null;
+
   if (newBalance <= LOW_BALANCE_THRESHOLD) {
     const lastWarn = _balanceWarningSent.get(keyId + ':low') || 0;
     if (Date.now() - lastWarn < 10 * 60 * 1000) return null;
@@ -1644,7 +1663,7 @@ async function handleOpenAINonStream(res, keyId, resolved, payload, client) {
   const newBal = await deductBalance(keyId, usd);
   await logUsage(keyId, usage);
 
-  const warning = await getBalanceWarning(keyId, newBal);
+  const warning = await getBalanceWarning(keyId, newBal, req);
   if (warning && response.choices?.[0]?.message?.content) {
     response.choices[0].message.content += warning;
   }
@@ -1732,7 +1751,7 @@ async function handleOpenAIStream(res, keyId, resolved, payload, client) {
     const newBal = await deductBalance(keyId, usd);
     await logUsage(keyId, usage);
 
-    const warning = await getBalanceWarning(keyId, newBal);
+    const warning = await getBalanceWarning(keyId, newBal, req);
     if (warning && !res.writableEnded) {
       const warnChunk = { id: 'vajb-warn', object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { content: warning }, finish_reason: null }] };
       res.write('data: ' + JSON.stringify(warnChunk) + '\n\n');
@@ -1824,7 +1843,7 @@ async function handleAnthropicNonStream(res, keyId, resolved, payload, client) {
     response, response.usage, resolved.id, response.id || 'vajb-' + Date.now()
   );
 
-  const warning = await getBalanceWarning(keyId, newBal);
+  const warning = await getBalanceWarning(keyId, newBal, req);
   if (warning && openAIResponse.choices?.[0]?.message?.content) {
     openAIResponse.choices[0].message.content += warning;
   }
@@ -1971,7 +1990,7 @@ async function handleAnthropicStream(res, keyId, resolved, payload, client) {
     const newBal = await deductBalance(keyId, usd);
     await logUsage(keyId, usage);
 
-    const warning = await getBalanceWarning(keyId, newBal);
+    const warning = await getBalanceWarning(keyId, newBal, req);
     if (warning && !res.writableEnded) {
       const warnChunk = { id: streamId + '-warn', object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { content: warning }, finish_reason: null }] };
       res.write('data: ' + JSON.stringify(warnChunk) + '\n\n');

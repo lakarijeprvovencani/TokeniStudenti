@@ -12,3 +12,11 @@ export function toCredits(usd: number): number {
 export function formatCredits(usd: number): string {
   return toCredits(usd).toLocaleString('sr-RS')
 }
+
+/**
+ * Ask the nearest mounted PaywallModal host (Welcome or IDELayout) to open.
+ * Both mount a listener so exactly one responds depending on current screen.
+ */
+export function openPaywall() {
+  window.dispatchEvent(new CustomEvent('vajb:open-paywall'))
+}

@@ -13,7 +13,7 @@ import { preboot, onServerReady, getServerUrl, writeFile as wcWriteFile, clearFi
 import { buildEnvFile } from '../services/secretsStore'
 import { filterForPush, ensureGitignoreSafety, DEFAULT_GITIGNORE, scanForSecrets, redactSecrets, type SecretFinding } from '../services/pushFilter'
 import { fetchUserInfo, logout, revealApiKey, type UserInfo } from '../services/userService'
-import { formatCredits } from '../services/credits'
+import { formatCredits, openPaywall } from '../services/credits'
 import { saveProject, generateProjectId, type SavedProject } from '../services/projectStore'
 import FileExplorer from './FileExplorer'
 import Settings from './Settings'
@@ -270,6 +270,7 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [paywallBalance, setPaywallBalance] = useState(0)
+  const [paywallVariant, setPaywallVariant] = useState<'welcome' | 'out-of-credits'>('welcome')
   const [payToast, setPayToast] = useState('')
 
   // Handle Stripe return param if we land back in the IDE post-payment
@@ -290,8 +291,20 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
 
   const handleLowBalance = useCallback((bal: number) => {
     setPaywallBalance(bal)
+    setPaywallVariant('out-of-credits')
     setPaywallOpen(true)
   }, [])
+
+  // Global "Dopuni kredite" button → open paywall in welcome framing
+  useEffect(() => {
+    const handler = () => {
+      setPaywallBalance(userInfo?.balance ?? 0)
+      setPaywallVariant('welcome')
+      setPaywallOpen(true)
+    }
+    window.addEventListener('vajb:open-paywall', handler)
+    return () => window.removeEventListener('vajb:open-paywall', handler)
+  }, [userInfo?.balance])
   const [terminalOpen, setTerminalOpen] = useState(false)
   const [pushing, setPushing] = useState(false)
   const [ghConnected, setGhConnected] = useState(false)
@@ -691,16 +704,15 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
 
           {/* Credit badge */}
           {userInfo && (
-            <a
-              href="https://vajbagent.com/dashboard"
-              target="_blank"
-              rel="noopener"
+            <button
+              type="button"
+              onClick={openPaywall}
               className={`topbar-credit ${userInfo.balance < 0.5 ? 'low' : ''}`}
               title={`Kredit: ${formatCredits(userInfo.balance)} kredita — Klikni za dopunu`}
             >
               <Wallet size={13} />
               <span>{formatCredits(userInfo.balance)}</span>
-            </a>
+            </button>
           )}
 
           {/* User avatar with dropdown */}
@@ -736,10 +748,14 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
                     </button>
                   </div>
                   <div className="user-menu-divider" />
-                  <a href="https://vajbagent.com/dashboard" target="_blank" rel="noopener" className="user-menu-item">
+                  <button
+                    type="button"
+                    className="user-menu-item"
+                    onClick={() => { setUserMenuOpen(false); openPaywall() }}
+                  >
                     <Wallet size={14} />
                     Dopuni kredite
-                  </a>
+                  </button>
                   <button className="user-menu-item logout" onClick={async () => { await logout(); try { localStorage.removeItem('vajb_last_active_project') } catch {}; window.location.reload() }}>
                     <LogOut size={14} />
                     Odjavi se
@@ -945,8 +961,9 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
       <PaywallModal
         open={paywallOpen}
         onClose={() => setPaywallOpen(false)}
-        variant="out-of-credits"
+        variant={paywallVariant}
         currentBalanceUsd={paywallBalance}
+        onSkip={() => setPaywallOpen(false)}
       />
       <AnimatePresence>
         {payToast && (

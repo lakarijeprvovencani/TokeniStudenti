@@ -8,6 +8,9 @@ import {
 } from 'lucide-react'
 import { loadSecrets, addSecret, removeSecret, type Secret } from '../services/secretsStore'
 import * as supa from '../services/supabaseIntegration'
+import * as gh from '../services/githubIntegration'
+import * as nl from '../services/netlifyIntegration'
+import { openPaywall } from '../services/credits'
 import './Settings.css'
 
 type Tab = 'integrations' | 'secrets' | 'account' | 'about'
@@ -43,10 +46,7 @@ const INTEGRATIONS: IntegrationDef[] = [
     description: 'Deploy sajta jednim klikom',
     icon: <Rocket size={20} />,
     color: '#00AD9F',
-    fields: [
-      { key: 'vajb_netlify_token', label: 'Personal Access Token', placeholder: 'nfp_xxxxxxxxxxxx', type: 'password' },
-    ],
-    docsUrl: 'https://app.netlify.com/user/applications#personal-access-tokens',
+    oauth: true,
   },
   {
     key: 'github',
@@ -54,11 +54,7 @@ const INTEGRATIONS: IntegrationDef[] = [
     description: 'Push koda direktno u repozitorijum',
     icon: <GitBranch size={20} />,
     color: '#f0f6fc',
-    fields: [
-      { key: 'vajb_github_token', label: 'Personal Access Token', placeholder: 'ghp_xxxxxxxxxxxx', type: 'password' },
-      { key: 'vajb_github_repo', label: 'Repozitorijum', placeholder: 'username/repo-name' },
-    ],
-    docsUrl: 'https://github.com/settings/tokens',
+    oauth: true,
   },
   {
     key: 'vercel',
@@ -112,6 +108,16 @@ export default function Settings({ open, onClose }: SettingsProps) {
   const [newProjectName, setNewProjectName] = useState('')
   const [showCreateProject, setShowCreateProject] = useState(false)
 
+  // GitHub OAuth
+  const [ghStatus, setGhStatus] = useState<gh.GitHubStatus | null>(null)
+  const [ghLoading, setGhLoading] = useState(false)
+  const [ghError, setGhError] = useState<string | null>(null)
+
+  // Netlify OAuth
+  const [nlStatus, setNlStatus] = useState<nl.NetlifyStatus | null>(null)
+  const [nlLoading, setNlLoading] = useState(false)
+  const [nlError, setNlError] = useState<string | null>(null)
+
   useEffect(() => {
     if (!open) return
     // Load integration values
@@ -130,6 +136,10 @@ export default function Settings({ open, onClose }: SettingsProps) {
       if (s.connected) loadSupaData()
     }).catch(() => setSupaStatus({ connected: false, configured: false }))
 
+    // Load GitHub + Netlify status
+    gh.getStatus().then(setGhStatus).catch(() => setGhStatus({ connected: false, configured: false, info: null }))
+    nl.getStatus().then(setNlStatus).catch(() => setNlStatus({ connected: false, configured: false, info: null }))
+
     // Background refresh — if user connects in another tab/popup, Settings picks it up
     const refreshInterval = setInterval(async () => {
       try {
@@ -142,6 +152,8 @@ export default function Settings({ open, onClose }: SettingsProps) {
           return s
         })
       } catch { /* ignore */ }
+      try { const s = await gh.getStatus(); setGhStatus(s) } catch { /* ignore */ }
+      try { const s = await nl.getStatus(); setNlStatus(s) } catch { /* ignore */ }
     }, 3000)
 
     return () => clearInterval(refreshInterval)
@@ -187,6 +199,46 @@ export default function Settings({ open, onClose }: SettingsProps) {
     setSupaStatus({ connected: false, configured: supaStatus?.configured || false })
     setSupaProjects([])
     setSupaOrgs([])
+  }
+
+  const handleGhConnect = async () => {
+    setGhError(null)
+    setGhLoading(true)
+    try {
+      await gh.startOAuthFlow()
+      const status = await gh.getStatus()
+      setGhStatus(status)
+    } catch (err) {
+      setGhError(err instanceof Error ? err.message : 'Greška')
+    } finally {
+      setGhLoading(false)
+    }
+  }
+
+  const handleGhDisconnect = async () => {
+    if (!confirm('Prekini GitHub vezu?')) return
+    await gh.disconnect()
+    setGhStatus({ connected: false, configured: ghStatus?.configured || false, info: null })
+  }
+
+  const handleNlConnect = async () => {
+    setNlError(null)
+    setNlLoading(true)
+    try {
+      await nl.startOAuthFlow()
+      const status = await nl.getStatus()
+      setNlStatus(status)
+    } catch (err) {
+      setNlError(err instanceof Error ? err.message : 'Greška')
+    } finally {
+      setNlLoading(false)
+    }
+  }
+
+  const handleNlDisconnect = async () => {
+    if (!confirm('Prekini Netlify vezu?')) return
+    await nl.disconnect()
+    setNlStatus({ connected: false, configured: nlStatus?.configured || false, info: null })
   }
 
   const handleUseProject = async (project: supa.SupabaseProject) => {
@@ -259,6 +311,8 @@ export default function Settings({ open, onClose }: SettingsProps) {
 
   const isConnected = (integration: IntegrationDef) => {
     if (integration.key === 'supabase' && supaStatus?.connected) return true
+    if (integration.key === 'github' && ghStatus?.connected) return true
+    if (integration.key === 'netlify' && nlStatus?.connected) return true
     if (!integration.fields) return false
     return integration.fields.every(f => !!localStorage.getItem(f.key))
   }
@@ -514,6 +568,62 @@ export default function Settings({ open, onClose }: SettingsProps) {
                     </div>
                   )}
 
+                  {/* GitHub OAuth Section */}
+                  {currentIntegration.key === 'github' && (
+                    <div className="supa-oauth-section">
+                      {!ghStatus?.configured ? (
+                        <div className="alert-error">GitHub OAuth nije konfigurisan na backend-u.</div>
+                      ) : !ghStatus.connected ? (
+                        <div className="supa-oauth-connect">
+                          <div className="supa-oauth-info">
+                            <h4>Poveži se jednim klikom</h4>
+                            <p>Autorizuj VajbAgent na GitHub-u i agent će moći da pravi repozitorijume i push-uje kod automatski.</p>
+                          </div>
+                          <button className="btn-primary" onClick={handleGhConnect} disabled={ghLoading}>
+                            {ghLoading ? <Loader2 size={14} className="spin" /> : <Zap size={14} />}
+                            Poveži GitHub
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="supa-connected-bar">
+                          <div>
+                            <Check size={14} style={{ color: '#3ecf8e' }} /> Povezan kao <strong>@{ghStatus.info?.username || ''}</strong>
+                          </div>
+                          <button className="btn-ghost-danger" onClick={handleGhDisconnect}>Prekini</button>
+                        </div>
+                      )}
+                      {ghError && <div className="alert-error">{ghError}</div>}
+                    </div>
+                  )}
+
+                  {/* Netlify OAuth Section */}
+                  {currentIntegration.key === 'netlify' && (
+                    <div className="supa-oauth-section">
+                      {!nlStatus?.configured ? (
+                        <div className="alert-error">Netlify OAuth nije konfigurisan na backend-u.</div>
+                      ) : !nlStatus.connected ? (
+                        <div className="supa-oauth-connect">
+                          <div className="supa-oauth-info">
+                            <h4>Poveži se jednim klikom</h4>
+                            <p>Autorizuj VajbAgent na Netlify-u i agent će moći da deployuje sajt jednim klikom.</p>
+                          </div>
+                          <button className="btn-primary" onClick={handleNlConnect} disabled={nlLoading}>
+                            {nlLoading ? <Loader2 size={14} className="spin" /> : <Zap size={14} />}
+                            Poveži Netlify
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="supa-connected-bar">
+                          <div>
+                            <Check size={14} style={{ color: '#3ecf8e' }} /> Povezan kao <strong>{nlStatus.info?.email || ''}</strong>
+                          </div>
+                          <button className="btn-ghost-danger" onClick={handleNlDisconnect}>Prekini</button>
+                        </div>
+                      )}
+                      {nlError && <div className="alert-error">{nlError}</div>}
+                    </div>
+                  )}
+
                   {/* Manual fields (fallback or for other services) */}
                   {currentIntegration.fields && (
                     <div className="integration-manual">
@@ -647,23 +757,18 @@ export default function Settings({ open, onClose }: SettingsProps) {
                   </div>
 
                   <div className="account-card">
-                    <a href="https://vajbagent.com/dashboard" target="_blank" rel="noopener" className="account-link">
+                    <button
+                      type="button"
+                      className="account-link"
+                      onClick={() => { onClose(); openPaywall() }}
+                    >
                       <CreditCard size={16} />
                       <div>
                         <div className="account-link-title">Dopuni kredite</div>
-                        <div className="account-link-desc">Otvori dashboard na vajbagent.com</div>
+                        <div className="account-link-desc">Izaberi paket i plati karticom</div>
                       </div>
                       <ExternalLink size={14} />
-                    </a>
-
-                    <a href="https://vajbagent.com/dashboard" target="_blank" rel="noopener" className="account-link">
-                      <User size={16} />
-                      <div>
-                        <div className="account-link-title">Upravljaj nalogom</div>
-                        <div className="account-link-desc">Promeni email, lozinku, ime</div>
-                      </div>
-                      <ExternalLink size={14} />
-                    </a>
+                    </button>
                   </div>
                 </motion.div>
               )}
@@ -703,10 +808,6 @@ export default function Settings({ open, onClose }: SettingsProps) {
                   <div className="about-links">
                     <a href="https://vajbagent.com" target="_blank" rel="noopener" className="about-link-item">
                       <span>Početna</span>
-                      <ExternalLink size={13} />
-                    </a>
-                    <a href="https://vajbagent.com/dashboard" target="_blank" rel="noopener" className="about-link-item">
-                      <span>Dashboard</span>
                       <ExternalLink size={13} />
                     </a>
                   </div>
