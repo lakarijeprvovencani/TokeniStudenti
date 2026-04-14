@@ -9,7 +9,10 @@ import './AuthModal.css'
 interface AuthModalProps {
   open: boolean
   onClose: () => void
-  onAuthed: (user: UserInfo) => void
+  /** isNewRegistration=true only when the user just went through the register
+   *  tab; login and API-key flows set it to false so the caller can decide
+   *  whether to show the post-signup paywall/onboarding. */
+  onAuthed: (user: UserInfo, isNewRegistration: boolean) => void
   /** Optional prompt the user was trying to send — shown as a preview so they remember */
   pendingPrompt?: string
 }
@@ -27,6 +30,7 @@ export default function AuthModal({ open, onClose, onAuthed, pendingPrompt }: Au
 
   const submit = async () => {
     setError('')
+    let isNewRegistration = false
     if (mode === 'register') {
       if (!firstName.trim() || !lastName.trim() || !email.trim() || !password) {
         setError('Popuni sva polja.')
@@ -35,6 +39,7 @@ export default function AuthModal({ open, onClose, onAuthed, pendingPrompt }: Au
       setLoading(true)
       const result = await register(firstName.trim(), lastName.trim(), email.trim(), password)
       if (!result.ok) { setLoading(false); setError(result.error || 'Greška pri registraciji.'); return }
+      isNewRegistration = true
     } else {
       if (!email.trim() || !password) { setError('Unesi email i lozinku.'); return }
       setLoading(true)
@@ -47,7 +52,7 @@ export default function AuthModal({ open, onClose, onAuthed, pendingPrompt }: Au
     const info = await fetchUserInfo()
     setLoading(false)
     if (!info) { setError('Nalog je napravljen, ali provera sesije nije uspela. Osveži stranicu.'); return }
-    onAuthed(info)
+    onAuthed(info, isNewRegistration)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

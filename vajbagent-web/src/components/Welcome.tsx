@@ -128,7 +128,10 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
     })
   }, [])
 
-  // Load saved projects when user is logged in
+  // Load saved projects when user is logged in. Onboarding is NOT triggered
+  // here anymore — it only fires from handleAuthModalSuccess for genuine
+  // new registrations, so returning users (login or auto-resumed session)
+  // never see the onboarding overlay again.
   useEffect(() => {
     if (!user) return
     setLoadingProjects(true)
@@ -136,12 +139,6 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
       .then(list => setProjects(list))
       .catch(() => {})
       .finally(() => setLoadingProjects(false))
-    // Onboarding is only for truly new users — anyone who has already topped
-    // up (balance above the free-gift amount) has seen the product before.
-    const FREE_GIFT = 0.5
-    if (shouldShowOnboarding() && user.balance <= FREE_GIFT) {
-      setShowOnboarding(true)
-    }
   }, [user])
 
   const handleDeleteProject = async (id: string, e: React.MouseEvent) => {
@@ -164,10 +161,23 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
     onStart(trimmed)
   }
 
-  const handleAuthModalSuccess = (info: UserInfo) => {
+  const handleAuthModalSuccess = (info: UserInfo, isNewRegistration: boolean) => {
     onAuth(info)
     setAuthModalOpen(false)
-    // Go straight to paywall — user can still dismiss with "continue on free"
+    if (!isNewRegistration) {
+      // Returning user (login) — never show paywall or onboarding on sign-in,
+      // just continue with whatever they were doing.
+      const p = pendingPrompt
+      setPendingPrompt('')
+      if (p) onStart(p)
+      return
+    }
+    // Fresh registration: show onboarding first (if they haven't dismissed
+    // it), then the paywall upsell. shouldShowOnboarding() is already
+    // scoped per user so each account only ever sees the overlay once.
+    if (shouldShowOnboarding()) {
+      setShowOnboarding(true)
+    }
     setPaywallOpen(true)
   }
 
