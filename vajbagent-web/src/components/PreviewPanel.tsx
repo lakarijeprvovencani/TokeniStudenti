@@ -114,6 +114,46 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
     return null
   }, [files, buildDir])
 
+  /**
+   * Replace <img src="/foo.jpg" /> and url("/foo.jpg") in inline CSS with
+   * the actual data URL for the matching file in the React state, so
+   * user-uploaded images render inside the blob preview iframe (which
+   * lives on a throwaway blob: origin with no filesystem).
+   */
+  const inlineImageRefs = useCallback((html: string): string => {
+    const imageEntries = Object.entries(files).filter(
+      ([p, c]) => /\.(jpg|jpeg|png|webp|gif|svg|avif)$/i.test(p) && typeof c === 'string' && c.startsWith('data:')
+    )
+    if (imageEntries.length === 0) return html
+
+    const findDataUrl = (ref: string): string | null => {
+      const cleaned = ref.replace(/^\.?\//, '').replace(/^public\//, '')
+      for (const [p, data] of imageEntries) {
+        const normalized = p.replace(/^public\//, '')
+        if (normalized === cleaned || p === cleaned || p === ref) return data
+        if (p.endsWith('/' + cleaned) || normalized.endsWith('/' + cleaned)) return data
+      }
+      return null
+    }
+
+    // <img src="...">, <source srcset="...">, background="..."
+    html = html.replace(/(<img\b[^>]*\bsrc=)(["'])([^"']+)(\2)/gi, (match, head, q, src, _q) => {
+      const data = findDataUrl(src)
+      return data ? `${head}${q}${data}${q}` : match
+    })
+    html = html.replace(/(<source\b[^>]*\bsrcset=)(["'])([^"']+)(\2)/gi, (match, head, q, src, _q) => {
+      const data = findDataUrl(src)
+      return data ? `${head}${q}${data}${q}` : match
+    })
+    // url(...) inside inline <style> and style="..." attributes
+    html = html.replace(/url\((['"]?)([^'")]+)\1\)/gi, (match, q, src) => {
+      if (src.startsWith('data:') || src.startsWith('http') || src.startsWith('#')) return match
+      const data = findDataUrl(src)
+      return data ? `url(${q}${data}${q})` : match
+    })
+    return html
+  }, [files])
+
   // Build inlined HTML from static files (existing logic)
   const buildFullHtml = useCallback((raw: string): string => {
     let html = raw
@@ -142,8 +182,8 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
       html = html + '\n' + jsBlocks
     }
 
-    return html
-  }, [files])
+    return inlineImageRefs(html)
+  }, [files, inlineImageRefs])
 
   // Build inlined HTML from build output for a specific page
   const buildPageHtml = useCallback((pageHtml: string): string => {
@@ -191,8 +231,8 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
       html += NAV_INTERCEPT_SCRIPT
     }
 
-    return html
-  }, [files, isNextJsBuild])
+    return inlineImageRefs(html)
+  }, [files, isNextJsBuild, inlineImageRefs])
 
   // Generate blob URL for current page — debounced
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -448,7 +488,14 @@ ${sharedStyles}
           <iframe
             ref={iframeRef}
             className="preview-frame"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            /*
+              SECURITY: no allow-same-origin on the blob path. Blob URLs inherit
+              the creator origin, so combining allow-same-origin with allow-scripts
+              would let user-generated HTML in the preview read this origin's
+              localStorage (API key, Supabase tokens, etc.). With an opaque origin
+              the preview still runs scripts but is isolated from the host app.
+            */
+            sandbox="allow-scripts allow-forms allow-popups"
             title="Preview"
             key={`blob-${refreshKey}`}
           />
