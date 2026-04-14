@@ -2,21 +2,42 @@ import { WebContainer } from '@webcontainer/api'
 
 let instance: WebContainer | null = null
 let bootingPromise: Promise<WebContainer> | null = null
+let bootFailed = false
+
+// If boot doesn't complete within this window, reject. StackBlitz silently
+// rejects origins that aren't registered (vajbagent.com falls into that
+// bucket) and the internal boot promise just never resolves — without this
+// timeout every awaiting caller would hang indefinitely on the chat path.
+const BOOT_TIMEOUT_MS = 8000
 
 export async function getWebContainer(): Promise<WebContainer> {
   if (instance) return instance
+  if (bootFailed) throw new Error('WebContainer unavailable on this origin')
   if (bootingPromise) return bootingPromise
 
-  bootingPromise = WebContainer.boot({
-    coep: 'credentialless',
-    forwardPreviewErrors: true,
-  })
+  const bootRace = Promise.race<WebContainer>([
+    WebContainer.boot({
+      coep: 'credentialless',
+      forwardPreviewErrors: true,
+    }),
+    new Promise<WebContainer>((_, rej) =>
+      setTimeout(() => rej(new Error('WebContainer boot timeout — origin blocked?')), BOOT_TIMEOUT_MS)
+    ),
+  ])
+
+  bootingPromise = bootRace
     .then(wc => {
       instance = wc
       console.log('[WebContainer] Booted successfully (coep=credentialless)')
       ensureServerListener(wc)
       ensurePreviewErrorListener(wc)
       return wc
+    })
+    .catch(err => {
+      bootFailed = true
+      bootingPromise = null
+      console.error('[WebContainer] Boot failed permanently:', err.message)
+      throw err
     })
 
   return bootingPromise

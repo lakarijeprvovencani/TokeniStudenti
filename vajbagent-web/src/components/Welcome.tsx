@@ -136,8 +136,10 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
       .then(list => setProjects(list))
       .catch(() => {})
       .finally(() => setLoadingProjects(false))
-    // Show onboarding on first login
-    if (shouldShowOnboarding()) {
+    // Onboarding is only for truly new users — anyone who has already topped
+    // up (balance above the free-gift amount) has seen the product before.
+    const FREE_GIFT = 0.5
+    if (shouldShowOnboarding() && user.balance <= FREE_GIFT) {
       setShowOnboarding(true)
     }
   }, [user])
@@ -203,6 +205,17 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
       <div className="welcome-glow-secondary" />
 
       {/* Top-right user controls */}
+      {!isLoggedIn && (
+        <div className="welcome-topbar">
+          <button
+            type="button"
+            className="welcome-auth-link"
+            onClick={() => { setAuthModalOpen(true) }}
+          >
+            Prijavi se / Registracija
+          </button>
+        </div>
+      )}
       {isLoggedIn && (
         <div className="welcome-topbar">
           <button className="welcome-icon-btn" onClick={() => setSettingsOpen(true)} title="Podešavanja">
