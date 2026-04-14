@@ -256,14 +256,15 @@ export async function trackRegistrationIP(ip) {
   if (!ip) return;
   regCache = null;
   const regs = await readRegistrations();
-  regs[ip] = (regs[ip] || 0) + 1;
+  const normalized = normalizeIP(ip);
+  regs[normalized] = (regs[normalized] || 0) + 1;
   await writeRegistrations(regs);
 }
 
 export async function getRegistrationCount(ip) {
   if (!ip) return 0;
   const regs = await readRegistrations();
-  return regs[ip] || 0;
+  return regs[normalizeIP(ip)] || 0;
 }
 
 // ─── Password hashing (scrypt, zero dependencies) ───────────────────────────
@@ -293,8 +294,11 @@ export async function verifyPassword(password, stored) {
 }
 
 export async function setStudentPassword(key, password) {
-  if (!password || password.length < 6) {
-    return { error: 'Lozinka mora imati najmanje 6 karaktera.' };
+  if (!password || password.length < 8) {
+    return { error: 'Lozinka mora imati najmanje 8 karaktera.' };
+  }
+  if (password.length > 200) {
+    return { error: 'Lozinka je predugačka.' };
   }
   const students = await readStudents();
   const student = students.find(s => s.key === key);

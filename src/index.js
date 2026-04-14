@@ -14,7 +14,7 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { requireStudentAuth, requireAuth, createSession, destroySession, setSessionCookie, clearSessionCookie, parseCookies } from './auth.js';
+import { requireStudentAuth, requireAuth, createSession, destroySession, setSessionCookie, clearSessionCookie, parseCookies, validateSession, keyId } from './auth.js';
 import {
   openAIToAnthropicMessages,
   openAIToolsToAnthropic,
@@ -302,23 +302,59 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(hashA, hashB);
 }
 
-app.set('trust proxy', true);
+// Trust only one proxy hop (Render sits in front) — prevents XFF spoofing
+// which would otherwise let an attacker bypass IP-based rate limits / registration caps.
+app.set('trust proxy', 1);
 
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
 }));
 
-const ALLOWED_ORIGINS = (process.env.WEB_ORIGINS || 'http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177').split(',').map(s => s.trim());
+// ─── CORS: strict allowlist ────────────────────────────────────────────────
+// Production origins can be set via WEB_ORIGINS env var (comma-separated).
+// The default list includes vajbagent.com + the web app deploy and local dev.
+// IMPORTANT: never fall through to `cb(null, true)` when credentials are allowed —
+// that would let any site read authenticated responses (session cookie hijack / api key exfiltration).
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://vajbagent.com',
+  'https://www.vajbagent.com',
+  'https://papaya-cat-45b818.netlify.app',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'http://localhost:5176',
+  'http://localhost:5177',
+];
+const ALLOWED_ORIGINS = (process.env.WEB_ORIGINS
+  ? process.env.WEB_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
+  : DEFAULT_ALLOWED_ORIGINS);
+
+// Allow Netlify deploy preview URLs (--<hash>--papaya-cat-45b818.netlify.app) automatically
+const ALLOWED_ORIGIN_PATTERNS = [
+  /^https:\/\/[a-f0-9]+--papaya-cat-45b818\.netlify\.app$/,
+];
+
+function isOriginAllowed(origin) {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  return ALLOWED_ORIGIN_PATTERNS.some(re => re.test(origin));
+}
+
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow requests with no origin (extensions, curl, server-to-server)
+    // Requests with no Origin header (curl, server-to-server, extension) are allowed
+    // but the `credentials` flag for the response header is set to false in that case
+    // (since there's no cookie to protect). This is safe for Bearer-token auth.
     if (!origin) return cb(null, true);
-    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-    // Fallback: allow any origin for API key auth (extensions)
-    cb(null, true);
+    if (isOriginAllowed(origin)) return cb(null, true);
+    console.warn('[CORS] Blocked origin:', origin);
+    return cb(new Error('CORS: origin not allowed'));
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Secret'],
+  maxAge: 600,
 }));
 
 const authLimiter = rateLimit({
@@ -333,6 +369,22 @@ const authLimiter = rateLimit({
   },
   validate: false,
   handler: (_req, res) => res.status(429).json({ error: { message: 'Previše zahteva. Pokušaj ponovo za par minuta.', code: 'rate_limit' } }),
+});
+
+// Per-email login limiter — blocks credential stuffing across many accounts
+// from a single IP. 8 attempts per email per 10 minutes.
+const loginEmailLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const email = (req.body?.email || '').toString().trim().toLowerCase();
+    return 'email:' + (email || req.ip || 'unknown');
+  },
+  validate: false,
+  skip: (req) => !req.body?.email,
+  handler: (_req, res) => res.status(429).json({ error: 'Previše pokušaja prijave za ovaj email. Pokušaj ponovo za 10 minuta.' }),
 });
 
 const adminLimiter = rateLimit({
@@ -359,7 +411,11 @@ const registerLimiter = rateLimit({
 
 app.use((req, res, next) => {
   let logPath = req.path;
-  if (req.query.secret) logPath = req.path + '?secret=***';
+  // Redact any sensitive query params if they ever appear (defense-in-depth — server now
+  // only accepts admin secrets in headers).
+  if (req.query.secret || req.query.admin_secret || req.query.key || req.query.token) {
+    logPath = req.path + '?[redacted]';
+  }
   const ip = normalizeIP(req.ip || req.connection?.remoteAddress || '?');
   if (logPath.includes('register')) {
     console.log(`${req.method} ${logPath} [IP: ${ip}, raw: ${req.ip}, xff: ${req.headers['x-forwarded-for'] || 'none'}]`);
@@ -391,33 +447,44 @@ async function isStripeEventProcessed(eventId) {
   const r = getRedis();
   if (r) {
     try {
-      let data = await r.get(STRIPE_REDIS_KEY);
-      if (typeof data === 'string') { try { data = JSON.parse(data); } catch {} }
-      if (data && typeof data === 'object' && data[eventId]) return true;
+      // Use a dedicated per-event key instead of one big object — no race.
+      const exists = await r.get(`vajb:stripe_event:${eventId}`);
+      if (exists) return true;
     } catch {}
   }
   const file = readStripeEventsFile();
   return !!file[eventId];
 }
-async function markStripeEventProcessed(eventId) {
-  const now = Date.now();
+
+/**
+ * Atomically claims a Stripe event for processing. Returns true ONLY if this
+ * call is the first to see the event — concurrent webhook deliveries cannot
+ * both return true, preventing double-credit bugs.
+ *
+ * Uses Redis SET with NX + EX. Falls back to file mode (non-atomic) if Redis is unavailable.
+ */
+async function claimStripeEvent(eventId) {
   const r = getRedis();
-  let events = {};
   if (r) {
     try {
-      let data = await r.get(STRIPE_REDIS_KEY);
-      if (typeof data === 'string') { try { data = JSON.parse(data); } catch {} }
-      if (data && typeof data === 'object') events = data;
-    } catch {}
-  } else {
-    events = readStripeEventsFile();
+      // Upstash compat: SET key value NX EX ttl
+      const result = await r.set(`vajb:stripe_event:${eventId}`, String(Date.now()), { nx: true, ex: STRIPE_EVENT_TTL / 1000 });
+      return result === 'OK' || result === true || result === 1;
+    } catch (err) {
+      console.warn('[stripe] redis claim failed, falling back to file:', err.message);
+    }
   }
-  for (const [id, ts] of Object.entries(events)) {
-    if (now - ts > STRIPE_EVENT_TTL) delete events[id];
+  // Fallback: file mode (non-atomic — only used when Redis isn't configured at all)
+  const file = readStripeEventsFile();
+  if (file[eventId]) return false;
+  file[eventId] = Date.now();
+  // Clean expired entries
+  const now = Date.now();
+  for (const [id, ts] of Object.entries(file)) {
+    if (now - ts > STRIPE_EVENT_TTL) delete file[id];
   }
-  events[eventId] = now;
-  if (r) { try { await r.set(STRIPE_REDIS_KEY, events); } catch {} }
-  try { writeStripeEventsFile(events); } catch {}
+  try { writeStripeEventsFile(file); } catch {}
+  return true;
 }
 
 app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), asyncHandler(async (req, res) => {
@@ -441,11 +508,13 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), asyncHan
   if (event.type !== 'checkout.session.completed') {
     return res.status(200).send();
   }
-  if (await isStripeEventProcessed(event.id)) {
+  // Atomically claim the event — if another concurrent webhook delivery already
+  // claimed it, we exit without crediting (prevents double-credit on retries).
+  const claimed = await claimStripeEvent(event.id);
+  if (!claimed) {
     console.log('Stripe webhook: duplicate event ignored', event.id);
     return res.status(200).send();
   }
-  await markStripeEventProcessed(event.id);
 
   const session = event.data.object;
   if (session.payment_status !== 'paid') {
@@ -468,7 +537,7 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), asyncHan
   res.status(200).send();
 }));
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '20mb' }));
 app.use((err, _req, res, next) => {
   if (err.type === 'entity.too.large') {
     return res.status(413).json({ error: { message: 'Payload prevelik. Max 10MB.', code: 'payload_too_large' } });
@@ -500,7 +569,7 @@ app.get('/models', (_req, res) => res.json(modelsResponse()));
 
 // ---- Admin: model info (only for you) ----
 app.get('/admin/models', adminLimiter, (req, res) => {
-  const secret = req.headers['x-admin-secret'] || req.query.secret;
+  const secret = req.headers['x-admin-secret'];
   if (!safeEqual(secret, process.env.ADMIN_SECRET)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -514,7 +583,13 @@ app.get('/admin/models', adminLimiter, (req, res) => {
 });
 
 // ---- Self-registration ----
-const REGISTER_TOKEN_SECRET = process.env.ADMIN_SECRET || 'fallback-reg-secret';
+// Require a real secret — never fall back to a hardcoded string (that would let
+// anyone forge registration tokens and bypass anti-abuse limits).
+const REGISTER_TOKEN_SECRET = process.env.REGISTER_TOKEN_SECRET || process.env.ADMIN_SECRET;
+if (!REGISTER_TOKEN_SECRET || REGISTER_TOKEN_SECRET.length < 16) {
+  console.error('FATAL: REGISTER_TOKEN_SECRET (or ADMIN_SECRET) must be set and ≥16 chars. Registration tokens cannot be issued safely without it.');
+  process.exit(1);
+}
 const REGISTER_BONUS = (() => {
   const v = parseFloat(process.env.SELF_REGISTER_BONUS);
   return Number.isFinite(v) && v >= 0 ? v : 2;
@@ -554,8 +629,11 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
     return res.status(400).json({ error: 'Unesite ispravnu email adresu.' });
   }
-  if (!password || typeof password !== 'string' || password.length < 6) {
-    return res.status(400).json({ error: 'Lozinka mora imati najmanje 6 karaktera.' });
+  if (!password || typeof password !== 'string' || password.length < 8) {
+    return res.status(400).json({ error: 'Lozinka mora imati najmanje 8 karaktera.' });
+  }
+  if (password.length > 200) {
+    return res.status(400).json({ error: 'Lozinka je predugačka.' });
   }
 
   const clientIP = normalizeIP(req.ip || req.connection?.remoteAddress || 'unknown');
@@ -591,7 +669,7 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   });
 }));
 
-app.post('/auth/login', authLimiter, asyncHandler(async (req, res) => {
+app.post('/auth/login', loginEmailLimiter, authLimiter, asyncHandler(async (req, res) => {
   const { email, password } = req.body || {};
 
   if (!email || !password) {
@@ -634,11 +712,15 @@ app.get('/auth/me', authLimiter, requireAuth, asyncHandler(async (req, res) => {
   const balance = await getBalance(req.studentApiKey);
   const deposited = await getTotalDeposited(req.studentApiKey);
   const regBonus = parseFloat(process.env.SELF_REGISTER_BONUS) || 2;
+  // Only return the raw api_key when explicitly requested via ?include_key=1
+  // AND authenticated via the session cookie (not Bearer — Bearer already has it).
+  const cookies = parseCookies(req);
+  const includeKey = req.query.include_key === '1' && !!cookies.vajb_session;
   res.json({
     name: req.studentName,
     balance_usd: balance,
     free_tier: deposited <= regBonus,
-    api_key: req.studentApiKey,
+    ...(includeKey && { api_key: req.studentApiKey }),
   });
 }));
 
@@ -657,7 +739,14 @@ app.post('/auth/set-password', authLimiter, asyncHandler(async (req, res) => {
   const result = await setStudentPassword(student.key, new_password);
   if (result.error) return res.status(400).json({ error: result.error });
 
-  // Create session & set cookie
+  // Invalidate any existing sessions for this key — a stolen session cookie
+  // must not survive a password change.
+  try {
+    const { destroyAllSessionsForKey } = await import('./auth.js');
+    destroyAllSessionsForKey(student.key);
+  } catch (e) { console.warn('[set-password] destroyAllSessionsForKey failed:', e.message); }
+
+  // Create fresh session
   const session = createSession(student.key);
   setSessionCookie(res, session.token);
 
@@ -797,8 +886,22 @@ app.get('/auth/supabase/callback', asyncHandler(async (req, res) => {
     `));
   }
 
+  // Resolve the current session so we can verify the callback is the same user
+  // who initiated the flow. This prevents OAuth login-CSRF.
+  const _sbCookies = parseCookies(req);
+  const _sbSession = _sbCookies.vajb_session ? validateSession(_sbCookies.vajb_session) : null;
+  const _sbExpectedKey = _sbSession?.studentKey || null;
+  if (!_sbExpectedKey) {
+    return res.status(401).send(pageShell(`
+      <div class="icon error">⚠</div>
+      <h1>Sesija je istekla</h1>
+      <p>Moraš biti ulogovan u istom browseru da bi završio povezivanje.</p>
+      <button class="btn" onclick="window.close()">Zatvori</button>
+    `));
+  }
+
   try {
-    await supabaseOAuth.handleCallback(String(code), String(state));
+    await supabaseOAuth.handleCallback(String(code), String(state), _sbExpectedKey);
     // Success — notify opener, but DO NOT close automatically.
     // User sees confirmation and clicks button to close.
     res.send(pageShell(`
@@ -1035,8 +1138,16 @@ p { font-size: 0.92rem; color: #aaa; line-height: 1.55; margin-bottom: 24px; }
   }
   if (!code || !state) return res.status(400).send(pageShell('⚠', 'Greška', 'Nedostaje code ili state', '#ef4444'));
 
+  // Anti-CSRF: require a live session and pass its studentKey to handleCallback.
+  const _ghCookies = parseCookies(req);
+  const _ghSession = _ghCookies.vajb_session ? validateSession(_ghCookies.vajb_session) : null;
+  const _ghExpectedKey = _ghSession?.studentKey || null;
+  if (!_ghExpectedKey) {
+    return res.status(401).send(pageShell('⚠', 'Sesija je istekla', 'Moraš biti ulogovan u istom browseru da bi završio povezivanje.', '#ef4444'));
+  }
+
   try {
-    const result = await githubOAuth.handleCallback(String(code), String(state));
+    const result = await githubOAuth.handleCallback(String(code), String(state), _ghExpectedKey);
     res.send(pageShell('✓', 'GitHub je povezan!', `Povezan kao <strong>@${result.username || ''}</strong>. Možeš zatvoriti ovaj prozor.`));
   } catch (err) {
     console.error('[GitHub OAuth] Callback error:', err.message);
@@ -1064,9 +1175,66 @@ app.get('/api/github/repos', requireAuth, asyncHandler(async (req, res) => {
   }
 }));
 
+// Hard limits for push/deploy payloads — prevents OOM, abuse of GitHub/Netlify rate limits,
+// and protects against payloads full of junk files.
+const MAX_PUSH_FILES = 500;
+const MAX_PUSH_FILE_SIZE = 1_000_000; // 1 MB per file
+const MAX_PUSH_TOTAL_SIZE = 15_000_000; // 15 MB total
+
+// Validates path: no absolute paths, no `..`, no leading slash, no null bytes.
+// Reject anything that would escape the intended repo root.
+function validateRepoPath(p) {
+  if (typeof p !== 'string') return false;
+  if (p.length === 0 || p.length > 500) return false;
+  if (p.includes('\0')) return false;
+  if (p.startsWith('/')) return false;
+  if (p.startsWith('\\')) return false;
+  if (/(^|\/)\.\.(\/|$)/.test(p)) return false;
+  if (/^[a-zA-Z]:/.test(p)) return false; // windows drive letter
+  return true;
+}
+
+function validateAndLimitFiles(files) {
+  if (!files || typeof files !== 'object') {
+    return { error: 'files must be an object of path → content' };
+  }
+  const entries = Object.entries(files);
+  if (entries.length === 0) return { error: 'nema fajlova' };
+  if (entries.length > MAX_PUSH_FILES) {
+    return { error: `Previše fajlova (maks ${MAX_PUSH_FILES}).` };
+  }
+  let total = 0;
+  for (const [p, c] of entries) {
+    if (!validateRepoPath(p)) {
+      return { error: `Nevažeća putanja: ${String(p).slice(0, 80)}` };
+    }
+    if (typeof c !== 'string') {
+      return { error: `Sadržaj fajla ${p} mora biti tekst.` };
+    }
+    if (c.length > MAX_PUSH_FILE_SIZE) {
+      return { error: `Fajl ${p} je prevelik (maks 1MB).` };
+    }
+    total += c.length;
+    if (total > MAX_PUSH_TOTAL_SIZE) {
+      return { error: 'Ukupna veličina fajlova premašuje 15MB.' };
+    }
+  }
+  return { ok: true };
+}
+
 app.post('/api/github/push', requireAuth, asyncHandler(async (req, res) => {
   const { repo, files, message, branch, createIfMissing } = req.body || {};
-  if (!repo || !files) return res.status(400).json({ error: 'repo and files are required' });
+  if (!repo || typeof repo !== 'string' || repo.length > 100) {
+    return res.status(400).json({ error: 'repo is required (max 100 chars)' });
+  }
+  if (!/^[\w.-]+(\/[\w.-]+)?$/.test(repo)) {
+    return res.status(400).json({ error: 'Nevažeće ime repozitorijuma.' });
+  }
+  const check = validateAndLimitFiles(files);
+  if (!check.ok) return res.status(400).json({ error: check.error });
+  if (typeof message === 'string' && message.length > 500) {
+    return res.status(400).json({ error: 'commit message is too long' });
+  }
   try {
     const result = await githubOAuth.pushFiles(req.studentApiKey, {
       repo, files, message, branch, createIfMissing,
@@ -1116,8 +1284,16 @@ p { font-size: 0.92rem; color: #aaa; line-height: 1.55; margin-bottom: 24px; }
   }
   if (!code || !state) return res.status(400).send(pageShell('⚠', 'Greška', 'Nedostaje code ili state', '#ef4444'));
 
+  // Anti-CSRF: require a live session.
+  const _nlCookies = parseCookies(req);
+  const _nlSession = _nlCookies.vajb_session ? validateSession(_nlCookies.vajb_session) : null;
+  const _nlExpectedKey = _nlSession?.studentKey || null;
+  if (!_nlExpectedKey) {
+    return res.status(401).send(pageShell('⚠', 'Sesija je istekla', 'Moraš biti ulogovan u istom browseru da bi završio povezivanje.', '#ef4444'));
+  }
+
   try {
-    const result = await netlifyOAuth.handleCallback(String(code), String(state));
+    const result = await netlifyOAuth.handleCallback(String(code), String(state), _nlExpectedKey);
     res.send(pageShell('✓', 'Netlify je povezan!', `Povezan kao <strong>${result.email || ''}</strong>. Možeš zatvoriti ovaj prozor.`));
   } catch (err) {
     console.error('[Netlify OAuth] Callback error:', err.message);
@@ -1147,7 +1323,14 @@ app.get('/api/netlify/sites', requireAuth, asyncHandler(async (req, res) => {
 
 app.post('/api/netlify/deploy', requireAuth, asyncHandler(async (req, res) => {
   const { files, siteId, siteName } = req.body || {};
-  if (!files) return res.status(400).json({ error: 'files required' });
+  const check = validateAndLimitFiles(files);
+  if (!check.ok) return res.status(400).json({ error: check.error });
+  if (siteId && (typeof siteId !== 'string' || siteId.length > 100)) {
+    return res.status(400).json({ error: 'Nevažeći siteId.' });
+  }
+  if (siteName && (typeof siteName !== 'string' || !/^[a-z0-9-]{1,63}$/.test(siteName))) {
+    return res.status(400).json({ error: 'Nevažeće ime sajta. Samo slova, brojevi i crtice, do 63 karaktera.' });
+  }
   try {
     const result = await netlifyOAuth.deploySite(req.studentApiKey, { files, siteId, siteName });
     res.json({ result });
@@ -1390,8 +1573,10 @@ const chatCompletionsHandler = [
         code = 'provider_rejected';
       }
 
+      // Never leak raw upstream error bodies to clients — they may contain
+      // prompt fragments, provider names, model IDs, internal limits, etc.
       res.status(status).json({
-        error: { message: userMsg, type: code, detail: msg },
+        error: { message: userMsg, type: code },
       });
     } finally {
       releaseConcurrency(keyId);
@@ -1811,9 +1996,12 @@ app.get('/me', authLimiter, requireAuth, asyncHandler(async (req, res) => {
   const regBonus = parseFloat(process.env.SELF_REGISTER_BONUS) || 2;
   const freeTier = totalDeposited <= regBonus;
 
-  // Include API key only for cookie-based auth (web app needs it for display)
+  // Only include the raw API key when the client explicitly asks for it via
+  // `?include_key=1`. Default /me responses never expose the key, so idle UI
+  // refreshes (balance polling, etc.) never transmit it — reducing the attack
+  // surface dramatically. The explicit "Show API key" UI button must opt in.
   const cookies = parseCookies(req);
-  const includeKey = !!cookies.vajb_session;
+  const includeKey = cookies.vajb_session && req.query.include_key === '1';
 
   const base = {
     key_id: keyId, name, balance_usd: balanceUsd, total_deposited: totalDeposited,
@@ -1930,8 +2118,10 @@ app.post('/admin/add-credits', adminLimiter, asyncHandler(async (req, res) => {
 }));
 
 // ---- Admin: student management ----
+// Secret comes from X-Admin-Secret header ONLY — never query string or body.
+// Query strings leak to access logs, Referer headers, and browser history.
 function requireAdmin(req, res, next) {
-  const secret = req.headers['x-admin-secret'] || req.query.secret || req.body?.admin_secret;
+  const secret = req.headers['x-admin-secret'];
   if (!safeEqual(secret, process.env.ADMIN_SECRET)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -2156,7 +2346,7 @@ app.use('/docs', express.static(path.join(__dirname, '..', 'docs')));
 
 // ---- Debug ----
 app.get('/debug/redis', adminLimiter, asyncHandler(async (req, res) => {
-  const secret = req.headers['x-admin-secret'] || req.query.secret;
+  const secret = req.headers['x-admin-secret'];
   if (!safeEqual(secret, process.env.ADMIN_SECRET)) return res.status(401).json({ error: 'Unauthorized' });
   const { getRedis, isRedisConfigured } = await import('./redis.js');
   const configured = isRedisConfigured();
@@ -2180,6 +2370,8 @@ app.get('/debug/redis', adminLimiter, asyncHandler(async (req, res) => {
 }));
 
 // ---- Web Search (Tavily) ----
+// Each web search costs a flat fee (approximates Tavily's ~$0.008/call + margin).
+const WEB_SEARCH_COST_USD = 0.02;
 app.post('/v1/web-search', authLimiter, requireStudentAuth, asyncHandler(async (req, res) => {
   const tavilyKey = process.env.TAVILY_API_KEY;
   if (!tavilyKey || tavilyKey === 'tvly-YOUR_KEY_HERE') {
@@ -2189,6 +2381,12 @@ app.post('/v1/web-search', authLimiter, requireStudentAuth, asyncHandler(async (
   const { query, max_results = 5, include_answer = true } = req.body || {};
   if (!query || typeof query !== 'string' || query.trim().length < 2) {
     return res.status(400).json({ error: { message: 'Parametar "query" je obavezan (min 2 karaktera).', code: 'invalid_query' } });
+  }
+
+  // Require sufficient balance before calling upstream — prevents free usage
+  const preBalance = await getBalance(req.studentKeyId);
+  if (preBalance < WEB_SEARCH_COST_USD) {
+    return res.status(402).json({ error: { message: 'Nedovoljan kredit za web pretragu.', code: 'insufficient_funds' } });
   }
 
   try {
@@ -2220,6 +2418,9 @@ app.post('/v1/web-search', authLimiter, requireStudentAuth, asyncHandler(async (
       score: r.score || 0,
     }));
 
+    // Deduct flat fee on successful search
+    try { await deductBalance(req.studentKeyId, WEB_SEARCH_COST_USD); } catch (e) { console.warn('[web-search] deduct failed:', e.message); }
+
     res.json({
       query: query.trim(),
       answer: data.answer || null,
@@ -2231,11 +2432,76 @@ app.post('/v1/web-search', authLimiter, requireStudentAuth, asyncHandler(async (
   }
 }));
 
+// ---- Image Search (Unsplash proxy) ----
+// Key never ships to the client; backend holds it in env.
+app.post('/v1/image-search', authLimiter, requireAuth, asyncHandler(async (req, res) => {
+  const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
+  if (!unsplashKey) {
+    return res.status(503).json({ error: { message: 'Image search nije konfigurisan.', code: 'search_not_configured' } });
+  }
+  const { query, count = 5, orientation } = req.body || {};
+  if (!query || typeof query !== 'string' || query.trim().length < 2) {
+    return res.status(400).json({ error: { message: 'query je obavezan (min 2 karaktera).' } });
+  }
+  const safeCount = Math.min(Math.max(Number(count) || 5, 1), 10);
+  try {
+    let url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query.trim())}&per_page=${safeCount}`;
+    if (orientation && /^(landscape|portrait|squarish)$/.test(orientation)) {
+      url += `&orientation=${orientation}`;
+    }
+    const upstream = await fetch(url, {
+      headers: {
+        'Authorization': `Client-ID ${unsplashKey}`,
+        'Accept-Version': 'v1',
+      },
+    });
+    if (upstream.status === 403 || upstream.status === 429) {
+      return res.status(429).json({ error: { message: 'Rate limit dostignut.' } });
+    }
+    if (!upstream.ok) {
+      return res.status(502).json({ error: { message: 'Image search upstream error.' } });
+    }
+    const data = await upstream.json();
+    const results = (data.results || []).map(p => ({
+      url: p.urls?.regular || p.urls?.small || '',
+      alt: p.alt_description || p.description || 'No description',
+      photographer: p.user?.name || 'Unknown',
+      profile: p.user?.links?.html || '',
+    }));
+    // Fire-and-forget download tracking (required by Unsplash guidelines)
+    for (const p of data.results || []) {
+      if (p.links?.download_location) {
+        fetch(`${p.links.download_location}?client_id=${unsplashKey}`).catch(() => {});
+      }
+    }
+    res.json({ query: query.trim(), results });
+  } catch (err) {
+    console.error('[image-search] error:', err.message);
+    res.status(502).json({ error: { message: 'Image search nedostupan.' } });
+  }
+}));
+
 // ---- Voice transcription (Whisper) ----
+// Whisper is ~$0.006/min. We cap audio at ~3MB (short clips only) and charge a flat fee per call.
+const TRANSCRIBE_COST_USD = 0.02;
+const MAX_AUDIO_B64_LENGTH = 4_500_000; // ~3MB decoded
 app.post('/v1/audio/transcribe', authLimiter, requireStudentAuth, asyncHandler(async (req, res) => {
   const { audio, format } = req.body || {};
   if (!audio || typeof audio !== 'string') {
     return res.status(400).json({ error: { message: 'Parametar "audio" (base64) je obavezan.', code: 'invalid_audio' } });
+  }
+  if (audio.length > MAX_AUDIO_B64_LENGTH) {
+    return res.status(413).json({ error: { message: 'Audio zapis je prevelik. Maksimum ~3MB.', code: 'audio_too_large' } });
+  }
+  // Basic base64 sanity check — reject non-base64 input (prevents feeding random bytes to OpenAI)
+  if (!/^[A-Za-z0-9+/=\r\n]+$/.test(audio.slice(0, 200))) {
+    return res.status(400).json({ error: { message: 'Nevažeći audio format.', code: 'invalid_audio' } });
+  }
+
+  // Balance check
+  const preBalance = await getBalance(req.studentKeyId);
+  if (preBalance < TRANSCRIBE_COST_USD) {
+    return res.status(402).json({ error: { message: 'Nedovoljan kredit za transkripciju.', code: 'insufficient_funds' } });
   }
 
   // Use first available OpenAI key for Whisper
@@ -2256,9 +2522,10 @@ app.post('/v1/audio/transcribe', authLimiter, requireStudentAuth, asyncHandler(a
       language: 'sr',
     });
 
-    // Log usage
-    const userId = req.studentId || 'unknown';
-    console.log(`Whisper transcription: user=${userId}, size=${audioBuffer.length}b, text="${(transcription.text || '').substring(0, 50)}..."`);
+    try { await deductBalance(req.studentKeyId, TRANSCRIBE_COST_USD); } catch (e) { console.warn('[transcribe] deduct failed:', e.message); }
+
+    // Log usage (truncated — never log entire transcript)
+    console.log(`[Whisper] key=${keyId(req.studentApiKey).slice(0, 8)}... size=${audioBuffer.length}b`);
 
     res.json({ text: transcription.text || '' });
   } catch (err) {

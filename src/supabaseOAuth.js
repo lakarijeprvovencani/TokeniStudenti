@@ -134,7 +134,7 @@ export function buildAuthorizeUrl(studentKey) {
 /**
  * Handle the OAuth callback. Exchange code for tokens and save them.
  */
-export async function handleCallback(code, state) {
+export async function handleCallback(code, state, expectedStudentKey) {
   if (!code || !state) {
     throw new Error('Missing code or state');
   }
@@ -144,6 +144,12 @@ export async function handleCallback(code, state) {
     throw new Error('Invalid or expired state');
   }
   stateStore.delete(state);
+
+  // Anti-CSRF: reject callbacks where the completing session doesn't match
+  // the session that started the flow.
+  if (expectedStudentKey && stateData.studentKey !== expectedStudentKey) {
+    throw new Error('Session mismatch — initiator and callback are different users');
+  }
 
   if (stateData.expires < Date.now()) {
     throw new Error('State expired');

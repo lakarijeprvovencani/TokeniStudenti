@@ -84,13 +84,21 @@ export function buildAuthorizeUrl(studentKey) {
   return `${AUTHORIZE_URL}?${params.toString()}`;
 }
 
-export async function handleCallback(code, state) {
+export async function handleCallback(code, state, expectedStudentKey) {
   if (!code || !state) throw new Error('Missing code or state');
 
   const stateData = stateStore.get(state);
   if (!stateData) throw new Error('Invalid or expired state');
   stateStore.delete(state);
   if (stateData.expires < Date.now()) throw new Error('State expired');
+
+  // Prevent OAuth login-CSRF: the callback must come from the same user
+  // session that started the flow. Otherwise an attacker could start a flow
+  // on their account, send the consent URL to a victim, and bind the victim's
+  // GitHub account to the attacker's student key.
+  if (expectedStudentKey && stateData.studentKey !== expectedStudentKey) {
+    throw new Error('Session mismatch — initiator and callback are different users');
+  }
 
   // Exchange code for access token
   const resp = await fetch(TOKEN_URL, {

@@ -76,13 +76,18 @@ export function buildAuthorizeUrl(studentKey) {
   return `${AUTHORIZE_URL}?${params.toString()}`;
 }
 
-export async function handleCallback(code, state) {
+export async function handleCallback(code, state, expectedStudentKey) {
   if (!code || !state) throw new Error('Missing code or state');
 
   const stateData = stateStore.get(state);
   if (!stateData) throw new Error('Invalid or expired state');
   stateStore.delete(state);
   if (stateData.expires < Date.now()) throw new Error('State expired');
+
+  // Anti-CSRF: the callback MUST come from the same session that started the flow.
+  if (expectedStudentKey && stateData.studentKey !== expectedStudentKey) {
+    throw new Error('Session mismatch — initiator and callback are different users');
+  }
 
   const body = new URLSearchParams({
     grant_type: 'authorization_code',

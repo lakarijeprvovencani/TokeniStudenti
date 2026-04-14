@@ -6,6 +6,14 @@ export function keyId(key) {
   return key.trim();
 }
 
+// Short identifier for logging — never expose full key in logs.
+export function keyIdShort(key) {
+  if (!key) return 'unknown';
+  const t = key.trim();
+  if (t.length <= 10) return t.slice(0, 4) + '***';
+  return t.slice(0, 6) + '...' + t.slice(-3);
+}
+
 function safeMatch(candidate, list) {
   const candidateHash = crypto.createHash('sha256').update(String(candidate)).digest();
   let matched = null;
@@ -43,6 +51,22 @@ export function validateSession(token) {
 
 export function destroySession(token) {
   sessions.delete(token);
+}
+
+/**
+ * Invalidate ALL active sessions for a given student key.
+ * Called on password change / account lockout so old sessions can't survive a credential reset.
+ */
+export function destroyAllSessionsForKey(studentKey) {
+  if (!studentKey) return 0;
+  let count = 0;
+  for (const [token, session] of sessions.entries()) {
+    if (session.studentKey === studentKey) {
+      sessions.delete(token);
+      count++;
+    }
+  }
+  return count;
 }
 
 export function parseCookies(req) {
