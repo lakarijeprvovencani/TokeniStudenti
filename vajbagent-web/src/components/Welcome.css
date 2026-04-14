@@ -943,3 +943,19 @@
 .welcome-attached-remove:hover {
   background: #ef4444;
 }
+
+.welcome-capabilities {
+  max-width: 620px;
+  margin: -8px auto 24px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text3, #777);
+  line-height: 1.55;
+  letter-spacing: 0.01em;
+}
+@media (max-width: 600px) {
+  .welcome-capabilities {
+    font-size: 0.75rem;
+    padding: 0 18px;
+  }
+}

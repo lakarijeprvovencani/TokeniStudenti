@@ -323,6 +323,14 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
           >
             Opiši ideju, VajbAgent će je pretvoriti u kod.
           </motion.p>
+          <motion.p
+            className="welcome-capabilities"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.38 }}
+          >
+            Landing strane · sajtovi · React aplikacije · dashbordi · PWA za mobilne · Supabase baza i auth · GitHub &amp; Netlify deploy jednim klikom
+          </motion.p>
 
           <motion.div
             className="quick-starts"

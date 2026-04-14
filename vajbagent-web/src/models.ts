@@ -12,7 +12,7 @@ export const MODELS: Model[] = [
   { id: 'vajb-agent-max',       name: 'Max',       desc: 'Kompleksni zadaci, duboko razumevanje' },
   { id: 'vajb-agent-power',     name: 'Power',     desc: 'Najjači za zahtevne projekte' },
   { id: 'vajb-agent-ultra',     name: 'Ultra',     desc: 'Premium kvalitet, vrhunska preciznost', tag: 'Najjači' },
-  { id: 'vajb-agent-architect', name: 'Architect', desc: 'Full-stack arhitekta za ceo projekat' },
+  { id: 'vajb-agent-architect', name: 'Architect', desc: 'Za složenije frontend projekte i planiranje strukture' },
 ]
 
 export const DEFAULT_MODEL = 'vajb-agent-turbo'
