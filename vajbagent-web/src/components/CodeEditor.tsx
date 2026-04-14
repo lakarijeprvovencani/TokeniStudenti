@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Editor, { type OnMount } from '@monaco-editor/react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { X, FileCode, Hash, FileJson, FileText, Undo2, Redo2 } from 'lucide-react'
 import './CodeEditor.css'
 
@@ -253,22 +253,29 @@ export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile
       {/* Tab bar */}
       {openTabs.length > 0 && (
         <div className="editor-tabs" ref={tabBarRef}>
-          {openTabs.map(tab => (
-            <button
-              key={tab}
-              data-tab={tab}
-              className={`editor-tab ${tab === activeFile ? 'active' : ''}`}
-              onClick={() => onSelectFile?.(tab)}
-              onAuxClick={(e) => handleTabAuxClick(tab, e)}
-              title={tab}
-            >
-              {getFileIcon(tab)}
-              <span className="tab-name">{tab.split('/').pop()}</span>
-              <button className="tab-close" onClick={(e) => closeTab(tab, e)}>
-                <X size={10} />
-              </button>
-            </button>
-          ))}
+          <AnimatePresence initial={false}>
+            {openTabs.map(tab => (
+              <motion.button
+                key={tab}
+                layout
+                initial={{ opacity: 0, scale: 0.85, y: -4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.85, y: -4 }}
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                data-tab={tab}
+                className={`editor-tab ${tab === activeFile ? 'active' : ''}`}
+                onClick={() => onSelectFile?.(tab)}
+                onAuxClick={(e) => handleTabAuxClick(tab, e)}
+                title={tab}
+              >
+                {getFileIcon(tab)}
+                <span className="tab-name">{tab.split('/').pop()}</span>
+                <span className="tab-close" onClick={(e) => closeTab(tab, e)}>
+                  <X size={10} />
+                </span>
+              </motion.button>
+            ))}
+          </AnimatePresence>
         </div>
       )}
 

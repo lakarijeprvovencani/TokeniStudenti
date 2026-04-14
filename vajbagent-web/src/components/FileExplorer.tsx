@@ -1,17 +1,24 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FileText, FileCode, FileJson, Folder, Hash, ChevronRight, FolderOpen } from 'lucide-react'
+import { FileText, FileCode, FileJson, Folder, Hash, ChevronRight, FolderOpen, Key, FilePlus, FolderPlus, RefreshCw, FoldVertical, Trash2, Edit3 } from 'lucide-react'
 import './FileExplorer.css'
 
 interface FileExplorerProps {
   files: Record<string, string>
   activeFile: string | null
   onSelectFile: (path: string) => void
+  onCreateFile?: (path: string, content: string) => void | Promise<void>
+  onDeleteFile?: (path: string) => void | Promise<void>
+  onRenameFile?: (oldPath: string, newPath: string) => void | Promise<void>
+  onRefresh?: () => void
 }
 
 function FileIcon({ name }: { name: string }) {
-  const ext = name.split('.').pop()?.toLowerCase() || ''
+  const base = name.split('/').pop() || name
+  const ext = base.split('.').pop()?.toLowerCase() || ''
 
+  // Env files — special orange key icon
+  if (base === '.env' || base.startsWith('.env.')) return <Key size={13} className="ficon ficon-env" />
   if (ext === 'html' || ext === 'htm') return <FileCode size={14} className="ficon ficon-html" />
   if (ext === 'css' || ext === 'scss') return <Hash size={14} className="ficon ficon-css" />
   if (ext === 'tsx' || ext === 'jsx') return <FileCode size={14} className="ficon ficon-react" />
@@ -39,17 +46,110 @@ function buildTree(paths: string[]): { folders: Record<string, string[]>; rootFi
   return { folders, rootFiles }
 }
 
-function FolderGroup({ folder, folderFiles, activeFile, onSelectFile }: {
+interface FileRowProps {
+  path: string
+  displayName: string
+  nested?: boolean
+  active: boolean
+  onSelect: () => void
+  onDelete?: () => void
+  onRename?: (newName: string) => void
+}
+
+function FileRow({ path, displayName, nested, active, onSelect, onDelete, onRename }: FileRowProps) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [renameValue, setRenameValue] = useState(displayName)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (renaming) {
+      setTimeout(() => inputRef.current?.focus(), 0)
+    }
+  }, [renaming])
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setMenuOpen(true)
+  }
+
+  const submitRename = () => {
+    setRenaming(false)
+    if (renameValue && renameValue !== displayName && onRename) {
+      onRename(renameValue)
+    }
+  }
+
+  if (renaming) {
+    return (
+      <div className={`explorer-file ${nested ? 'nested' : ''}`}>
+        <FileIcon name={path} />
+        <input
+          ref={inputRef}
+          className="rename-input"
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onBlur={submitRename}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') submitRename()
+            if (e.key === 'Escape') { setRenaming(false); setRenameValue(displayName) }
+          }}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <motion.button
+        layout
+        initial={{ opacity: 0, x: -8 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -8 }}
+        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+        className={`explorer-file ${nested ? 'nested' : ''} ${active ? 'active' : ''}`}
+        onClick={onSelect}
+        onContextMenu={handleContextMenu}
+      >
+        <FileIcon name={path} />
+        <span className="file-name">{displayName}</span>
+      </motion.button>
+      {menuOpen && (
+        <>
+          <div className="ctx-menu-backdrop" onClick={() => setMenuOpen(false)} />
+          <div className="ctx-menu">
+            <button onClick={() => { setMenuOpen(false); setRenaming(true) }}>
+              <Edit3 size={12} /> Preimenuj
+            </button>
+            {onDelete && (
+              <button className="ctx-danger" onClick={() => { setMenuOpen(false); onDelete() }}>
+                <Trash2 size={12} /> Obriši
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </>
+  )
+}
+
+function FolderGroup({
+  folder, folderFiles, activeFile, onSelectFile, isCollapsed, onToggleCollapse, onDeleteFile, onRenameFile,
+}: {
   folder: string
   folderFiles: string[]
   activeFile: string | null
   onSelectFile: (path: string) => void
+  isCollapsed: boolean
+  onToggleCollapse: () => void
+  onDeleteFile?: (path: string) => void | Promise<void>
+  onRenameFile?: (oldPath: string, newPath: string) => void | Promise<void>
 }) {
-  const [open, setOpen] = useState(true)
+  const open = !isCollapsed
 
   return (
     <div className="explorer-folder-group">
-      <button className="explorer-folder" onClick={() => setOpen(!open)}>
+      <button className="explorer-folder" onClick={onToggleCollapse}>
         <motion.div
           className="folder-chevron"
           animate={{ rotate: open ? 90 : 0 }}
@@ -74,19 +174,23 @@ function FolderGroup({ folder, folderFiles, activeFile, onSelectFile }: {
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
           >
-            {folderFiles.map((path) => (
-              <motion.button
-                key={path}
-                className={`explorer-file nested ${path === activeFile ? 'active' : ''}`}
-                onClick={() => onSelectFile(path)}
-                initial={{ opacity: 0, x: -6 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <FileIcon name={path} />
-                <span className="file-name">{path.split('/').pop()}</span>
-              </motion.button>
-            ))}
+            <AnimatePresence initial={false}>
+              {folderFiles.map((path) => (
+                <FileRow
+                  key={path}
+                  path={path}
+                  displayName={path.split('/').pop() || path}
+                  nested
+                  active={path === activeFile}
+                  onSelect={() => onSelectFile(path)}
+                  onDelete={onDeleteFile ? () => onDeleteFile(path) : undefined}
+                  onRename={onRenameFile ? (newName: string) => {
+                    const dir = path.substring(0, path.lastIndexOf('/'))
+                    return onRenameFile(path, dir ? `${dir}/${newName}` : newName)
+                  } : undefined}
+                />
+              ))}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
@@ -94,9 +198,63 @@ function FolderGroup({ folder, folderFiles, activeFile, onSelectFile }: {
   )
 }
 
-export default function FileExplorer({ files, activeFile, onSelectFile }: FileExplorerProps) {
+export default function FileExplorer({
+  files, activeFile, onSelectFile, onCreateFile, onDeleteFile, onRenameFile, onRefresh,
+}: FileExplorerProps) {
   const fileList = Object.keys(files).filter(f => !f.endsWith('/')).sort()
   const { folders, rootFiles } = buildTree(fileList)
+
+  // Inline create new file/folder
+  const [creating, setCreating] = useState<'file' | 'folder' | null>(null)
+  const [newName, setNewName] = useState('')
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const newInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (creating) {
+      setTimeout(() => newInputRef.current?.focus(), 0)
+    }
+  }, [creating])
+
+  const handleNewFile = () => {
+    setCreating('file')
+    setNewName('')
+  }
+
+  const handleNewFolder = () => {
+    setCreating('folder')
+    setNewName('')
+  }
+
+  const submitNew = async () => {
+    const name = newName.trim()
+    if (!name) {
+      setCreating(null)
+      return
+    }
+    if (creating === 'file' && onCreateFile) {
+      await onCreateFile(name, '')
+      onSelectFile(name)
+    } else if (creating === 'folder' && onCreateFile) {
+      // Create a placeholder file inside the folder so it shows up
+      await onCreateFile(`${name}/.gitkeep`, '')
+    }
+    setCreating(null)
+    setNewName('')
+  }
+
+  const handleCollapseAll = () => {
+    setCollapsed(new Set(Object.keys(folders)))
+  }
+
+  const toggleFolder = (folder: string) => {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      if (next.has(folder)) next.delete(folder)
+      else next.add(folder)
+      return next
+    })
+  }
 
   return (
     <div className="explorer">
@@ -104,8 +262,30 @@ export default function FileExplorer({ files, activeFile, onSelectFile }: FileEx
         <span>EXPLORER</span>
         <span className="explorer-count">{fileList.length}</span>
       </div>
+      {(onCreateFile || onRefresh) && (
+        <div className="explorer-toolbar">
+          {onCreateFile && (
+            <button className="explorer-tool-btn" onClick={handleNewFile} title="Novi fajl">
+              <FilePlus size={13} />
+            </button>
+          )}
+          {onCreateFile && (
+            <button className="explorer-tool-btn" onClick={handleNewFolder} title="Novi folder">
+              <FolderPlus size={13} />
+            </button>
+          )}
+          {onRefresh && (
+            <button className="explorer-tool-btn" onClick={onRefresh} title="Osveži">
+              <RefreshCw size={13} />
+            </button>
+          )}
+          <button className="explorer-tool-btn" onClick={handleCollapseAll} title="Sakrij sve foldere">
+            <FoldVertical size={13} />
+          </button>
+        </div>
+      )}
       <div className="explorer-tree">
-        {fileList.length === 0 ? (
+        {fileList.length === 0 && !creating ? (
           <div className="explorer-empty">
             <div className="empty-logo-wrap">
               <img src="/logo.svg" alt="" className="empty-logo" />
@@ -115,6 +295,25 @@ export default function FileExplorer({ files, activeFile, onSelectFile }: FileEx
           </div>
         ) : (
           <>
+            {/* Inline create input */}
+            {creating && (
+              <div className="explorer-file creating">
+                {creating === 'file' ? <FileText size={14} className="ficon" /> : <Folder size={14} className="ficon ficon-folder" />}
+                <input
+                  ref={newInputRef}
+                  className="rename-input"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder={creating === 'file' ? 'index.html' : 'src'}
+                  onBlur={submitNew}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') submitNew()
+                    if (e.key === 'Escape') { setCreating(null); setNewName('') }
+                  }}
+                />
+              </div>
+            )}
+
             {/* Folders first */}
             {Object.entries(folders).map(([folder, folderFiles]) => (
               <FolderGroup
@@ -123,23 +322,25 @@ export default function FileExplorer({ files, activeFile, onSelectFile }: FileEx
                 folderFiles={folderFiles}
                 activeFile={activeFile}
                 onSelectFile={onSelectFile}
+                isCollapsed={collapsed.has(folder)}
+                onToggleCollapse={() => toggleFolder(folder)}
+                onDeleteFile={onDeleteFile}
+                onRenameFile={onRenameFile}
               />
             ))}
 
             {/* Root files */}
-            <AnimatePresence>
-              {rootFiles.map((path, i) => (
-                <motion.button
+            <AnimatePresence initial={false}>
+              {rootFiles.map((path) => (
+                <FileRow
                   key={path}
-                  className={`explorer-file ${path === activeFile ? 'active' : ''}`}
-                  onClick={() => onSelectFile(path)}
-                  initial={{ opacity: 0, x: -6 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.2, delay: i * 0.03 }}
-                >
-                  <FileIcon name={path} />
-                  <span className="file-name">{path}</span>
-                </motion.button>
+                  path={path}
+                  displayName={path}
+                  active={path === activeFile}
+                  onSelect={() => onSelectFile(path)}
+                  onDelete={onDeleteFile ? () => onDeleteFile(path) : undefined}
+                  onRename={onRenameFile ? (newName: string) => onRenameFile(path, newName) : undefined}
+                />
               ))}
             </AnimatePresence>
           </>
