@@ -654,7 +654,7 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   await trackRegistrationIP(clientIP);
 
   // Create session & set cookie
-  const session = createSession(result.student.key);
+  const session = await createSession(result.student.key);
   setSessionCookie(res, session.token);
 
   console.log(`[Auth] Registered: "${fullName}" <${result.student.email}> [IP: ${clientIP}]`);
@@ -686,7 +686,7 @@ app.post('/auth/login', loginEmailLimiter, authLimiter, asyncHandler(async (req,
     return res.status(401).json({ error: 'Pogrešan email ili lozinka.' });
   }
 
-  const session = createSession(student.key);
+  const session = await createSession(student.key);
   setSessionCookie(res, session.token);
 
   console.log(`[Auth] Login: "${student.name}" <${student.email}>`);
@@ -701,12 +701,12 @@ app.post('/auth/login', loginEmailLimiter, authLimiter, asyncHandler(async (req,
   });
 }));
 
-app.post('/auth/logout', (_req, res) => {
+app.post('/auth/logout', asyncHandler(async (_req, res) => {
   const cookies = parseCookies(_req);
-  if (cookies.vajb_session) destroySession(cookies.vajb_session);
+  if (cookies.vajb_session) await destroySession(cookies.vajb_session);
   clearSessionCookie(res);
   res.json({ ok: true });
-});
+}));
 
 app.get('/auth/me', authLimiter, requireAuth, asyncHandler(async (req, res) => {
   const balance = await getBalance(req.studentApiKey);
@@ -743,11 +743,11 @@ app.post('/auth/set-password', authLimiter, asyncHandler(async (req, res) => {
   // must not survive a password change.
   try {
     const { destroyAllSessionsForKey } = await import('./auth.js');
-    destroyAllSessionsForKey(student.key);
+    await destroyAllSessionsForKey(student.key);
   } catch (e) { console.warn('[set-password] destroyAllSessionsForKey failed:', e.message); }
 
   // Create fresh session
-  const session = createSession(student.key);
+  const session = await createSession(student.key);
   setSessionCookie(res, session.token);
 
   console.log(`[Auth] Password set: "${student.name}" <${student.email}>`);
@@ -889,7 +889,7 @@ app.get('/auth/supabase/callback', asyncHandler(async (req, res) => {
   // Resolve the current session so we can verify the callback is the same user
   // who initiated the flow. This prevents OAuth login-CSRF.
   const _sbCookies = parseCookies(req);
-  const _sbSession = _sbCookies.vajb_session ? validateSession(_sbCookies.vajb_session) : null;
+  const _sbSession = _sbCookies.vajb_session ? await validateSession(_sbCookies.vajb_session) : null;
   const _sbExpectedKey = _sbSession?.studentKey || null;
   if (!_sbExpectedKey) {
     return res.status(401).send(pageShell(`
@@ -1140,7 +1140,7 @@ p { font-size: 0.92rem; color: #aaa; line-height: 1.55; margin-bottom: 24px; }
 
   // Anti-CSRF: require a live session and pass its studentKey to handleCallback.
   const _ghCookies = parseCookies(req);
-  const _ghSession = _ghCookies.vajb_session ? validateSession(_ghCookies.vajb_session) : null;
+  const _ghSession = _ghCookies.vajb_session ? await validateSession(_ghCookies.vajb_session) : null;
   const _ghExpectedKey = _ghSession?.studentKey || null;
   if (!_ghExpectedKey) {
     return res.status(401).send(pageShell('⚠', 'Sesija je istekla', 'Moraš biti ulogovan u istom browseru da bi završio povezivanje.', '#ef4444'));
@@ -1286,7 +1286,7 @@ p { font-size: 0.92rem; color: #aaa; line-height: 1.55; margin-bottom: 24px; }
 
   // Anti-CSRF: require a live session.
   const _nlCookies = parseCookies(req);
-  const _nlSession = _nlCookies.vajb_session ? validateSession(_nlCookies.vajb_session) : null;
+  const _nlSession = _nlCookies.vajb_session ? await validateSession(_nlCookies.vajb_session) : null;
   const _nlExpectedKey = _nlSession?.studentKey || null;
   if (!_nlExpectedKey) {
     return res.status(401).send(pageShell('⚠', 'Sesija je istekla', 'Moraš biti ulogovan u istom browseru da bi završio povezivanje.', '#ef4444'));
