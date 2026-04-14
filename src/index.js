@@ -1806,16 +1806,16 @@ async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, st
 
   try {
     if (stream) {
-      await handleOpenAIStream(res, keyId, resolved, payload, poolEntry.client);
+      await handleOpenAIStream(req, res, keyId, resolved, payload, poolEntry.client);
     } else {
-      await handleOpenAINonStream(res, keyId, resolved, payload, poolEntry.client);
+      await handleOpenAINonStream(req, res, keyId, resolved, payload, poolEntry.client);
     }
   } finally {
     releaseFromPool(poolEntry);
   }
 }
 
-async function handleOpenAINonStream(res, keyId, resolved, payload, client) {
+async function handleOpenAINonStream(req, res, keyId, resolved, payload, client) {
   const response = await withRetry(() => client.chat.completions.create(payload));
 
   // Validate response has content
@@ -1848,7 +1848,7 @@ async function handleOpenAINonStream(res, keyId, resolved, payload, client) {
   res.json(response);
 }
 
-async function handleOpenAIStream(res, keyId, resolved, payload, client) {
+async function handleOpenAIStream(req, res, keyId, resolved, payload, client) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
