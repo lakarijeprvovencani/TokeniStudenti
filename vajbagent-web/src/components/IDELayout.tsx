@@ -550,6 +550,7 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
 
   // Gather deployable files: prefer build output (dist/ or out/) if present, else all source.
   // Applies the same security filter as GitHub push — .env is NEVER deployed publicly.
+  // Files under public/ are hoisted to root (Vite convention: public/hero.jpg → /hero.jpg).
   const collectDeployFiles = (): Record<string, string> => {
     const all = filesRef.current
     const distFiles: Record<string, string> = {}
@@ -559,11 +560,15 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
       if (p.startsWith('dist/')) distFiles[p.slice(5)] = c
       else if (p.startsWith('out/')) outFiles[p.slice(4)] = c
     }
-    // dist/ and out/ are build artifacts — already bundled, no .env there normally,
-    // but run through filter anyway for safety
     if (Object.keys(distFiles).length > 0) return filterForPush(distFiles).kept
     if (Object.keys(outFiles).length > 0) return filterForPush(outFiles).kept
-    return filterForPush(all).kept
+
+    const hoisted: Record<string, string> = {}
+    for (const [p, c] of Object.entries(all)) {
+      if (p.endsWith('/')) continue
+      hoisted[p.startsWith('public/') ? p.slice(7) : p] = c
+    }
+    return filterForPush(hoisted).kept
   }
 
   const slugify = (s: string) =>
