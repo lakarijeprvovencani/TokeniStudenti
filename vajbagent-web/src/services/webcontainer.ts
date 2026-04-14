@@ -355,6 +355,16 @@ export async function runCommand(cmd: string, args: string[]): Promise<string> {
   return output + (exitCode !== 0 ? `\n(exit code: ${exitCode})` : '')
 }
 
+const BINARY_EXT_RE = /\.(jpg|jpeg|png|webp|gif|svg|avif|ico|pdf|woff2?|ttf|otf|eot|mp4|webm|mp3|wav|ogg|zip)$/i
+
+/**
+ * Read every file in the WC filesystem into a plain object. Binary
+ * assets (images, fonts, media) are NOT read here — reading them as
+ * UTF-8 would corrupt the bytes and, worse, overwrite the data URL
+ * that lives in our React state for user-uploaded images. Callers
+ * that want binary content should preserve it themselves from the
+ * previous state snapshot.
+ */
 export async function getAllFiles(): Promise<Record<string, string>> {
   const wc = await getWebContainer()
   const paths = await listFiles('.')
@@ -362,6 +372,7 @@ export async function getAllFiles(): Promise<Record<string, string>> {
 
   for (const p of paths) {
     if (p.endsWith('/')) continue
+    if (BINARY_EXT_RE.test(p)) continue  // leave binary assets to the caller
     try {
       files[p] = await wc.fs.readFile(p, 'utf-8')
     } catch (err) {

@@ -347,8 +347,20 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
   }, [])
 
   const handleFilesChanged = useCallback((newFiles: Record<string, string>) => {
-    setFiles(newFiles)
-    const fileNames = Object.keys(newFiles).filter(f => !f.endsWith('/'))
+    // Merge with existing state so that user-uploaded binary images
+    // (stored as data URLs) are preserved. getAllFiles deliberately
+    // skips binary files — without this merge, calling setFiles with
+    // its output would drop every image the user just uploaded.
+    setFiles(prev => {
+      const merged: Record<string, string> = { ...newFiles }
+      for (const [path, content] of Object.entries(prev)) {
+        if (isImagePath(path) && typeof content === 'string' && content.startsWith('data:')) {
+          merged[path] = content
+        }
+      }
+      return merged
+    })
+    const fileNames = Object.keys(newFiles).filter(f => !f.endsWith('/') && !isImagePath(f))
     if (fileNames.length > 0) {
       setActiveFile(fileNames[fileNames.length - 1])
     }
@@ -481,7 +493,16 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
     try {
       const { getAllFiles } = await import('../services/webcontainer')
       const all = await getAllFiles()
-      setFiles(all)
+      // Preserve user-uploaded images — getAllFiles skips binary paths.
+      setFiles(prev => {
+        const merged: Record<string, string> = { ...all }
+        for (const [path, content] of Object.entries(prev)) {
+          if (isImagePath(path) && typeof content === 'string' && content.startsWith('data:')) {
+            merged[path] = content
+          }
+        }
+        return merged
+      })
     } catch (err) {
       console.warn('[Explorer] Refresh failed:', err)
     }
