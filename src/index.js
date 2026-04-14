@@ -587,7 +587,23 @@ function setWebAppHeaders(res) {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
 }
 
-app.get('/', (_req, res) => {
+// WebContainers on vajbagent.com requires each visitor to complete a
+// StackBlitz OAuth popup (free tier behavior — auth.init returns
+// {status:'need-auth'} on non-grandfathered origins). That's unusable
+// for a public product, so the root is redirected to the Netlify
+// deploy where WebContainers "just works" via the *.netlify.app
+// grandfathered origin. Flip WEB_APP_AT_ROOT=1 on Render once a
+// StackBlitz Enterprise/OSS license for vajbagent.com is approved
+// and the SPA will be served locally again.
+const WEB_APP_AT_ROOT = process.env.WEB_APP_AT_ROOT === '1';
+const WEB_APP_REDIRECT_URL = (process.env.WEB_APP_REDIRECT_URL || 'https://papaya-cat-45b818.netlify.app').replace(/\/$/, '');
+
+app.get('/', (req, res) => {
+  if (!WEB_APP_AT_ROOT) {
+    const qs = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    return res.redirect(302, WEB_APP_REDIRECT_URL + '/' + qs);
+  }
   if (webAppIndexExists) {
     setWebAppHeaders(res);
     return res.sendFile(path.join(WEB_APP_DIST, 'index.html'));
