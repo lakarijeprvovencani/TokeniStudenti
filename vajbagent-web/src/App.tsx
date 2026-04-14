@@ -119,9 +119,12 @@ class RootErrorBoundary extends Component<{ children: ReactNode }, { error: Erro
   }
 }
 
+interface AttachedImage { name: string; dataUrl: string }
+
 function AppInner() {
   const [state, setState] = useState<AppState>('welcome')
   const [prompt, setPrompt] = useState('')
+  const [pendingImages, setPendingImages] = useState<AttachedImage[]>([])
   const [model, setModel] = useState(DEFAULT_MODEL)
   const [user, setUser] = useState<UserInfo | null>(null)
   const [resumeProject, setResumeProject] = useState<SavedProject | null>(null)
@@ -177,9 +180,10 @@ function AppInner() {
     setUser(userInfo)
   }, [])
 
-  const handleStart = (text: string) => {
+  const handleStart = (text: string, images: AttachedImage[] = []) => {
     setResumeProject(null)
     setPrompt(text)
+    setPendingImages(images)
     setState('loading')
     // Clear until IDELayout creates its new project; it will save under a new id
     clearLastProjectId()
@@ -188,6 +192,7 @@ function AppInner() {
   const handleResume = (project: SavedProject) => {
     setResumeProject(project)
     setPrompt('')
+    setPendingImages([])
     setModel(project.model)
     writeLastProjectId(project.id)
     // Skip loading animation for resume — go straight to IDE
@@ -248,6 +253,7 @@ function AppInner() {
         >
           <IDELayout
             initialPrompt={prompt}
+            initialImages={pendingImages}
             model={model}
             onModelChange={setModel}
             freeTier={freeTier}

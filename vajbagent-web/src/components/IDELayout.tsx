@@ -30,6 +30,9 @@ import './IDELayout.css'
 
 interface IDELayoutProps {
   initialPrompt: string
+  /** Images attached on Welcome before entering the IDE. Passed to
+   *  ChatPanel so they become part of the very first user message. */
+  initialImages?: { name: string; dataUrl: string }[]
   model: string
   onModelChange: (model: string) => void
   freeTier?: boolean
@@ -43,7 +46,7 @@ const panelVariants = {
   exit: { opacity: 0, scale: 0.98, transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } },
 }
 
-export default function IDELayout({ initialPrompt, model, onModelChange, freeTier, resumeProject, onBackToWelcome }: IDELayoutProps) {
+export default function IDELayout({ initialPrompt, initialImages, model, onModelChange, freeTier, resumeProject, onBackToWelcome }: IDELayoutProps) {
   const [files, setFiles] = useState<Record<string, string>>({})
   const [activeFile, setActiveFile] = useState<string | null>(null)
   const [contextUsed, setContextUsed] = useState(0)
@@ -953,6 +956,7 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
         <div className={`chat-wrap ${chatOpen ? 'open' : 'closed'}`}>
           <ChatPanel
             initialPrompt={initialPrompt}
+            initialImages={initialImages}
             model={model}
             onModelChange={onModelChange}
             onFilesChanged={handleFilesChanged}

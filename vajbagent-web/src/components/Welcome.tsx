@@ -19,8 +19,10 @@ const QUICK_STARTS = [
   { icon: <Code2 size={16} />, label: 'Dashboard', prompt: 'Napravi admin dashboard sa sidebar navigacijom, karticama sa statistikama i tabelom podataka.' },
 ]
 
+interface AttachedImage { name: string; dataUrl: string }
+
 interface WelcomeProps {
-  onStart: (prompt: string) => void
+  onStart: (prompt: string, images?: AttachedImage[]) => void
   onResume: (project: SavedProject) => void
   model: string
   onModelChange: (model: string) => void
@@ -44,6 +46,7 @@ const TEXT_EXTS = /\.(ts|tsx|js|jsx|py|html|css|json|md|txt|yaml|yml|sql|sh|csv|
 
 export default function Welcome({ onStart, onResume, model, onModelChange, onAuth, user, freeTier }: WelcomeProps) {
   const [text, setText] = useState('')
+  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([])
   const [focused, setFocused] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -68,17 +71,41 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
     e.target.value = ''
   }
 
-  // Handle image attach (Paperclip button) — converts to data URL and adds note
+  const readImageAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(reader.error)
+      reader.readAsDataURL(file)
+    })
+
+  // Handle image attach (Paperclip button) — store as data URLs so they can be
+  // sent as multimodal parts in the first chat message. Enforces a max count
+  // so the request payload stays reasonable.
   const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
-    // For simplicity on welcome screen, just note that images were attached
-    // The actual image data goes via session/initialPrompt but Welcome doesn't support that yet
-    // So we tell the user to use the chat panel for images
-    if (files.length > 0) {
-      alert('Slike možeš da prikačiš direktno u chat panel kad uđeš u projekat — prevuci ih ili pejstuj.')
+    const MAX_IMAGES = 4
+    const MAX_BYTES = 5 * 1024 * 1024 // 5MB each
+    const accepted: AttachedImage[] = []
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) continue
+      if (file.size > MAX_BYTES) continue
+      if (attachedImages.length + accepted.length >= MAX_IMAGES) break
+      try {
+        const dataUrl = await readImageAsDataUrl(file)
+        accepted.push({ name: file.name, dataUrl })
+      } catch { /* skip unreadable file */ }
+    }
+    if (accepted.length > 0) {
+      setAttachedImages(prev => [...prev, ...accepted].slice(0, MAX_IMAGES))
+      inputRef.current?.focus()
     }
     e.target.value = ''
+  }
+
+  const removeAttachedImage = (index: number) => {
+    setAttachedImages(prev => prev.filter((_, i) => i !== index))
   }
 
   // New-flow modals (Bolt/Lovable style)
@@ -150,15 +177,26 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
 
   const handleSubmit = () => {
     const trimmed = text.trim()
-    if (!trimmed) return
+    if (!trimmed && attachedImages.length === 0) return
     if (!user) {
-      // Stash the prompt and pop the auth modal — after register the paywall
-      // appears, and once the user either pays or skips we start generation.
+      // Stash the prompt (and any attached images) and pop the auth modal.
+      // After register → paywall; after login → onStart fires with the
+      // full stashed payload.
       setPendingPrompt(trimmed)
       setAuthModalOpen(true)
       return
     }
-    onStart(trimmed)
+    // Pre-flight balance check: a logged-in user with effectively 0 credit
+    // can never succeed on the first send — back-end will 402 — so open
+    // the paywall immediately instead of letting them watch the spinner.
+    const MIN_USD_TO_START = 0.01
+    if (user.balance < MIN_USD_TO_START) {
+      setPendingPrompt(trimmed)
+      openPaywall()
+      return
+    }
+    onStart(trimmed, attachedImages)
+    setAttachedImages([])
   }
 
   const handleAuthModalSuccess = (info: UserInfo, isNewRegistration: boolean) => {
@@ -168,8 +206,10 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
       // Returning user (login) — never show paywall or onboarding on sign-in,
       // just continue with whatever they were doing.
       const p = pendingPrompt
+      const imgs = attachedImages
       setPendingPrompt('')
-      if (p) onStart(p)
+      setAttachedImages([])
+      if (p || imgs.length > 0) onStart(p, imgs)
       return
     }
     // Fresh registration: show onboarding first (if they haven't dismissed
@@ -183,10 +223,12 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
 
   const handlePaywallSkip = () => {
     setPaywallOpen(false)
-    // User chose to continue with free credits — start generation with stashed prompt
+    // User chose to continue with free credits — start generation with stashed prompt + images
     const p = pendingPrompt
+    const imgs = attachedImages
     setPendingPrompt('')
-    if (p) onStart(p)
+    setAttachedImages([])
+    if (p || imgs.length > 0) onStart(p, imgs)
   }
 
   const handlePaywallClose = () => {
@@ -326,6 +368,23 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
           >
             <div className="input-glow-border" />
             <div className="input-inner">
+              {attachedImages.length > 0 && (
+                <div className="welcome-attached-images">
+                  {attachedImages.map((img, i) => (
+                    <div key={i} className="welcome-attached-image" title={img.name}>
+                      <img src={img.dataUrl} alt={img.name} />
+                      <button
+                        type="button"
+                        className="welcome-attached-remove"
+                        onClick={() => removeAttachedImage(i)}
+                        title="Ukloni sliku"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <textarea
                 ref={inputRef}
                 value={text}
@@ -333,7 +392,7 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
                 onKeyDown={handleKeyDown}
-                placeholder="Opiši šta ti treba..."
+                placeholder={attachedImages.length > 0 ? 'Opiši šta hoćeš sa slikom...' : 'Opiši šta ti treba...'}
                 rows={2}
               />
               <div className="input-actions">
@@ -363,9 +422,9 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
                   <ModelSelector value={model} onChange={onModelChange} freeTier={freeTier} />
                 </div>
                 <button
-                  className={`send-btn ${text.trim() ? 'active' : ''}`}
+                  className={`send-btn ${text.trim() || attachedImages.length > 0 ? 'active' : ''}`}
                   onClick={handleSubmit}
-                  disabled={!text.trim()}
+                  disabled={!text.trim() && attachedImages.length === 0}
                 >
                   <ArrowUp size={18} />
                 </button>

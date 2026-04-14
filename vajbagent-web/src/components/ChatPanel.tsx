@@ -37,6 +37,9 @@ interface StreamResult {
 
 interface ChatPanelProps {
   initialPrompt: string
+  /** Images attached on the welcome screen — injected into the very first
+   *  user message so the agent sees them right away. */
+  initialImages?: { name: string; dataUrl: string }[]
   model: string
   onModelChange?: (model: string) => void
   onFilesChanged: (files: Record<string, string>) => void
@@ -243,7 +246,7 @@ function loadSession(): { history: Message[]; displayMessages: { role: string; c
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function ChatPanel({ initialPrompt, model, onModelChange, onFilesChanged, onDone, onContextUpdate, onStreamingChange, onStatusChange, onChatHistoryUpdate, files, activeFile, selectionRef, freeTier, resumeHistory, resumeDisplayMessages, resumeNeedsBuild, onLowBalance }: ChatPanelProps) {
+export default function ChatPanel({ initialPrompt, initialImages, model, onModelChange, onFilesChanged, onDone, onContextUpdate, onStreamingChange, onStatusChange, onChatHistoryUpdate, files, activeFile, selectionRef, freeTier, resumeHistory, resumeDisplayMessages, resumeNeedsBuild, onLowBalance }: ChatPanelProps) {
   const [displayMessages, setDisplayMessages] = useState<{ role: string; content: string }[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
@@ -298,7 +301,16 @@ export default function ChatPanel({ initialPrompt, model, onModelChange, onFiles
       historyRef.current = session.history
       setDisplayMessages(session.displayMessages)
     } else if (initialPrompt) {
-      sendMessage(initialPrompt)
+      // Inject any images attached on the Welcome screen so the first
+      // outgoing message is multimodal. sendMessage reads from
+      // attachedImages state, which is updated here before the call.
+      if (initialImages && initialImages.length > 0) {
+        setAttachedImages(initialImages)
+        // Let React commit the state update before sendMessage reads it.
+        setTimeout(() => sendMessage(initialPrompt), 0)
+      } else {
+        sendMessage(initialPrompt)
+      }
     }
   }, [])
 
