@@ -10,7 +10,7 @@ import { saveAs } from 'file-saver'
 import * as ghInt from '../services/githubIntegration'
 import * as nlInt from '../services/netlifyIntegration'
 import { preboot, onServerReady, getServerUrl, writeFile as wcWriteFile, clearFilesystem } from '../services/webcontainer'
-import { addImageFiles, hydrateImagesIntoWc, isImagePath, countImages, MAX_IMAGES_PER_PROJECT } from '../services/userAssets'
+import { addImageFiles, addVideoFiles, hydrateImagesIntoWc, isImagePath, isMediaPath, countImages, countVideos, MAX_IMAGES_PER_PROJECT, MAX_VIDEOS_PER_PROJECT } from '../services/userAssets'
 import { buildEnvFile } from '../services/secretsStore'
 import { filterForPush, ensureGitignoreSafety, DEFAULT_GITIGNORE, scanForSecrets, redactSecrets, type SecretFinding } from '../services/pushFilter'
 import { fetchUserInfo, logout, revealApiKey, type UserInfo } from '../services/userService'
@@ -107,8 +107,8 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
         continue
       }
 
-      // Always keep user-uploaded images (data URLs or R2 URLs) regardless of size
-      if (isImagePath(path)) {
+      // Always keep user-uploaded media (images + video) regardless of size
+      if (isMediaPath(path)) {
         filtered[path] = content
         continue
       }
@@ -225,9 +225,9 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
       console.log('[Resume] Restoring', entries.length, 'files to WebContainers')
       for (const [path, content] of entries) {
         if (path.endsWith('/')) continue
-        // Images stored as data URLs or R2 URLs should not be written as text —
-        // hydrateImagesIntoWc handles them as binary below.
-        if (isImagePath(path) && typeof content === 'string' &&
+        // Media (images + video) stored as data URLs or R2 URLs should not be
+        // written as text — hydrateImagesIntoWc handles them as binary below.
+        if (isMediaPath(path) && typeof content === 'string' &&
             (content.startsWith('data:') || content.startsWith('https://'))) continue
         try {
           await wcWriteFile(path, content)
@@ -426,36 +426,50 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
    */
   const handleImageUpload = useCallback(async (rawFiles: File[]) => {
     if (!rawFiles || rawFiles.length === 0) return
-    // Only keep files that look like images. Non-image drops should
-    // fall through to other handlers (text attach etc).
-    const imgs = rawFiles.filter(f => f.type.startsWith('image/'))
-    if (imgs.length === 0) return
 
-    const already = countImages(filesRef.current)
-    if (already >= MAX_IMAGES_PER_PROJECT) {
-      setToast({ type: 'error', msg: `Limit je ${MAX_IMAGES_PER_PROJECT} slika po projektu. Obriši neke pa pokušaj ponovo.` })
-      return
+    const imgs = rawFiles.filter(f => f.type.startsWith('image/'))
+    const vids = rawFiles.filter(f => f.type.startsWith('video/'))
+
+    if (imgs.length === 0 && vids.length === 0) return
+
+    const allAdded: { path: string; dataUrl: string }[] = []
+    const allSkipped: { name: string; reason: string }[] = []
+
+    if (imgs.length > 0) {
+      const already = countImages(filesRef.current)
+      if (already >= MAX_IMAGES_PER_PROJECT) {
+        setToast({ type: 'error', msg: `Limit je ${MAX_IMAGES_PER_PROJECT} slika po projektu.` })
+      } else {
+        const result = await addImageFiles(imgs, filesRef.current)
+        allAdded.push(...result.added)
+        allSkipped.push(...result.skipped)
+      }
     }
 
-    try {
-      const result = await addImageFiles(imgs, filesRef.current)
-      if (result.added.length > 0) {
-        setFiles(prev => {
-          const next = { ...prev }
-          for (const img of result.added) next[img.path] = img.dataUrl
-          return next
-        })
-        // Select the first new image so the preview opens it immediately.
-        setActiveFile(result.added[0].path)
-        setToast({ type: 'success', msg: result.added.length === 1 ? 'Slika dodata' : `Dodato ${result.added.length} slika` })
+    if (vids.length > 0) {
+      const already = countVideos(filesRef.current)
+      if (already >= MAX_VIDEOS_PER_PROJECT) {
+        setToast({ type: 'error', msg: `Limit je ${MAX_VIDEOS_PER_PROJECT} videa po projektu.` })
+      } else {
+        const result = await addVideoFiles(vids, filesRef.current)
+        allAdded.push(...result.added)
+        allSkipped.push(...result.skipped)
       }
-      if (result.skipped.length > 0) {
-        const first = result.skipped[0]
-        setToast({ type: 'error', msg: `${first.name}: ${first.reason}${result.skipped.length > 1 ? ` (+${result.skipped.length - 1})` : ''}` })
-      }
-    } catch (err) {
-      console.warn('[Assets] Upload failed:', err)
-      setToast({ type: 'error', msg: 'Greška pri dodavanju slike.' })
+    }
+
+    if (allAdded.length > 0) {
+      setFiles(prev => {
+        const next = { ...prev }
+        for (const item of allAdded) next[item.path] = item.dataUrl
+        return next
+      })
+      setActiveFile(allAdded[0].path)
+      const label = allAdded.some(a => a.path.endsWith('.mp4') || a.path.endsWith('.webm')) ? 'medija' : 'slika'
+      setToast({ type: 'success', msg: allAdded.length === 1 ? `${label.charAt(0).toUpperCase() + label.slice(1)} dodata` : `Dodato ${allAdded.length} fajlova` })
+    }
+    if (allSkipped.length > 0) {
+      const first = allSkipped[0]
+      setToast({ type: 'error', msg: `${first.name}: ${first.reason}${allSkipped.length > 1 ? ` (+${allSkipped.length - 1})` : ''}` })
     }
   }, [])
 

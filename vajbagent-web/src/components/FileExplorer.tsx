@@ -15,6 +15,7 @@ interface FileExplorerProps {
 }
 
 const IMAGE_EXT_SET = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'avif'])
+const VIDEO_EXT_SET = new Set(['mp4', 'webm'])
 
 function FileIcon({ name, preview }: { name: string; preview?: string }) {
   const base = name.split('/').pop() || name
@@ -25,6 +26,7 @@ function FileIcon({ name, preview }: { name: string; preview?: string }) {
     return <img src={preview} alt="" className="ficon-thumb" />
   }
   if (IMAGE_EXT_SET.has(ext)) return <ImageIcon size={14} className="ficon ficon-image" />
+  if (VIDEO_EXT_SET.has(ext)) return <FileCode size={14} className="ficon ficon-video" />
 
   // Env files — special orange key icon
   if (base === '.env' || base.startsWith('.env.')) return <Key size={13} className="ficon ficon-env" />
@@ -263,7 +265,7 @@ export default function FileExplorer({
     e.preventDefault()
     dragDepth.current = 0
     setDragOver(false)
-    const dropped = Array.from(e.dataTransfer.files || []).filter(f => f.type.startsWith('image/'))
+    const dropped = Array.from(e.dataTransfer.files || []).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'))
     if (dropped.length > 0) await onUploadImages(dropped)
   }
 
@@ -281,7 +283,7 @@ export default function FileExplorer({
       for (const item of Array.from(items)) {
         if (item.kind === 'file') {
           const f = item.getAsFile()
-          if (f && f.type.startsWith('image/')) pasted.push(f)
+          if (f && (f.type.startsWith('image/') || f.type.startsWith('video/'))) pasted.push(f)
         }
       }
       if (pasted.length > 0) {
@@ -382,7 +384,7 @@ export default function FileExplorer({
         ref={imageInputRef}
         type="file"
         multiple
-        accept="image/*"
+        accept="image/*,video/mp4,video/webm"
         style={{ display: 'none' }}
         onChange={handleImagePick}
       />

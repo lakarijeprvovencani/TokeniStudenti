@@ -122,7 +122,7 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
    */
   const inlineImageRefs = useCallback((html: string): string => {
     const imageEntries = Object.entries(files).filter(
-      ([p, c]) => /\.(jpg|jpeg|png|webp|gif|svg|avif)$/i.test(p) && typeof c === 'string' &&
+      ([p, c]) => /\.(jpg|jpeg|png|webp|gif|svg|avif|mp4|webm)$/i.test(p) && typeof c === 'string' &&
         (c.startsWith('data:') || c.startsWith('https://'))
     )
     if (imageEntries.length === 0) return html
@@ -137,11 +137,11 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
       return null
     }
 
-    html = html.replace(/(<img\b[^>]*\bsrc=)(["'])([^"']+)(\2)/gi, (match, head, q, src, _q) => {
+    html = html.replace(/(<(?:img|video)\b[^>]*\bsrc=)(["'])([^"']+)(\2)/gi, (match, head, q, src, _q) => {
       const url = findImageUrl(src)
       return url ? `${head}${q}${url}${q}` : match
     })
-    html = html.replace(/(<source\b[^>]*\bsrcset=)(["'])([^"']+)(\2)/gi, (match, head, q, src, _q) => {
+    html = html.replace(/(<source\b[^>]*\b(?:srcset|src)=)(["'])([^"']+)(\2)/gi, (match, head, q, src, _q) => {
       const url = findImageUrl(src)
       return url ? `${head}${q}${url}${q}` : match
     })

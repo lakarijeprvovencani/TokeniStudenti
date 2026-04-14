@@ -13,14 +13,17 @@ import { resizeImageFile } from './imageResize'
 import { writeBinaryFile } from './webcontainer'
 import { signUpload, commitUpload } from './remoteProjectStore'
 
-/** Hard cap on images per project. 20 is plenty for landing / portfolio / menu sites. */
 export const MAX_IMAGES_PER_PROJECT = 20
-/** Max post-resize size per single image. 20MB phone shots become ~700KB so this basically never trips. */
 export const MAX_IMAGE_BYTES = 2 * 1024 * 1024
-/** Max total image size per project, keeps IndexedDB quota safe. */
 export const MAX_TOTAL_IMAGE_BYTES = 15 * 1024 * 1024
 
+export const MAX_VIDEOS_PER_PROJECT = 3
+export const MAX_VIDEO_BYTES = 15 * 1024 * 1024 // 15MB per video
+export const MAX_TOTAL_MEDIA_BYTES = 30 * 1024 * 1024
+
 const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'avif']
+const VIDEO_EXTS = ['mp4', 'webm']
+const MEDIA_EXTS = [...IMAGE_EXTS, ...VIDEO_EXTS]
 
 export interface UploadedImage {
   /** Path in the WC filesystem + in SavedProject.files (e.g. "public/hero.jpg") */
@@ -36,19 +39,18 @@ export interface UploadResult {
   skipped: { name: string; reason: string }[]
 }
 
-/** Slugify a filename: lowercase, ASCII-only, keeps extension. */
-function slugifyName(raw: string): string {
+function slugifyName(raw: string, fallbackExt = 'jpg'): string {
   const lastDot = raw.lastIndexOf('.')
   const base = lastDot >= 0 ? raw.slice(0, lastDot) : raw
   const ext = lastDot >= 0 ? raw.slice(lastDot + 1).toLowerCase() : ''
   const slug = base
     .toLowerCase()
     .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')   // strip diacritics
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-    .slice(0, 48) || 'slika'
-  const safeExt = IMAGE_EXTS.includes(ext) ? ext : 'jpg'
+    .slice(0, 48) || 'media'
+  const safeExt = MEDIA_EXTS.includes(ext) ? ext : fallbackExt
   return `${slug}.${safeExt}`
 }
 
@@ -128,12 +130,88 @@ export function totalImageBytes(files: Record<string, string>): number {
   return total
 }
 
+export function countVideos(files: Record<string, string>): number {
+  let n = 0
+  for (const path of Object.keys(files)) {
+    if (path.endsWith('/')) continue
+    const ext = path.split('.').pop()?.toLowerCase() || ''
+    if (VIDEO_EXTS.includes(ext)) n++
+  }
+  return n
+}
+
+export function isVideoPath(path: string): boolean {
+  const ext = path.split('.').pop()?.toLowerCase() || ''
+  return VIDEO_EXTS.includes(ext)
+}
+
+export function isMediaPath(path: string): boolean {
+  return isImagePath(path) || isVideoPath(path)
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader()
+    fr.onload = () => resolve(fr.result as string)
+    fr.onerror = () => reject(fr.error || new Error('read failed'))
+    fr.readAsDataURL(file)
+  })
+}
+
 /**
- * Process a batch of picked/dropped/pasted files into the project.
- * Returns which ones were added and which were skipped with a reason.
- * The caller is responsible for:
- *   - Merging `added` into the React `files` state
- *   - Displaying error toasts for `skipped`
+ * Process a batch of video files into the project.
+ * Videos are NOT resized — stored as-is (capped at MAX_VIDEO_BYTES).
+ */
+export async function addVideoFiles(
+  rawFiles: File[],
+  currentFiles: Record<string, string>,
+): Promise<UploadResult> {
+  const added: UploadedImage[] = []
+  const skipped: { name: string; reason: string }[] = []
+  const workingFiles: Record<string, string> = { ...currentFiles }
+  let existingVideoCount = countVideos(workingFiles)
+
+  for (const file of rawFiles) {
+    if (!file.type.startsWith('video/')) {
+      skipped.push({ name: file.name, reason: 'Nije video' })
+      continue
+    }
+    if (existingVideoCount >= MAX_VIDEOS_PER_PROJECT) {
+      skipped.push({ name: file.name, reason: `Limit ${MAX_VIDEOS_PER_PROJECT} videa po projektu` })
+      continue
+    }
+    if (file.size > MAX_VIDEO_BYTES) {
+      skipped.push({ name: file.name, reason: `Video prevelik (max ${MAX_VIDEO_BYTES / 1024 / 1024}MB)` })
+      continue
+    }
+
+    const dataUrl = await readFileAsDataUrl(file)
+    const desiredPath = `public/${slugifyName(file.name, 'mp4')}`
+    const finalPath = resolveConflict(workingFiles, desiredPath)
+
+    const bytes = dataUrlToBytes(dataUrl)
+    if (!bytes) {
+      skipped.push({ name: file.name, reason: 'Ne mogu da pročitam video' })
+      continue
+    }
+    try {
+      await writeBinaryFile(finalPath, bytes)
+    } catch (err) {
+      console.warn('[userAssets] WC writeBinaryFile video failed:', err)
+      skipped.push({ name: file.name, reason: 'WebContainer nije spreman' })
+      continue
+    }
+
+    workingFiles[finalPath] = dataUrl
+    existingVideoCount++
+    added.push({ path: finalPath, dataUrl, bytes: file.size })
+  }
+
+  return { added, skipped }
+}
+
+/**
+ * Process a batch of picked/dropped/pasted image files into the project.
  */
 export async function addImageFiles(
   rawFiles: File[],
@@ -209,7 +287,7 @@ export async function hydrateImagesIntoWc(files: Record<string, string>): Promis
 
   for (const [path, content] of Object.entries(files)) {
     if (path.endsWith('/')) continue
-    if (!isImagePath(path)) continue
+    if (!isMediaPath(path)) continue
     if (typeof content !== 'string') continue
 
     if (isR2Url(content)) {
@@ -265,6 +343,7 @@ export async function uploadImageToR2(
     jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
     webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml',
     avif: 'image/avif', ico: 'image/x-icon',
+    mp4: 'video/mp4', webm: 'video/webm',
   }
   const contentType = mimeMap[ext] || 'application/octet-stream'
 
@@ -290,7 +369,7 @@ export async function uploadImageToR2(
 }
 
 /**
- * Scan all image entries in a project's files and upload any data URLs to R2.
+ * Scan all media (image + video) entries and upload data URLs to R2.
  * Returns a new files map with data URLs replaced by R2 URLs.
  */
 export async function uploadAllImagesToR2(
@@ -301,7 +380,7 @@ export async function uploadAllImagesToR2(
   const pending: Promise<void>[] = []
 
   for (const [path, content] of Object.entries(files)) {
-    if (!isImagePath(path)) continue
+    if (!isMediaPath(path)) continue
     if (!isDataUrl(content)) continue
 
     pending.push(
