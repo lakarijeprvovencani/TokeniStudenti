@@ -11,6 +11,7 @@ interface CodeEditorProps {
   onSelectFile?: (path: string) => void
   isAgentStreaming?: boolean
   onSelectionChange?: (selection: string | null) => void
+  streamingStatus?: string
 }
 
 function getLanguage(path: string): string {
@@ -35,14 +36,38 @@ function getFileIcon(name: string) {
 
 const STEPS_COUNT = 12
 
-export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile, isAgentStreaming, onSelectionChange }: CodeEditorProps) {
-  const [displayContent, setDisplayContent] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
+const STATUS_FALLBACKS = [
+  'Razmišljam...',
+  'Pišem kod...',
+  'Čitam fajlove...',
+  'Gradim strukturu...',
+  'Dodajem detalje...',
+  'Proveravam greške...',
+  'Finalizujem...',
+]
+
+export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile, isAgentStreaming, onSelectionChange, streamingStatus }: CodeEditorProps) {
+  // Rotate through friendly fallback status labels when agent hasn't set one explicitly.
+  const [fallbackIdx, setFallbackIdx] = useState(0)
+  useEffect(() => {
+    if (!isAgentStreaming || streamingStatus) return
+    const timer = setInterval(() => {
+      setFallbackIdx(i => (i + 1) % STATUS_FALLBACKS.length)
+    }, 2200)
+    return () => clearInterval(timer)
+  }, [isAgentStreaming, streamingStatus])
   const [openTabs, setOpenTabs] = useState<string[]>([])
-  const prevFileRef = useRef<string>('')
-  const prevContentRef = useRef<string>('')
-  const timerRef = useRef<number | null>(null)
   const editorRef = useRef<any>(null)
+  // Track whether the user is actively typing in the editor.
+  // When true, we do NOT overwrite the editor's internal model from props —
+  // that used to revert every keystroke when a user-driven onChange triggered
+  // a parent re-render before Monaco could sync its controlled value.
+  const userFocusRef = useRef(false)
+  // Tracks the most recent content we received from props so we only push
+  // imperative updates when the file actually changes (switching tabs) or
+  // when the AGENT writes to the currently-open file while the user is idle.
+  const lastSyncedContentRef = useRef<string>('')
+  const lastSyncedPathRef = useRef<string>('')
 
   // Track open tabs
   useEffect(() => {
@@ -99,9 +124,12 @@ export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
   }, [activeFile])
 
-  // Monaco mount handler — track selection
+  // Monaco mount handler — track selection + focus
   const handleEditorMount: OnMount = useCallback((editor) => {
     editorRef.current = editor
+
+    editor.onDidFocusEditorText(() => { userFocusRef.current = true })
+    editor.onDidBlurEditorText(() => { userFocusRef.current = false })
 
     editor.onDidChangeCursorSelection(() => {
       const selection = editor.getSelection()
@@ -118,44 +146,45 @@ export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile
     })
   }, [onSelectionChange])
 
+  // Imperatively sync editor content with props WITHOUT fighting user input.
+  // - File switch: always update + move cursor to top.
+  // - Same file, content changed externally (agent): only update if the user
+  //   isn't currently focused in the editor (prevents keystroke revert).
   useEffect(() => {
-    if (!activeFile || !files[activeFile]) {
-      setDisplayContent('')
+    const editor = editorRef.current
+    if (!editor || !activeFile) return
+    const content = files[activeFile] ?? ''
+    const fileChanged = activeFile !== lastSyncedPathRef.current
+    const contentChanged = content !== lastSyncedContentRef.current
+    if (!fileChanged && !contentChanged) return
+
+    const currentEditorValue = editor.getValue()
+    if (currentEditorValue === content) {
+      // Editor already matches — just record what we saw
+      lastSyncedPathRef.current = activeFile
+      lastSyncedContentRef.current = content
       return
     }
 
-    const fullContent = files[activeFile]
-    const fileChanged = activeFile !== prevFileRef.current
-    const contentChanged = fullContent !== prevContentRef.current
+    // If the user is typing right now and only content changed (not file), skip.
+    // We'd overwrite their work. They'll get the agent's version next time they blur.
+    if (!fileChanged && userFocusRef.current) return
 
-    prevFileRef.current = activeFile
-    prevContentRef.current = fullContent
-
-    if (!fileChanged && !contentChanged) return
-
-    // Clear any existing animation
-    if (timerRef.current) {
-      clearTimeout(timerRef.current)
-      timerRef.current = null
+    // Preserve cursor position when agent updates the current file while user isn't focused
+    const position = editor.getPosition()
+    editor.setValue(content)
+    if (!fileChanged && position) {
+      try { editor.setPosition(position) } catch { /* ignore */ }
     }
-
-    // Always show content instantly — typewriter was causing "stuck" issues
-    setDisplayContent(fullContent)
-    setIsTyping(false)
+    lastSyncedPathRef.current = activeFile
+    lastSyncedContentRef.current = content
   }, [activeFile, files])
 
-  // When streaming stops, ensure typing indicator is cleared
-  useEffect(() => {
-    if (!isAgentStreaming) {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current)
-        timerRef.current = null
-      }
-      setIsTyping(false)
-    }
-  }, [isAgentStreaming])
-
-  if (!activeFile || !files[activeFile]) {
+  // Empty / building state — only when NO file is actively selected.
+  // If the user has picked a file (even a brand-new empty one), fall through
+  // to the real editor so they can type into it.
+  const hasActiveFile = !!activeFile && activeFile in files
+  if (!hasActiveFile) {
     return (
       <div className="editor-panel">
         <div className="editor-empty">
@@ -189,7 +218,15 @@ export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile
                 <div className="building-dots">
                   <span /><span /><span />
                 </div>
-                <span>Kreiram kod...</span>
+                <motion.span
+                  key={streamingStatus || `fb-${fallbackIdx}`}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  {streamingStatus || STATUS_FALLBACKS[fallbackIdx]}
+                </motion.span>
               </div>
             </motion.div>
           ) : (
@@ -249,7 +286,6 @@ export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile
             className="breadcrumb-btn"
             title="Undo (Ctrl+Z)"
             onClick={() => editorRef.current?.trigger('toolbar', 'undo', null)}
-            disabled={isTyping}
           >
             <Undo2 size={13} />
           </button>
@@ -257,7 +293,6 @@ export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile
             className="breadcrumb-btn"
             title="Redo (Ctrl+Y)"
             onClick={() => editorRef.current?.trigger('toolbar', 'redo', null)}
-            disabled={isTyping}
           >
             <Redo2 size={13} />
           </button>
@@ -265,31 +300,21 @@ export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile
         <span className="breadcrumb-lang">{getLanguage(activeFile).toUpperCase()}</span>
       </div>
 
-      {/* Typing indicator — only when agent is actually writing */}
-      {isTyping && (
-        <div className="typing-indicator">
-          <div className="typing-dots">
-            <span />
-            <span />
-            <span />
-          </div>
-          <span>Piše kod...</span>
-        </div>
-      )}
-
       <Editor
         height="100%"
         language={getLanguage(activeFile)}
-        value={displayContent || files[activeFile]}
+        defaultValue={files[activeFile] ?? ''}
+        path={activeFile}
         theme="vs-dark"
         onMount={handleEditorMount}
         onChange={(value) => {
-          if (!isTyping && activeFile && onFileEdit && value !== undefined) {
+          if (activeFile && onFileEdit && value !== undefined) {
+            lastSyncedContentRef.current = value
             onFileEdit(activeFile, value)
           }
         }}
         options={{
-          readOnly: isTyping,
+          readOnly: false,
           fontSize: 13,
           fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
           fontLigatures: true,
@@ -302,7 +327,7 @@ export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile
           hideCursorInOverviewRuler: true,
           scrollbar: { verticalScrollbarSize: 5, horizontalScrollbarSize: 5 },
           wordWrap: 'on',
-          cursorBlinking: isTyping ? 'smooth' : 'blink',
+          cursorBlinking: 'blink',
           cursorSmoothCaretAnimation: 'on',
           smoothScrolling: true,
           bracketPairColorization: { enabled: true },

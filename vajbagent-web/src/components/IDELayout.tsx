@@ -3,18 +3,22 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Settings as SettingsIcon, Download, Rocket,
   Sparkles, User, Zap, ChevronLeft, ChevronRight,
-  Terminal, GitBranch, Wallet, LogOut, Copy, Check, Home,
+  Terminal, GitBranch, Wallet, LogOut, Copy, Check, Home, Loader2, ExternalLink, X, ChevronDown, Globe, RefreshCw,
 } from 'lucide-react'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
-import { deployToNetlify, deployToVercel } from '../services/deploy'
-import { pushToGitHub } from '../services/github'
+import * as ghInt from '../services/githubIntegration'
+import * as nlInt from '../services/netlifyIntegration'
 import { preboot, onServerReady, getServerUrl, writeFile as wcWriteFile, clearFilesystem } from '../services/webcontainer'
 import { buildEnvFile } from '../services/secretsStore'
-import { fetchUserInfo, logout, type UserInfo } from '../services/userService'
+import { filterForPush, ensureGitignoreSafety, DEFAULT_GITIGNORE, scanForSecrets, redactSecrets, type SecretFinding } from '../services/pushFilter'
+import { fetchUserInfo, logout, revealApiKey, type UserInfo } from '../services/userService'
 import { saveProject, generateProjectId, type SavedProject } from '../services/projectStore'
 import FileExplorer from './FileExplorer'
 import Settings from './Settings'
+import GitHubPushModal from './GitHubPushModal'
+import NetlifyDeployModal from './NetlifyDeployModal'
+import SecretWarningModal from './SecretWarningModal'
 import CodeEditor from './CodeEditor'
 import PreviewPanel from './PreviewPanel'
 import ChatPanel from './ChatPanel'
@@ -42,6 +46,7 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
   const [contextUsed, setContextUsed] = useState(0)
   const [contextLimit, setContextLimit] = useState(0)
   const [isAgentStreaming, setIsAgentStreaming] = useState(false)
+  const [agentStatus, setAgentStatus] = useState('')
   const [showPreviewReady, setShowPreviewReady] = useState(false)
   const [explorerOpen, setExplorerOpen] = useState(true)
   const [chatOpen, setChatOpen] = useState(true)
@@ -119,7 +124,9 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
         createdAt: projectCreatedAtRef.current,
         updatedAt: Date.now(),
         prompt: projectPromptRef.current,
-      }).catch(err => console.warn('[AutoSave] Failed:', err))
+      })
+        .then(() => localStorage.setItem('vajb_last_active_project', projectIdRef.current))
+        .catch(err => console.warn('[AutoSave] Failed:', err))
     }, 5000)
   }, [model])
 
@@ -199,18 +206,44 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
   }, [])
   useEffect(() => { preboot() }, [])
 
-  // Inject user's env secrets into WebContainers as .env file
+  // Inject user's env secrets into WebContainers as .env file.
+  // Runs on mount AND whenever secrets change (via storage event or custom event).
+  // Also retries if WebContainers isn't ready yet.
   useEffect(() => {
-    const envContent = buildEnvFile()
-    if (!envContent) return
-    // Wait a bit for boot, then write .env
-    const timer = setTimeout(() => {
-      wcWriteFile('.env', envContent).catch(err => console.warn('[Env] Failed to write .env:', err))
-    }, 1000)
-    return () => clearTimeout(timer)
+    let cancelled = false
+    const syncEnv = async () => {
+      const envContent = buildEnvFile()
+      if (!envContent) return
+      try {
+        await preboot()
+        if (cancelled) return
+        await wcWriteFile('.env', envContent)
+        if (cancelled) return
+        setFiles(prev => (prev['.env'] === envContent ? prev : { ...prev, '.env': envContent }))
+      } catch (err) {
+        console.warn('[Env] Failed to write .env:', err)
+      }
+    }
+    syncEnv()
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'vajb_env_secrets') syncEnv()
+    }
+    const onCustom = () => syncEnv()
+    window.addEventListener('storage', onStorage)
+    window.addEventListener('vajb-secrets-changed', onCustom as EventListener)
+    return () => {
+      cancelled = true
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('vajb-secrets-changed', onCustom as EventListener)
+    }
   }, [])
   useEffect(() => {
     fetchUserInfo().then(info => { if (info) setUserInfo(info) })
+    ghInt.getStatus().then(s => {
+      setGhConnected(s.connected)
+      setGhUsername(s.info?.username || null)
+    }).catch(() => {})
+    nlInt.getStatus().then(s => setNlConnected(s.connected)).catch(() => {})
   }, [])
 
   const [hasDevServer, setHasDevServer] = useState(!!getServerUrl())
@@ -235,6 +268,22 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [terminalOpen, setTerminalOpen] = useState(false)
   const [pushing, setPushing] = useState(false)
+  const [ghConnected, setGhConnected] = useState(false)
+  const [ghUsername, setGhUsername] = useState<string | null>(null)
+  const [ghModalOpen, setGhModalOpen] = useState(false)
+  const [nlConnected, setNlConnected] = useState(false)
+  const [nlSiteId, setNlSiteId] = useState<string | null>(null)
+  const [nlModalOpen, setNlModalOpen] = useState(false)
+  const [secretFindings, setSecretFindings] = useState<SecretFinding[]>([])
+  const pendingPushRef = useRef<{ repo: string; message: string; kept: Record<string, string>; skipped: string[] } | null>(null)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string; url?: string } | null>(null)
+  const [deployMenuOpen, setDeployMenuOpen] = useState(false)
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 6000)
+    return () => clearTimeout(t)
+  }, [toast])
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [keyCopied, setKeyCopied] = useState(false)
 
@@ -258,6 +307,84 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
       await writeFile(path, content)
     } catch (err) {
       console.warn('[Editor] Failed to write:', path, err)
+    }
+  }, [])
+
+  // Manual file/folder management from explorer toolbar
+  const handleCreateFile = useCallback(async (path: string, content: string) => {
+    const cleanPath = path.replace(/^\/+/, '')
+    if (!cleanPath) return
+    if (filesRef.current[cleanPath]) {
+      alert(`Fajl "${cleanPath}" već postoji.`)
+      return
+    }
+    try {
+      await wcWriteFile(cleanPath, content)
+      setFiles(prev => ({ ...prev, [cleanPath]: content }))
+    } catch (err) {
+      console.warn('[Explorer] Failed to create:', cleanPath, err)
+      alert('Greška pri kreiranju fajla: ' + (err instanceof Error ? err.message : String(err)))
+    }
+  }, [])
+
+  const handleDeleteFile = useCallback(async (path: string) => {
+    if (!confirm(`Obriši "${path}"?`)) return
+    try {
+      const { getWebContainer } = await import('../services/webcontainer')
+      const wc = await getWebContainer()
+      await wc.fs.rm(path)
+      setFiles(prev => {
+        const next = { ...prev }
+        delete next[path]
+        return next
+      })
+      if (activeFile === path) {
+        const remaining = Object.keys(filesRef.current).filter(f => f !== path && !f.endsWith('/'))
+        setActiveFile(remaining[0] || null)
+      }
+    } catch (err) {
+      console.warn('[Explorer] Failed to delete:', path, err)
+      alert('Greška pri brisanju: ' + (err instanceof Error ? err.message : String(err)))
+    }
+  }, [activeFile])
+
+  const handleRenameFile = useCallback(async (oldPath: string, newPath: string) => {
+    if (oldPath === newPath) return
+    if (filesRef.current[newPath]) {
+      alert(`Fajl "${newPath}" već postoji.`)
+      return
+    }
+    try {
+      const content = filesRef.current[oldPath] || ''
+      const { getWebContainer } = await import('../services/webcontainer')
+      const wc = await getWebContainer()
+      // mkdir for parent if needed, then write new, delete old
+      const dir = newPath.substring(0, newPath.lastIndexOf('/'))
+      if (dir) {
+        try { await wc.fs.mkdir(dir, { recursive: true }) } catch { /* exists */ }
+      }
+      await wc.fs.writeFile(newPath, content)
+      await wc.fs.rm(oldPath)
+      setFiles(prev => {
+        const next = { ...prev }
+        delete next[oldPath]
+        next[newPath] = content
+        return next
+      })
+      if (activeFile === oldPath) setActiveFile(newPath)
+    } catch (err) {
+      console.warn('[Explorer] Rename failed:', err)
+      alert('Greška pri preimenovanju: ' + (err instanceof Error ? err.message : String(err)))
+    }
+  }, [activeFile])
+
+  const handleExplorerRefresh = useCallback(async () => {
+    try {
+      const { getAllFiles } = await import('../services/webcontainer')
+      const all = await getAllFiles()
+      setFiles(all)
+    } catch (err) {
+      console.warn('[Explorer] Refresh failed:', err)
     }
   }, [])
 
@@ -296,49 +423,146 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
   const hasPreview = hasHtml || hasDevServer || hasBuildOutput
   const hasFiles = Object.keys(files).filter(f => !f.endsWith('/')).length > 0
   const contextPercent = contextLimit > 0 ? contextUsed / contextLimit : 0
-  const contextColor = contextPercent > 0.85 ? '#ef4444' : contextPercent > 0.65 ? '#f59e0b' : '#22c55e'
+  // Orange brand scale — lighter at low usage, richer as it fills, red when critical
+  const contextColor = contextPercent > 0.9 ? '#ef4444'
+                     : contextPercent > 0.7 ? '#fb923c'
+                     : '#f97316'
+
+  // Gather deployable files: prefer build output (dist/ or out/) if present, else all source.
+  // Applies the same security filter as GitHub push — .env is NEVER deployed publicly.
+  const collectDeployFiles = (): Record<string, string> => {
+    const all = filesRef.current
+    const distFiles: Record<string, string> = {}
+    const outFiles: Record<string, string> = {}
+    for (const [p, c] of Object.entries(all)) {
+      if (p.endsWith('/')) continue
+      if (p.startsWith('dist/')) distFiles[p.slice(5)] = c
+      else if (p.startsWith('out/')) outFiles[p.slice(4)] = c
+    }
+    // dist/ and out/ are build artifacts — already bundled, no .env there normally,
+    // but run through filter anyway for safety
+    if (Object.keys(distFiles).length > 0) return filterForPush(distFiles).kept
+    if (Object.keys(outFiles).length > 0) return filterForPush(outFiles).kept
+    return filterForPush(all).kept
+  }
+
+  const slugify = (s: string) =>
+    s.toLowerCase().replace(/[čć]/g, 'c').replace(/š/g, 's').replace(/ž/g, 'z').replace(/đ/g, 'dj')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
 
   const handleDeploy = async () => {
-    setDeploying(true)
-    setDeployUrl(null)
-    const netlifyToken = localStorage.getItem('vajb_netlify_token') || undefined
-    const vercelToken = localStorage.getItem('vajb_vercel_token')
-
-    let result
-    if (vercelToken && !netlifyToken) {
-      result = await deployToVercel(files, vercelToken)
-    } else {
-      result = await deployToNetlify(files, netlifyToken)
+    if (!nlConnected) {
+      const status = await nlInt.getStatus().catch(() => null)
+      if (!status?.connected) {
+        setToast({ type: 'error', msg: 'Prvo poveži Netlify u Podešavanjima.' })
+        setSettingsOpen(true)
+        return
+      }
+      setNlConnected(true)
     }
+    setNlModalOpen(true)
+  }
 
-    setDeploying(false)
-    if (result.success && result.url) {
+  const doDeploy = async (opts: { siteId?: string; siteName?: string }) => {
+    setDeploying(true)
+    try {
+      const deployFiles = collectDeployFiles()
+      if (Object.keys(deployFiles).length === 0) {
+        throw new Error('Nema fajlova za deploy.')
+      }
+      const result = await nlInt.deploySite({
+        files: deployFiles,
+        siteId: opts.siteId,
+        siteName: opts.siteName,
+      })
+      setNlSiteId(result.site_id)
       setDeployUrl(result.url)
-      window.open(result.url, '_blank')
-    } else {
-      alert(result.error || 'Deploy nije uspeo.')
+      setToast({ type: 'success', msg: 'Sajt je objavljen!', url: result.url })
+      return { url: result.url, site_id: result.site_id }
+    } finally {
+      setDeploying(false)
     }
   }
 
   const handleGitHubPush = async () => {
-    const token = localStorage.getItem('vajb_github_token')
-    const repo = localStorage.getItem('vajb_github_repo')
-    if (!token || !repo) {
-      alert('Prvo podesi GitHub token i repozitorijum u Podešavanjima.')
-      setSettingsOpen(true)
-      return
+    if (!ghConnected) {
+      const status = await ghInt.getStatus().catch(() => null)
+      if (!status?.connected) {
+        setToast({ type: 'error', msg: 'Prvo poveži GitHub u Podešavanjima.' })
+        setSettingsOpen(true)
+        return
+      }
+      setGhConnected(true)
+      setGhUsername(status.info?.username || null)
     }
+    setGhModalOpen(true)
+  }
+
+  const executePush = async (repo: string, message: string, kept: Record<string, string>, secretSkips: string[]) => {
+    // Auto-create or patch .gitignore so user's repo always has safe defaults
+    const existingGitignore = kept['.gitignore']
+    const patched = ensureGitignoreSafety(existingGitignore)
+    if (patched !== null) {
+      kept['.gitignore'] = patched
+      try { await wcWriteFile('.gitignore', patched) } catch { /* not critical */ }
+      setFiles(prev => ({ ...prev, '.gitignore': patched }))
+    } else if (!existingGitignore) {
+      kept['.gitignore'] = DEFAULT_GITIGNORE
+    }
+
+    const result = await ghInt.pushFiles({ repo, files: kept, message })
+    const extraMsg = secretSkips.length > 0
+      ? ` · Zaštićeno: ${secretSkips.join(', ')} nije push-ovano.`
+      : ''
+    setToast({
+      type: 'success',
+      msg: `Push-ovano na ${result.owner}/${result.repo}${extraMsg}`,
+      url: result.url,
+    })
+  }
+
+  const doGitHubPush = async (repo: string, message: string) => {
     setPushing(true)
-    const result = await pushToGitHub(files, token, repo)
-    setPushing(false)
-    if (result.success && result.url) {
-      window.open(result.url, '_blank')
-    } else {
-      alert(result.error || 'Push na GitHub nije uspeo.')
+    try {
+      const { kept, skipped } = filterForPush(filesRef.current)
+      const secretSkips = skipped.filter(s => s.reason === 'secret').map(s => s.path)
+
+      // Scan remaining file contents for hardcoded secrets
+      const findings = scanForSecrets(kept)
+      if (findings.length > 0) {
+        // Pause push, show warning modal — user decides whether to redact and continue
+        pendingPushRef.current = { repo, message, kept, skipped: secretSkips }
+        setSecretFindings(findings)
+        setPushing(false)
+        return
+      }
+
+      await executePush(repo, message, kept, secretSkips)
+    } finally {
+      setPushing(false)
     }
   }
 
-  const hasGitHub = !!(localStorage.getItem('vajb_github_token') && localStorage.getItem('vajb_github_repo'))
+  const handleProceedWithRedaction = async () => {
+    const pending = pendingPushRef.current
+    if (!pending) return
+    setSecretFindings([])
+    setPushing(true)
+    try {
+      const redacted = redactSecrets(pending.kept)
+      await executePush(pending.repo, pending.message, redacted, pending.skipped)
+      pendingPushRef.current = null
+    } catch (err) {
+      setToast({ type: 'error', msg: 'Push nije uspeo: ' + (err instanceof Error ? err.message : String(err)) })
+    } finally {
+      setPushing(false)
+    }
+  }
+
+  const handleCancelPush = () => {
+    setSecretFindings([])
+    pendingPushRef.current = null
+  }
 
   const downloadZip = async () => {
     const zip = new JSZip()
@@ -379,12 +603,14 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
       <div className="ide-topbar">
         <div className="ide-topbar-left">
           {onBackToWelcome && (
-            <button className="topbar-btn topbar-home" onClick={onBackToWelcome} title="Početna">
+            <button className="topbar-home" onClick={onBackToWelcome} title="Početna">
               <Home size={15} />
             </button>
           )}
-          <img src="/logo.svg" alt="VajbAgent" className="ide-logo" />
-          <span className="ide-brand">Vajb<span>Agent</span></span>
+          <div className="topbar-brand-wrap">
+            <img src="/logo.svg" alt="VajbAgent" className="ide-logo" />
+            <span className="ide-brand">Vajb<span>Agent</span></span>
+          </div>
         </div>
 
         <div className="ide-topbar-center">
@@ -463,28 +689,32 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
                     <span className="user-menu-name">{userInfo.name}</span>
                     <span className="user-menu-balance">${userInfo.balance.toFixed(2)}</span>
                   </div>
-                  {userInfo.apiKey && (
-                    <div className="user-menu-key">
-                      <span className="user-menu-key-label">API ključ (za Cursor)</span>
-                      <button
-                        className="user-menu-key-copy"
-                        onClick={() => {
-                          navigator.clipboard.writeText(userInfo.apiKey!)
-                          setKeyCopied(true)
-                          setTimeout(() => setKeyCopied(false), 2000)
-                        }}
-                      >
-                        <code>{userInfo.apiKey.slice(0, 12)}...{userInfo.apiKey.slice(-4)}</code>
-                        {keyCopied ? <Check size={12} /> : <Copy size={12} />}
-                      </button>
-                    </div>
-                  )}
+                  <div className="user-menu-key">
+                    <span className="user-menu-key-label">API ključ (za Cursor)</span>
+                    <button
+                      className="user-menu-key-copy"
+                      onClick={async () => {
+                        // Fetch the key on demand — it's never in default /me responses.
+                        const k = await revealApiKey()
+                        if (!k) {
+                          alert('Ne mogu da dohvatim ključ. Prijavi se ponovo.')
+                          return
+                        }
+                        await navigator.clipboard.writeText(k)
+                        setKeyCopied(true)
+                        setTimeout(() => setKeyCopied(false), 2000)
+                      }}
+                    >
+                      <code>Kopiraj API ključ</code>
+                      {keyCopied ? <Check size={12} /> : <Copy size={12} />}
+                    </button>
+                  </div>
                   <div className="user-menu-divider" />
                   <a href="https://vajbagent.com/dashboard" target="_blank" rel="noopener" className="user-menu-item">
                     <Wallet size={14} />
                     Dopuni kredite
                   </a>
-                  <button className="user-menu-item logout" onClick={async () => { await logout(); window.location.reload() }}>
+                  <button className="user-menu-item logout" onClick={async () => { await logout(); try { localStorage.removeItem('vajb_last_active_project') } catch {}; window.location.reload() }}>
                     <LogOut size={14} />
                     Odjavi se
                   </button>
@@ -504,22 +734,107 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
               <button className="topbar-btn" onClick={downloadZip} title="Preuzmi kod (.zip)">
                 <Download size={15} />
               </button>
-              {hasGitHub && (
-                <button className="topbar-btn" onClick={handleGitHubPush} disabled={pushing} title="Push na GitHub">
-                  <GitBranch size={15} />
-                </button>
-              )}
+              <button
+                className={`topbar-btn ${ghConnected ? 'connected' : ''}`}
+                onClick={handleGitHubPush}
+                disabled={pushing}
+                title={ghConnected
+                  ? `Push na GitHub (${ghUsername ? '@' + ghUsername : 'povezan'})`
+                  : 'GitHub nije povezan — klikni da podesiš'}
+              >
+                {pushing ? <Loader2 size={15} className="spin" /> : <GitBranch size={15} />}
+                {ghConnected && <span className="topbar-btn-dot" />}
+              </button>
             </>
           )}
-          <button className="btn-deploy" onClick={handleDeploy} disabled={(!hasHtml && !hasBuildOutput) || deploying}>
-            <Rocket size={14} />
-            <span>{deploying ? 'Objavljujem...' : deployUrl ? 'Ponovo' : 'Objavi'}</span>
-          </button>
-          {deployUrl && (
-            <a href={deployUrl} target="_blank" rel="noopener" className="deploy-link">
-              {deployUrl.replace('https://', '')}
-            </a>
-          )}
+          {/* ── Unified Deploy button: single control with a dropdown for actions ── */}
+          <div className="deploy-wrap">
+            <button
+              className="btn-deploy"
+              onClick={() => {
+                if (deployUrl) {
+                  // Already deployed → clicking main button re-deploys to the same site
+                  handleDeploy()
+                } else {
+                  handleDeploy()
+                }
+              }}
+              disabled={(!hasHtml && !hasBuildOutput) || deploying}
+              title={nlConnected ? 'Objavi na Netlify' : 'Netlify nije povezan — klikni da podesiš'}
+            >
+              {deploying ? <Loader2 size={14} className="spin" /> : <Rocket size={14} />}
+              <span>{deploying ? 'Objavljujem...' : deployUrl ? 'Objavljeno' : 'Objavi'}</span>
+              {deployUrl && !deploying && <span className="deploy-dot" />}
+            </button>
+            {(deployUrl || nlSiteId) && !deploying && (
+              <button
+                className="btn-deploy-chevron"
+                onClick={() => setDeployMenuOpen(v => !v)}
+                title="Više opcija"
+                disabled={(!hasHtml && !hasBuildOutput)}
+              >
+                <ChevronDown size={13} />
+              </button>
+            )}
+            <AnimatePresence>
+              {deployMenuOpen && (
+                <>
+                  <div className="deploy-menu-backdrop" onClick={() => setDeployMenuOpen(false)} />
+                  <motion.div
+                    className="deploy-menu"
+                    initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                    transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                  >
+                    {deployUrl && (
+                      <>
+                        <div className="deploy-menu-header">
+                          <div className="deploy-menu-label">Trenutni sajt</div>
+                          <div className="deploy-menu-url" title={deployUrl}>
+                            <Globe size={11} />
+                            <span>{deployUrl.replace('https://', '')}</span>
+                          </div>
+                        </div>
+                        <div className="deploy-menu-divider" />
+                        <a
+                          href={deployUrl}
+                          target="_blank"
+                          rel="noopener"
+                          className="deploy-menu-item"
+                          onClick={() => setDeployMenuOpen(false)}
+                        >
+                          <ExternalLink size={13} />
+                          Otvori sajt u novom tabu
+                        </a>
+                        <button
+                          className="deploy-menu-item"
+                          onClick={() => { setDeployMenuOpen(false); handleDeploy() }}
+                        >
+                          <RefreshCw size={13} />
+                          Ponovo objavi (isti sajt)
+                        </button>
+                      </>
+                    )}
+                    <button
+                      className="deploy-menu-item"
+                      onClick={() => { setDeployMenuOpen(false); setNlSiteId(null); setDeployUrl(null); handleDeploy() }}
+                    >
+                      <Rocket size={13} />
+                      Objavi kao novi sajt
+                    </button>
+                    <button
+                      className="deploy-menu-item"
+                      onClick={() => { setDeployMenuOpen(false); setSettingsOpen(true) }}
+                    >
+                      <Globe size={13} />
+                      Podešavanja Netlify-a
+                    </button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 
@@ -527,7 +842,15 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
       <div className="ide-panels">
         {/* Explorer — always mounted, just hidden via CSS */}
         <div className={`explorer-wrap ${explorerOpen ? 'open' : 'closed'}`}>
-          <FileExplorer files={files} activeFile={activeFile} onSelectFile={setActiveFile} />
+          <FileExplorer
+            files={files}
+            activeFile={activeFile}
+            onSelectFile={(p) => { setActiveFile(p); if (view === 'preview') setView('code') }}
+            onCreateFile={handleCreateFile}
+            onDeleteFile={handleDeleteFile}
+            onRenameFile={handleRenameFile}
+            onRefresh={handleExplorerRefresh}
+          />
         </div>
 
         <button
@@ -542,12 +865,12 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
           <AnimatePresence mode="wait">
             {view === 'code' && (
               <motion.div key="code-only" className="panel-animate" variants={panelVariants} initial="initial" animate="animate" exit="exit">
-                <CodeEditor files={files} activeFile={activeFile} onFileEdit={handleFileEdit} onSelectFile={setActiveFile} isAgentStreaming={isAgentStreaming} onSelectionChange={handleSelectionChange} />
+                <CodeEditor files={files} activeFile={activeFile} onFileEdit={handleFileEdit} onSelectFile={setActiveFile} isAgentStreaming={isAgentStreaming} onSelectionChange={handleSelectionChange} streamingStatus={agentStatus} />
               </motion.div>
             )}
             {view === 'split' && (
               <motion.div key="split-view" className="panel-animate" variants={panelVariants} initial="initial" animate="animate" exit="exit">
-                <CodeEditor files={files} activeFile={activeFile} onFileEdit={handleFileEdit} onSelectFile={setActiveFile} isAgentStreaming={isAgentStreaming} onSelectionChange={handleSelectionChange} />
+                <CodeEditor files={files} activeFile={activeFile} onFileEdit={handleFileEdit} onSelectFile={setActiveFile} isAgentStreaming={isAgentStreaming} onSelectionChange={handleSelectionChange} streamingStatus={agentStatus} />
                 <div className="ide-divider" />
                 <PreviewPanel files={files} />
               </motion.div>
@@ -579,6 +902,7 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
             onDone={handleAgentDone}
             onContextUpdate={handleContextUpdate}
             onStreamingChange={handleStreamingChange}
+            onStatusChange={setAgentStatus}
             onChatHistoryUpdate={handleChatHistoryUpdate}
             files={files}
             activeFile={activeFile}
@@ -591,6 +915,54 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
         </div>
       </div>
       <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <GitHubPushModal
+        open={ghModalOpen}
+        onClose={() => setGhModalOpen(false)}
+        onPush={doGitHubPush}
+        defaultName={projectNameRef.current ? slugify(projectNameRef.current) : 'vajbagent-projekat'}
+        connectedUsername={ghUsername}
+      />
+      <NetlifyDeployModal
+        open={nlModalOpen}
+        onClose={() => setNlModalOpen(false)}
+        onDeploy={doDeploy}
+        defaultName={projectNameRef.current ? slugify(projectNameRef.current) : 'vajbagent-sajt'}
+        currentSiteId={nlSiteId}
+      />
+      <SecretWarningModal
+        open={secretFindings.length > 0}
+        findings={secretFindings}
+        onCancel={handleCancelPush}
+        onProceedWithRedaction={handleProceedWithRedaction}
+      />
+
+      {/* ── Toast ── */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            className={`ide-toast ${toast.type}`}
+            initial={{ opacity: 0, y: 20, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.96 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <div className="ide-toast-icon">
+              {toast.type === 'success' ? <Check size={16} /> : <X size={16} />}
+            </div>
+            <div className="ide-toast-body">
+              <div className="ide-toast-msg">{toast.msg}</div>
+              {toast.url && (
+                <a href={toast.url} target="_blank" rel="noopener" className="ide-toast-link">
+                  {toast.url.replace('https://', '')} <ExternalLink size={11} />
+                </a>
+              )}
+            </div>
+            <button className="ide-toast-close" onClick={() => setToast(null)}>
+              <X size={13} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
