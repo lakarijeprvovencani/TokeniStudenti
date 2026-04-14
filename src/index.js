@@ -326,9 +326,15 @@ const DEFAULT_ALLOWED_ORIGINS = [
   'http://localhost:5176',
   'http://localhost:5177',
 ];
-const ALLOWED_ORIGINS = (process.env.WEB_ORIGINS
-  ? process.env.WEB_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
-  : DEFAULT_ALLOWED_ORIGINS);
+// WEB_ORIGINS env var adds to the default list — never replaces it.
+// A stale env value that forgets vajbagent.com used to break the
+// whole web UI (SPA assets served with crossorigin attribute got 500
+// when the CORS check rejected the origin → fell through to the
+// global error handler with application/json response).
+const ALLOWED_ORIGINS = Array.from(new Set([
+  ...DEFAULT_ALLOWED_ORIGINS,
+  ...(process.env.WEB_ORIGINS ? process.env.WEB_ORIGINS.split(',').map(s => s.trim()).filter(Boolean) : []),
+]));
 
 // Allow Netlify deploy preview URLs (--<hash>--papaya-cat-45b818.netlify.app) automatically
 const ALLOWED_ORIGIN_PATTERNS = [
