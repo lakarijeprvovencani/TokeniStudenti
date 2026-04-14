@@ -274,7 +274,7 @@ export async function uploadImageToR2(
     const putResp = await fetch(uploadUrl, {
       method: 'PUT',
       headers: { 'Content-Type': contentType },
-      body: bytes,
+      body: bytes as unknown as BodyInit,
     })
     if (!putResp.ok) {
       console.warn('[userAssets] R2 PUT failed:', putResp.status)
