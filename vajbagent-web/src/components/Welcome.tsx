@@ -7,6 +7,7 @@ import AuthModal from './AuthModal'
 import PaywallModal from './PaywallModal'
 import { listProjects, deleteProject, type SavedProject } from '../services/projectStore'
 import { formatCredits, openPaywall } from '../services/credits'
+import { resizeImageFile } from '../services/imageResize'
 import { TEMPLATES, TEMPLATE_CATEGORIES, type Template } from '../templates'
 import ModelSelector from './ModelSelector'
 import Settings from './Settings'
@@ -71,31 +72,19 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
     e.target.value = ''
   }
 
-  const readImageAsDataUrl = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = () => reject(reader.error)
-      reader.readAsDataURL(file)
-    })
-
-  // Handle image attach (Paperclip button) — store as data URLs so they can be
-  // sent as multimodal parts in the first chat message. Enforces a max count
-  // so the request payload stays reasonable.
+  // Handle image attach (Paperclip button) — auto-resizes + recompresses every
+  // image client-side so we never reject a file for being "too big". A 20MB
+  // phone photo becomes a ~700KB JPEG that the vision model can still read
+  // perfectly. Caps at 4 images so the outgoing request stays sane.
   const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
     const MAX_IMAGES = 4
-    const MAX_BYTES = 5 * 1024 * 1024 // 5MB each
     const accepted: AttachedImage[] = []
     for (const file of files) {
-      if (!file.type.startsWith('image/')) continue
-      if (file.size > MAX_BYTES) continue
       if (attachedImages.length + accepted.length >= MAX_IMAGES) break
-      try {
-        const dataUrl = await readImageAsDataUrl(file)
-        accepted.push({ name: file.name, dataUrl })
-      } catch { /* skip unreadable file */ }
+      const resized = await resizeImageFile(file)
+      if (resized) accepted.push({ name: resized.name, dataUrl: resized.dataUrl })
     }
     if (accepted.length > 0) {
       setAttachedImages(prev => [...prev, ...accepted].slice(0, MAX_IMAGES))
