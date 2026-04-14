@@ -587,22 +587,7 @@ function setWebAppHeaders(res) {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
 }
 
-// Temporary: redirect to the Netlify deploy where WebContainers work via
-// the *.netlify.app grandfathered origin. StackBlitz free WebContainer API
-// on custom domains requires per-user OAuth into stackblitz.com, which
-// breaks the public-product UX. Flip WEB_APP_AT_ROOT=1 on Render once an
-// Enterprise/OSS tier is approved for vajbagent.com.
-const WEB_APP_AT_ROOT = process.env.WEB_APP_AT_ROOT === '1';
-const WEB_APP_REDIRECT_URL = (process.env.WEB_APP_REDIRECT_URL || 'https://papaya-cat-45b818.netlify.app').replace(/\/$/, '');
-
-app.get('/', (req, res) => {
-  if (!WEB_APP_AT_ROOT) {
-    const qs = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
-    // Cache-Control: no-store so any upstream (CF, Render edge) never pins
-    // this redirect after we flip WEB_APP_AT_ROOT=1 later.
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-    return res.redirect(302, WEB_APP_REDIRECT_URL + '/' + qs);
-  }
+app.get('/', (_req, res) => {
   if (webAppIndexExists) {
     setWebAppHeaders(res);
     return res.sendFile(path.join(WEB_APP_DIST, 'index.html'));

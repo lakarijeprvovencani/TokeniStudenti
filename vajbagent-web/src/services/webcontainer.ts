@@ -22,18 +22,30 @@ const BOOT_TIMEOUT_MS = 12000
 const DEFAULT_WC_CLIENT_ID = 'wc_api_lakarijeprvovencani_c6001ce8750d18be6019ac6a4a75a82b'
 const WC_CLIENT_ID: string = import.meta.env.VITE_WEBCONTAINER_CLIENT_ID || DEFAULT_WC_CLIENT_ID
 
+let authStatus: 'not-configured' | 'need-auth' | 'authorized' | 'error' = 'not-configured'
+
 function initAuthOnce() {
   if (authInitialized) return
   authInitialized = true
   try {
-    auth.init({
+    const result = auth.init({
       clientId: WC_CLIENT_ID,
       scope: '',
       editorOrigin: 'https://stackblitz.com',
     })
-    console.log('[WebContainer] auth.init configured with client ID')
+    console.log('[WebContainer] auth.init result:', result)
+    // auth.init returns either {status: 'need-auth' | 'authorized'} or an
+    // error-shaped object. Log both so we can diagnose without guessing.
+    if (result && typeof result === 'object' && 'status' in result) {
+      authStatus = (result as { status: 'need-auth' | 'authorized' }).status
+      console.log('[WebContainer] auth.init status:', authStatus)
+    } else {
+      authStatus = 'error'
+      console.error('[WebContainer] auth.init returned unexpected shape:', result)
+    }
   } catch (err) {
-    console.error('[WebContainer] auth.init failed:', err)
+    authStatus = 'error'
+    console.error('[WebContainer] auth.init threw:', err)
   }
 }
 
@@ -44,21 +56,23 @@ export async function getWebContainer(): Promise<WebContainer> {
 
   initAuthOnce()
 
-  // Await auth handshake first, THEN boot. Without awaiting loggedIn() the
-  // boot call races the auth postMessage dance and StackBlitz rejects the
-  // request with a generic timeout. If the origin is properly registered
-  // and anonymous access is allowed via scope:'', loggedIn() resolves
-  // immediately without any user prompt.
   const bootRace = Promise.race<WebContainer>([
     (async () => {
-      await auth.loggedIn()
+      // If auth.init reported 'authorized' or 'not-configured' we can boot
+      // directly. If 'need-auth' we must wait for the user to authorize —
+      // auth.loggedIn() hangs forever otherwise, so we race it with the
+      // parent timeout and surface a clearer error if it fires.
+      if (authStatus === 'need-auth') {
+        console.warn('[WebContainer] auth.init reported need-auth — awaiting loggedIn popup')
+        await auth.loggedIn()
+      }
       return WebContainer.boot({
         coep: 'credentialless',
         forwardPreviewErrors: true,
       })
     })(),
     new Promise<WebContainer>((_, rej) =>
-      setTimeout(() => rej(new Error('WebContainer boot timeout — origin blocked?')), BOOT_TIMEOUT_MS)
+      setTimeout(() => rej(new Error(`WebContainer boot timeout (authStatus=${authStatus}) — origin blocked or need-auth hanging`)), BOOT_TIMEOUT_MS)
     ),
   ])
 
