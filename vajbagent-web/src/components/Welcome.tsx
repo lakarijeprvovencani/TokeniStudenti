@@ -158,6 +158,7 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
           id: s.id, name: s.name, model: s.model, prompt: s.prompt,
           createdAt: s.createdAt, updatedAt: s.updatedAt,
           files: {}, chatHistory: [], displayMessages: [],
+          _fileCount: s.fileCount,
         }))
         setProjects(asSaved)
       })
@@ -470,7 +471,7 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
                           <Clock size={10} />
                           {timeAgo(project.updatedAt)}
                           {' · '}
-                          {Object.keys(project.files || {}).filter(f => !f.endsWith('/')).length || '?'} fajlova
+                          {project._fileCount ?? Object.keys(project.files || {}).filter(f => !f.endsWith('/')).length} fajlova
                         </span>
                       </div>
                       <button

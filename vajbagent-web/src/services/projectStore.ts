@@ -55,6 +55,8 @@ export interface SavedProject {
   deployUrl?: string | null
   /** Last Netlify site ID — reuse for subsequent deploys */
   nlSiteId?: string | null
+  /** Cached file count from remote summary (avoids loading full project for list) */
+  _fileCount?: number
 }
 
 function openDbByName(name: string): Promise<IDBDatabase> {
