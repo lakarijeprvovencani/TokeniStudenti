@@ -12,18 +12,19 @@ let authInitialized = false
 const BOOT_TIMEOUT_MS = 12000
 
 // WebContainer API client ID — issued at https://stackblitz.com dashboard.
-// Without this the boot works only on grandfathered origins like
-// *.netlify.app. Set VITE_WEBCONTAINER_CLIENT_ID at build time on Render so
-// the production vajbagent.com build embeds it.
-const WC_CLIENT_ID: string | undefined = import.meta.env.VITE_WEBCONTAINER_CLIENT_ID
+// This is a PUBLIC client identifier (same category as Stripe pk_live_* or
+// a Google Maps API key): the security comes from the "Allowed sites"
+// whitelist on the StackBlitz dashboard, not from hiding the value. Anyone
+// can read it out of the shipped JS bundle — only registered origins can
+// actually boot a container with it. Hardcoding as a default means the
+// production build is never at the mercy of Render env var timing; set
+// VITE_WEBCONTAINER_CLIENT_ID at build time to override for dev/staging.
+const DEFAULT_WC_CLIENT_ID = 'wc_api_lakarijeprvovencani_c6001ce8750d18be6019ac6a4a75a82b'
+const WC_CLIENT_ID: string = import.meta.env.VITE_WEBCONTAINER_CLIENT_ID || DEFAULT_WC_CLIENT_ID
 
 function initAuthOnce() {
   if (authInitialized) return
   authInitialized = true
-  if (!WC_CLIENT_ID) {
-    console.warn('[WebContainer] No VITE_WEBCONTAINER_CLIENT_ID set — boot will rely on the origin being on StackBlitz\'s free allowlist.')
-    return
-  }
   try {
     auth.init({ clientId: WC_CLIENT_ID, scope: '' })
     console.log('[WebContainer] auth.init configured with client ID')
