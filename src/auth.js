@@ -167,7 +167,7 @@ export function setSessionCookie(res, token) {
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? 'none' : 'lax',
-    maxAge: SESSION_TTL,
+    maxAge: SESSION_TTL_MS,
     path: '/',
   });
 }
