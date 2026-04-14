@@ -2635,9 +2635,15 @@ app.use((req, res) => {
 });
 
 // ---- Global error handler (never leak stack traces) ----
+// IMPORTANT: mark error responses as non-cacheable so Cloudflare (or any
+// upstream proxy) never locks in a broken response. We learned this the
+// hard way when a transient 500 during a deploy got stuck on the CF edge.
 app.use((err, _req, res, _next) => {
   console.error('Unhandled error:', err.message);
   if (res.headersSent) return;
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('CDN-Cache-Control', 'no-store');
+  res.setHeader('Cloudflare-CDN-Cache-Control', 'no-store');
   res.status(500).json({ error: { message: 'Internal server error' } });
 });
 
