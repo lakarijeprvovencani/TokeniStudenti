@@ -23,6 +23,7 @@ import SecretWarningModal from './SecretWarningModal'
 import CodeEditor from './CodeEditor'
 import PreviewPanel from './PreviewPanel'
 import ChatPanel from './ChatPanel'
+import PaywallModal from './PaywallModal'
 import TerminalPanel from './Terminal'
 import './IDELayout.css'
 
@@ -267,6 +268,30 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
   const [deploying, setDeploying] = useState(false)
   const [deployUrl, setDeployUrl] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [paywallOpen, setPaywallOpen] = useState(false)
+  const [paywallBalance, setPaywallBalance] = useState(0)
+  const [payToast, setPayToast] = useState('')
+
+  // Handle Stripe return param if we land back in the IDE post-payment
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const pay = params.get('pay')
+    if (!pay) return
+    if (pay === 'ok') {
+      const amt = params.get('amount') || ''
+      setPayToast(`Uplata uspešna! ${amt ? `+$${amt}` : 'Krediti dodati.'}`)
+      fetchUserInfo().then(info => { if (info) setUserInfo(info) })
+    } else if (pay === 'cancel') {
+      setPayToast('Plaćanje je otkazano.')
+    }
+    window.history.replaceState({}, '', window.location.pathname)
+    setTimeout(() => setPayToast(''), 5000)
+  }, [])
+
+  const handleLowBalance = useCallback((bal: number) => {
+    setPaywallBalance(bal)
+    setPaywallOpen(true)
+  }, [])
   const [terminalOpen, setTerminalOpen] = useState(false)
   const [pushing, setPushing] = useState(false)
   const [ghConnected, setGhConnected] = useState(false)
@@ -912,10 +937,30 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
             resumeHistory={resumeProject?.chatHistory}
             resumeDisplayMessages={resumeProject?.displayMessages}
             resumeNeedsBuild={!!resumeProject?.files['package.json']}
+            onLowBalance={handleLowBalance}
           />
         </div>
       </div>
       <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <PaywallModal
+        open={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        variant="out-of-credits"
+        currentBalanceUsd={paywallBalance}
+      />
+      <AnimatePresence>
+        {payToast && (
+          <motion.div
+            className="pay-toast"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            style={{ position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)', padding: '14px 22px', background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.08))', border: '1px solid rgba(16,185,129,0.45)', color: '#6ee7b7', fontSize: '0.9rem', fontWeight: 600, borderRadius: 12, backdropFilter: 'blur(12px)', zIndex: 10001 }}
+          >
+            {payToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
       <GitHubPushModal
         open={ghModalOpen}
         onClose={() => setGhModalOpen(false)}

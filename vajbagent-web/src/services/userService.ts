@@ -77,10 +77,16 @@ export async function logout(): Promise<void> {
   } catch { /* ignore */ }
 }
 
-/** Check if user is logged in (session cookie valid). Returns user info or null. */
-export async function checkSession(): Promise<UserInfo | null> {
+/**
+ * Check if user is logged in (session cookie valid).
+ * By default does NOT include the raw API key — use `revealKey: true` only
+ * when the user explicitly clicks "Show API key", to minimise how often
+ * the secret moves over the wire and into memory.
+ */
+export async function checkSession(opts: { revealKey?: boolean } = {}): Promise<UserInfo | null> {
   try {
-    const res = await fetch(`${API_URL}/auth/me`, {
+    const qs = opts.revealKey ? '?include_key=1' : ''
+    const res = await fetch(`${API_URL}/auth/me${qs}`, {
       credentials: 'include',
       signal: AbortSignal.timeout(5000),
     })
@@ -97,13 +103,39 @@ export async function checkSession(): Promise<UserInfo | null> {
   }
 }
 
-/** Fetch user info — uses session cookie */
+/** Fetch user info — uses session cookie (no api_key in response) */
 export async function fetchUserInfo(): Promise<UserInfo | null> {
   return checkSession()
+}
+
+/** Reveal the API key — only call from an explicit user action (e.g. "Copy key" button) */
+export async function revealApiKey(): Promise<string | null> {
+  const info = await checkSession({ revealKey: true })
+  return info?.apiKey || null
 }
 
 /** Refresh just the balance */
 export async function fetchBalance(): Promise<number | null> {
   const info = await checkSession()
   return info?.balance ?? null
+}
+
+/**
+ * Start a Stripe Checkout session for a USD top-up and return the hosted URL.
+ * Session cookie auth — no API key needed from the web app.
+ */
+export async function createCheckout(amountUsd: number): Promise<{ ok: boolean; url?: string; error?: string }> {
+  try {
+    const res = await fetch(`${API_URL}/create-checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ amount_usd: amountUsd, return_url: window.location.origin + '/' }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.url) return { ok: false, error: data.error || 'Greška pri kreiranju sesije plaćanja.' }
+    return { ok: true, url: data.url }
+  } catch {
+    return { ok: false, error: 'Ne mogu da se povežem sa serverom.' }
+  }
 }

@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Code2, Globe, Layout, ArrowUp, Plus, Paperclip, Loader2, LogIn, UserPlus, Key, FolderOpen, Trash2, Clock, Settings as SettingsIcon, LogOut, Sparkles } from 'lucide-react'
-import { login, register, setPassword as setPasswordApi, logout, checkSession, type UserInfo } from '../services/userService'
+import { Code2, Globe, Layout, ArrowUp, Plus, Paperclip, Loader2, FolderOpen, Trash2, Clock, Settings as SettingsIcon, LogOut, Sparkles } from 'lucide-react'
+import { logout, checkSession, type UserInfo } from '../services/userService'
+import AuthModal from './AuthModal'
+import PaywallModal from './PaywallModal'
 import { listProjects, deleteProject, type SavedProject } from '../services/projectStore'
 import { formatCredits } from '../services/credits'
 import { TEMPLATES, TEMPLATE_CATEGORIES, type Template } from '../templates'
@@ -26,8 +28,6 @@ interface WelcomeProps {
   user: UserInfo | null
   freeTier: boolean
 }
-
-type AuthTab = 'login' | 'register' | 'apikey'
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts
@@ -81,16 +81,30 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
     e.target.value = ''
   }
 
-  // Auth state
-  const [authTab, setAuthTab] = useState<AuthTab>('login')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [apiKey, setApiKey] = useState('')
-  const [authLoading, setAuthLoading] = useState(false)
-  const [authError, setAuthError] = useState('')
-  const [checkingSession, setCheckingSession] = useState(true)
+  // New-flow modals (Bolt/Lovable style)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [paywallOpen, setPaywallOpen] = useState(false)
+  const [pendingPrompt, setPendingPrompt] = useState('')
+  const [paySuccessToast, setPaySuccessToast] = useState('')
+
+  // Handle Stripe return (?pay=ok|cancel) — webhook has already credited the
+  // account server-side, we just need to refresh balance + show feedback.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const pay = params.get('pay')
+    if (!pay) return
+    if (pay === 'ok') {
+      const amt = params.get('amount') || ''
+      setPaySuccessToast(`Uplata uspešna! ${amt ? `+${amt}$ kredita` : 'Krediti dodati na nalog.'}`)
+      // Reload user info to pick up new balance
+      checkSession().then(info => { if (info) onAuth(info) })
+    } else if (pay === 'cancel') {
+      setPaySuccessToast('Plaćanje je otkazano.')
+    }
+    // Clean the URL so refresh doesn't re-show the toast
+    window.history.replaceState({}, '', window.location.pathname)
+    setTimeout(() => setPaySuccessToast(''), 5000)
+  }, [])
 
   // Projects state
   const [projects, setProjects] = useState<SavedProject[]>([])
@@ -103,7 +117,6 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
   useEffect(() => {
     checkSession().then(info => {
       if (info) onAuth(info)
-      setCheckingSession(false)
     })
   }, [])
 
@@ -128,65 +141,37 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
     setProjects(prev => prev.filter(p => p.id !== id))
   }
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password) return
-    setAuthLoading(true)
-    setAuthError('')
-    const result = await login(email.trim(), password)
-    setAuthLoading(false)
-    if (result.ok) {
-      onAuth({ name: result.name!, balance: result.balance!, freeTier: result.freeTier ?? true })
-    } else {
-      setAuthError(result.error || 'Greška pri prijavi.')
-    }
-  }
-
-  const handleRegister = async () => {
-    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password) return
-    setAuthLoading(true)
-    setAuthError('')
-    const result = await register(firstName.trim(), lastName.trim(), email.trim(), password)
-    setAuthLoading(false)
-    if (result.ok) {
-      onAuth({ name: result.name!, balance: result.balance!, freeTier: result.freeTier ?? true })
-    } else {
-      setAuthError(result.error || 'Greška pri registraciji.')
-    }
-  }
-
-  const handleSetPassword = async () => {
-    if (!email.trim() || !apiKey.trim() || !password) return
-    setAuthLoading(true)
-    setAuthError('')
-    const result = await setPasswordApi(email.trim(), apiKey.trim(), password)
-    setAuthLoading(false)
-    if (result.ok) {
-      const loginResult = await login(email.trim(), password)
-      if (loginResult.ok) {
-        onAuth({ name: loginResult.name!, balance: loginResult.balance!, freeTier: false })
-      }
-    } else {
-      setAuthError(result.error || 'Pogrešan email ili API ključ.')
-    }
-  }
-
-  const handleAuthSubmit = () => {
-    if (authTab === 'login') handleLogin()
-    else if (authTab === 'register') handleRegister()
-    else handleSetPassword()
-  }
-
-  const handleAuthKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      handleAuthSubmit()
-    }
-  }
-
   const handleSubmit = () => {
     const trimmed = text.trim()
-    if (!trimmed || !user) return
+    if (!trimmed) return
+    if (!user) {
+      // Stash the prompt and pop the auth modal — after register the paywall
+      // appears, and once the user either pays or skips we start generation.
+      setPendingPrompt(trimmed)
+      setAuthModalOpen(true)
+      return
+    }
     onStart(trimmed)
+  }
+
+  const handleAuthModalSuccess = (info: UserInfo) => {
+    onAuth(info)
+    setAuthModalOpen(false)
+    // Go straight to paywall — user can still dismiss with "continue on free"
+    setPaywallOpen(true)
+  }
+
+  const handlePaywallSkip = () => {
+    setPaywallOpen(false)
+    // User chose to continue with free credits — start generation with stashed prompt
+    const p = pendingPrompt
+    setPendingPrompt('')
+    if (p) onStart(p)
+  }
+
+  const handlePaywallClose = () => {
+    // Close via X button — same as skip (they still have free credits)
+    handlePaywallSkip()
   }
 
   const handleUseTemplate = (template: Template) => {
@@ -259,10 +244,10 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' }}
       >
-        {isLoggedIn ? 'Šta želiš da napraviš?' : 'Prijavi se'}
+        Šta želiš da napraviš?
       </motion.h1>
 
-      {isLoggedIn ? (
+      {true ? (
         <>
           <motion.p
             className="welcome-subtitle"
@@ -404,120 +389,7 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
             </div>
           )}
         </>
-      ) : (
-        /* ── Auth form ── */
-        <motion.div
-          className="auth-card"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-        >
-          {checkingSession ? (
-            <div className="auth-checking">
-              <Loader2 size={20} className="spin" />
-              <span>Provera sesije...</span>
-            </div>
-          ) : (
-            <>
-              <div className="auth-tabs">
-                <button
-                  className={`auth-tab ${authTab === 'login' ? 'active' : ''}`}
-                  onClick={() => { setAuthTab('login'); setAuthError('') }}
-                >
-                  <LogIn size={14} />
-                  Prijava
-                </button>
-                <button
-                  className={`auth-tab ${authTab === 'register' ? 'active' : ''}`}
-                  onClick={() => { setAuthTab('register'); setAuthError('') }}
-                >
-                  <UserPlus size={14} />
-                  Registracija
-                </button>
-                <button
-                  className={`auth-tab ${authTab === 'apikey' ? 'active' : ''}`}
-                  onClick={() => { setAuthTab('apikey'); setAuthError('') }}
-                >
-                  <Key size={14} />
-                  API ključ
-                </button>
-              </div>
-
-              {authTab === 'apikey' && (
-                <p className="auth-hint">Imaš API ključ iz Cursor ekstenzije? Postavi lozinku za web pristup.</p>
-              )}
-
-              <div className="auth-fields">
-                {authTab === 'register' && (
-                  <div className="auth-row">
-                    <input
-                      type="text"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      onKeyDown={handleAuthKeyDown}
-                      placeholder="Ime"
-                      className="auth-input"
-                    />
-                    <input
-                      type="text"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      onKeyDown={handleAuthKeyDown}
-                      placeholder="Prezime"
-                      className="auth-input"
-                    />
-                  </div>
-                )}
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onKeyDown={handleAuthKeyDown}
-                  placeholder="Email adresa"
-                  className="auth-input"
-                />
-                {authTab === 'apikey' && (
-                  <input
-                    type="text"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    onKeyDown={handleAuthKeyDown}
-                    placeholder="va-xxxx-xxxx-xxxx"
-                    className="auth-input"
-                    style={{ fontFamily: 'var(--mono)', letterSpacing: '0.02em' }}
-                  />
-                )}
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={handleAuthKeyDown}
-                  placeholder={authTab === 'apikey' ? 'Nova lozinka' : 'Lozinka'}
-                  className="auth-input"
-                />
-              </div>
-
-              {authError && <p className="auth-error">{authError}</p>}
-
-              <button
-                className="auth-submit"
-                onClick={handleAuthSubmit}
-                disabled={authLoading}
-              >
-                {authLoading ? (
-                  <Loader2 size={16} className="spin" />
-                ) : authTab === 'login' ? (
-                  'Prijavi se'
-                ) : authTab === 'register' ? (
-                  'Napravi nalog'
-                ) : (
-                  'Postavi lozinku'
-                )}
-              </button>
-            </>
-          )}
-        </motion.div>
-      )}
+      ) : null}
 
       <motion.div
         className="welcome-footer"
@@ -532,6 +404,34 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
 
       {/* First-time user onboarding */}
       {showOnboarding && <Onboarding onComplete={() => setShowOnboarding(false)} />}
+
+      {/* New bolt-style auth + paywall flow */}
+      <AuthModal
+        open={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onAuthed={handleAuthModalSuccess}
+        pendingPrompt={pendingPrompt}
+      />
+      <PaywallModal
+        open={paywallOpen}
+        onClose={handlePaywallClose}
+        variant="welcome"
+        onSkip={handlePaywallSkip}
+      />
+
+      {/* Stripe return toast */}
+      <AnimatePresence>
+        {paySuccessToast && (
+          <motion.div
+            className="pay-toast"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+          >
+            {paySuccessToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Templates Modal (portaled to body) ── */}
       {createPortal(

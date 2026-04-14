@@ -2035,6 +2035,24 @@ app.post('/create-checkout', authLimiter, requireAuth, asyncHandler(async (req, 
     return res.status(400).json({ error: 'amount_usd mora biti između 1 i 1000.' });
   }
   const baseUrl = process.env.BASE_URL || (req.protocol + '://' + req.get('host'));
+
+  // Optional return_url from trusted origins (web app at papaya-cat-*.netlify.app, etc.)
+  // Whitelist matches WEB_ORIGINS used for CORS so we never redirect to an attacker domain.
+  const rawReturn = typeof req.body?.return_url === 'string' ? req.body.return_url : '';
+  const webOrigins = (process.env.WEB_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+  let successUrl = baseUrl + '/payment-status?status=success&amount=' + amountUsd;
+  let cancelUrl = baseUrl + '/payment-status?status=cancelled';
+  if (rawReturn) {
+    try {
+      const parsed = new URL(rawReturn);
+      const origin = parsed.origin;
+      if (webOrigins.includes(origin)) {
+        successUrl = origin + (parsed.pathname || '/') + '?pay=ok&amount=' + amountUsd;
+        cancelUrl = origin + (parsed.pathname || '/') + '?pay=cancel';
+      }
+    } catch { /* ignore malformed return_url */ }
+  }
+
   try {
     const params = new URLSearchParams();
     params.append('mode', 'payment');
@@ -2045,8 +2063,8 @@ app.post('/create-checkout', authLimiter, requireAuth, asyncHandler(async (req, 
     params.append('line_items[0][price_data][unit_amount]', String(Math.round(amountUsd * 100)));
     params.append('line_items[0][quantity]', '1');
     params.append('metadata[key_id]', req.studentKeyId);
-    params.append('success_url', baseUrl + '/payment-status?status=success&amount=' + amountUsd);
-    params.append('cancel_url', baseUrl + '/payment-status?status=cancelled');
+    params.append('success_url', successUrl);
+    params.append('cancel_url', cancelUrl);
 
     const resp = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',

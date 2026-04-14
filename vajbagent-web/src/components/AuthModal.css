@@ -1,0 +1,98 @@
+.auth-modal {
+  max-width: 480px;
+}
+
+.auth-pending-prompt {
+  background: rgba(249, 115, 22, 0.05);
+  border: 1px solid rgba(249, 115, 22, 0.18);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 18px;
+}
+.auth-pending-prompt .pending-label {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #f97316;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+.auth-pending-prompt .pending-text {
+  font-size: 0.85rem;
+  color: #d4d4dc;
+  line-height: 1.45;
+  max-height: 60px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.auth-mode-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+.auth-mode-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  color: #9a9aa3;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.auth-mode-tab:hover { color: #fff; }
+.auth-mode-tab.active {
+  background: rgba(249, 115, 22, 0.1);
+  color: #f97316;
+}
+
+.auth-fields-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.auth-name-row {
+  display: flex;
+  gap: 10px;
+}
+.auth-name-row .auth-input-modal { flex: 1; }
+.auth-input-modal {
+  width: 100%;
+  padding: 13px 14px;
+  background: #0a0a0d;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.auth-input-modal:focus {
+  border-color: #f97316;
+}
+.auth-input-modal::placeholder { color: #555; }
+
+.auth-submit-big {
+  width: 100%;
+  justify-content: center;
+  padding: 14px;
+  font-size: 0.95rem;
+  margin-bottom: 12px;
+}

@@ -42,6 +42,7 @@ interface ChatPanelProps {
   onDone?: () => void
   onContextUpdate?: (used: number, limit: number) => void
   onStreamingChange?: (streaming: boolean) => void
+  onStatusChange?: (status: string) => void
   onChatHistoryUpdate?: (history: unknown[], displayMessages: unknown[]) => void
   files: Record<string, string>
   activeFile: string | null
@@ -50,6 +51,8 @@ interface ChatPanelProps {
   resumeHistory?: unknown[]
   resumeDisplayMessages?: unknown[]
   resumeNeedsBuild?: boolean
+  /** Called when balance is critically low so parent can show the paywall */
+  onLowBalance?: (balanceUsd: number) => void
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -239,7 +242,7 @@ function loadSession(): { history: Message[]; displayMessages: { role: string; c
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function ChatPanel({ initialPrompt, model, onModelChange, onFilesChanged, onDone, onContextUpdate, onStreamingChange, onChatHistoryUpdate, files, activeFile, selectionRef, freeTier, resumeHistory, resumeDisplayMessages, resumeNeedsBuild }: ChatPanelProps) {
+export default function ChatPanel({ initialPrompt, model, onModelChange, onFilesChanged, onDone, onContextUpdate, onStreamingChange, onStatusChange, onChatHistoryUpdate, files, activeFile, selectionRef, freeTier, resumeHistory, resumeDisplayMessages, resumeNeedsBuild, onLowBalance }: ChatPanelProps) {
   const [displayMessages, setDisplayMessages] = useState<{ role: string; content: string }[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
@@ -313,6 +316,12 @@ export default function ChatPanel({ initialPrompt, model, onModelChange, onFiles
       requestAnimationFrame(() => { programmaticScroll.current = false })
     }
   }, [displayMessages, streamText, statusText])
+
+  // Forward status text to parent so other panels (e.g. code editor overlay)
+  // can show what the agent is currently doing instead of the generic "Kreiram kod...".
+  useEffect(() => {
+    onStatusChange?.(statusText)
+  }, [statusText, onStatusChange])
 
   // When streaming ends, always reset scroll lock so user can see the final message
   useEffect(() => {
@@ -498,6 +507,7 @@ export default function ChatPanel({ initialPrompt, model, onModelChange, onFiles
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
     let fullText = ''
+    let lastCtxUpdate = 0
     const toolCalls: Record<number, ToolCall> = {}
     let sseBuffer = ''
     let finishReason: string | null = null
@@ -551,6 +561,12 @@ export default function ChatPanel({ initialPrompt, model, onModelChange, onFiles
             if (choice.delta?.content) {
               fullText += choice.delta.content
               setStreamText(fullText)
+              // Real-time context update — throttled every ~400 chars
+              if (fullText.length > 0 && fullText.length - lastCtxUpdate > 400) {
+                lastCtxUpdate = fullText.length
+                const streamingUsed = estimateTokens([...messages, { role: 'assistant', content: fullText }], systemPrompt)
+                onContextUpdate?.(streamingUsed, getContextLimit(model))
+              }
             }
 
             if (choice.delta?.tool_calls) {
@@ -866,20 +882,24 @@ export default function ChatPanel({ initialPrompt, model, onModelChange, onFiles
       // Refresh balance and warn at multiple levels
       fetchBalance().then(bal => {
         if (bal === null) return
+        const credits = Math.max(0, Math.round(bal * 1000))
+        const fmt = credits.toLocaleString('sr-RS')
         if (bal <= 0.05) {
           setDisplayMessages(prev => [...prev, {
             role: 'error',
-            content: `Kredit je pri kraju ($${bal.toFixed(2)}). Dopuni na vajbagent.com da nastaviš.`,
+            content: `Ponestalo ti je kredita (${fmt}). Dopuni nalog da nastaviš.`,
           }])
+          // Trigger paywall modal on parent
+          onLowBalance?.(bal)
         } else if (bal < 0.50) {
           setDisplayMessages(prev => [...prev, {
             role: 'status',
-            content: `⚠ Kredit pada — preostalo $${bal.toFixed(2)}. Dopuni na vajbagent.com`,
+            content: `⚠ Kredit pada — preostalo ${fmt} kredita.`,
           }])
         } else if (bal < 2.00) {
           setDisplayMessages(prev => [...prev, {
             role: 'status',
-            content: `Preostalo $${bal.toFixed(2)} kredita.`,
+            content: `Preostalo ${fmt} kredita.`,
           }])
         }
       })

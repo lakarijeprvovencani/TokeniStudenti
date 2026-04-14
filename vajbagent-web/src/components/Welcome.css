@@ -840,3 +840,21 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Stripe return toast */
+.pay-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 14px 22px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.08));
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  color: #6ee7b7;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 20px 48px -16px rgba(0, 0, 0, 0.6);
+  z-index: 10001;
+}
