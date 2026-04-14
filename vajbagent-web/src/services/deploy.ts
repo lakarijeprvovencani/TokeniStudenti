@@ -7,6 +7,27 @@ export interface DeployResult {
   error?: string
 }
 
+const IMAGE_EXTS = /\.(jpe?g|png|webp|gif|avif|ico|svg)$/i
+
+function dataUrlToUint8Array(dataUrl: string): Uint8Array | null {
+  const comma = dataUrl.indexOf(',')
+  if (comma < 0) return null
+  const meta = dataUrl.slice(5, comma)
+  const isBase64 = meta.endsWith(';base64')
+  const payload = dataUrl.slice(comma + 1)
+  try {
+    if (isBase64) {
+      const bin = atob(payload)
+      const out = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
+      return out
+    }
+    return new TextEncoder().encode(decodeURIComponent(payload))
+  } catch {
+    return null
+  }
+}
+
 /**
  * Deploy fajlove na Netlify.
  * Ako ima token (iz podešavanja), koristi korisnikov nalog.
@@ -17,21 +38,26 @@ export async function deployToNetlify(
   token?: string
 ): Promise<DeployResult> {
   try {
-    // Napravi finalni HTML sa ubačenim CSS/JS
     const htmlFile = files['index.html'] || files['index.htm']
     if (!htmlFile) {
       return { success: false, error: 'Nema index.html fajla za deploy.' }
     }
 
-    // Kreiraj ZIP sa svim fajlovima
     const { default: JSZip } = await import('jszip')
     const zip = new JSZip()
 
-    // Ubaci sve fajlove u ZIP
     for (const [path, content] of Object.entries(files)) {
-      if (!path.endsWith('/')) {
-        zip.file(path, content)
+      if (path.endsWith('/')) continue
+
+      if (IMAGE_EXTS.test(path) && content.startsWith('data:')) {
+        const binary = dataUrlToUint8Array(content)
+        if (binary) {
+          zip.file(path, binary)
+          continue
+        }
       }
+
+      zip.file(path, content)
     }
 
     const zipBlob = await zip.generateAsync({ type: 'blob' })
@@ -92,7 +118,16 @@ export async function deployToVercel(
   try {
     const fileList = Object.entries(files)
       .filter(([path]) => !path.endsWith('/') && !path.includes('node_modules/'))
-      .map(([file, data]) => ({ file, data }))
+      .map(([file, data]) => {
+        if (IMAGE_EXTS.test(file) && data.startsWith('data:')) {
+          const comma = data.indexOf(',')
+          const meta = comma >= 0 ? data.slice(5, comma) : ''
+          if (meta.endsWith(';base64')) {
+            return { file, data: data.slice(comma + 1), encoding: 'base64' as const }
+          }
+        }
+        return { file, data }
+      })
 
     if (fileList.length === 0) {
       return { success: false, error: 'Nema fajlova za deploy.' }
