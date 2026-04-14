@@ -319,6 +319,7 @@ app.use(helmet({
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://vajbagent.com',
   'https://www.vajbagent.com',
+  'https://vajbagent.netlify.app',
   'https://papaya-cat-45b818.netlify.app',
   'http://localhost:5173',
   'http://localhost:5174',
@@ -336,8 +337,10 @@ const ALLOWED_ORIGINS = Array.from(new Set([
   ...(process.env.WEB_ORIGINS ? process.env.WEB_ORIGINS.split(',').map(s => s.trim()).filter(Boolean) : []),
 ]));
 
-// Allow Netlify deploy preview URLs (--<hash>--papaya-cat-45b818.netlify.app) automatically
+// Allow Netlify deploy preview URLs for both the new branded site and the
+// legacy papaya-cat deploy.
 const ALLOWED_ORIGIN_PATTERNS = [
+  /^https:\/\/[a-f0-9]+--vajbagent\.netlify\.app$/,
   /^https:\/\/[a-f0-9]+--papaya-cat-45b818\.netlify\.app$/,
 ];
 
@@ -596,7 +599,7 @@ function setWebAppHeaders(res) {
 // StackBlitz Enterprise/OSS license for vajbagent.com is approved
 // and the SPA will be served locally again.
 const WEB_APP_AT_ROOT = process.env.WEB_APP_AT_ROOT === '1';
-const WEB_APP_REDIRECT_URL = (process.env.WEB_APP_REDIRECT_URL || 'https://papaya-cat-45b818.netlify.app').replace(/\/$/, '');
+const WEB_APP_REDIRECT_URL = (process.env.WEB_APP_REDIRECT_URL || 'https://vajbagent.netlify.app').replace(/\/$/, '');
 
 app.get('/', (req, res) => {
   if (!WEB_APP_AT_ROOT) {
