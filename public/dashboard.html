@@ -98,8 +98,10 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .topup-balance-sub{font-size:.8rem;color:var(--text2);line-height:1.5;margin:0}
 .topup-choose-sub{font-size:.82rem;color:var(--text2);margin-bottom:16px;line-height:1.5}
 .topup-grid{display:flex;gap:12px;flex-wrap:wrap}
-.btn-topup{padding:14px 28px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:.95rem;font-weight:700;font-family:inherit;border-radius:10px;cursor:pointer;transition:all .15s}
+.btn-topup{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 24px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:.95rem;font-weight:700;font-family:inherit;border-radius:10px;cursor:pointer;transition:all .15s}
 .btn-topup:hover{border-color:var(--orange);color:var(--orange)}
+.btn-topup-sub{font-size:.68rem;font-weight:500;color:var(--text2);letter-spacing:.01em}
+.btn-topup:hover .btn-topup-sub{color:var(--orange);opacity:.8}
 .topup-err{color:var(--red);font-size:.8rem;margin-top:12px;display:none}
 .topup-secure{font-size:.75rem;color:var(--text3);margin-top:16px;line-height:1.5}
 
@@ -271,7 +273,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <div class="pay-banner pay-fail" id="payFail" style="display:none">Plaćanje je otkazano. Krediti nisu naplaćeni.<button class="close-b" onclick="closeBanner('payFail')">&times;</button></div>
       <div class="hero-bal">
         <div class="hero-label">Raspoloživi kredit</div>
-        <div class="hero-val"><span id="hBal">0.00</span><span class="cur">USD</span></div>
+        <div class="hero-val"><span id="hBal">0</span><span class="cur">kredita</span></div>
         <div class="hero-sub">Troši se automatski po zahtevu u tvom IDE-u</div>
       </div>
       <div class="stats">
@@ -312,7 +314,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
       <div class="card topup-balance-card">
         <div class="card-title card-title-light">Trenutno stanje</div>
-        <div class="topup-balance-val" id="topBal">$0.00</div>
+        <div class="topup-balance-val" id="topBal">0 kredita</div>
         <p class="topup-balance-sub">Nepotrošeni kredit na tvom nalogu. Troši se automatski pri svakom zahtevu u tvom IDE-u.</p>
       </div>
 
@@ -320,23 +322,23 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
         <div class="card-title card-title-light">Izaberi iznos za dopunu</div>
         <p class="topup-choose-sub">Klik na iznos otvara sigurnu Stripe stranicu za plaćanje. Krediti se pripisuju odmah po uspešnoj uplati.</p>
         <div class="topup-grid">
-          <button class="btn-topup" onclick="topup(5)">+ $5</button>
-          <button class="btn-topup" onclick="topup(10)">+ $10</button>
-          <button class="btn-topup" onclick="topup(15)">+ $15</button>
-          <button class="btn-topup" onclick="topup(20)">+ $20</button>
-          <button class="btn-topup" onclick="topup(25)">+ $25</button>
-          <button class="btn-topup" onclick="topup(30)">+ $30</button>
-          <button class="btn-topup" onclick="topup(35)">+ $35</button>
-          <button class="btn-topup" onclick="topup(40)">+ $40</button>
-          <button class="btn-topup" onclick="topup(45)">+ $45</button>
-          <button class="btn-topup" onclick="topup(50)">+ $50</button>
-          <button class="btn-topup" onclick="topup(55)">+ $55</button>
-          <button class="btn-topup" onclick="topup(60)">+ $60</button>
-          <button class="btn-topup" onclick="topup(65)">+ $65</button>
-          <button class="btn-topup" onclick="topup(70)">+ $70</button>
-          <button class="btn-topup" onclick="topup(100)">+ $100</button>
-          <button class="btn-topup" onclick="topup(150)">+ $150</button>
-          <button class="btn-topup" onclick="topup(200)">+ $200</button>
+          <button class="btn-topup" onclick="topup(5)">+ $5<span class="btn-topup-sub">5.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(10)">+ $10<span class="btn-topup-sub">10.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(15)">+ $15<span class="btn-topup-sub">15.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(20)">+ $20<span class="btn-topup-sub">20.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(25)">+ $25<span class="btn-topup-sub">25.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(30)">+ $30<span class="btn-topup-sub">30.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(35)">+ $35<span class="btn-topup-sub">35.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(40)">+ $40<span class="btn-topup-sub">40.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(45)">+ $45<span class="btn-topup-sub">45.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(50)">+ $50<span class="btn-topup-sub">50.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(55)">+ $55<span class="btn-topup-sub">55.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(60)">+ $60<span class="btn-topup-sub">60.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(65)">+ $65<span class="btn-topup-sub">65.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(70)">+ $70<span class="btn-topup-sub">70.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(100)">+ $100<span class="btn-topup-sub">100.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(150)">+ $150<span class="btn-topup-sub">150.000 kredita</span></button>
+          <button class="btn-topup" onclick="topup(200)">+ $200<span class="btn-topup-sub">200.000 kredita</span></button>
           <button class="btn-topup" onclick="topup(500)">+ $500</button>
         </div>
         <div class="topup-err" id="topErr"></div>
@@ -556,20 +558,24 @@ document.querySelectorAll('.nav-item').forEach(el=>{
   };
 });
 
+const CREDITS_PER_USD=1000;
+const toCredits=(usd)=>Math.max(0,Math.round((usd||0)*CREDITS_PER_USD));
+const fmtCredits=(usd)=>toCredits(usd).toLocaleString('sr-RS');
+
 function render(d){
   $('sideKey').textContent=d.key_id||'-';
-  $('hBal').textContent=(d.balance_usd??0).toFixed(2);
+  $('hBal').textContent=fmtCredits(d.balance_usd);
   $('vReqs').textContent=fmt(d.requests||0);
   $('vIn').textContent=fmt(d.input_tokens||0);
   $('vOut').textContent=fmt(d.output_tokens||0);
   $('vLast').textContent=fmtD(d.last_used);
   const spent = Math.max(0, (d.total_deposited ?? 0) - (d.balance_usd ?? 0));
-  $('vCost').textContent='$'+spent.toFixed(2);
+  $('vCost').textContent=fmtCredits(spent)+' kredita';
   $('vTotal').textContent=fmt((d.input_tokens||0)+(d.output_tokens||0));
   $('vInDetail').textContent=fmt(d.input_tokens||0);
   $('vOutDetail').textContent=fmt(d.output_tokens||0);
   $('vReqsDetail').textContent=fmt(d.requests||0);
-  $('topBal').textContent='$'+(d.balance_usd??0).toFixed(2);
+  $('topBal').textContent=fmtCredits(d.balance_usd)+' kredita';
   $('dashKey').textContent=apiKey;
   $('setupKeyExt').textContent=apiKey;
 

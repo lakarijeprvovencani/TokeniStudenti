@@ -13,6 +13,7 @@ import { preboot, onServerReady, getServerUrl, writeFile as wcWriteFile, clearFi
 import { buildEnvFile } from '../services/secretsStore'
 import { filterForPush, ensureGitignoreSafety, DEFAULT_GITIGNORE, scanForSecrets, redactSecrets, type SecretFinding } from '../services/pushFilter'
 import { fetchUserInfo, logout, revealApiKey, type UserInfo } from '../services/userService'
+import { formatCredits } from '../services/credits'
 import { saveProject, generateProjectId, type SavedProject } from '../services/projectStore'
 import FileExplorer from './FileExplorer'
 import Settings from './Settings'
@@ -652,7 +653,7 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
                     <div className="token-tooltip-row">
                       <span>Kredit</span>
                       <strong style={{ color: userInfo.balance < 1 ? '#ef4444' : 'var(--text)' }}>
-                        ${userInfo.balance.toFixed(2)}
+                        {formatCredits(userInfo.balance)} kredita
                       </strong>
                     </div>
                   </>
@@ -670,10 +671,10 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
               target="_blank"
               rel="noopener"
               className={`topbar-credit ${userInfo.balance < 0.5 ? 'low' : ''}`}
-              title={`Kredit: $${userInfo.balance.toFixed(2)} — Klikni za dopunu`}
+              title={`Kredit: ${formatCredits(userInfo.balance)} kredita — Klikni za dopunu`}
             >
               <Wallet size={13} />
-              <span>${userInfo.balance.toFixed(2)}</span>
+              <span>{formatCredits(userInfo.balance)}</span>
             </a>
           )}
 
@@ -687,7 +688,7 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
                 <div className="user-menu">
                   <div className="user-menu-header">
                     <span className="user-menu-name">{userInfo.name}</span>
-                    <span className="user-menu-balance">${userInfo.balance.toFixed(2)}</span>
+                    <span className="user-menu-balance">{formatCredits(userInfo.balance)} kredita</span>
                   </div>
                   <div className="user-menu-key">
                     <span className="user-menu-key-label">API ključ (za Cursor)</span>

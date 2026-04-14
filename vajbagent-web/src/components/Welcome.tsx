@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Code2, Globe, Layout, ArrowUp, Plus, Paperclip, Loader2, LogIn, UserPlus, Key, FolderOpen, Trash2, Clock, Settings as SettingsIcon, LogOut, Sparkles } from 'lucide-react'
 import { login, register, setPassword as setPasswordApi, logout, checkSession, type UserInfo } from '../services/userService'
 import { listProjects, deleteProject, type SavedProject } from '../services/projectStore'
+import { formatCredits } from '../services/credits'
 import { TEMPLATES, TEMPLATE_CATEGORIES, type Template } from '../templates'
 import ModelSelector from './ModelSelector'
 import Settings from './Settings'
@@ -226,7 +227,7 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
                 <div className="welcome-user-menu">
                   <div className="welcome-menu-header">
                     <span className="welcome-menu-name">{user.name}</span>
-                    <span className="welcome-menu-balance">${user.balance.toFixed(2)}</span>
+                    <span className="welcome-menu-balance">{formatCredits(user.balance)} kredita</span>
                   </div>
                   <div className="welcome-menu-divider" />
                   <a href="https://vajbagent.com/dashboard" target="_blank" rel="noopener" className="welcome-menu-item">
