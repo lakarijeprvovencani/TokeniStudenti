@@ -409,7 +409,11 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.7 }}
       >
-        <>Powered by <span className="footer-brand">Vajb<span>Agent</span></span></>
+        <span>Powered by <span className="footer-brand">Vajb<span>Agent</span></span></span>
+        <span className="footer-sep">·</span>
+        <a href="/extenzija" className="footer-ext-link">
+          Koristiš Cursor / VS Code? Preuzmi ekstenziju →
+        </a>
       </motion.div>
 
       <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />

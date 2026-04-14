@@ -548,11 +548,51 @@ app.use((err, _req, res, next) => {
   next(err);
 });
 
-// ---- Root: landing page ----
+// ---- Web app (primary landing — bolt-style AI coder) ----
+// We serve the built Vite bundle from vajbagent-web/dist.
+// WebContainers need cross-origin isolation headers on the document AND
+// on every static asset; we set them on the dist/ static middleware and
+// on the / route handler.
+const WEB_APP_DIST = path.join(__dirname, '..', 'vajbagent-web', 'dist');
+const webAppIndexExists = fs.existsSync(path.join(WEB_APP_DIST, 'index.html'));
+
+function setWebAppHeaders(res) {
+  // credentialless matches what Netlify was serving and keeps 3rd-party
+  // resources (images, fonts) loadable without CORP headers on their side.
+  res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+}
+
 app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  if (webAppIndexExists) {
+    setWebAppHeaders(res);
+    return res.sendFile(path.join(WEB_APP_DIST, 'index.html'));
+  }
+  // Build output missing — fall back to the extension landing so the site
+  // is never fully broken during a bad deploy.
+  res.sendFile(path.join(__dirname, '..', 'public', 'extenzija.html'));
 });
 app.head('/', (_req, res) => res.status(200).end());
+
+// Serve the hashed JS/CSS assets from vajbagent-web/dist with COOP/COEP
+if (webAppIndexExists) {
+  app.use(express.static(WEB_APP_DIST, {
+    index: false,
+    setHeaders: (res, filePath) => {
+      setWebAppHeaders(res);
+      // Hashed assets are immutable — long cache. Non-hashed index.html
+      // should never be fetched from here (/, above, serves it).
+      if (/-[A-Za-z0-9_-]{8,}\.(js|css|woff2?|png|svg|jpg|jpeg|gif|webp)$/.test(filePath)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    },
+  }));
+}
+
+// ---- Cursor/VS Code extension landing (moved from `/` on 2026-04-14) ----
+app.get('/extenzija', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'extenzija.html'));
+});
 
 // ---- Models list ----
 const modelsResponse = () => ({

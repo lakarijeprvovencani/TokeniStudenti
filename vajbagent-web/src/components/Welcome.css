@@ -858,3 +858,23 @@
   box-shadow: 0 20px 48px -16px rgba(0, 0, 0, 0.6);
   z-index: 10001;
 }
+
+.welcome-footer .footer-sep {
+  opacity: 0.3;
+  margin: 0 4px;
+}
+.welcome-footer .footer-ext-link {
+  color: var(--text2, #888);
+  text-decoration: none;
+  transition: color 0.15s;
+  border-bottom: 1px dashed rgba(255,255,255,0.15);
+  padding-bottom: 1px;
+}
+.welcome-footer .footer-ext-link:hover {
+  color: #f97316;
+  border-bottom-color: #f97316;
+}
+@media (max-width: 600px) {
+  .welcome-footer { flex-direction: column; gap: 4px; }
+  .welcome-footer .footer-sep { display: none; }
+}

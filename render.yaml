@@ -4,7 +4,7 @@ services:
   - type: web
     name: vajb-agent
     runtime: node
-    buildCommand: npm install
+    buildCommand: npm install && npm run build:web
     startCommand: npm start
     # Trajni disk: balance i usage prežive restart (inače se gube na free tieru)
     disk:
