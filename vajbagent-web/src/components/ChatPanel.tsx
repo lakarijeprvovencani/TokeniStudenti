@@ -4,6 +4,7 @@ import { ArrowUp, Loader2, User, Square } from 'lucide-react'
 import { executeToolCall } from '../services/toolHandler'
 import { buildFullContext, invalidateIndex } from '../services/contextBuilder'
 import { fetchBalance } from '../services/userService'
+import { scopedStorage as scopedStorageRef } from '../services/storageScope'
 import MarkdownRenderer from './MarkdownRenderer'
 import CommandPalette from './CommandPalette'
 import FileMention from './FileMention'
@@ -220,18 +221,18 @@ function buildFallbackSummary(history: Message[]): string {
 
 function saveSession(history: Message[], displayMessages: { role: string; content: string }[], model: string) {
   try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ history, displayMessages, model, ts: Date.now() }))
+    scopedStorageRef.set(SESSION_KEY, JSON.stringify({ history, displayMessages, model, ts: Date.now() }))
   } catch { /* storage full */ }
 }
 
 function loadSession(): { history: Message[]; displayMessages: { role: string; content: string }[]; model: string } | null {
   try {
-    const raw = localStorage.getItem(SESSION_KEY)
+    const raw = scopedStorageRef.get(SESSION_KEY)
     if (!raw) return null
     const data = JSON.parse(raw)
     // Expire sessions older than 2 hours
     if (Date.now() - data.ts > 2 * 60 * 60 * 1000) {
-      localStorage.removeItem(SESSION_KEY)
+      scopedStorageRef.remove(SESSION_KEY)
       return null
     }
     return data

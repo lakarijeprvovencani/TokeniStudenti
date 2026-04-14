@@ -1,7 +1,13 @@
+import { setScope } from './storageScope'
+
 const API_URL = import.meta.env.VITE_API_URL || 'https://vajbagent.com'
 
 export interface UserInfo {
   name: string
+  /** Stable non-secret user identifier — hash of student key. Used to scope
+   *  per-user browser storage so two users on the same browser profile
+   *  never see each other's projects or secrets. */
+  userId: string
   freeTier: boolean
   balance: number
   apiKey?: string
@@ -67,7 +73,7 @@ export async function setPassword(email: string, currentKey: string, newPassword
   }
 }
 
-/** Logout — clears session cookie */
+/** Logout — clears session cookie and the per-user storage scope */
 export async function logout(): Promise<void> {
   try {
     await fetch(`${API_URL}/auth/logout`, {
@@ -75,6 +81,7 @@ export async function logout(): Promise<void> {
       credentials: 'include',
     })
   } catch { /* ignore */ }
+  setScope(null)
 }
 
 /**
@@ -90,14 +97,20 @@ export async function checkSession(opts: { revealKey?: boolean } = {}): Promise<
       credentials: 'include',
       signal: AbortSignal.timeout(5000),
     })
-    if (!res.ok) return null
+    if (!res.ok) {
+      setScope(null)
+      return null
+    }
     const data = await res.json()
-    return {
+    const info: UserInfo = {
       name: data.name || '',
+      userId: data.user_id || '',
       freeTier: data.free_tier ?? true,
       balance: data.balance_usd ?? 0,
       apiKey: data.api_key || undefined,
     }
+    if (info.userId) setScope(info.userId)
+    return info
   } catch {
     return null
   }

@@ -1,14 +1,12 @@
 import { writeFile, readFile, listFiles, runCommand, getAllFiles } from './webcontainer'
 import { parseToolCallArguments } from './toolArgsParse'
+import { scopedStorage } from './storageScope'
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://vajbagent.com'
 
 function getApiKey(): string {
-  return localStorage.getItem('vajb_api_key') || ''
+  return scopedStorage.get('vajb_api_key') || ''
 }
-
-// Unsplash API key (same as extension)
-const UNSPLASH_KEY = [103,48,114,106,97,103,121,90,65,68,65,55,79,100,87,104,73,98,102,100,103,108,50,95,122,112,73,99,107,50,120,98,113,48,83,89,116,76,100,89,69,122,107].map(c => String.fromCharCode(c)).join('')
 
 interface ToolCall {
   id: string
@@ -404,22 +402,20 @@ async function handleSearchImages(args: Record<string, unknown>): Promise<string
   if (!query) return 'Greska: query je obavezan'
 
   try {
-    let url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=${count}`
-    if (orientation) url += `&orientation=${orientation}`
-
-    const res = await fetch(url, {
+    // Route through backend so the Unsplash key never ships in the client bundle.
+    const res = await fetch(`${API_URL}/v1/image-search`, {
+      method: 'POST',
       headers: {
-        'Authorization': `Client-ID ${UNSPLASH_KEY}`,
-        'Accept-Version': 'v1',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getApiKey()}`,
       },
+      body: JSON.stringify({ query, count, orientation }),
+      credentials: 'include',
       signal: AbortSignal.timeout(10000),
     })
 
-    if (res.status === 403 || res.status === 429) {
-      return 'Greska: Unsplash API rate limit dostignut (50 req/sat). Pokusaj ponovo za par minuta.'
-    }
-
-    if (!res.ok) return `Greska: Unsplash API vratio ${res.status}`
+    if (res.status === 429) return 'Greska: rate limit dostignut. Pokusaj ponovo za par minuta.'
+    if (!res.ok) return `Greska: image search vratio ${res.status}`
 
     const data = await res.json()
     if (!data.results || data.results.length === 0) {
@@ -427,24 +423,13 @@ async function handleSearchImages(args: Record<string, unknown>): Promise<string
     }
 
     const parts: string[] = [`Found ${data.results.length} image(s) for "${query}":\n`]
-
     for (let i = 0; i < data.results.length; i++) {
       const photo = data.results[i]
-      const imgUrl = photo.urls?.regular || photo.urls?.small || ''
-      const alt = photo.alt_description || photo.description || 'No description'
-      const photographer = photo.user?.name || 'Unknown'
-      const profileUrl = photo.user?.links?.html || ''
-
-      parts.push(`${i + 1}. ${alt}`)
-      parts.push(`   URL: ${imgUrl}`)
-      parts.push(`   Credit: Photo by ${photographer} on Unsplash`)
-      if (profileUrl) parts.push(`   Profile: ${profileUrl}?utm_source=vajbagent&utm_medium=referral`)
+      parts.push(`${i + 1}. ${photo.alt || 'No description'}`)
+      parts.push(`   URL: ${photo.url}`)
+      parts.push(`   Credit: Photo by ${photo.photographer} on Unsplash`)
+      if (photo.profile) parts.push(`   Profile: ${photo.profile}?utm_source=vajbagent&utm_medium=referral`)
       parts.push('')
-
-      // Fire download tracking (required by Unsplash API)
-      if (photo.links?.download_location) {
-        fetch(`${photo.links.download_location}?client_id=${UNSPLASH_KEY}`).catch(() => {})
-      }
     }
 
     parts.push('IMPORTANT: In this browser environment, use the image URLs DIRECTLY in your HTML <img src="URL"> tags. Do NOT use download_file for images — WebContainers cannot store binary files. Always include Unsplash attribution.')
@@ -498,7 +483,7 @@ async function handleDownloadFile(
 // ─── Supabase tools ──────────────────────────────────────────────────────────
 
 function getSupabaseProjectRef(): string | null {
-  return localStorage.getItem('vajb_supabase_project_ref')
+  return scopedStorage.get('vajb_supabase_project_ref')
 }
 
 async function callSupabaseApi(path: string, init: RequestInit = {}): Promise<Response> {

@@ -1,10 +1,45 @@
 /**
- * Environment secrets management.
- * Stores user-defined env vars (API keys, tokens, etc.) in localStorage.
- * Auto-injects them as a .env file in WebContainers when projects load.
+ * Environment secrets management — scoped per user.
+ *
+ * Env var blobs live in localStorage under `vajb_env_secrets::<userId>`
+ * so two people sharing the same browser profile cannot read each
+ * other's API keys. On first access for a given user the legacy
+ * unscoped `vajb_env_secrets` key is migrated into the scoped slot
+ * (once) so existing installs don't silently lose their secrets.
+ *
+ * Anonymous visitors (no userId) get an empty read and a no-op write.
  */
 
-const STORAGE_KEY = 'vajb_env_secrets'
+import { getScope } from './storageScope'
+
+const LEGACY_STORAGE_KEY = 'vajb_env_secrets'
+
+function scopedStorageKey(): string | null {
+  const scope = getScope()
+  if (!scope) return null
+  return `${LEGACY_STORAGE_KEY}::${scope}`
+}
+
+// Migrate legacy secrets into the current user's scoped key exactly once.
+const migratedScopes = new Set<string>()
+function migrateLegacyIfNeeded(): void {
+  const scope = getScope()
+  if (!scope || migratedScopes.has(scope)) return
+  migratedScopes.add(scope)
+  try {
+    const scopedKey = `${LEGACY_STORAGE_KEY}::${scope}`
+    if (localStorage.getItem(scopedKey)) return
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY)
+    if (legacy) {
+      localStorage.setItem(scopedKey, legacy)
+      // Leave the legacy key in place — if a different user later logs in
+      // on the same browser, they will also migrate it to THEIR scope on
+      // first access. Once every active user has migrated we can wipe it
+      // manually, but keeping it around is harmless because the unscoped
+      // key is never read anymore.
+    }
+  } catch { /* ignore */ }
+}
 
 export interface Secret {
   key: string
@@ -12,8 +47,11 @@ export interface Secret {
 }
 
 export function loadSecrets(): Secret[] {
+  const key = scopedStorageKey()
+  if (!key) return []
+  migrateLegacyIfNeeded()
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(key)
     if (!raw) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
@@ -24,8 +62,12 @@ export function loadSecrets(): Secret[] {
 }
 
 export function saveSecrets(secrets: Secret[]): void {
+  const key = scopedStorageKey()
+  if (!key) return
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(secrets))
+    localStorage.setItem(key, JSON.stringify(secrets))
+    // Notify listeners in the same tab (storage event only fires cross-tab)
+    window.dispatchEvent(new CustomEvent('vajb-secrets-changed'))
   } catch (err) {
     console.warn('[Secrets] Save failed:', err)
   }

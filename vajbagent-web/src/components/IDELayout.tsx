@@ -14,6 +14,7 @@ import { buildEnvFile } from '../services/secretsStore'
 import { filterForPush, ensureGitignoreSafety, DEFAULT_GITIGNORE, scanForSecrets, redactSecrets, type SecretFinding } from '../services/pushFilter'
 import { fetchUserInfo, logout, revealApiKey, type UserInfo } from '../services/userService'
 import { formatCredits, openPaywall } from '../services/credits'
+import { getScope } from '../services/storageScope'
 import { saveProject, generateProjectId, type SavedProject } from '../services/projectStore'
 import FileExplorer from './FileExplorer'
 import Settings from './Settings'
@@ -127,7 +128,10 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
         updatedAt: Date.now(),
         prompt: projectPromptRef.current,
       })
-        .then(() => localStorage.setItem('vajb_last_active_project', projectIdRef.current))
+        .then(() => {
+          const scope = getScope()
+          if (scope) localStorage.setItem(`vajb_last_active_project::${scope}`, projectIdRef.current)
+        })
         .catch(err => console.warn('[AutoSave] Failed:', err))
     }, 5000)
   }, [model])
@@ -156,7 +160,8 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
         prompt: projectPromptRef.current,
       })
       // Use localStorage as emergency backup (IndexedDB may not complete)
-      localStorage.setItem('vajb_unsaved_project', data)
+      const scope = getScope()
+      if (scope) localStorage.setItem(`vajb_unsaved_project::${scope}`, data)
     }
     window.addEventListener('beforeunload', handleUnload)
     return () => window.removeEventListener('beforeunload', handleUnload)
@@ -756,7 +761,17 @@ export default function IDELayout({ initialPrompt, model, onModelChange, freeTie
                     <Wallet size={14} />
                     Dopuni kredite
                   </button>
-                  <button className="user-menu-item logout" onClick={async () => { await logout(); try { localStorage.removeItem('vajb_last_active_project') } catch {}; window.location.reload() }}>
+                  <button className="user-menu-item logout" onClick={async () => {
+                    // Capture scope BEFORE logout() clears it so we remove
+                    // the correct per-user pointer.
+                    const scope = getScope()
+                    await logout()
+                    try {
+                      if (scope) localStorage.removeItem(`vajb_last_active_project::${scope}`)
+                      localStorage.removeItem('vajb_last_active_project')
+                    } catch { /* ignore */ }
+                    window.location.reload()
+                  }}>
                     <LogOut size={14} />
                     Odjavi se
                   </button>

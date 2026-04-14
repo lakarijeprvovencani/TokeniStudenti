@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, Zap, Code2, Rocket, ChevronRight } from 'lucide-react'
+import { scopedStorage } from '../services/storageScope'
 import './Onboarding.css'
 
 interface OnboardingProps {
@@ -53,11 +54,11 @@ const STEPS = [
 const STORAGE_KEY = 'vajb_onboarding_done'
 
 export function shouldShowOnboarding(): boolean {
-  return !localStorage.getItem(STORAGE_KEY)
+  return !scopedStorage.get(STORAGE_KEY)
 }
 
 export function markOnboardingDone(): void {
-  localStorage.setItem(STORAGE_KEY, '1')
+  scopedStorage.set(STORAGE_KEY, '1')
 }
 
 export default function Onboarding({ onComplete }: OnboardingProps) {

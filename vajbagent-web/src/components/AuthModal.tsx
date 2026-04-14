@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { X, Loader2, Sparkles, LogIn, UserPlus } from 'lucide-react'
-import { register, login, type UserInfo } from '../services/userService'
+import { register, login, fetchUserInfo, type UserInfo } from '../services/userService'
 import './PaywallModal.css'
 import './AuthModal.css'
 
@@ -34,17 +34,20 @@ export default function AuthModal({ open, onClose, onAuthed, pendingPrompt }: Au
       }
       setLoading(true)
       const result = await register(firstName.trim(), lastName.trim(), email.trim(), password)
-      setLoading(false)
-      if (!result.ok) { setError(result.error || 'Greška pri registraciji.'); return }
-      onAuthed({ name: result.name!, balance: result.balance ?? 0, freeTier: result.freeTier ?? true })
+      if (!result.ok) { setLoading(false); setError(result.error || 'Greška pri registraciji.'); return }
     } else {
       if (!email.trim() || !password) { setError('Unesi email i lozinku.'); return }
       setLoading(true)
       const result = await login(email.trim(), password)
-      setLoading(false)
-      if (!result.ok) { setError(result.error || 'Greška pri prijavi.'); return }
-      onAuthed({ name: result.name!, balance: result.balance ?? 0, freeTier: result.freeTier ?? true })
+      if (!result.ok) { setLoading(false); setError(result.error || 'Greška pri prijavi.'); return }
     }
+    // Fetch the full UserInfo via /auth/me — this is the only place that
+    // returns the stable user_id we need for per-user storage scoping, and
+    // it also calls setScope() internally.
+    const info = await fetchUserInfo()
+    setLoading(false)
+    if (!info) { setError('Nalog je napravljen, ali provera sesije nije uspela. Osveži stranicu.'); return }
+    onAuthed(info)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

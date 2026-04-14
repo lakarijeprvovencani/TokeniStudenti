@@ -11,6 +11,7 @@ import * as supa from '../services/supabaseIntegration'
 import * as gh from '../services/githubIntegration'
 import * as nl from '../services/netlifyIntegration'
 import { openPaywall } from '../services/credits'
+import { scopedStorage } from '../services/storageScope'
 import './Settings.css'
 
 type Tab = 'integrations' | 'secrets' | 'account' | 'about'
@@ -125,7 +126,7 @@ export default function Settings({ open, onClose }: SettingsProps) {
     for (const integration of INTEGRATIONS) {
       if (!integration.fields) continue
       for (const field of integration.fields) {
-        loaded[field.key] = localStorage.getItem(field.key) || ''
+        loaded[field.key] = scopedStorage.get(field.key) || ''
       }
     }
     setValues(loaded)
@@ -246,11 +247,11 @@ export default function Settings({ open, onClose }: SettingsProps) {
     setSupaError(null)
     try {
       const creds = await supa.getCredentials(project.ref)
-      localStorage.setItem('vajb_supabase_url', creds.url)
-      localStorage.setItem('vajb_supabase_key', creds.anon_key)
+      scopedStorage.set('vajb_supabase_url', creds.url)
+      scopedStorage.set('vajb_supabase_key', creds.anon_key)
       // Save project ref so agent tools can target this project for SQL operations
-      localStorage.setItem('vajb_supabase_project_ref', project.ref)
-      localStorage.setItem('vajb_supabase_project_name', project.name)
+      scopedStorage.set('vajb_supabase_project_ref', project.ref)
+      scopedStorage.set('vajb_supabase_project_name', project.name)
       addSecret('SUPABASE_URL', creds.url)
       addSecret('SUPABASE_ANON_KEY', creds.anon_key)
       addSecret('VITE_SUPABASE_URL', creds.url)
@@ -289,7 +290,7 @@ export default function Settings({ open, onClose }: SettingsProps) {
     for (const field of integration.fields) {
       const val = values[field.key]?.trim() || ''
       if (val) {
-        localStorage.setItem(field.key, val)
+        scopedStorage.set(field.key, val)
         // Also save Supabase as env secrets for auto-injection
         if (integrationKey === 'supabase' && val) {
           if (field.key === 'vajb_supabase_url') {
@@ -301,7 +302,7 @@ export default function Settings({ open, onClose }: SettingsProps) {
           }
         }
       } else {
-        localStorage.removeItem(field.key)
+        scopedStorage.remove(field.key)
       }
     }
     setSecrets(loadSecrets())
@@ -314,7 +315,7 @@ export default function Settings({ open, onClose }: SettingsProps) {
     if (integration.key === 'github' && ghStatus?.connected) return true
     if (integration.key === 'netlify' && nlStatus?.connected) return true
     if (!integration.fields) return false
-    return integration.fields.every(f => !!localStorage.getItem(f.key))
+    return integration.fields.every(f => !!scopedStorage.get(f.key))
   }
 
   const handleAddSecret = () => {

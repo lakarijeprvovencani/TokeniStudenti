@@ -1,5 +1,6 @@
 import { listFiles, readFile } from './webcontainer'
 import { getSecretKeys } from './secretsStore'
+import { scopedStorage } from './storageScope'
 
 // ─── Workspace Index ─────────────────────────────────────────────────────────
 
@@ -200,10 +201,10 @@ export function getModelBoost(model: string): string | null {
 export function buildIntegrationContext(): string | null {
   const parts: string[] = []
 
-  const supabaseUrl = localStorage.getItem('vajb_supabase_url')
-  const supabaseKey = localStorage.getItem('vajb_supabase_key')
-  const supabaseProjectRef = localStorage.getItem('vajb_supabase_project_ref')
-  const supabaseProjectName = localStorage.getItem('vajb_supabase_project_name')
+  const supabaseUrl = scopedStorage.get('vajb_supabase_url')
+  const supabaseKey = scopedStorage.get('vajb_supabase_key')
+  const supabaseProjectRef = scopedStorage.get('vajb_supabase_project_ref')
+  const supabaseProjectName = scopedStorage.get('vajb_supabase_project_name')
   if (supabaseUrl && supabaseKey) {
     const projectInfo = supabaseProjectName ? ` (project: ${supabaseProjectName})` : ''
     parts.push(`[Supabase]${projectInfo} URL: ${supabaseUrl} | Anon Key: ${supabaseKey} — use createClient(url, key) from @supabase/supabase-js. Install with: npm i @supabase/supabase-js`)
@@ -236,22 +237,22 @@ WHEN USER ASKS:
 YOU HAVE FULL DATABASE ACCESS. Never claim otherwise. Use the tools.`)
   }
 
-  const stripePk = localStorage.getItem('vajb_stripe_pk')
+  const stripePk = scopedStorage.get('vajb_stripe_pk')
   if (stripePk) {
     parts.push(`[Stripe] Publishable Key: ${stripePk} — use loadStripe(key) from @stripe/stripe-js. Install with: npm i @stripe/stripe-js`)
   }
 
-  const githubRepo = localStorage.getItem('vajb_github_repo')
+  const githubRepo = scopedStorage.get('vajb_github_repo')
   if (githubRepo) {
     parts.push(`[GitHub] Repo: ${githubRepo} — korisnik može da push-uje kod na GitHub preko dugmeta u topbar-u.`)
   }
 
-  const vercelToken = localStorage.getItem('vajb_vercel_token')
+  const vercelToken = scopedStorage.get('vajb_vercel_token')
   if (vercelToken) {
     parts.push(`[Vercel] Token konfigurisan — deploy na Vercel je dostupan.`)
   }
 
-  const netlifyToken = localStorage.getItem('vajb_netlify_token')
+  const netlifyToken = scopedStorage.get('vajb_netlify_token')
   if (netlifyToken) {
     parts.push(`[Netlify] Token konfigurisan — deploy koristi autentifikovani API.`)
   }

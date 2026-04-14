@@ -799,6 +799,11 @@ app.get('/auth/me', authLimiter, requireAuth, asyncHandler(async (req, res) => {
   const includeKey = req.query.include_key === '1' && !!cookies.vajb_session;
   res.json({
     name: req.studentName,
+    // Stable, non-secret user identifier — hash of the student key, safe to
+    // expose to the SPA for scoping browser-side storage (projects, secrets)
+    // per user so two people sharing a browser profile never see each other's
+    // data.
+    user_id: req.studentKeyId,
     balance_usd: balance,
     free_tier: deposited <= regBonus,
     ...(includeKey && { api_key: req.studentApiKey }),
