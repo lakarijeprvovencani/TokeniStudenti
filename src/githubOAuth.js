@@ -257,8 +257,15 @@ export async function pushFiles(studentKey, { repo, files, message = 'Update fro
   const blobs = {};
   for (const [path, content] of Object.entries(files)) {
     if (path.endsWith('/')) continue;
-    // Skip build artifacts
-    if (/^(node_modules|\.git|dist|out|\.next|\.cache)\//.test(path)) continue;
+    // Skip build artifacts, VCS dirs, IDE config, and SECRETS
+    if (/^(node_modules|\.git|dist|out|build|\.next|\.nuxt|\.cache|\.turbo|\.vercel|\.netlify|coverage|\.idea|\.vscode)\//.test(path)) continue;
+    const base = path.split('/').pop() || path;
+    // Never push environment files or credential files (defense-in-depth —
+    // frontend also filters, but backend MUST enforce independently)
+    if (/^\.env(\..*)?$/.test(base)) continue;
+    if (/\.(pem|key|p12|pfx|keystore|jks)$/i.test(base)) continue;
+    if (/^(service-account|firebase-credentials|credentials|secrets)(\..+)?\.json$/i.test(base)) continue;
+    if (/^id_(rsa|ed25519|ecdsa|dsa)(\..+)?$/.test(base)) continue;
     if (typeof content !== 'string') continue;
 
     const blob = await ghApi(studentKey, 'POST', `/repos/${owner}/${repoName}/git/blobs`, {
