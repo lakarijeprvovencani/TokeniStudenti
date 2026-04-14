@@ -107,6 +107,12 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
         continue
       }
 
+      // Always keep user-uploaded images (data URLs or R2 URLs) regardless of size
+      if (isImagePath(path)) {
+        filtered[path] = content
+        continue
+      }
+
       // Skip very large files (likely minified bundles)
       if (content.length > 100000) continue
       filtered[path] = content
@@ -219,9 +225,10 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
       console.log('[Resume] Restoring', entries.length, 'files to WebContainers')
       for (const [path, content] of entries) {
         if (path.endsWith('/')) continue
-        // Binary images live as data URLs in the project store — feed them
-        // through the binary-aware hydrate below, not the text writeFile.
-        if (isImagePath(path) && typeof content === 'string' && content.startsWith('data:')) continue
+        // Images stored as data URLs or R2 URLs should not be written as text —
+        // hydrateImagesIntoWc handles them as binary below.
+        if (isImagePath(path) && typeof content === 'string' &&
+            (content.startsWith('data:') || content.startsWith('https://'))) continue
         try {
           await wcWriteFile(path, content)
         } catch (err) {

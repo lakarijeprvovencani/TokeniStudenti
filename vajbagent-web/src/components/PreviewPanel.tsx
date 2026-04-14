@@ -122,11 +122,12 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
    */
   const inlineImageRefs = useCallback((html: string): string => {
     const imageEntries = Object.entries(files).filter(
-      ([p, c]) => /\.(jpg|jpeg|png|webp|gif|svg|avif)$/i.test(p) && typeof c === 'string' && c.startsWith('data:')
+      ([p, c]) => /\.(jpg|jpeg|png|webp|gif|svg|avif)$/i.test(p) && typeof c === 'string' &&
+        (c.startsWith('data:') || c.startsWith('https://'))
     )
     if (imageEntries.length === 0) return html
 
-    const findDataUrl = (ref: string): string | null => {
+    const findImageUrl = (ref: string): string | null => {
       const cleaned = ref.replace(/^\.?\//, '').replace(/^public\//, '')
       for (const [p, data] of imageEntries) {
         const normalized = p.replace(/^public\//, '')
@@ -136,20 +137,18 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
       return null
     }
 
-    // <img src="...">, <source srcset="...">, background="..."
     html = html.replace(/(<img\b[^>]*\bsrc=)(["'])([^"']+)(\2)/gi, (match, head, q, src, _q) => {
-      const data = findDataUrl(src)
-      return data ? `${head}${q}${data}${q}` : match
+      const url = findImageUrl(src)
+      return url ? `${head}${q}${url}${q}` : match
     })
     html = html.replace(/(<source\b[^>]*\bsrcset=)(["'])([^"']+)(\2)/gi, (match, head, q, src, _q) => {
-      const data = findDataUrl(src)
-      return data ? `${head}${q}${data}${q}` : match
+      const url = findImageUrl(src)
+      return url ? `${head}${q}${url}${q}` : match
     })
-    // url(...) inside inline <style> and style="..." attributes
     html = html.replace(/url\((['"]?)([^'")]+)\1\)/gi, (match, q, src) => {
       if (src.startsWith('data:') || src.startsWith('http') || src.startsWith('#')) return match
-      const data = findDataUrl(src)
-      return data ? `url(${q}${data}${q})` : match
+      const url = findImageUrl(src)
+      return url ? `url(${q}${url}${q})` : match
     })
     return html
   }, [files])
