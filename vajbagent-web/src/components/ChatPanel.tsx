@@ -301,16 +301,11 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
       historyRef.current = session.history
       setDisplayMessages(session.displayMessages)
     } else if (initialPrompt) {
-      // Inject any images attached on the Welcome screen so the first
-      // outgoing message is multimodal. sendMessage reads from
-      // attachedImages state, which is updated here before the call.
-      if (initialImages && initialImages.length > 0) {
-        setAttachedImages(initialImages)
-        // Let React commit the state update before sendMessage reads it.
-        setTimeout(() => sendMessage(initialPrompt), 0)
-      } else {
-        sendMessage(initialPrompt)
-      }
+      // Pass Welcome-attached images directly as an override so the very
+      // first request is multimodal. Relying on setAttachedImages + a
+      // setTimeout race would commit the state after sendMessage had
+      // already read the stale (empty) array.
+      sendMessage(initialPrompt, initialImages)
     }
   }, [])
 
@@ -618,9 +613,14 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
 
   // ─── Main send loop ─────────────────────────────────────────────────────
 
-  async function sendMessage(text: string) {
-    // If there are attached images, include them in message content
-    const images = [...attachedImages]
+  async function sendMessage(text: string, overrideImages?: { name: string; dataUrl: string }[]) {
+    // If there are attached images, include them in message content.
+    // overrideImages lets callers (like the initial welcome-prompt effect)
+    // pass images directly instead of going through setAttachedImages,
+    // which is async and would race with this very call.
+    const images = overrideImages && overrideImages.length > 0
+      ? [...overrideImages]
+      : [...attachedImages]
     setAttachedImages([])
 
     let msgContent: string

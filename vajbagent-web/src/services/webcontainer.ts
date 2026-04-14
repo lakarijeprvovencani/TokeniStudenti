@@ -24,9 +24,40 @@ const WC_CLIENT_ID: string = import.meta.env.VITE_WEBCONTAINER_CLIENT_ID || DEFA
 
 let authStatus: 'not-configured' | 'need-auth' | 'authorized' | 'error' = 'not-configured'
 
+/**
+ * StackBlitz grandfathers a handful of origins into the free WebContainer
+ * tier — *.netlify.app, *.stackblitz.io, localhost, *.webcontainer.io.
+ * On those hosts WebContainer.boot() just works anonymously.
+ *
+ * Calling auth.init() on a grandfathered host is counterproductive: it
+ * flips the client into "authenticated app" mode that expects a
+ * StackBlitz OAuth popup per visitor — a non-starter for a public
+ * product. Detect and skip.
+ *
+ * For custom origins (vajbagent.com proper) auth.init IS required, and
+ * that path only works if the user has an authenticated StackBlitz
+ * session. That's why the Express server at vajbagent.com redirects /
+ * to vajbagent.netlify.app until we have a commercial/OSS license.
+ */
+function isGrandfatheredHost(): boolean {
+  if (typeof window === 'undefined') return false
+  const host = window.location.hostname
+  if (host === 'localhost' || host === '127.0.0.1') return true
+  if (host.endsWith('.netlify.app')) return true
+  if (host.endsWith('.stackblitz.io')) return true
+  if (host.endsWith('.webcontainer.io')) return true
+  if (host.endsWith('.local-credentialless.webcontainer.io')) return true
+  return false
+}
+
 function initAuthOnce() {
   if (authInitialized) return
   authInitialized = true
+  if (isGrandfatheredHost()) {
+    console.log('[WebContainer] Grandfathered origin — skipping auth.init, using anonymous free boot.')
+    authStatus = 'authorized'
+    return
+  }
   try {
     const result = auth.init({
       clientId: WC_CLIENT_ID,
