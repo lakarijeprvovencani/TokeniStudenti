@@ -55,11 +55,12 @@ if (!existsSync(webDir) || !statSync(webDir).isDirectory()) {
 console.log('[postinstall] Building vajbagent-web SPA…');
 const env = { ...process.env, VAJB_WEB_BUILD_RUNNING: '1' };
 
-// 1. Install web app deps
-const install = spawnSync('npm', ['install', '--no-audit', '--no-fund'], {
+// 1. Install web app deps — force dev deps because Render sets NODE_ENV=production
+// which would otherwise skip vite, typescript, @vitejs/plugin-react, etc.
+const install = spawnSync('npm', ['install', '--include=dev', '--no-audit', '--no-fund'], {
   cwd: webDir,
   stdio: 'inherit',
-  env,
+  env: { ...env, NODE_ENV: 'development' },
   shell: process.platform === 'win32',
 });
 if (install.status !== 0) {
@@ -67,11 +68,12 @@ if (install.status !== 0) {
   process.exit(0); // never block the root install
 }
 
-// 2. Build
+// 2. Build (keep NODE_ENV=development during the build so tsc/vite can
+// still resolve devDependencies from node_modules)
 const build = spawnSync('npm', ['run', 'build'], {
   cwd: webDir,
   stdio: 'inherit',
-  env,
+  env: { ...env, NODE_ENV: 'development' },
   shell: process.platform === 'win32',
 });
 if (build.status !== 0) {
