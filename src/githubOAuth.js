@@ -276,10 +276,6 @@ export async function pushFiles(studentKey, { repo, files, message = 'Update fro
     if (/^id_(rsa|ed25519|ecdsa|dsa)(\..+)?$/.test(base)) continue;
     if (typeof content !== 'string') continue;
 
-    // User-uploaded binary assets (images, fonts) arrive as data URLs
-    // from the frontend. GitHub's blob API accepts base64 directly —
-    // strip the data URL prefix and forward the raw base64 so the image
-    // lands in the repo as a real binary, not a text dump.
     let blob;
     if (content.startsWith('data:')) {
       const commaIdx = content.indexOf(',');
@@ -292,12 +288,28 @@ export async function pushFiles(studentKey, { repo, files, message = 'Update fro
           encoding: 'base64',
         });
       } else {
-        // URL-encoded (e.g. some SVGs) — decode and send as utf-8
         const decoded = decodeURIComponent(payload);
         blob = await ghApi(studentKey, 'POST', `/repos/${owner}/${repoName}/git/blobs`, {
           content: Buffer.from(decoded, 'utf-8').toString('base64'),
           encoding: 'base64',
         });
+      }
+    } else if (content.startsWith('https://') && (content.includes('.r2.') || content.includes('cloudflarestorage'))) {
+      try {
+        const r2Resp = await fetch(content);
+        if (r2Resp.ok) {
+          const buf = Buffer.from(await r2Resp.arrayBuffer());
+          blob = await ghApi(studentKey, 'POST', `/repos/${owner}/${repoName}/git/blobs`, {
+            content: buf.toString('base64'),
+            encoding: 'base64',
+          });
+        } else {
+          console.warn('[githubPush] R2 fetch failed for', path, r2Resp.status);
+          continue;
+        }
+      } catch (err) {
+        console.warn('[githubPush] R2 fetch error for', path, err.message);
+        continue;
       }
     } else {
       blob = await ghApi(studentKey, 'POST', `/repos/${owner}/${repoName}/git/blobs`, {

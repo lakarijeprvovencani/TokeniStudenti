@@ -5,7 +5,9 @@ import LoadingTransition from './components/LoadingTransition'
 import IDELayout from './components/IDELayout'
 import { DEFAULT_MODEL } from './models'
 import { type UserInfo, fetchUserInfo } from './services/userService'
-import { type SavedProject, loadProject } from './services/projectStore'
+import { type SavedProject, loadProject as loadProjectLocal, listProjects as listProjectsLocal } from './services/projectStore'
+import { loadProject as loadProjectRemote, listProjects as listProjectsRemote, saveProject as saveProjectRemote } from './services/remoteProjectStore'
+import { uploadAllImagesToR2 } from './services/userAssets'
 import { getScope } from './services/storageScope'
 import './App.css'
 
@@ -128,36 +130,65 @@ function AppInner() {
   const [model, setModel] = useState(DEFAULT_MODEL)
   const [user, setUser] = useState<UserInfo | null>(null)
   const [resumeProject, setResumeProject] = useState<SavedProject | null>(null)
+  const [migrationBanner, setMigrationBanner] = useState<{ count: number; running: boolean } | null>(null)
 
-  // On mount: check if the backend still recognises our session. If yes and
-  // there's a last-active project, auto-resume into IDE. If not (logged out,
-  // or stale cookie from before a Redis restart), stay on welcome and clear
-  // the auto-resume pointer so stale projects can't boot us into a broken IDE.
+  const migrateLocalProjects = useCallback(async () => {
+    setMigrationBanner(prev => prev ? { ...prev, running: true } : null)
+    try {
+      const locals = await listProjectsLocal()
+      let migrated = 0
+      for (const proj of locals) {
+        try {
+          const cloudFiles = await uploadAllImagesToR2(proj.id, proj.files)
+          await saveProjectRemote({ ...proj, files: cloudFiles })
+          migrated++
+        } catch (err) {
+          console.warn('[Migration] Failed for', proj.id, err)
+        }
+      }
+      console.log(`[Migration] Done: ${migrated}/${locals.length}`)
+    } finally {
+      setMigrationBanner(null)
+    }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     const boot = async () => {
-      // First: verify session
       const userInfo = await fetchUserInfo().catch(() => null)
       if (cancelled) return
       if (!userInfo) {
-        // Not authenticated — drop any stale auto-resume pointer and stay on welcome
         clearLastProjectId()
         return
       }
       setUser(userInfo)
 
-      // Authenticated: try to resume last project (scoped to this user)
+      // Check for local projects that aren't in the cloud yet
+      try {
+        const [locals, remotes] = await Promise.all([
+          listProjectsLocal().catch(() => [] as SavedProject[]),
+          listProjectsRemote().catch(() => []),
+        ])
+        if (locals.length > 0 && remotes.length === 0) {
+          setMigrationBanner({ count: locals.length, running: false })
+        }
+      } catch { /* ignore */ }
+
       const lastId = readLastProjectId()
       if (!lastId) return
       try {
-        const project = await loadProject(lastId)
+        let project: SavedProject | null = null
+        try {
+          project = await loadProjectRemote(lastId)
+        } catch {
+          project = await loadProjectLocal(lastId)
+        }
         if (cancelled) return
         if (project && (Object.keys(project.files || {}).length > 0 || (project.chatHistory && project.chatHistory.length > 0))) {
           setResumeProject(project)
           setModel(project.model)
           setState('ide')
         } else {
-          // Empty / missing project — clean up pointer
           clearLastProjectId()
         }
       } catch (err) {
@@ -189,13 +220,20 @@ function AppInner() {
     clearLastProjectId()
   }
 
-  const handleResume = (project: SavedProject) => {
-    setResumeProject(project)
+  const handleResume = async (projectOrSummary: SavedProject) => {
+    writeLastProjectId(projectOrSummary.id)
+    let full: SavedProject | null = null
+    try {
+      full = await loadProjectRemote(projectOrSummary.id)
+    } catch { /* fallback */ }
+    if (!full) {
+      try { full = await loadProjectLocal(projectOrSummary.id) } catch { /* ignore */ }
+    }
+    if (!full) full = projectOrSummary
+    setResumeProject(full)
     setPrompt('')
     setPendingImages([])
-    setModel(project.model)
-    writeLastProjectId(project.id)
-    // Skip loading animation for resume — go straight to IDE
+    setModel(full.model || projectOrSummary.model)
     setState('ide')
   }
 
@@ -213,6 +251,33 @@ function AppInner() {
   const freeTier = user?.freeTier ?? true
 
   return (
+    <>
+    {migrationBanner && state === 'welcome' && (
+      <div style={{
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+        background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+        color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', gap: 12, fontSize: '0.85rem', fontWeight: 500,
+      }}>
+        <span>
+          {migrationBanner.running
+            ? 'Prebacujem projekte u cloud...'
+            : `Pronađeno ${migrationBanner.count} lokalni${migrationBanner.count === 1 ? '' : 'h'} projek${migrationBanner.count === 1 ? 'at' : 'ata'}. Prebaci u cloud?`}
+        </span>
+        {!migrationBanner.running && (
+          <>
+            <button onClick={migrateLocalProjects} style={{
+              padding: '4px 14px', background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: 6, color: '#fff', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600,
+            }}>Da, prebaci</button>
+            <button onClick={() => setMigrationBanner(null)} style={{
+              padding: '4px 14px', background: 'transparent', border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: 6, color: '#fff', cursor: 'pointer', fontSize: '0.8rem',
+            }}>Ne sad</button>
+          </>
+        )}
+      </div>
+    )}
     <AnimatePresence mode="wait">
       {state === 'welcome' && (
         <motion.div
@@ -263,6 +328,7 @@ function AppInner() {
         </motion.div>
       )}
     </AnimatePresence>
+    </>
   )
 }
 

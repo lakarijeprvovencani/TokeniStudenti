@@ -16,7 +16,9 @@ import { filterForPush, ensureGitignoreSafety, DEFAULT_GITIGNORE, scanForSecrets
 import { fetchUserInfo, logout, revealApiKey, type UserInfo } from '../services/userService'
 import { formatCredits, openPaywall } from '../services/credits'
 import { getScope } from '../services/storageScope'
-import { saveProject, generateProjectId, type SavedProject } from '../services/projectStore'
+import { saveProject as saveProjectLocal, generateProjectId, type SavedProject } from '../services/projectStore'
+import * as remoteStore from '../services/remoteProjectStore'
+import { uploadAllImagesToR2 } from '../services/userAssets'
 import FileExplorer from './FileExplorer'
 import Settings from './Settings'
 import GitHubPushModal from './GitHubPushModal'
@@ -115,14 +117,15 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
   // Auto-save project (debounced 5s)
   const triggerAutoSave = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    saveTimerRef.current = setTimeout(() => {
+    saveTimerRef.current = setTimeout(async () => {
       const currentFiles = filesRef.current
-      // Only save if there are files or chat messages
       if (Object.keys(currentFiles).length === 0 && chatHistoryRef.current.length === 0) return
 
-      const sourceFiles = filterSourceFiles(currentFiles)
-      saveProject({
-        id: projectIdRef.current,
+      let sourceFiles = filterSourceFiles(currentFiles)
+      const projectId = projectIdRef.current
+
+      const projectData: SavedProject = {
+        id: projectId,
         name: projectNameRef.current || 'Novi projekat',
         files: sourceFiles,
         chatHistory: chatHistoryRef.current,
@@ -131,12 +134,34 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
         createdAt: projectCreatedAtRef.current,
         updatedAt: Date.now(),
         prompt: projectPromptRef.current,
-      })
+      }
+
+      const scope = getScope()
+
+      try {
+        if (scope) {
+          const cloudFiles = await uploadAllImagesToR2(projectId, sourceFiles)
+          projectData.files = cloudFiles
+          await remoteStore.saveProject(projectData)
+          if (cloudFiles !== sourceFiles) {
+            setFiles(prev => {
+              const merged = { ...prev }
+              for (const [p, v] of Object.entries(cloudFiles)) {
+                if (v !== sourceFiles[p]) merged[p] = v
+              }
+              return merged
+            })
+          }
+        }
+      } catch (err) {
+        console.warn('[AutoSave] Remote save failed, falling back to IndexedDB:', err)
+      }
+
+      saveProjectLocal(projectData)
         .then(() => {
-          const scope = getScope()
-          if (scope) localStorage.setItem(`vajb_last_active_project::${scope}`, projectIdRef.current)
+          if (scope) localStorage.setItem(`vajb_last_active_project::${scope}`, projectId)
         })
-        .catch(err => console.warn('[AutoSave] Failed:', err))
+        .catch(err => console.warn('[AutoSave] IndexedDB save failed:', err))
     }, 5000)
   }, [model])
 

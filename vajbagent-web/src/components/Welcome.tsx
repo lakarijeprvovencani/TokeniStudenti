@@ -5,7 +5,8 @@ import { Code2, Globe, Layout, ArrowUp, Plus, Paperclip, Loader2, FolderOpen, Tr
 import { logout, checkSession, type UserInfo } from '../services/userService'
 import AuthModal from './AuthModal'
 import PaywallModal from './PaywallModal'
-import { listProjects, deleteProject, type SavedProject } from '../services/projectStore'
+import { listProjects as listProjectsLocal, deleteProject as deleteProjectLocal, type SavedProject } from '../services/projectStore'
+import * as remoteStore from '../services/remoteProjectStore'
 import { formatCredits, openPaywall } from '../services/credits'
 import { resizeImageFile } from '../services/imageResize'
 import { TEMPLATES, TEMPLATE_CATEGORIES, type Template } from '../templates'
@@ -151,16 +152,28 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
   useEffect(() => {
     if (!user) return
     setLoadingProjects(true)
-    listProjects()
-      .then(list => setProjects(list))
-      .catch(() => {})
+    remoteStore.listProjects()
+      .then(summaries => {
+        const asSaved: SavedProject[] = summaries.map(s => ({
+          id: s.id, name: s.name, model: s.model, prompt: s.prompt,
+          createdAt: s.createdAt, updatedAt: s.updatedAt,
+          files: {}, chatHistory: [], displayMessages: [],
+        }))
+        setProjects(asSaved)
+      })
+      .catch(() => {
+        listProjectsLocal()
+          .then(list => setProjects(list))
+          .catch(() => {})
+      })
       .finally(() => setLoadingProjects(false))
   }, [user])
 
   const handleDeleteProject = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     if (!confirm('Obriši ovaj projekat?')) return
-    await deleteProject(id)
+    try { await remoteStore.deleteProject(id) } catch { /* fallback below */ }
+    try { await deleteProjectLocal(id) } catch { /* ignore */ }
     setProjects(prev => prev.filter(p => p.id !== id))
   }
 
@@ -457,7 +470,7 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
                           <Clock size={10} />
                           {timeAgo(project.updatedAt)}
                           {' · '}
-                          {Object.keys(project.files).filter(f => !f.endsWith('/')).length} fajlova
+                          {Object.keys(project.files || {}).filter(f => !f.endsWith('/')).length || '?'} fajlova
                         </span>
                       </div>
                       <button

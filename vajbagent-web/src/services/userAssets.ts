@@ -1,22 +1,17 @@
 /**
  * User-uploaded image assets for the current project.
  *
- * Lives at two places simultaneously so the preview works instantly and
- * the project survives a refresh:
- *   1. WebContainer virtual filesystem under `public/<slug>.<ext>` as a
- *      real binary file — what the preview iframe and the agent see.
- *   2. IndexedDB (alongside the text files via projectStore) as a
- *      data URL entry in SavedProject.files, so the next time the user
- *      opens the app the project-restore path re-inflates the binary
- *      back into the WebContainer.
- *
- * Limits are intentionally conservative — we treat every breach as a
- * user error surface, not a silent drop. The caller is responsible for
- * showing the returned error message.
+ * Storage tiers (in order of preference):
+ *   1. WebContainer virtual filesystem — binary file for instant preview.
+ *   2. Cloudflare R2 via backend presigned URL — persistent cloud storage.
+ *      files[path] stores the public R2 URL after upload.
+ *   3. data URL in React state (fallback) — used when R2 is unavailable
+ *      or during the upload window before R2 completes.
  */
 
 import { resizeImageFile } from './imageResize'
 import { writeBinaryFile } from './webcontainer'
+import { signUpload, commitUpload } from './remoteProjectStore'
 
 /** Hard cap on images per project. 20 is plenty for landing / portfolio / menu sites. */
 export const MAX_IMAGES_PER_PROJECT = 20
@@ -205,24 +200,117 @@ export async function addImageFiles(
   return { added, skipped }
 }
 
-/** Re-inflate user-upload images from the persisted project back into WC fs. */
+/**
+ * Re-inflate user-upload images from the persisted project back into WC fs.
+ * Handles both data URLs (legacy/offline) and R2 public URLs (cloud).
+ */
 export async function hydrateImagesIntoWc(files: Record<string, string>): Promise<void> {
+  const tasks: Promise<void>[] = []
+
   for (const [path, content] of Object.entries(files)) {
     if (path.endsWith('/')) continue
-    const ext = path.split('.').pop()?.toLowerCase() || ''
-    if (!IMAGE_EXTS.includes(ext)) continue
-    if (typeof content !== 'string' || !content.startsWith('data:')) continue
-    const bytes = dataUrlToBytes(content)
-    if (!bytes) continue
-    try {
-      await writeBinaryFile(path, bytes)
-    } catch (err) {
-      console.warn('[userAssets] hydrate failed:', path, err)
+    if (!isImagePath(path)) continue
+    if (typeof content !== 'string') continue
+
+    if (isR2Url(content)) {
+      tasks.push(
+        fetch(content)
+          .then(r => r.arrayBuffer())
+          .then(buf => writeBinaryFile(path, new Uint8Array(buf)))
+          .catch(err => console.warn('[userAssets] hydrate from R2 failed:', path, err))
+      )
+    } else if (isDataUrl(content)) {
+      const bytes = dataUrlToBytes(content)
+      if (!bytes) continue
+      tasks.push(
+        writeBinaryFile(path, bytes)
+          .catch(err => console.warn('[userAssets] hydrate from dataUrl failed:', path, err))
+      )
     }
   }
+
+  await Promise.allSettled(tasks)
 }
 
 export function isImagePath(path: string): boolean {
   const ext = path.split('.').pop()?.toLowerCase() || ''
   return IMAGE_EXTS.includes(ext)
+}
+
+export function isR2Url(value: string): boolean {
+  return typeof value === 'string' && (
+    value.startsWith('https://') && value.includes('.r2.') ||
+    value.startsWith('https://') && value.includes('cloudflarestorage')
+  )
+}
+
+export function isDataUrl(value: string): boolean {
+  return typeof value === 'string' && value.startsWith('data:')
+}
+
+/**
+ * Upload a single data-URL image to R2 via the backend presign flow.
+ * Returns the public R2 URL, or null if the upload fails (caller keeps data URL).
+ */
+export async function uploadImageToR2(
+  projectId: string,
+  filePath: string,
+  dataUrl: string,
+): Promise<string | null> {
+  const bytes = dataUrlToBytes(dataUrl)
+  if (!bytes) return null
+
+  const ext = filePath.split('.').pop()?.toLowerCase() || 'jpg'
+  const mimeMap: Record<string, string> = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+    webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml',
+    avif: 'image/avif', ico: 'image/x-icon',
+  }
+  const contentType = mimeMap[ext] || 'application/octet-stream'
+
+  try {
+    const { uploadUrl, r2Key } = await signUpload(projectId, filePath, contentType, bytes.length)
+
+    const putResp = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': contentType },
+      body: bytes,
+    })
+    if (!putResp.ok) {
+      console.warn('[userAssets] R2 PUT failed:', putResp.status)
+      return null
+    }
+
+    const { url } = await commitUpload(projectId, r2Key, filePath)
+    return url
+  } catch (err) {
+    console.warn('[userAssets] R2 upload failed for', filePath, err)
+    return null
+  }
+}
+
+/**
+ * Scan all image entries in a project's files and upload any data URLs to R2.
+ * Returns a new files map with data URLs replaced by R2 URLs.
+ */
+export async function uploadAllImagesToR2(
+  projectId: string,
+  files: Record<string, string>,
+): Promise<Record<string, string>> {
+  const updated = { ...files }
+  const pending: Promise<void>[] = []
+
+  for (const [path, content] of Object.entries(files)) {
+    if (!isImagePath(path)) continue
+    if (!isDataUrl(content)) continue
+
+    pending.push(
+      uploadImageToR2(projectId, path, content).then(url => {
+        if (url) updated[path] = url
+      })
+    )
+  }
+
+  await Promise.allSettled(pending)
+  return updated
 }

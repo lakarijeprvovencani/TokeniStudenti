@@ -211,14 +211,12 @@ export async function deploySite(studentKey, { files, siteId, siteName }) {
     if (path.endsWith('/')) continue;
     if (/^(node_modules|\.git|\.next|\.nuxt|\.cache|\.turbo|\.idea|\.vscode|coverage)\//.test(path)) continue;
     const base = path.split('/').pop() || path;
-    // Never deploy environment files or credential files — defense-in-depth
     if (/^\.env(\..*)?$/.test(base)) continue;
     if (/\.(pem|key|p12|pfx|keystore|jks)$/i.test(base)) continue;
     if (/^(service-account|firebase-credentials|credentials|secrets)(\..+)?\.json$/i.test(base)) continue;
     if (/^id_(rsa|ed25519|ecdsa|dsa)(\..+)?$/.test(base)) continue;
     if (typeof content !== 'string') continue;
 
-    // Data URL → Buffer of real bytes for binary assets.
     let payload;
     if (content.startsWith('data:')) {
       const commaIdx = content.indexOf(',');
@@ -228,6 +226,19 @@ export async function deploySite(studentKey, { files, siteId, siteName }) {
       payload = isBase64
         ? Buffer.from(encoded, 'base64')
         : Buffer.from(decodeURIComponent(encoded), 'utf-8');
+    } else if (content.startsWith('https://') && (content.includes('.r2.') || content.includes('cloudflarestorage'))) {
+      try {
+        const r2Resp = await fetch(content);
+        if (r2Resp.ok) {
+          payload = Buffer.from(await r2Resp.arrayBuffer());
+        } else {
+          console.warn('[netlifyDeploy] R2 fetch failed for', path, r2Resp.status);
+          continue;
+        }
+      } catch (err) {
+        console.warn('[netlifyDeploy] R2 fetch error for', path, err.message);
+        continue;
+      }
     } else {
       payload = content;
     }

@@ -2,6 +2,30 @@ import { useState, useCallback } from 'react'
 import { Copy, Check } from 'lucide-react'
 import './MarkdownRenderer.css'
 
+// ─── HTML escape — CRITICAL ──────────────────────────────────────────────────
+// Every piece of user/LLM-generated text MUST go through this before being
+// fed into any regex transform, otherwise a response containing `<img onerror=...>`
+// would execute as real DOM (XSS → localStorage exfiltration of API keys).
+// We escape first, then our regex transforms re-introduce only the HTML tags
+// we explicitly want (strong, em, a, code, etc.).
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+// Safer URL check — reject javascript:, data:, vbscript: etc.
+function isSafeUrl(url: string): boolean {
+  const trimmed = url.trim().toLowerCase()
+  if (trimmed.startsWith('javascript:')) return false
+  if (trimmed.startsWith('vbscript:')) return false
+  if (trimmed.startsWith('data:') && !trimmed.startsWith('data:image/')) return false
+  return true
+}
+
 interface Props {
   text: string
   onFileClick?: (path: string) => void
@@ -77,22 +101,40 @@ function CopyButton({ code }: { code: string }) {
 // ─── File path detection ─────────────────────────────────────────────────────
 
 function processInlineCode(text: string, onFileClick?: (path: string) => void): string {
+  // Text is already HTML-escaped when this runs.
   if (!onFileClick) {
     return text.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>')
   }
 
   return text.replace(/`([^`]+)`/g, (_match, content: string) => {
-    // Check if it looks like a file path
-    if (/^(?:[\w.-]+\/)*[\w.-]+\.\w{1,10}$/.test(content)) {
-      return `<code class="md-inline-code md-file-link" data-path="${content}">${content}</code>`
+    // The captured content is already HTML-escaped from processInline.
+    // For the data-path attribute we need the RAW path (unescaped back).
+    // Since escapeHtml only touched &<>"' we can reverse by replacing known entities.
+    const rawPath = content
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+    if (/^(?:[\w.-]+\/)*[\w.-]+\.\w{1,10}$/.test(rawPath)) {
+      // Re-escape for the attribute
+      const attr = rawPath.replace(/"/g, '&quot;').replace(/</g, '&lt;')
+      return `<code class="md-inline-code md-file-link" data-path="${attr}">${content}</code>`
     }
     return `<code class="md-inline-code">${content}</code>`
   })
 }
 
 // ─── Inline formatting ───────────────────────────────────────────────────────
-
+// SECURITY: `text` is HTML-escaped FIRST, then our regex transforms re-introduce
+// only the tags we whitelist (strong, em, a, code). Any raw HTML in the input
+// (e.g. `<img onerror>`) is already inert (`&lt;img onerror&gt;`).
 function processInline(text: string, onFileClick?: (path: string) => void): string {
+  // Use a placeholder to preserve intentional <br/> tags through the escape step.
+  const BR_MARK = '\u0001BR\u0001'
+  text = text.replace(/<br\s*\/?>/gi, BR_MARK)
+  text = escapeHtml(text)
+  text = text.replace(new RegExp(BR_MARK, 'g'), '<br/>')
   // Bold + italic
   text = text.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
   // Bold
@@ -101,12 +143,20 @@ function processInline(text: string, onFileClick?: (path: string) => void): stri
   text = text.replace(/\*(.+?)\*/g, '<em>$1</em>')
   // Inline code (with file path detection)
   text = processInlineCode(text, onFileClick)
-  // Links [text](url)
-  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
-  // Auto-link URLs
-  text = text.replace(/(?<!")(?<!=)(https?:\/\/[^\s<>"]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
+  // Links [text](url) — URL is validated to reject javascript:, vbscript:, data:, etc.
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, url) => {
+    // url and label are both already HTML-escaped by escapeHtml above
+    const decoded = url.replace(/&amp;/g, '&')
+    if (!isSafeUrl(decoded)) return label
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`
+  })
+  // Auto-link URLs (only http/https; already escaped)
+  text = text.replace(/(?<!")(?<!=)(https?:\/\/[^\s<>"]+)/g, (_m, url) => {
+    if (!isSafeUrl(url.replace(/&amp;/g, '&'))) return url
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`
+  })
   // Localhost links
-  text = text.replace(/\blocalhost:(\d+)(\/[^\s]*)?/g, '<a href="http://localhost:$1$2" target="_blank" rel="noopener">localhost:$1$2</a>')
+  text = text.replace(/\blocalhost:(\d+)(\/[^\s]*)?/g, '<a href="http://localhost:$1$2" target="_blank" rel="noopener noreferrer">localhost:$1$2</a>')
   return text
 }
 

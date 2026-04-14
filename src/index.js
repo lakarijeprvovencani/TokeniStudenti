@@ -1429,6 +1429,92 @@ app.post('/api/netlify/deploy', requireAuth, asyncHandler(async (req, res) => {
   }
 }));
 
+// ─── Project Storage (R2 + Redis) ────────────────────────────────────────────
+
+import * as projectStore from './projectStore.js';
+import * as r2 from './r2.js';
+
+const ALLOWED_UPLOAD_TYPES = new Set([
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif',
+  'image/svg+xml', 'image/x-icon',
+  'video/mp4', 'video/webm',
+  'font/woff', 'font/woff2',
+]);
+const MAX_UPLOAD_SIZE = 15 * 1024 * 1024; // 15MB per file
+const MAX_UPLOADS_PER_PROJECT = 30;
+
+app.get('/api/projects', requireAuth, asyncHandler(async (req, res) => {
+  const list = await projectStore.listProjects(req.studentKeyId);
+  res.json({ projects: list });
+}));
+
+app.get('/api/projects/:id', requireAuth, asyncHandler(async (req, res) => {
+  const project = await projectStore.loadProject(req.studentKeyId, req.params.id);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+  res.json({ project });
+}));
+
+app.post('/api/projects', requireAuth, asyncHandler(async (req, res) => {
+  const { id, name, model, prompt, files, chatHistory, displayMessages } = req.body || {};
+  if (!id || typeof id !== 'string') return res.status(400).json({ error: 'id is required' });
+  const project = {
+    id, name: name || '', model: model || '', prompt: prompt || '',
+    files: files || {}, chatHistory: chatHistory || [], displayMessages: displayMessages || [],
+    createdAt: Date.now(), updatedAt: Date.now(),
+  };
+  const summary = await projectStore.saveProject(req.studentKeyId, project);
+  res.json({ summary });
+}));
+
+app.put('/api/projects/:id', requireAuth, asyncHandler(async (req, res) => {
+  const existing = await projectStore.loadProject(req.studentKeyId, req.params.id);
+  const body = req.body || {};
+  const project = {
+    ...(existing || {}),
+    ...body,
+    id: req.params.id,
+    updatedAt: Date.now(),
+  };
+  if (!project.createdAt) project.createdAt = Date.now();
+  const summary = await projectStore.saveProject(req.studentKeyId, project);
+  res.json({ summary });
+}));
+
+app.delete('/api/projects/:id', requireAuth, asyncHandler(async (req, res) => {
+  await projectStore.deleteProject(req.studentKeyId, req.params.id);
+  res.json({ ok: true });
+}));
+
+app.post('/api/projects/:id/uploads/sign', requireAuth, asyncHandler(async (req, res) => {
+  if (!r2.isR2Configured()) return res.status(503).json({ error: 'Storage not configured' });
+  const { path: filePath, contentType, sizeBytes } = req.body || {};
+  if (!filePath || typeof filePath !== 'string') return res.status(400).json({ error: 'path required' });
+  if (!contentType || !ALLOWED_UPLOAD_TYPES.has(contentType)) {
+    return res.status(400).json({ error: `Content type not allowed: ${contentType}` });
+  }
+  if (!sizeBytes || sizeBytes > MAX_UPLOAD_SIZE) {
+    return res.status(400).json({ error: `File too large (max ${MAX_UPLOAD_SIZE / 1024 / 1024}MB)` });
+  }
+  const sanitized = filePath.replace(/^\/+/, '').replace(/\.\./g, '');
+  const r2Key = `${req.studentKeyId}/${req.params.id}/${sanitized}`;
+  const uploadUrl = await r2.getSignedUploadUrl(r2Key, contentType, 300);
+  const publicFileUrl = r2.publicUrl(r2Key);
+  res.json({ uploadUrl, publicUrl: publicFileUrl, r2Key });
+}));
+
+app.post('/api/projects/:id/uploads/commit', requireAuth, asyncHandler(async (req, res) => {
+  if (!r2.isR2Configured()) return res.status(503).json({ error: 'Storage not configured' });
+  const { r2Key, filePath } = req.body || {};
+  if (!r2Key || !filePath) return res.status(400).json({ error: 'r2Key and filePath required' });
+  if (!r2Key.startsWith(`${req.studentKeyId}/`)) {
+    return res.status(403).json({ error: 'Key does not belong to this user' });
+  }
+  const head = await r2.headObject(r2Key);
+  if (!head) return res.status(404).json({ error: 'Object not found in storage' });
+  const fileUrl = r2.publicUrl(r2Key);
+  res.json({ url: fileUrl, size: head.size, contentType: head.contentType });
+}));
+
 // ─── Legacy Registration (extension/landing page) ───────────────────────────
 
 app.get('/register/token', registerLimiter, (_req, res) => {
