@@ -26,7 +26,11 @@ function initAuthOnce() {
   if (authInitialized) return
   authInitialized = true
   try {
-    auth.init({ clientId: WC_CLIENT_ID, scope: '' })
+    auth.init({
+      clientId: WC_CLIENT_ID,
+      scope: '',
+      editorOrigin: 'https://stackblitz.com',
+    })
     console.log('[WebContainer] auth.init configured with client ID')
   } catch (err) {
     console.error('[WebContainer] auth.init failed:', err)
@@ -40,11 +44,19 @@ export async function getWebContainer(): Promise<WebContainer> {
 
   initAuthOnce()
 
+  // Await auth handshake first, THEN boot. Without awaiting loggedIn() the
+  // boot call races the auth postMessage dance and StackBlitz rejects the
+  // request with a generic timeout. If the origin is properly registered
+  // and anonymous access is allowed via scope:'', loggedIn() resolves
+  // immediately without any user prompt.
   const bootRace = Promise.race<WebContainer>([
-    WebContainer.boot({
-      coep: 'credentialless',
-      forwardPreviewErrors: true,
-    }),
+    (async () => {
+      await auth.loggedIn()
+      return WebContainer.boot({
+        coep: 'credentialless',
+        forwardPreviewErrors: true,
+      })
+    })(),
     new Promise<WebContainer>((_, rej) =>
       setTimeout(() => rej(new Error('WebContainer boot timeout — origin blocked?')), BOOT_TIMEOUT_MS)
     ),
