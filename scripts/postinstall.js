@@ -21,6 +21,23 @@ import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const webDir = path.join(root, 'vajbagent-web');
+const distIndex = path.join(webDir, 'dist', 'index.html');
+
+// Idempotent: if the bundle is already built and newer than the source,
+// skip. This lets the same script be used for `postinstall` (fresh
+// install → build) AND `prestart` (fast no-op if postinstall already
+// did the work, but safety net if it didn't).
+if (existsSync(distIndex)) {
+  const srcEntry = path.join(webDir, 'src', 'main.tsx');
+  if (existsSync(srcEntry)) {
+    const distMtime = statSync(distIndex).mtimeMs;
+    const srcMtime = statSync(srcEntry).mtimeMs;
+    if (distMtime >= srcMtime) {
+      console.log('[postinstall] dist/index.html is fresh — skipping build.');
+      process.exit(0);
+    }
+  }
+}
 
 if (process.env.SKIP_WEB_BUILD === '1') {
   console.log('[postinstall] SKIP_WEB_BUILD=1 — skipping web build.');
@@ -62,7 +79,6 @@ if (build.status !== 0) {
   process.exit(0);
 }
 
-const distIndex = path.join(webDir, 'dist', 'index.html');
 if (!existsSync(distIndex)) {
   console.error('[postinstall] Build finished but dist/index.html missing — fallback will trigger.');
   process.exit(0);

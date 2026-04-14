@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
+    "prestart": "node scripts/postinstall.js",
     "dev": "node --watch src/index.js",
     "test": "node test-backend.mjs",
     "build:web": "cd vajbagent-web && npm install --no-audit --no-fund && npm run build",
