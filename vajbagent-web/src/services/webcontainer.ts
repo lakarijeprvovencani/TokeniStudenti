@@ -1,19 +1,43 @@
-import { WebContainer } from '@webcontainer/api'
+import { WebContainer, auth } from '@webcontainer/api'
 
 let instance: WebContainer | null = null
 let bootingPromise: Promise<WebContainer> | null = null
 let bootFailed = false
+let authInitialized = false
 
 // If boot doesn't complete within this window, reject. StackBlitz silently
 // rejects origins that aren't registered (vajbagent.com falls into that
 // bucket) and the internal boot promise just never resolves — without this
 // timeout every awaiting caller would hang indefinitely on the chat path.
-const BOOT_TIMEOUT_MS = 8000
+const BOOT_TIMEOUT_MS = 12000
+
+// WebContainer API client ID — issued at https://stackblitz.com dashboard.
+// Without this the boot works only on grandfathered origins like
+// *.netlify.app. Set VITE_WEBCONTAINER_CLIENT_ID at build time on Render so
+// the production vajbagent.com build embeds it.
+const WC_CLIENT_ID: string | undefined = import.meta.env.VITE_WEBCONTAINER_CLIENT_ID
+
+function initAuthOnce() {
+  if (authInitialized) return
+  authInitialized = true
+  if (!WC_CLIENT_ID) {
+    console.warn('[WebContainer] No VITE_WEBCONTAINER_CLIENT_ID set — boot will rely on the origin being on StackBlitz\'s free allowlist.')
+    return
+  }
+  try {
+    auth.init({ clientId: WC_CLIENT_ID, scope: '' })
+    console.log('[WebContainer] auth.init configured with client ID')
+  } catch (err) {
+    console.error('[WebContainer] auth.init failed:', err)
+  }
+}
 
 export async function getWebContainer(): Promise<WebContainer> {
   if (instance) return instance
   if (bootFailed) throw new Error('WebContainer unavailable on this origin')
   if (bootingPromise) return bootingPromise
+
+  initAuthOnce()
 
   const bootRace = Promise.race<WebContainer>([
     WebContainer.boot({
