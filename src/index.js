@@ -554,7 +554,25 @@ app.use((err, _req, res, next) => {
 // on every static asset; we set them on the dist/ static middleware and
 // on the / route handler.
 const WEB_APP_DIST = path.join(__dirname, '..', 'vajbagent-web', 'dist');
-const webAppIndexExists = fs.existsSync(path.join(WEB_APP_DIST, 'index.html'));
+const WEB_APP_INDEX = path.join(WEB_APP_DIST, 'index.html');
+
+// Safety net: Render's Build Command is pinned to `npm install` and the
+// Start Command runs `node src/index.js` directly, bypassing npm's
+// pre/postinstall hooks. If the SPA bundle is missing at boot, build it
+// in-process synchronously so the `/` handler has something to serve.
+if (!fs.existsSync(WEB_APP_INDEX)) {
+  try {
+    const { execSync } = await import('node:child_process');
+    const buildScript = path.join(__dirname, '..', 'scripts', 'postinstall.js');
+    if (fs.existsSync(buildScript)) {
+      console.log('[web-app] dist/index.html missing — building SPA in-process…');
+      execSync(`node "${buildScript}"`, { stdio: 'inherit', cwd: path.join(__dirname, '..') });
+    }
+  } catch (err) {
+    console.error('[web-app] In-process build failed — will fall back to extenzija.html:', err.message);
+  }
+}
+const webAppIndexExists = fs.existsSync(WEB_APP_INDEX);
 
 function setWebAppHeaders(res) {
   // credentialless matches what Netlify was serving and keeps 3rd-party
