@@ -1788,7 +1788,7 @@ async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, st
   const maxTokens = Math.min(Math.max(requested, 256), modelMax);
   const trimmedMessages = trimOpenAIMessages(messages, resolved.backendModel);
 
-  const isReasoning = resolved.backendModel.startsWith('o');
+  const isReasoning = resolved.backendModel.startsWith('o') || resolved.backendModel.startsWith('gpt-5');
   const isGpt5 = resolved.backendModel.startsWith('gpt-5');
 
   const payload = {
