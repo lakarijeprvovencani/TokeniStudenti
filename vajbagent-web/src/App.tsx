@@ -9,6 +9,7 @@ import { type SavedProject, loadProject as loadProjectLocal, listProjects as lis
 import { loadProject as loadProjectRemote, listProjects as listProjectsRemote, saveProject as saveProjectRemote } from './services/remoteProjectStore'
 import { uploadAllImagesToR2 } from './services/userAssets'
 import { getScope } from './services/storageScope'
+import { preboot as prebootWebContainer } from './services/webcontainer'
 import './App.css'
 
 type AppState = 'booting' | 'welcome' | 'loading' | 'ide'
@@ -131,6 +132,15 @@ function AppInner() {
   const [user, setUser] = useState<UserInfo | null>(null)
   const [resumeProject, setResumeProject] = useState<SavedProject | null>(null)
   const [migrationBanner, setMigrationBanner] = useState<{ count: number; running: boolean } | null>(null)
+
+  // Warm the WebContainer as soon as the app mounts — this runs in parallel
+  // with user auth, project list fetch, and the user typing their first prompt.
+  // By the time they hit Send, WC is usually already booted, shaving 3-8s off
+  // first-run preview time. preboot() is idempotent so re-calling it from
+  // IDELayout is cheap.
+  useEffect(() => {
+    prebootWebContainer()
+  }, [])
 
   const migrateLocalProjects = useCallback(async () => {
     setMigrationBanner(prev => prev ? { ...prev, running: true } : null)

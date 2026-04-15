@@ -29,7 +29,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { logUsage, getUsageSummary, getUsageForKey, getModelStats } from './usage.js';
-import { getBalance, deductBalance, costUsd, addBalance, getTotalDeposited, loadStudentMarkupFlags, setStudentNoMarkup, getStudentMarkup, providerCostUsd, getPrices } from './balance.js';
+import { getBalance, deductBalance, costUsd, costUsdWithCache, addBalance, getTotalDeposited, loadStudentMarkupFlags, setStudentNoMarkup, getStudentMarkup, providerCostUsd, getPrices } from './balance.js';
 import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP, addStudentWithPassword, authenticateWithPassword, setStudentPassword, studentHasPassword } from './students.js';
 import { sendWelcomeEmail, sendRecoveryEmail, isEmailConfigured } from './email.js';
 import * as supabaseOAuth from './supabaseOAuth.js';
@@ -1827,15 +1827,27 @@ async function handleOpenAINonStream(req, res, keyId, resolved, payload, client)
   }
 
   const reasoning = response.usage?.completion_tokens_details?.reasoning_tokens ?? 0;
+  const cachedInput = response.usage?.prompt_tokens_details?.cached_tokens ?? 0;
+  const totalInput = response.usage?.prompt_tokens ?? 0;
+  const uncachedInput = Math.max(0, totalInput - cachedInput);
   const usage = {
-    input_tokens: response.usage?.prompt_tokens ?? 0,
+    input_tokens: totalInput,
     output_tokens: response.usage?.completion_tokens ?? 0,
+    cached_input_tokens: cachedInput,
     model: resolved.backendModel,
   };
   if (reasoning > 0) {
     console.log(`OpenAI reasoning tokens: ${reasoning} (billed as output, total output=${usage.output_tokens})`);
   }
-  const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel, keyId);
+  if (cachedInput > 0) {
+    console.log(`OpenAI cache hit: cached=${cachedInput}/${totalInput} input tokens`);
+  }
+  const usd = costUsdWithCache({
+    uncachedInput,
+    cacheReadInput: cachedInput,
+    cacheCreationInput: 0, // OpenAI doesn't charge for cache writes
+    outputTokens: usage.output_tokens,
+  }, resolved.backendModel, keyId);
   const newBal = await deductBalance(keyId, usd);
   await logUsage(keyId, usage);
 
@@ -1899,6 +1911,7 @@ async function handleOpenAIStream(req, res, keyId, resolved, payload, client) {
         usage.input_tokens = chunk.usage.prompt_tokens ?? usage.input_tokens;
         usage.output_tokens = chunk.usage.completion_tokens ?? usage.output_tokens;
         usage.reasoning_tokens = chunk.usage.completion_tokens_details?.reasoning_tokens ?? usage.reasoning_tokens ?? 0;
+        usage.cached_input_tokens = chunk.usage.prompt_tokens_details?.cached_tokens ?? usage.cached_input_tokens ?? 0;
       }
       chunkCount++;
       chunk.model = resolved.id;
@@ -1923,7 +1936,17 @@ async function handleOpenAIStream(req, res, keyId, resolved, payload, client) {
   }
   try {
     usage.model = resolved.backendModel;
-    const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel, keyId);
+    const cachedInput = usage.cached_input_tokens || 0;
+    const uncachedInput = Math.max(0, (usage.input_tokens || 0) - cachedInput);
+    if (cachedInput > 0) {
+      console.log(`OpenAI stream cache hit: cached=${cachedInput}/${usage.input_tokens} input tokens`);
+    }
+    const usd = costUsdWithCache({
+      uncachedInput,
+      cacheReadInput: cachedInput,
+      cacheCreationInput: 0,
+      outputTokens: usage.output_tokens,
+    }, resolved.backendModel, keyId);
     const newBal = await deductBalance(keyId, usd);
     await logUsage(keyId, usage);
 
@@ -1967,18 +1990,27 @@ async function handleAnthropic(req, res, keyId, resolved, messages, openAITools,
   const modelMax = MAX_OUTPUT[resolved.backendModel] || 16384;
   const maxTokens = Math.min(Math.max(Number(max_tokens) || 4096, 1), modelMax);
 
-  // Anthropic prompt caching: send system as structured block with cache_control
-  // Cached system prompt tokens cost 90% less on repeat calls
+  // Anthropic prompt caching: send system as structured block with cache_control.
+  // Cached tokens cost 10% of normal input price on repeat calls; first write costs 1.25x.
   const systemPayload = mergedSystem
     ? [{ type: 'text', text: mergedSystem, cache_control: { type: 'ephemeral' } }]
     : undefined;
+
+  // Tools caching: mark the last tool with cache_control so the entire tools
+  // array (same identity across every request) gets cached as one block.
+  // Tools are ~4–5k tokens and never change — this is a pure win.
+  const cachedAnthropicTools = anthropicTools.length > 0
+    ? anthropicTools.map((t, i) => i === anthropicTools.length - 1
+        ? { ...t, cache_control: { type: 'ephemeral' } }
+        : t)
+    : anthropicTools;
 
   const payload = {
     model: resolved.backendModel,
     max_tokens: maxTokens,
     messages: anthropicMessages,
     ...(systemPayload && { system: systemPayload }),
-    ...(anthropicTools.length > 0 && { tools: anthropicTools }),
+    ...(cachedAnthropicTools.length > 0 && { tools: cachedAnthropicTools }),
   };
 
   const poolEntry = acquireFromPool(anthropicPool, 'Anthropic');
@@ -2006,12 +2038,25 @@ async function handleAnthropicNonStream(res, keyId, resolved, payload, client) {
     });
   }
 
+  const cacheRead = response.usage?.cache_read_input_tokens ?? 0;
+  const cacheCreate = response.usage?.cache_creation_input_tokens ?? 0;
+  const uncachedInput = response.usage?.input_tokens ?? 0;
   const usage = {
-    input_tokens: response.usage?.input_tokens ?? 0,
+    input_tokens: uncachedInput + cacheRead + cacheCreate, // total billable tokens for logging
     output_tokens: response.usage?.output_tokens ?? 0,
+    cache_read_input_tokens: cacheRead,
+    cache_creation_input_tokens: cacheCreate,
     model: resolved.backendModel,
   };
-  const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel, keyId);
+  const usd = costUsdWithCache({
+    uncachedInput,
+    cacheReadInput: cacheRead,
+    cacheCreationInput: cacheCreate,
+    outputTokens: usage.output_tokens,
+  }, resolved.backendModel, keyId);
+  if (cacheRead > 0 || cacheCreate > 0) {
+    console.log(`Anthropic cache: read=${cacheRead}, created=${cacheCreate}, uncached=${uncachedInput}, cost=$${usd.toFixed(5)}`);
+  }
   const newBal = await deductBalance(keyId, usd);
   await logUsage(keyId, usage);
 
@@ -2081,6 +2126,8 @@ async function handleAnthropicStream(res, keyId, resolved, payload, client) {
       
       if (event.type === 'message_start' && event.message?.usage) {
         usage.input_tokens = event.message.usage.input_tokens ?? 0;
+        usage.cache_read_input_tokens = event.message.usage.cache_read_input_tokens ?? 0;
+        usage.cache_creation_input_tokens = event.message.usage.cache_creation_input_tokens ?? 0;
       }
       
       // Detect thinking block start - send indicator
@@ -2127,6 +2174,8 @@ async function handleAnthropicStream(res, keyId, resolved, payload, client) {
       if (event.type === 'message_delta' && event.usage) {
         if (event.usage.input_tokens != null) usage.input_tokens = event.usage.input_tokens;
         if (event.usage.output_tokens != null) usage.output_tokens = event.usage.output_tokens;
+        if (event.usage.cache_read_input_tokens != null) usage.cache_read_input_tokens = event.usage.cache_read_input_tokens;
+        if (event.usage.cache_creation_input_tokens != null) usage.cache_creation_input_tokens = event.usage.cache_creation_input_tokens;
       }
     }
   } catch (streamErr) {
@@ -2162,9 +2211,24 @@ async function handleAnthropicStream(res, keyId, resolved, payload, client) {
 
   try {
     usage.model = resolved.backendModel;
-    const usd = costUsd(usage.input_tokens, usage.output_tokens, resolved.backendModel, keyId);
+    const cacheRead = usage.cache_read_input_tokens || 0;
+    const cacheCreate = usage.cache_creation_input_tokens || 0;
+    const uncachedInput = usage.input_tokens || 0;
+    // Report total billable input in usage log (uncached + cached read + cached create)
+    const totalBillableInput = uncachedInput + cacheRead + cacheCreate;
+    const usd = costUsdWithCache({
+      uncachedInput,
+      cacheReadInput: cacheRead,
+      cacheCreationInput: cacheCreate,
+      outputTokens: usage.output_tokens,
+    }, resolved.backendModel, keyId);
+    if (cacheRead > 0 || cacheCreate > 0) {
+      console.log(`Anthropic stream cache: read=${cacheRead}, created=${cacheCreate}, uncached=${uncachedInput}, cost=$${usd.toFixed(5)}`);
+    }
+    // Log with total billable input so usage analytics show full picture
+    const loggedUsage = { ...usage, input_tokens: totalBillableInput };
     const newBal = await deductBalance(keyId, usd);
-    await logUsage(keyId, usage);
+    await logUsage(keyId, loggedUsage);
 
     const warning = await getBalanceWarning(keyId, newBal, req);
     if (warning && !res.writableEnded) {

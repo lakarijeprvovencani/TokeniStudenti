@@ -215,6 +215,33 @@ export function providerCostUsd(inputTokens, outputTokens, model) {
   return (inputTokens / 1e6) * price.in + (outputTokens / 1e6) * price.out;
 }
 
+/**
+ * Cost calculation with prompt caching discounts.
+ *   - uncachedInput: regular input tokens (fresh) → 100% of input price
+ *   - cacheReadInput: cache hit tokens            → 10% of input price
+ *   - cacheCreationInput: cache write (first)     → 125% of input price (Anthropic)
+ *                                                   100% for OpenAI (no write premium)
+ *
+ * Anthropic charges a 1.25x premium on cache writes; OpenAI does not.
+ * Both charge ~10% on cache reads.
+ */
+export function providerCostUsdWithCache(opts, model) {
+  const price = getPrice(model);
+  const uncached = Math.max(0, Number(opts.uncachedInput) || 0);
+  const cacheRead = Math.max(0, Number(opts.cacheReadInput) || 0);
+  const cacheCreate = Math.max(0, Number(opts.cacheCreationInput) || 0);
+  const output = Math.max(0, Number(opts.outputTokens) || 0);
+  const isAnthropic = /claude|opus|sonnet|haiku/i.test(model || '');
+  const createMultiplier = isAnthropic ? 1.25 : 1.0;
+
+  return (
+    (uncached / 1e6) * price.in +
+    (cacheRead / 1e6) * price.in * 0.10 +
+    (cacheCreate / 1e6) * price.in * createMultiplier +
+    (output / 1e6) * price.out
+  );
+}
+
 export const anthropicCostUsd = providerCostUsd;
 
 export function getStudentMarkup(model) {
@@ -259,6 +286,15 @@ export function loadStudentMarkupFlags(students) {
 
 export function costUsd(inputTokens, outputTokens, model, keyId = null) {
   const raw = providerCostUsd(inputTokens, outputTokens, model);
+  if (keyId && getStudentNoMarkup(keyId)) {
+    return Math.round(raw * 1e6) / 1e6;
+  }
+  return Math.round(raw * getStudentMarkup(model) * 1e6) / 1e6;
+}
+
+/** Cost with cache split — same markup logic as costUsd, but honors cache pricing. */
+export function costUsdWithCache(opts, model, keyId = null) {
+  const raw = providerCostUsdWithCache(opts, model);
   if (keyId && getStudentNoMarkup(keyId)) {
     return Math.round(raw * 1e6) / 1e6;
   }
