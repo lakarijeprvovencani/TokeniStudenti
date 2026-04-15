@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowUp, Loader2, User, Square } from 'lucide-react'
 import { executeToolCall } from '../services/toolHandler'
+import { readFile as wcReadFile } from '../services/webcontainer'
 import { buildFullContext, invalidateIndex } from '../services/contextBuilder'
 import { fetchBalance } from '../services/userService'
 import { scopedStorage as scopedStorageRef } from '../services/storageScope'
@@ -649,8 +650,47 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
     // Reset scroll — user sent a message, so scroll to bottom
     userScrolledUp.current = false
 
+    // ─── First-shot quality booster ─────────────────────────────────────────
+    // If this is the user's first message AND it looks like a build request,
+    // inject a high-priority quality directive as a system message right before
+    // their prompt. This is runtime context injection (same pattern as the
+    // lazy-nudge and iter-limit warning) — it does NOT modify systemPrompt.ts.
+    // Goal: force the "wow on first screen" standard that a commercial
+    // Lovable/Bolt clone needs to retain a new user.
+    const BUILD_BOOSTER_RE = /\b(napravi|kreiraj|izgradi|dodaj|build|create|make|generat|generise)\b|\b(sajt|stranic|landing|aplikacij|komponent|portfolio|shop|prodavnic|blog|page|component|site|app)\b/i
+    const userMsgCount = historyRef.current.filter(m => m.role === 'user').length
+    const isFirstBuildPrompt = userMsgCount === 1 && BUILD_BOOSTER_RE.test(text.toLowerCase()) && text.length > 40
+    if (isFirstBuildPrompt) {
+      const qualityDirective: Message = {
+        role: 'system',
+        content: [
+          'FIRST-SHOT QUALITY REQUIREMENT (runtime directive, not a persistent rule):',
+          'This is the user\'s FIRST prompt in this session. The preview they see after you finish will decide whether they stay or close the tab forever. Treat this like a portfolio piece.',
+          '',
+          'MANDATORY:',
+          '1. Deliver a COMPLETE site. If the user listed sections (nav, hero, about, services, features, testimonials, pricing, contact, footer, itd.), build EVERY one of them with real, tailored copy. No "Lorem ipsum". No empty sections. No "coming soon" placeholders.',
+          '2. Every section must be VISIBLE WITHOUT SCROLLING DEPENDENCIES. If you add fade-in or reveal animations, the INITIAL CSS state must be opacity:1 (or add a fallback that marks elements visible on DOMContentLoaded). The preview runs in a blob iframe where IntersectionObserver is unreliable — assume it will NOT fire.',
+          '3. Use a cohesive design system: pick a real palette (3-5 colors), one heading font + one body font, consistent spacing scale (8/16/24/32/48/64px), clear hierarchy. No default browser fonts, no unstyled elements.',
+          '4. For images: use search_images to get real Unsplash photos tailored to the project topic. Do NOT use placeholder gradients as fake "images".',
+          '5. Write files of reasonable size (up to ~200 lines each is fine). Split into multiple files only when it genuinely helps clarity — do not fragment a single cohesive landing page into 8 stubs.',
+          '6. Before you finish, mentally review: "Would a paying customer go WOW at the first screen?" If any section renders empty, unstyled, or generic — fix it BEFORE stopping.',
+          '',
+          'Start building now. Do NOT describe the plan back to the user — they already wrote it. Call write_file immediately.',
+        ].join('\n'),
+      }
+      // Insert the directive directly before the user message so the model
+      // reads it as "background context" attached to that specific request.
+      const insertAt = historyRef.current.length - 1
+      historyRef.current = [
+        ...historyRef.current.slice(0, insertAt),
+        qualityDirective,
+        historyRef.current[insertAt],
+      ]
+    }
+
     let lastAssistantHadText = false
     let lazyNudgeUsed = false
+    let sectionNudgeUsed = false
 
     try {
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
@@ -817,14 +857,91 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
           // brief instead of calling any tools. If the user clearly asked to
           // BUILD something and we haven't created any files yet in this
           // session, inject a runtime system nudge and retry once.
-          const noFilesCreatedYet = !historyRef.current.some(m =>
+          const hasWrittenFiles = historyRef.current.some(m =>
             m.role === 'assistant' && m.tool_calls?.some(tc => tc.function.name === 'write_file')
           )
+          const noFilesCreatedYet = !hasWrittenFiles
           const lastUserMsg = [...historyRef.current].reverse().find(m => m.role === 'user')
           const userText = (lastUserMsg?.content || '').toLowerCase()
           const BUILD_INTENT_RE = /\b(napravi|kreiraj|izgradi|sredi|dodaj|build|create|make|add)\b|\b(sajt|stranic|aplikacij|komponent|hero|footer|navigacij|layout|page|component|site|app|landing|portfolio)\b/i
           const hasBuildIntent = BUILD_INTENT_RE.test(userText) && userText.length > 40
           const looksLikeParroting = (result.text || '').length > 300
+
+          // Post-build section-completeness guard: when the model finishes
+          // with text but already wrote files, check if index.html actually
+          // contains every section the user mentioned. If not, nudge once
+          // to fill in the missing ones. This prevents the "half-empty site"
+          // outcome where the model produces hero+footer and skips the body.
+          if (!sectionNudgeUsed && hasWrittenFiles && hasBuildIntent) {
+            try {
+              const html = await wcReadFile('index.html').catch(() => null)
+              if (html && !html.startsWith('Greska:') && html.length > 200) {
+                // Stem-based patterns — Serbian has heavy inflection
+                // ("usluge" / "uslugama" / "uslugu") so \b-bounded whole words
+                // miss most real prompts. Match the stem instead.
+                const sectionDefs: Array<{ key: string; patterns: RegExp[] }> = [
+                  { key: 'nav',          patterns: [/navigacij/i, /\bnav\b/i, /\bmenu|\bmeni/i, /header/i] },
+                  { key: 'hero',         patterns: [/\bhero\b/i, /naslov.*vredn/i, /landing.*header/i] },
+                  { key: 'about',        patterns: [/\babout\b/i, /\bo nama|\bo meni|\bo nas/i] },
+                  { key: 'services',     patterns: [/\bservice/i, /uslug/i, /sta radi/i] },
+                  { key: 'features',     patterns: [/\bfeature/i, /karakteristik/i, /mogucnost/i, /benefit/i, /prednost/i] },
+                  { key: 'portfolio',    patterns: [/portfolio/i, /projek/i, /gallery|galerij/i, /radov/i] },
+                  { key: 'testimonials', patterns: [/testimon/i, /\bcitat/i, /utisc|recenzij/i] },
+                  { key: 'pricing',      patterns: [/pricing|cenov|\bcena|\bcene|cenama/i, /paket|plan/i] },
+                  { key: 'team',         patterns: [/\bteam\b/i, /\btim/i, /osoblje|zaposlen/i] },
+                  { key: 'faq',          patterns: [/\bfaq\b/i, /pitanj/i, /najcesc/i] },
+                  { key: 'contact',      patterns: [/contact/i, /kontakt/i, /\bforma|\bforme|\bformu/i] },
+                  { key: 'footer',       patterns: [/footer/i, /podnozj/i] },
+                ]
+                const requested = sectionDefs.filter(s => s.patterns.some(p => p.test(userText)))
+                // Case-insensitive search for section presence in HTML via classname,
+                // id, <section> + heading text, or <nav>/<header>/<footer> tags.
+                function htmlHasSection(html: string, key: string): boolean {
+                  const patterns: Record<string, RegExp> = {
+                    nav:          /<nav\b|class=["'][^"']*nav|id=["']nav/i,
+                    hero:         /class=["'][^"']*hero|id=["']hero/i,
+                    about:        /class=["'][^"']*about|id=["']about|>O nama<|>About</i,
+                    services:     /class=["'][^"']*service|id=["']service|>Usluge<|>Services</i,
+                    features:     /class=["'][^"']*feature|id=["']feature|>Karakteristike<|>Features</i,
+                    portfolio:    /class=["'][^"']*(portfolio|project|gallery)|id=["'](portfolio|project|gallery)|>Projekt|>Portfolio|>Galerij/i,
+                    testimonials: /class=["'][^"']*testimon|id=["']testimon|>Utisci|>Testimonial/i,
+                    pricing:      /class=["'][^"']*(pricing|price)|id=["'](pricing|price)|>Cen|>Pricing/i,
+                    team:         /class=["'][^"']*team|id=["']team|>Tim<|>Team</i,
+                    faq:          /class=["'][^"']*faq|id=["']faq|>FAQ|>Pitanj/i,
+                    contact:      /<form\b|class=["'][^"']*contact|id=["']contact|>Kontakt|>Contact/i,
+                    footer:       /<footer\b|class=["'][^"']*footer|id=["']footer/i,
+                  }
+                  return patterns[key]?.test(html) ?? false
+                }
+                const missing = requested.filter(s => !htmlHasSection(html, s.key))
+                if (requested.length >= 3 && missing.length > 0) {
+                  sectionNudgeUsed = true
+                  console.warn(`[Agent] Section completeness nudge — missing: ${missing.map(m => m.key).join(', ')}`)
+                  if (result.text) {
+                    historyRef.current = [...historyRef.current, { role: 'assistant', content: result.text }]
+                    setDisplayMessages(prev => [...prev, { role: 'assistant', content: result.text }])
+                  }
+                  setDisplayMessages(prev => [...prev, {
+                    role: 'status',
+                    content: `Dodajem nedostajuće sekcije: ${missing.map(m => m.key).join(', ')}…`,
+                  }])
+                  historyRef.current.push({
+                    role: 'system',
+                    content: [
+                      `QUALITY CHECK FAILED: The user asked for these sections but your index.html is missing them: ${missing.map(m => m.key).join(', ')}.`,
+                      'Add the missing sections NOW by using replace_in_file to insert them in the correct position (usually before </main> or before <footer>). Match the existing design language (same colors, spacing, typography, component patterns). Each new section must have real tailored copy — no Lorem ipsum, no placeholders.',
+                      'Do not describe what you will do — just call the tools.',
+                    ].join(' '),
+                  })
+                  setStatusText('Dopunjujem sekcije…')
+                  setStreamText('')
+                  continue
+                }
+              }
+            } catch (err) {
+              console.warn('[Agent] Section completeness check failed:', err)
+            }
+          }
 
           if (!lazyNudgeUsed && noFilesCreatedYet && hasBuildIntent && looksLikeParroting) {
             lazyNudgeUsed = true

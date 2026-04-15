@@ -8,6 +8,61 @@ interface PreviewPanelProps {
   files: Record<string, string>
 }
 
+/**
+ * CSS + JS shield injected into the blob preview HTML.
+ *
+ * Models love scroll-triggered reveal animations (opacity:0, translateY(20),
+ * then IntersectionObserver adds a ".visible" class). Problem: our preview
+ * iframe is loaded as a blob with no real scroll container, so the observer
+ * often never fires and entire sections stay invisible. Users see "half a
+ * site" and think the model failed.
+ *
+ * This shield:
+ *   1. CSS: any element with a class name or data-attribute commonly used
+ *      for scroll reveals is forced to opacity:1 / transform:none.
+ *   2. JS: after the document is interactive, walk the DOM and apply the
+ *      typical "already revealed" classes (visible, aos-animate, animated,
+ *      in-view, is-visible) so library-driven reveals also show up.
+ *
+ * Surgical — does NOT kill hover transitions, button animations, or any
+ * other runtime animation. Only neutralizes the initial-hidden states that
+ * scroll libraries rely on.
+ */
+const PREVIEW_REVEAL_SHIELD = `
+<style data-vajb-shield>
+[class*="fade-"],[class*="reveal"],[class*="animate-"],[class*="slide-"],
+[class*="scroll-"],[class*="appear"],[data-aos],[data-animate],[data-scroll],
+[data-reveal],.hidden-initial,.opacity-0,.invisible,.will-fade-in,
+.before-enter,.not-visible{
+  opacity:1!important;
+  transform:none!important;
+  visibility:visible!important;
+  filter:none!important;
+}
+html,body{opacity:1!important;}
+</style>
+<script data-vajb-shield>
+(function(){
+  function reveal(){
+    var sels=['.fade-in','.fade-up','.fade-down','.reveal','.slide-in',
+      '.animate-on-scroll','[data-aos]','[data-animate]','[data-reveal]',
+      '.scroll-trigger','.appear','.hidden-initial','.will-fade-in'];
+    var nodes=document.querySelectorAll(sels.join(','));
+    for(var i=0;i<nodes.length;i++){
+      nodes[i].classList.add('visible','in-view','is-visible','aos-animate','animated','active','show','shown','revealed');
+    }
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',reveal);
+  }else{
+    reveal();
+  }
+  setTimeout(reveal,50);
+  setTimeout(reveal,300);
+})();
+</script>
+`
+
 /** Script injected into blob HTML to intercept ALL link navigation and enable multi-page preview */
 const NAV_INTERCEPT_SCRIPT = `
 <script>
@@ -170,9 +225,11 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
       .join('\n')
 
     if (html.includes('</head>')) {
-      html = html.replace('</head>', cssBlocks + '\n</head>')
+      // Shield goes LAST in <head> so its !important CSS overrides anything
+      // the user's stylesheet set earlier in the cascade.
+      html = html.replace('</head>', cssBlocks + '\n' + PREVIEW_REVEAL_SHIELD + '\n</head>')
     } else {
-      html = cssBlocks + '\n' + html
+      html = cssBlocks + '\n' + PREVIEW_REVEAL_SHIELD + '\n' + html
     }
 
     if (html.includes('</body>')) {
@@ -223,7 +280,12 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
       )
     }
 
-    // Inject navigation interceptor before </body>
+    // Inject reveal shield in <head> and navigation interceptor before </body>
+    if (html.includes('</head>')) {
+      html = html.replace('</head>', PREVIEW_REVEAL_SHIELD + '\n</head>')
+    } else {
+      html = PREVIEW_REVEAL_SHIELD + '\n' + html
+    }
     if (html.includes('</body>')) {
       html = html.replace('</body>', NAV_INTERCEPT_SCRIPT + '\n</body>')
     } else {
