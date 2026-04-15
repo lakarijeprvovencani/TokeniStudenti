@@ -135,6 +135,28 @@
   box-shadow: 0 0 40px rgba(249, 115, 22, 0.08), 0 0 80px rgba(249, 115, 22, 0.04);
 }
 
+.input-wrap.drag-over {
+  background: linear-gradient(135deg, var(--orange), var(--orange2));
+  box-shadow: 0 0 40px rgba(249, 115, 22, 0.15);
+}
+
+.welcome-drop-overlay {
+  position: absolute;
+  inset: 2px;
+  z-index: 20;
+  border-radius: calc(var(--radius) - 2px);
+  background: rgba(10, 10, 15, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--orange);
+  font-size: 0.85rem;
+  font-weight: 500;
+  pointer-events: none;
+}
+
 .input-wrap.focused .input-glow-border {
   opacity: 1;
 }
@@ -228,6 +250,42 @@
 .send-btn.active:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 24px rgba(249, 115, 22, 0.4);
+}
+
+.send-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.enhance-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--text3);
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+.enhance-btn:hover:not(:disabled) {
+  border-color: var(--orange);
+  color: var(--orange);
+  background: rgba(249, 115, 22, 0.08);
+}
+.enhance-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.enhance-btn.enhancing {
+  border-color: var(--orange);
+  color: var(--orange);
+}
+.enhance-btn .spin {
+  animation: spin 0.8s linear infinite;
 }
 
 /* ── Auth Card ── */

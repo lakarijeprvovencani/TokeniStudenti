@@ -62,18 +62,19 @@ interface FileRowProps {
   displayName: string
   nested?: boolean
   active: boolean
-  /** Raw content for image thumbnails (data URL). Ignored for non-images. */
   preview?: string
   onSelect: () => void
   onDelete?: () => void
   onRename?: (newName: string) => void
+  onUploadImages?: (files: File[]) => void | Promise<void>
 }
 
-function FileRow({ path, displayName, nested, active, preview, onSelect, onDelete, onRename }: FileRowProps) {
+function FileRow({ path, displayName, nested, active, preview, onSelect, onDelete, onRename, onUploadImages }: FileRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(displayName)
   const inputRef = useRef<HTMLInputElement>(null)
+  const rowUploadRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (renaming) {
@@ -91,6 +92,12 @@ function FileRow({ path, displayName, nested, active, preview, onSelect, onDelet
     if (renameValue && renameValue !== displayName && onRename) {
       onRename(renameValue)
     }
+  }
+
+  const handleRowUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files || [])
+    if (picked.length > 0 && onUploadImages) await onUploadImages(picked)
+    e.target.value = ''
   }
 
   if (renaming) {
@@ -131,6 +138,11 @@ function FileRow({ path, displayName, nested, active, preview, onSelect, onDelet
         <>
           <div className="ctx-menu-backdrop" onClick={() => setMenuOpen(false)} />
           <div className="ctx-menu">
+            {onUploadImages && (
+              <button onClick={() => { setMenuOpen(false); rowUploadRef.current?.click() }}>
+                <ImagePlus size={12} /> Dodaj sliku / video
+              </button>
+            )}
             <button onClick={() => { setMenuOpen(false); setRenaming(true) }}>
               <Edit3 size={12} /> Preimenuj
             </button>
@@ -142,12 +154,21 @@ function FileRow({ path, displayName, nested, active, preview, onSelect, onDelet
           </div>
         </>
       )}
+      <input
+        ref={rowUploadRef}
+        type="file"
+        multiple
+        accept="image/*,video/mp4,video/webm"
+        style={{ display: 'none' }}
+        onChange={handleRowUpload}
+      />
     </>
   )
 }
 
 function FolderGroup({
-  folder, folderFiles, activeFile, files, onSelectFile, isCollapsed, onToggleCollapse, onDeleteFile, onRenameFile,
+  folder, folderFiles, activeFile, files, onSelectFile, isCollapsed, onToggleCollapse,
+  onDeleteFile, onRenameFile, onCreateFile, onUploadImages,
 }: {
   folder: string
   folderFiles: string[]
@@ -158,27 +179,137 @@ function FolderGroup({
   onToggleCollapse: () => void
   onDeleteFile?: (path: string) => void | Promise<void>
   onRenameFile?: (oldPath: string, newPath: string) => void | Promise<void>
+  onCreateFile?: (path: string, content: string) => void | Promise<void>
+  onUploadImages?: (files: File[]) => void | Promise<void>
 }) {
   const open = !isCollapsed
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [renameValue, setRenameValue] = useState(folder)
+  const [creatingFile, setCreatingFile] = useState(false)
+  const [newFileName, setNewFileName] = useState('')
+  const renameRef = useRef<HTMLInputElement>(null)
+  const createRef = useRef<HTMLInputElement>(null)
+  const folderUploadRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (renaming) setTimeout(() => renameRef.current?.focus(), 0)
+  }, [renaming])
+
+  useEffect(() => {
+    if (creatingFile) setTimeout(() => createRef.current?.focus(), 0)
+  }, [creatingFile])
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenuOpen(true)
+  }
+
+  const submitRename = () => {
+    setRenaming(false)
+    if (renameValue && renameValue !== folder && onRenameFile) {
+      for (const p of folderFiles) {
+        onRenameFile(p, p.replace(new RegExp(`^${folder}/`), `${renameValue}/`))
+      }
+    }
+  }
+
+  const submitNewFile = async () => {
+    const name = newFileName.trim()
+    setCreatingFile(false)
+    setNewFileName('')
+    if (name && onCreateFile) {
+      const path = `${folder}/${name}`
+      await onCreateFile(path, '')
+      onSelectFile(path)
+    }
+  }
+
+  const handleFolderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files || [])
+    if (picked.length > 0 && onUploadImages) await onUploadImages(picked)
+    e.target.value = ''
+  }
+
+  const deleteFolder = () => {
+    if (!onDeleteFile) return
+    for (const p of folderFiles) onDeleteFile(p)
+  }
+
+  const folderLabel = renaming ? (
+    <div className="explorer-folder renaming">
+      <Folder size={14} className="ficon ficon-folder" />
+      <input
+        ref={renameRef}
+        className="rename-input"
+        value={renameValue}
+        onChange={(e) => setRenameValue(e.target.value)}
+        onBlur={submitRename}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') submitRename()
+          if (e.key === 'Escape') { setRenaming(false); setRenameValue(folder) }
+        }}
+      />
+    </div>
+  ) : (
+    <button className="explorer-folder" onClick={onToggleCollapse} onContextMenu={handleContextMenu}>
+      <motion.div
+        className="folder-chevron"
+        animate={{ rotate: open ? 90 : 0 }}
+        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <ChevronRight size={12} />
+      </motion.div>
+      {open ? (
+        <FolderOpen size={14} className="ficon ficon-folder" />
+      ) : (
+        <Folder size={14} className="ficon ficon-folder" />
+      )}
+      <span>{folder}</span>
+      <span className="folder-count">{folderFiles.length}</span>
+    </button>
+  )
 
   return (
     <div className="explorer-folder-group">
-      <button className="explorer-folder" onClick={onToggleCollapse}>
-        <motion.div
-          className="folder-chevron"
-          animate={{ rotate: open ? 90 : 0 }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <ChevronRight size={12} />
-        </motion.div>
-        {open ? (
-          <FolderOpen size={14} className="ficon ficon-folder" />
-        ) : (
-          <Folder size={14} className="ficon ficon-folder" />
-        )}
-        <span>{folder}</span>
-        <span className="folder-count">{folderFiles.length}</span>
-      </button>
+      {folderLabel}
+
+      {menuOpen && (
+        <>
+          <div className="ctx-menu-backdrop" onClick={() => setMenuOpen(false)} />
+          <div className="ctx-menu">
+            {onCreateFile && (
+              <button onClick={() => { setMenuOpen(false); setCreatingFile(true); if (!open) onToggleCollapse() }}>
+                <FilePlus size={12} /> Novi fajl
+              </button>
+            )}
+            {onUploadImages && (
+              <button onClick={() => { setMenuOpen(false); folderUploadRef.current?.click() }}>
+                <ImagePlus size={12} /> Dodaj sliku / video
+              </button>
+            )}
+            <button onClick={() => { setMenuOpen(false); setRenaming(true); setRenameValue(folder) }}>
+              <Edit3 size={12} /> Preimenuj
+            </button>
+            {onDeleteFile && (
+              <button className="ctx-danger" onClick={() => { setMenuOpen(false); deleteFolder() }}>
+                <Trash2 size={12} /> Obriši folder
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      <input
+        ref={folderUploadRef}
+        type="file"
+        multiple
+        accept="image/*,video/mp4,video/webm"
+        style={{ display: 'none' }}
+        onChange={handleFolderUpload}
+      />
+
       <AnimatePresence>
         {open && (
           <motion.div
@@ -188,6 +319,23 @@ function FolderGroup({
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
           >
+            {creatingFile && (
+              <div className="explorer-file nested creating">
+                <FileText size={14} className="ficon" />
+                <input
+                  ref={createRef}
+                  className="rename-input"
+                  value={newFileName}
+                  onChange={(e) => setNewFileName(e.target.value)}
+                  placeholder="filename.html"
+                  onBlur={submitNewFile}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') submitNewFile()
+                    if (e.key === 'Escape') { setCreatingFile(false); setNewFileName('') }
+                  }}
+                />
+              </div>
+            )}
             <AnimatePresence initial={false}>
               {folderFiles.map((path) => (
                 <FileRow
@@ -203,6 +351,7 @@ function FolderGroup({
                     const dir = path.substring(0, path.lastIndexOf('/'))
                     return onRenameFile(path, dir ? `${dir}/${newName}` : newName)
                   } : undefined}
+                  onUploadImages={onUploadImages}
                 />
               ))}
             </AnimatePresence>
@@ -366,7 +515,7 @@ export default function FileExplorer({
             </button>
           )}
           {onUploadImages && (
-            <button className="explorer-tool-btn" onClick={handleImageButtonClick} title="Dodaj sliku">
+            <button className="explorer-tool-btn" onClick={handleImageButtonClick} title="Dodaj sliku / video">
               <ImagePlus size={13} />
             </button>
           )}
@@ -391,7 +540,7 @@ export default function FileExplorer({
       {dragOver && (
         <div className="explorer-drop-overlay">
           <ImagePlus size={28} />
-          <span>Pusti sliku da je dodaš u projekat</span>
+          <span>Pusti sliku ili video da dodaš u projekat</span>
         </div>
       )}
       <div className="explorer-tree">
@@ -437,6 +586,8 @@ export default function FileExplorer({
                 onToggleCollapse={() => toggleFolder(folder)}
                 onDeleteFile={onDeleteFile}
                 onRenameFile={onRenameFile}
+                onCreateFile={onCreateFile}
+                onUploadImages={onUploadImages}
               />
             ))}
 
@@ -452,6 +603,7 @@ export default function FileExplorer({
                   onSelect={() => onSelectFile(path)}
                   onDelete={onDeleteFile ? () => onDeleteFile(path) : undefined}
                   onRename={onRenameFile ? (newName: string) => onRenameFile(path, newName) : undefined}
+                  onUploadImages={onUploadImages}
                 />
               ))}
             </AnimatePresence>

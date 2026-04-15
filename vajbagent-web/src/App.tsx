@@ -11,7 +11,7 @@ import { uploadAllImagesToR2 } from './services/userAssets'
 import { getScope } from './services/storageScope'
 import './App.css'
 
-type AppState = 'welcome' | 'loading' | 'ide'
+type AppState = 'booting' | 'welcome' | 'loading' | 'ide'
 
 const LAST_PROJECT_KEY_BASE = 'vajb_last_active_project'
 const LEGACY_LAST_PROJECT_KEY = 'vajb_last_active_project'
@@ -124,7 +124,7 @@ class RootErrorBoundary extends Component<{ children: ReactNode }, { error: Erro
 interface AttachedImage { name: string; dataUrl: string }
 
 function AppInner() {
-  const [state, setState] = useState<AppState>('welcome')
+  const [state, setState] = useState<AppState>('booting')
   const [prompt, setPrompt] = useState('')
   const [pendingImages, setPendingImages] = useState<AttachedImage[]>([])
   const [model, setModel] = useState(DEFAULT_MODEL)
@@ -159,6 +159,7 @@ function AppInner() {
       if (cancelled) return
       if (!userInfo) {
         clearLastProjectId()
+        setState('welcome')
         return
       }
       setUser(userInfo)
@@ -175,7 +176,10 @@ function AppInner() {
       } catch { /* ignore */ }
 
       const lastId = readLastProjectId()
-      if (!lastId) return
+      if (!lastId) {
+        setState('welcome')
+        return
+      }
       try {
         let project: SavedProject | null = null
         try {
@@ -190,10 +194,12 @@ function AppInner() {
           setState('ide')
         } else {
           clearLastProjectId()
+          setState('welcome')
         }
       } catch (err) {
         console.warn('[App] Resume load failed:', err)
         clearLastProjectId()
+        setState('welcome')
       }
     }
     boot()
@@ -279,6 +285,27 @@ function AppInner() {
       </div>
     )}
     <AnimatePresence mode="wait">
+      {state === 'booting' && (
+        <motion.div
+          key="booting"
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.25 }}
+          style={{
+            position: 'fixed', inset: 0,
+            background: '#0a0a0f',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div style={{
+            width: 28, height: 28,
+            border: '2.5px solid rgba(255,255,255,0.1)',
+            borderTopColor: '#FA7315',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+        </motion.div>
+      )}
+
       {state === 'welcome' && (
         <motion.div
           key="welcome"

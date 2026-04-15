@@ -52,6 +52,9 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
   const [focused, setFocused] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [enhancing, setEnhancing] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const dragDepth = useRef(0)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
@@ -73,14 +76,11 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
     e.target.value = ''
   }
 
-  // Handle image attach (Paperclip button) — auto-resizes + recompresses every
-  // image client-side so we never reject a file for being "too big". A 20MB
-  // phone photo becomes a ~700KB JPEG that the vision model can still read
-  // perfectly. Caps at 4 images so the outgoing request stays sane.
+  const MAX_IMAGES = 4
+
   const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
-    const MAX_IMAGES = 4
     const accepted: AttachedImage[] = []
     for (const file of files) {
       if (attachedImages.length + accepted.length >= MAX_IMAGES) break
@@ -96,6 +96,36 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
 
   const removeAttachedImage = (index: number) => {
     setAttachedImages(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleWelcomeDragEnter = (e: React.DragEvent) => {
+    if (!Array.from(e.dataTransfer.items || []).some(i => i.kind === 'file')) return
+    e.preventDefault()
+    dragDepth.current++
+    setDragging(true)
+  }
+  const handleWelcomeDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    dragDepth.current = Math.max(0, dragDepth.current - 1)
+    if (dragDepth.current === 0) setDragging(false)
+  }
+  const handleWelcomeDragOver = (e: React.DragEvent) => { e.preventDefault() }
+  const handleWelcomeDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    dragDepth.current = 0
+    setDragging(false)
+    const files = Array.from(e.dataTransfer.files || []).filter(f => f.type.startsWith('image/'))
+    if (files.length === 0) return
+    const accepted: AttachedImage[] = []
+    for (const file of files) {
+      if (attachedImages.length + accepted.length >= MAX_IMAGES) break
+      const resized = await resizeImageFile(file)
+      if (resized) accepted.push({ name: resized.name, dataUrl: resized.dataUrl })
+    }
+    if (accepted.length > 0) {
+      setAttachedImages(prev => [...prev, ...accepted].slice(0, MAX_IMAGES))
+      inputRef.current?.focus()
+    }
   }
 
   // New-flow modals (Bolt/Lovable style)
@@ -176,6 +206,62 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
     try { await remoteStore.deleteProject(id) } catch { /* fallback below */ }
     try { await deleteProjectLocal(id) } catch { /* ignore */ }
     setProjects(prev => prev.filter(p => p.id !== id))
+  }
+
+  const enhancePrompt = async () => {
+    const raw = text.trim()
+    if (!raw || enhancing) return
+    setEnhancing(true)
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://vajbagent.com'
+      const res = await fetch(`${API_URL}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          model: 'vajb-agent-lite',
+          stream: false,
+          max_tokens: 4096,
+          messages: [
+            {
+              role: 'system',
+              content: `Ti si prompt enhancer za AI web builder. Korisnik ukuca kratak opis sajta, a ti ga pretvoriš u detaljan, jasan brief na SRPSKOM jeziku.
+
+Pravila:
+- Zadrži korisnikovu originalnu nameru 100% — ne menjaj temu
+- Imenuj KONKRETNE sekcije sajta (npr. hero sa CTA dugmetom, galerija usluga sa karticama, testimonial karusel, FAQ akordion, kontakt forma sa mapom, footer sa socijalnim mrežama)
+- Predloži paletu boja opisno (npr. "tamna elegantna paleta sa zlatnim akcentom" ili "svetla čista paleta sa plavim akcentima") — nemoj hex kodove
+- Predloži stil tipografije (npr. "moderan sans-serif font, veliki naslovi, čist razmak")
+- Ako je biznis tip (restoran, salon, klinika, agencija) — dodaj specifične sekcije za tu industriju (radno vreme, meni/cenovnik, galerija radova, recenzije, lokacija)
+- Naglasi da sajt treba biti responsivan, modernog dizajna, sa animacijama pri skrolovanju
+- Ako korisnik ne pomene temu — predloži jednu koja ima smisla
+- NE dodaj objašnjenja, napomene ni komentare — SAMO poboljšan prompt, ništa drugo
+- Piši kao senior UI dizajner koji daje brief developeru
+- Odgovor: 4-8 rečenica, dovoljno detaljan ali ne predugačak`
+            },
+            { role: 'user', content: raw }
+          ]
+        }),
+      })
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '')
+        console.warn('[Enhance] API error:', res.status, errText)
+        return
+      }
+      const data = await res.json()
+      console.log('[Enhance] Response:', JSON.stringify(data).slice(0, 500))
+      const enhanced = data.choices?.[0]?.message?.content?.trim()
+      if (enhanced) {
+        setText(enhanced)
+        setTimeout(() => inputRef.current?.focus(), 50)
+      } else {
+        console.warn('[Enhance] No content in response:', data)
+      }
+    } catch (err) {
+      console.warn('[Enhance] Failed:', err)
+    } finally {
+      setEnhancing(false)
+    }
   }
 
   const handleSubmit = () => {
@@ -372,12 +458,22 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
           </motion.div>
 
           <motion.div
-            className={`input-wrap ${focused ? 'focused' : ''}`}
+            className={`input-wrap ${focused ? 'focused' : ''} ${dragging ? 'drag-over' : ''}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.5, ease: 'easeOut' }}
+            onDragEnter={handleWelcomeDragEnter}
+            onDragLeave={handleWelcomeDragLeave}
+            onDragOver={handleWelcomeDragOver}
+            onDrop={handleWelcomeDrop}
           >
             <div className="input-glow-border" />
+            {dragging && (
+              <div className="welcome-drop-overlay">
+                <Paperclip size={22} />
+                <span>Pusti sliku ovde</span>
+              </div>
+            )}
             <div className="input-inner">
               {attachedImages.length > 0 && (
                 <div className="welcome-attached-images">
@@ -432,13 +528,25 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
                   />
                   <ModelSelector value={model} onChange={onModelChange} freeTier={freeTier} />
                 </div>
-                <button
-                  className={`send-btn ${text.trim() || attachedImages.length > 0 ? 'active' : ''}`}
-                  onClick={handleSubmit}
-                  disabled={!text.trim() && attachedImages.length === 0}
-                >
-                  <ArrowUp size={18} />
-                </button>
+                <div className="send-group">
+                  {text.trim().length > 0 && (
+                    <button
+                      className={`enhance-btn ${enhancing ? 'enhancing' : ''}`}
+                      onClick={enhancePrompt}
+                      disabled={enhancing || !text.trim()}
+                      title="Poboljšaj prompt"
+                    >
+                      {enhancing ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
+                    </button>
+                  )}
+                  <button
+                    className={`send-btn ${text.trim() || attachedImages.length > 0 ? 'active' : ''}`}
+                    onClick={handleSubmit}
+                    disabled={!text.trim() && attachedImages.length === 0}
+                  >
+                    <ArrowUp size={18} />
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>
