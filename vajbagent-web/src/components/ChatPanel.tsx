@@ -606,9 +606,17 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
       clearTimeout(hardTimer)
     }
 
-    // Verify we got something
+    // Verify we got something. If we got a finish_reason but no text and
+    // no tool calls, that's actually a valid "model decided to stop" — the
+    // provider sent the terminator without content. Treat it as empty
+    // completion instead of a fatal error so we don't trigger the retry
+    // loop on something that worked.
     const resultToolCalls = Object.values(toolCalls)
     if (!fullText && resultToolCalls.length === 0) {
+      if (finishReason) {
+        // Clean stop with no payload — treat as empty assistant response.
+        return { text: '', toolCalls: [], finishReason }
+      }
       throw new Error('Stream prekinut pre nego sto je odgovor stigao. Probaj ponovo.')
     }
 
@@ -763,8 +771,10 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
                 ? Math.min(4000 * Math.pow(2, attempt - 1), 15000)
                 : Math.min(2000 * Math.pow(2, attempt - 1), 8000)
 
+              // Status bar only — do not pollute the chat feed with retry
+              // noise. User sees the subtle status line at the bottom, not
+              // three separate "Pokušavam ponovo" messages.
               setStatusText(`Pokušavam ponovo (${attempt}/${MAX_RETRIES})...`)
-              setDisplayMessages(prev => [...prev, { role: 'status', content: `Pokušavam ponovo (${attempt}/${MAX_RETRIES})...` }])
               await new Promise(r => setTimeout(r, delay))
             }
 
@@ -917,20 +927,19 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
                 if (requested.length >= 3 && missing.length > 0) {
                   sectionNudgeUsed = true
                   console.warn(`[Agent] Section completeness nudge — missing: ${missing.map(m => m.key).join(', ')}`)
+                  // SILENT nudge: model's final text is discarded, section
+                  // directive is injected into history only. User sees a
+                  // subtle status line but no extra chat messages — the
+                  // build looks continuous instead of "done → oh wait → done".
                   if (result.text) {
                     historyRef.current = [...historyRef.current, { role: 'assistant', content: result.text }]
-                    setDisplayMessages(prev => [...prev, { role: 'assistant', content: result.text }])
                   }
-                  setDisplayMessages(prev => [...prev, {
-                    role: 'status',
-                    content: `Dodajem nedostajuće sekcije: ${missing.map(m => m.key).join(', ')}…`,
-                  }])
                   historyRef.current.push({
                     role: 'system',
                     content: [
-                      `QUALITY CHECK FAILED: The user asked for these sections but your index.html is missing them: ${missing.map(m => m.key).join(', ')}.`,
+                      `QUALITY CHECK: The user asked for these sections but your index.html is missing them: ${missing.map(m => m.key).join(', ')}.`,
                       'Add the missing sections NOW by using replace_in_file to insert them in the correct position (usually before </main> or before <footer>). Match the existing design language (same colors, spacing, typography, component patterns). Each new section must have real tailored copy — no Lorem ipsum, no placeholders.',
-                      'Do not describe what you will do — just call the tools.',
+                      'Do not describe what you will do — just call the tools. Do not produce any summary text until all sections are implemented.',
                     ].join(' '),
                   })
                   setStatusText('Dopunjujem sekcije…')
