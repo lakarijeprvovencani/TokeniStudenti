@@ -237,6 +237,71 @@ Cloudflare R2 (bucket: vajbagent):
 - **Supabase**: Connect user's Supabase project for database + auth in generated apps
 - All OAuth flows go through backend (vajbagent.com) as proxy — tokens stored in Redis per user
 
+## Recent Changes (April 2026)
+
+### Model Specs Updated (convert.js, index.js, CONTEXT.md)
+- Claude Sonnet 4.6 and Opus 4.6 context windows updated from 200K to **1M** (official Anthropic docs, March 2026)
+- GPT-4.1 input limit raised from 200K to **900K** tokens (1M context - 32K output)
+- `MODEL_INPUT_LIMITS` in `src/convert.js` updated for all models
+- CONTEXT.md model table corrected (Turbo was listed as o4-mini, actually GPT-4.1)
+- `reasoning_effort` already correctly applied to GPT-5 family + o4-mini in `handleOpenAI()` (line ~1791 in index.js)
+
+### Reasoning Token Fix (index.js)
+- GPT-5 models added to `isReasoning` check (`resolved.backendModel.startsWith('gpt-5')`)
+- Without this, GPT-5 Mini spent all output tokens on reasoning, returning empty `content` with `finish_reason: "length"`
+- `reasoning_effort: 'low'` for small requests (<=2048 tokens), `'medium'` for coding tasks
+
+### Newline/Escape Fix (toolHandler.ts)
+- AI models sometimes send double-escaped `\\n` in tool call arguments for `write_file`
+- Heuristic in `write_file` handler: if textual file has `\\n` literals AND (<=3 lines OR avg line >500 chars), auto-converts `\\n`→`\n`, `\\t`→`\t`, `\\"`→`"`
+- Prevents HTML/CSS appearing as single-line code with visible `\n` characters
+
+### Prompt Enhancer (Welcome.tsx, Welcome.css)
+- "Poboljšaj prompt" button (Sparkles icon) on Welcome screen
+- Calls `/v1/chat/completions` with `vajb-agent-lite` (GPT-5 Mini), `stream: false`, `max_tokens: 4096`
+- System prompt instructs model to enhance user's web project description
+- Opt-in only — user clicks button, result replaces textarea content
+
+### Drag & Drop Improvements
+- **Welcome screen**: drag & drop images now works on the main input area (was missing)
+- **Chat panel**: drop zone expanded from small input area to entire chat panel div
+- Both support same image formats as file picker
+
+### File Explorer Enhancements (FileExplorer.tsx, FileExplorer.css)
+- **Folder right-click menu**: "Novi fajl" (create file), "Dodaj sliku / video" (upload), "Preimenuj", "Obriši folder"
+- **File right-click menu**: added "Dodaj sliku / video" option
+- Context menu positioning fixed (`left: 24px`, `min-width: 170px`, `white-space: nowrap`)
+- Toolbar and drop overlay text updated to include video
+
+### Refresh Flash Fix (App.tsx)
+- New `'booting'` state (dark background + orange spinner) shown while app checks for active project
+- Prevents brief flash of Welcome page before resuming to IDE
+- State flow: `booting` → `ide` (if project resumes) or `booting` → `welcome` (if no project)
+
+### Deploy Persistence (IDELayout.tsx)
+- `deployUrl` and `nlSiteId` saved in project data (Redis + IndexedDB)
+- On resume, "Objavljeno" button shows instead of "Objavi" if site was previously deployed
+
+### R2 + Redis Migration (completed earlier)
+- Full migration from IndexedDB-only to cloud storage (R2 for binary, Redis for metadata)
+- Video support added (mp4/webm, 15MB limit, max 3 per project)
+- Media upload pipeline: presigned URLs, R2 public URLs replace data URLs on autosave
+- Resume flow fetches R2 binaries and hydrates into WebContainer
+- Deploy (Netlify/GitHub) fetches R2 binaries before uploading
+
+### Backend Fix (index.js)
+- `req` parameter was undefined in `handleOpenAINonStream` and `handleOpenAIStream` — fixed by passing it from `chatCompletionsHandler`
+
+---
+
+**What to watch for (next agent):**
+- `src/convert.js` — `MODEL_INPUT_LIMITS` must match real context windows. If Anthropic/OpenAI release new models, update here.
+- `src/index.js` line ~62 — `MAX_OUTPUT` table must match official max output tokens.
+- `src/index.js` line ~1791 — `isReasoning` check: any new reasoning model needs to be included here.
+- `src/index.js` line ~1800 — `reasoning_effort` logic: `'low'` for small requests, `'medium'` for coding. GPT-5 supports: minimal, low, medium, high, xhigh.
+- `vajbagent-web/src/services/toolHandler.ts` — newline heuristic in `write_file`: watch for false positives (files that legitimately contain `\\n`).
+- Model specs verified April 2026: GPT-5 Mini (400K/128K), GPT-4.1 (1M/32K), GPT-5 (400K/128K), GPT-5.4 (1.05M/128K), Claude Sonnet 4.6 (1M/64K), Claude Opus 4.6 (1M/128K).
+
 ## Building the Extension
 - Extension source: `vajbagent-vscode/`
 - Build: `cd vajbagent-vscode && npm run compile && npx @vscode/vsce package --no-dependencies`

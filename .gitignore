@@ -7,3 +7,6 @@ data/
 .vajbagent/
 *.vsix
 !public/vajbagent-latest.vsix
+
+# Local Netlify folder
+.netlify

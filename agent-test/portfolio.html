@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="sr" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio — Agent Test</title>
+  <link rel="stylesheet" href="style.css">
+  <!--
+    Photo credits (Unsplash):
+    proj1.jpg — Muhammad Rosyid Izzulkhaq
+    proj2.jpg — Safar Safarov
+    proj3.jpg — Growtika
+    proj4.jpg — Hossain Khan
+    proj5.jpg — Bernd Dittrich
+    proj6.jpg — Markus Spiske
+  -->
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="site-header">
+    <div>
+      <span class="site-kicker">Portfolio</span>
+      <h1>Moj Portfolio 2026</h1>
+    </div>
+    <nav class="main-nav" aria-label="Glavna navigacija">
+      <a href="#hero">Početna</a>
+      <a href="#projekti">Projekti</a>
+      <a href="#kontakt">Kontakt</a>
+      <a href="index.html">← Index</a>
+    </nav>
+    <button class="header-darkmode-btn" id="darkmode-toggle" aria-label="Prebaci dark/light mode">
+      <span class="darkmode-icon">🌙</span>
+    </button>
+  </header>
+
+  <main>
+    <!-- ===== HERO ===== -->
+    <section class="pf-hero" id="hero" aria-labelledby="pf-hero-title">
+      <div class="pf-hero-card">
+        <div class="pf-hero-copy">
+          <span class="section-label">Dobrodošli</span>
+          <h2 id="pf-hero-title">Zdravo, ja sam<br><strong class="pf-hero-name">Marko Nikolić</strong></h2>
+          <p class="pf-hero-sub">Full-stack developer koji voli čist kod, brze sajte i lepe interfejse. Radim sa React-om, Node.js-om i modernim CSS-om.</p>
+          <div class="pf-hero-tags" aria-label="Tehnologije">
+            <span class="pf-tag">React</span>
+            <span class="pf-tag">Node.js</span>
+            <span class="pf-tag">TypeScript</span>
+            <span class="pf-tag">CSS</span>
+            <span class="pf-tag">PostgreSQL</span>
+          </div>
+          <div class="hero-actions">
+            <a class="btn-primary" href="#projekti">Pogledaj projekte</a>
+            <a class="btn-secondary" href="#kontakt">Kontaktiraj me</a>
+          </div>
+        </div>
+        <div class="pf-hero-side">
+          <div class="pf-avatar" aria-hidden="true">MN</div>
+          <div class="hero-mini-stat">
+            <strong>24+</strong>
+            <span>završenih projekata</span>
+          </div>
+          <div class="hero-mini-stat">
+            <strong>4 god.</strong>
+            <span>iskustva</span>
+          </div>
+          <div class="hero-mini-stat">
+            <strong>98%</strong>
+            <span>zadovoljnih klijenata</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== GALERIJA PROJEKATA ===== -->
+    <section class="pf-projects" id="projekti" aria-labelledby="pf-projects-title">
+      <div class="section-heading">
+        <span class="section-label">Radovi</span>
+        <h2 id="pf-projects-title">Odabrani projekti</h2>
+        <p>Šest projekata koji pokazuju različite tehnologije i pristupe — od web aplikacija do mobilnih rešenja.</p>
+      </div>
+
+      <div class="pf-projects-grid">
+
+        <article class="pf-project-card">
+          <div class="pf-project-img-wrap">
+            <img src="img/proj1.jpg" alt="E-commerce platforma — screenshot aplikacije" loading="lazy">
+            <span class="pf-project-badge">Web App</span>
+          </div>
+          <div class="pf-project-body">
+            <h3>E-commerce platforma</h3>
+            <p>Kompletna online prodavnica sa košaricom, plaćanjem i admin panelom. React frontend, Node.js backend.</p>
+            <div class="pf-project-tags">
+              <span class="pf-tag pf-tag--sm">React</span>
+              <span class="pf-tag pf-tag--sm">Node.js</span>
+              <span class="pf-tag pf-tag--sm">Stripe</span>
+            </div>
+            <div class="pf-project-actions">
+              <a href="#" class="btn-primary pf-btn-sm">Demo</a>
+              <a href="#" class="btn-secondary pf-btn-sm">GitHub</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="pf-project-card">
+          <div class="pf-project-img-wrap">
+            <img src="img/proj2.jpg" alt="Developer portfolio screenshot" loading="lazy">
+            <span class="pf-project-badge">Portfolio</span>
+          </div>
+          <div class="pf-project-body">
+            <h3>Portfolio sajt</h3>
+            <p>Personalni portfolio sa animacijama, dark mode podrškom i smooth scroll navigacijom. Čist HTML/CSS/JS.</p>
+            <div class="pf-project-tags">
+              <span class="pf-tag pf-tag--sm">HTML</span>
+              <span class="pf-tag pf-tag--sm">CSS</span>
+              <span class="pf-tag pf-tag--sm">JavaScript</span>
+            </div>
+            <div class="pf-project-actions">
+              <a href="#" class="btn-primary pf-btn-sm">Demo</a>
+              <a href="#" class="btn-secondary pf-btn-sm">GitHub</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="pf-project-card">
+          <div class="pf-project-img-wrap">
+            <img src="img/proj3.jpg" alt="Dashboard aplikacija screenshot" loading="lazy">
+            <span class="pf-project-badge">Dashboard</span>
+          </div>
+          <div class="pf-project-body">
+            <h3>Analytics dashboard</h3>
+            <p>Real-time dashboard sa graficima, tabelama i filterima. Poveži se sa bilo kojim API-jem.</p>
+            <div class="pf-project-tags">
+              <span class="pf-tag pf-tag--sm">TypeScript</span>
+              <span class="pf-tag pf-tag--sm">Chart.js</span>
+              <span class="pf-tag pf-tag--sm">REST API</span>
+            </div>
+            <div class="pf-project-actions">
+              <a href="#" class="btn-primary pf-btn-sm">Demo</a>
+              <a href="#" class="btn-secondary pf-btn-sm">GitHub</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="pf-project-card">
+          <div class="pf-project-img-wrap">
+            <img src="img/proj4.jpg" alt="Mobilna aplikacija screenshot" loading="lazy">
+            <span class="pf-project-badge">Mobile</span>
+          </div>
+          <div class="pf-project-body">
+            <h3>Task manager app</h3>
+            <p>Mobilna aplikacija za praćenje zadataka sa notifikacijama, kalendarom i timskom saradnjom.</p>
+            <div class="pf-project-tags">
+              <span class="pf-tag pf-tag--sm">React Native</span>
+              <span class="pf-tag pf-tag--sm">Expo</span>
+              <span class="pf-tag pf-tag--sm">Firebase</span>
+            </div>
+            <div class="pf-project-actions">
+              <a href="#" class="btn-primary pf-btn-sm">Demo</a>
+              <a href="#" class="btn-secondary pf-btn-sm">GitHub</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="pf-project-card">
+          <div class="pf-project-img-wrap">
+            <img src="img/proj5.jpg" alt="API server screenshot" loading="lazy">
+            <span class="pf-project-badge">Backend</span>
+          </div>
+          <div class="pf-project-body">
+            <h3>REST API server</h3>
+            <p>Skalabilni API server sa autentifikacijom, rate limitingom, Redis kešom i kompletnom dokumentacijom.</p>
+            <div class="pf-project-tags">
+              <span class="pf-tag pf-tag--sm">Node.js</span>
+              <span class="pf-tag pf-tag--sm">Redis</span>
+              <span class="pf-tag pf-tag--sm">PostgreSQL</span>
+            </div>
+            <div class="pf-project-actions">
+              <a href="#" class="btn-primary pf-btn-sm">Demo</a>
+              <a href="#" class="btn-secondary pf-btn-sm">GitHub</a>
+            </div>
+          </div>
+        </article>
+
+        <article class="pf-project-card">
+          <div class="pf-project-img-wrap">
+            <img src="img/proj6.jpg" alt="Open source projekat screenshot" loading="lazy">
+            <span class="pf-project-badge">Open Source</span>
+          </div>
+          <div class="pf-project-body">
+            <h3>CLI alat za devove</h3>
+            <p>Open source command-line alat koji automatizuje ponavljajuće zadatke u razvoju softvera.</p>
+            <div class="pf-project-tags">
+              <span class="pf-tag pf-tag--sm">Python</span>
+              <span class="pf-tag pf-tag--sm">CLI</span>
+              <span class="pf-tag pf-tag--sm">npm</span>
+            </div>
+            <div class="pf-project-actions">
+              <a href="#" class="btn-primary pf-btn-sm">Demo</a>
+              <a href="#" class="btn-secondary pf-btn-sm">GitHub</a>
+            </div>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <!-- ===== KONTAKT ===== -->
+    <section class="pf-contact" id="kontakt" aria-labelledby="pf-contact-title">
+      <div class="pf-contact-inner">
+
+        <div class="pf-contact-info">
+          <span class="section-label">Kontakt</span>
+          <h2 id="pf-contact-title">Hajde da sarađujemo</h2>
+          <p>Dostupan sam za freelance projekte, konsultacije i dugoročnu saradnju. Pišite slobodno!</p>
+          <ul class="pf-contact-list">
+            <li>
+              <span class="pf-contact-icon" aria-hidden="true">📧</span>
+              <span>marko@example.com</span>
+            </li>
+            <li>
+              <span class="pf-contact-icon" aria-hidden="true">📍</span>
+              <span>Beograd, Srbija</span>
+            </li>
+            <li>
+              <span class="pf-contact-icon" aria-hidden="true">⏱️</span>
+              <span>Odgovaram u roku od 24h</span>
+            </li>
+            <li>
+              <span class="pf-contact-icon" aria-hidden="true">💼</span>
+              <span>Otvoren za nove projekte</span>
+            </li>
+          </ul>
+          <div class="pf-socials">
+            <a href="#" class="pf-social-btn" aria-label="GitHub">GH</a>
+            <a href="#" class="pf-social-btn" aria-label="LinkedIn">LI</a>
+            <a href="#" class="pf-social-btn" aria-label="Twitter">TW</a>
+          </div>
+        </div>
+
+        <form class="pf-contact-form" id="kontakt-forma" novalidate aria-label="Kontakt forma">
+          <div class="pf-form-group">
+            <label for="ime">Vaše ime <span class="pf-required" aria-hidden="true">*</span></label>
+            <input type="text" id="ime" name="ime" placeholder="npr. Ana Jovanović" autocomplete="name">
+          </div>
+          <div class="pf-form-group">
+            <label for="email">Email adresa <span class="pf-required" aria-hidden="true">*</span></label>
+            <input type="email" id="email" name="email" placeholder="npr. ana@email.com" autocomplete="email">
+          </div>
+          <div class="pf-form-group">
+            <label for="tema">Tema</label>
+            <select id="tema" name="tema">
+              <option value="">— Izaberi temu —</option>
+              <option value="freelance">Freelance projekat</option>
+              <option value="konsultacija">Konsultacija</option>
+              <option value="saradnja">Dugoročna saradnja</option>
+              <option value="ostalo">Ostalo</option>
+            </select>
+          </div>
+          <div class="pf-form-group">
+            <label for="poruka">Poruka <span class="pf-required" aria-hidden="true">*</span></label>
+            <textarea id="poruka" name="poruka" rows="5" placeholder="Opišite šta vam treba..."></textarea>
+          </div>
+          <button type="submit" class="btn-primary pf-submit-btn">Pošalji poruku</button>
+          <p class="pf-form-note"><span class="pf-required">*</span> Obavezna polja</p>
+        </form>
+
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="site-footer site-footer-rich">
+    <div class="footer-grid">
+      <div>
+        <h3>Portfolio</h3>
+        <p>Kompletna portfolio stranica sa hero sekcijom, galerijom projekata i kontakt formom.</p>
+      </div>
+      <div>
+        <h3>Navigacija</h3>
+        <ul class="footer-links">
+          <li><a href="#hero">Hero</a></li>
+          <li><a href="#projekti">Projekti</a></li>
+          <li><a href="#kontakt">Kontakt</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Agent-test</h3>
+        <ul class="footer-links">
+          <li><a href="index.html">Početna</a></li>
+          <li><a href="about.html">O nama</a></li>
+          <li><a href="galerija.html">Galerija</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="footer-note">Portfolio primer &middot; Agent-test folder &middot; Vajb kodiranje</p>
+  </footer>
+
+  <!-- Toast notification -->
+  <div class="toast" id="toast" role="alert" aria-live="polite"></div>
+
+  <script>
+    /* ── Dark mode ── */
+    (function () {
+      const btn = document.getElementById('darkmode-toggle');
+      const icon = btn.querySelector('.darkmode-icon');
+
+      function applyTheme(dark) {
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        icon.textContent = dark ? '☀️' : '🌙';
+        localStorage.setItem('theme', dark ? 'dark' : 'light');
+      }
+
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      applyTheme(saved ? saved === 'dark' : prefersDark);
+
+      btn.addEventListener('click', function () {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        applyTheme(!isDark);
+      });
+    })();
+
+    /* ── Smooth scroll ── */
+    document.querySelectorAll('a[href^="#"]').forEach(function (link) {
+      link.addEventListener('click', function (e) {
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          e.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+
+    /* ── Toast helper ── */
+    function showToast(msg, type) {
+      var t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast toast--' + (type || 'success') + ' toast--visible';
+      clearTimeout(t._tid);
+      t._tid = setTimeout(function () {
+        t.className = 'toast';
+      }, 3800);
+    }
+
+    /* ── Kontakt forma validacija ── */
+    document.addEventListener('DOMContentLoaded', function () {
+      var form = document.getElementById('kontakt-forma');
+      if (!form) return;
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var ime = form.ime.value.trim();
+        var email = form.email.value.trim();
+        var poruka = form.poruka.value.trim();
+        var emailReg = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        clearErrors(form);
+
+        var ok = true;
+        if (!ime) { showError(form.ime, 'Unesite vaše ime'); ok = false; }
+        if (!email) { showError(form.email, 'Unesite email adresu'); ok = false; }
+        else if (!emailReg.test(email)) { showError(form.email, 'Email adresa nije ispravna'); ok = false; }
+        if (!poruka) { showError(form.poruka, 'Unesite poruku'); ok = false; }
+        else if (poruka.length < 10) { showError(form.poruka, 'Poruka mora imati najmanje 10 karaktera'); ok = false; }
+
+        if (ok) {
+          var btn = form.querySelector('.btn-primary');
+          btn.disabled = true;
+          btn.textContent = 'Šaljem...';
+          setTimeout(function () {
+            form.reset();
+            clearErrors(form);
+            btn.disabled = false;
+            btn.textContent = 'Pošalji poruku';
+            showToast('✅ Poruka je uspešno poslata! Odgovorićemo uskoro.', 'success');
+          }, 1200);
+        } else {
+          showToast('⚠️ Molimo ispravite greške u formi.', 'error');
+        }
+      });
+
+      function showError(field, msg) {
+        field.classList.add('field--error');
+        var err = document.createElement('span');
+        err.className = 'field-error-msg';
+        err.textContent = msg;
+        field.parentNode.appendChild(err);
+      }
+
+      function clearErrors(form) {
+        form.querySelectorAll('.field--error').forEach(function (f) { f.classList.remove('field--error'); });
+        form.querySelectorAll('.field-error-msg').forEach(function (el) { el.remove(); });
+      }
+
+      /* Live validation on blur */
+      form.querySelectorAll('input, textarea').forEach(function (field) {
+        field.addEventListener('blur', function () {
+          if (this.value.trim()) {
+            this.classList.remove('field--error');
+            var msg = this.parentNode.querySelector('.field-error-msg');
+            if (msg) msg.remove();
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>
