@@ -650,6 +650,7 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
     userScrolledUp.current = false
 
     let lastAssistantHadText = false
+    let lazyNudgeUsed = false
 
     try {
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
@@ -811,7 +812,38 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
         // ─── Process result ──────────────────────────────────────────
 
         if (result.toolCalls.length === 0) {
-          // Pure text response, done
+          // Lazy-parroting guard: some weaker models (notably Turbo / GPT-4.1)
+          // respond to long build briefs with a cleaned-up version of the
+          // brief instead of calling any tools. If the user clearly asked to
+          // BUILD something and we haven't created any files yet in this
+          // session, inject a runtime system nudge and retry once.
+          const noFilesCreatedYet = !historyRef.current.some(m =>
+            m.role === 'assistant' && m.tool_calls?.some(tc => tc.function.name === 'write_file')
+          )
+          const lastUserMsg = [...historyRef.current].reverse().find(m => m.role === 'user')
+          const userText = (lastUserMsg?.content || '').toLowerCase()
+          const BUILD_INTENT_RE = /\b(napravi|kreiraj|izgradi|sredi|dodaj|build|create|make|add)\b|\b(sajt|stranic|aplikacij|komponent|hero|footer|navigacij|layout|page|component|site|app|landing|portfolio)\b/i
+          const hasBuildIntent = BUILD_INTENT_RE.test(userText) && userText.length > 40
+          const looksLikeParroting = (result.text || '').length > 300
+
+          if (!lazyNudgeUsed && noFilesCreatedYet && hasBuildIntent && looksLikeParroting) {
+            lazyNudgeUsed = true
+            console.warn('[Agent] Lazy-parroting detected — injecting build nudge and retrying')
+            // Persist the model's text so the user can see it was ignored,
+            // but keep it in history so the model has context for why we're nudging.
+            if (result.text) {
+              historyRef.current = [...historyRef.current, { role: 'assistant', content: result.text }]
+            }
+            historyRef.current.push({
+              role: 'system',
+              content: 'You returned only text. The user asked you to BUILD a website — not to summarize the brief. You MUST now call write_file to create the first file (usually index.html or src/App.tsx or similar depending on the stack). Do NOT describe the plan again. Start writing files immediately with write_file. Keep each file under 120 lines; split into multiple files if needed.',
+            })
+            setStatusText('Pokrećem izgradnju…')
+            setStreamText('')
+            continue
+          }
+
+          // Pure text response (clarifying answer, final summary, etc.) — we're done.
           if (result.text) {
             historyRef.current = [...historyRef.current, { role: 'assistant', content: result.text }]
             setDisplayMessages(prev => [...prev, { role: 'assistant', content: result.text }])
