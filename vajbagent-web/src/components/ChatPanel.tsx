@@ -69,12 +69,12 @@ const RETRY_PATTERN = /timeout|predugo|idle|ECONNRESET|ENOTFOUND|socket hang up|
 
 const CONTEXT_LIMITS: Record<string, number> = {
   'vajb-agent-lite': 400000,
-  'vajb-agent-turbo': 1000000,
+  'vajb-agent-turbo': 200000,      // Haiku 4.5: 200K context
   'vajb-agent-pro': 400000,
-  'vajb-agent-max': 200000,
+  'vajb-agent-max': 1000000,       // Sonnet 4.6: 1M context
   'vajb-agent-power': 1050000,
-  'vajb-agent-ultra': 200000,
-  'vajb-agent-architect': 200000,
+  'vajb-agent-ultra': 1000000,     // Opus 4.6: 1M context
+  'vajb-agent-architect': 1000000, // Opus 4.6: 1M context
 }
 
 const SESSION_KEY = 'vajb_session'

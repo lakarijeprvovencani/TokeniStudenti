@@ -63,6 +63,7 @@ const MAX_OUTPUT = {
   'gpt-5-mini':        128000,   // verified: developers.openai.com/api/docs/models/gpt-5-mini
   'o4-mini':           100000,
   'gpt-5':             128000,   // verified: developers.openai.com/api/docs/models/gpt-5
+  'claude-haiku-4-5':  64000,    // verified: Anthropic docs — 64K output, 200K context
   'claude-sonnet-4-6': 64000,    // verified: platform.claude.com/docs/en/about-claude/models/overview
   'gpt-5.4':           128000,   // verified: developers.openai.com/api/docs/models/gpt-5.4
   'claude-opus-4-6':   128000,   // verified: platform.claude.com/docs/en/about-claude/models/overview
@@ -73,7 +74,7 @@ const MAX_OUTPUT = {
 
 const VAJB_MODELS = [
   { id: 'vajb-agent-lite',      name: 'VajbAgent Lite',      backend: 'openai',    backendModel: 'gpt-5-mini',      desc: 'GPT-5 Mini — svakodnevno kodiranje, best value' },
-  { id: 'vajb-agent-turbo',     name: 'VajbAgent Turbo',     backend: 'openai',    backendModel: 'gpt-4.1',          desc: 'GPT-4.1 — brz i precizan, jak u kodiranju' },
+  { id: 'vajb-agent-turbo',     name: 'VajbAgent Turbo',     backend: 'anthropic', backendModel: 'claude-haiku-4-5', desc: 'Claude Haiku 4.5 — brz, jeftin, jak tool-caller' },
   { id: 'vajb-agent-pro',       name: 'VajbAgent Pro',       backend: 'openai',    backendModel: 'gpt-5',            desc: 'GPT-5 — ozbiljniji projekti, jak i pametan' },
   { id: 'vajb-agent-max',       name: 'VajbAgent Max',       backend: 'anthropic', backendModel: 'claude-sonnet-4-6', desc: 'Claude Sonnet — kompleksni zadaci' },
   { id: 'vajb-agent-power',     name: 'VajbAgent Power',     backend: 'openai',    backendModel: 'gpt-5.4',          desc: 'GPT-5.4 — najjači OpenAI, flagship' },

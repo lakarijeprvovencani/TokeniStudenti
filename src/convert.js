@@ -113,12 +113,12 @@ const MODEL_INPUT_LIMITS = {
   'gpt-4.1-mini': { tokens: 900000, chars: 3600000 },
   'gpt-4.1':      { tokens: 900000, chars: 3600000 },
   // Claude models — 1M context as of March 2026 (docs.anthropic.com)
+  'claude-haiku-4-5':  { tokens: 130000, chars: 520000 },   // 200K context - 64K max output
   'claude-sonnet-4-6': { tokens: 900000, chars: 3600000 },  // 1M context - 64K max output
   'claude-opus-4-6':   { tokens: 870000, chars: 3480000 },  // 1M context - 128K max output
   // Legacy
   'gpt-4o-mini':       { tokens: 100000, chars: 400000 },
   'gpt-4o':            { tokens: 100000, chars: 400000 },
-  'claude-haiku-4-5':  { tokens: 130000, chars: 520000 },
 };
 const DEFAULT_LIMIT = { tokens: 100000, chars: 400000 };
 

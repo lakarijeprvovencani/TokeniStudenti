@@ -9,56 +9,56 @@ interface PreviewPanelProps {
 }
 
 /**
- * CSS + JS shield injected into the blob preview HTML.
+ * Scroll-reveal JS shield injected into blob preview HTML.
  *
- * Models love scroll-triggered reveal animations (opacity:0, translateY(20),
- * then IntersectionObserver adds a ".visible" class). Problem: our preview
- * iframe is loaded as a blob with no real scroll container, so the observer
- * often never fires and entire sections stay invisible. Users see "half a
- * site" and think the model failed.
+ * Problem: models love scroll-triggered reveal animations (opacity:0 +
+ * IntersectionObserver adds a ".visible" class). In a blob iframe with
+ * no real scroll container, the observer often never fires and whole
+ * sections stay invisible.
  *
- * This shield:
- *   1. CSS: any element with a class name or data-attribute commonly used
- *      for scroll reveals is forced to opacity:1 / transform:none.
- *   2. JS: after the document is interactive, walk the DOM and apply the
- *      typical "already revealed" classes (visible, aos-animate, animated,
- *      in-view, is-visible) so library-driven reveals also show up.
+ * Solution (JS only, no !important CSS):
+ *   Walk the DOM after load and add every common "already revealed"
+ *   marker class (visible, in-view, aos-animate, animated, revealed…)
+ *   to any element that looks like a scroll reveal target. The user's
+ *   own CSS then handles the transition to the visible state normally.
  *
- * Surgical — does NOT kill hover transitions, button animations, or any
- * other runtime animation. Only neutralizes the initial-hidden states that
- * scroll libraries rely on.
+ * Why no !important CSS anymore: an earlier version forced
+ * opacity:1!important / transform:none!important / visibility:visible
+ * on substring selectors like [class*="fade-"] and broke legitimate
+ * layouts (mobile menu toggles, .header-slide, .scroll-container, etc.).
+ * Pure JS class-addition is surgical — it only affects elements that
+ * were ACTUALLY hidden waiting for a scroll trigger, never touches
+ * display:none / visibility:hidden used for responsive design.
  */
 const PREVIEW_REVEAL_SHIELD = `
-<style data-vajb-shield>
-[class*="fade-"],[class*="reveal"],[class*="animate-"],[class*="slide-"],
-[class*="scroll-"],[class*="appear"],[data-aos],[data-animate],[data-scroll],
-[data-reveal],.hidden-initial,.opacity-0,.invisible,.will-fade-in,
-.before-enter,.not-visible{
-  opacity:1!important;
-  transform:none!important;
-  visibility:visible!important;
-  filter:none!important;
-}
-html,body{opacity:1!important;}
-</style>
 <script data-vajb-shield>
 (function(){
+  var TARGET_SELECTORS = [
+    '.fade-in','.fade-up','.fade-down','.fade-left','.fade-right',
+    '.slide-in','.slide-up','.slide-down','.slide-left','.slide-right',
+    '.reveal','.reveal-up','.reveal-down',
+    '.animate-on-scroll','.scroll-reveal','.scroll-fade',
+    '[data-aos]','[data-animate]','[data-reveal]','[data-scroll-reveal]'
+  ].join(',');
+  var MARKER_CLASSES = ['visible','in-view','is-visible','aos-animate','animated','active','show','shown','revealed'];
   function reveal(){
-    var sels=['.fade-in','.fade-up','.fade-down','.reveal','.slide-in',
-      '.animate-on-scroll','[data-aos]','[data-animate]','[data-reveal]',
-      '.scroll-trigger','.appear','.hidden-initial','.will-fade-in'];
-    var nodes=document.querySelectorAll(sels.join(','));
-    for(var i=0;i<nodes.length;i++){
-      nodes[i].classList.add('visible','in-view','is-visible','aos-animate','animated','active','show','shown','revealed');
-    }
+    try {
+      var nodes = document.querySelectorAll(TARGET_SELECTORS);
+      for (var i = 0; i < nodes.length; i++) {
+        for (var j = 0; j < MARKER_CLASSES.length; j++) {
+          nodes[i].classList.add(MARKER_CLASSES[j]);
+        }
+      }
+    } catch(e) {}
   }
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',reveal);
-  }else{
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', reveal);
+  } else {
     reveal();
   }
-  setTimeout(reveal,50);
-  setTimeout(reveal,300);
+  setTimeout(reveal, 50);
+  setTimeout(reveal, 300);
+  setTimeout(reveal, 1000);
 })();
 </script>
 `
