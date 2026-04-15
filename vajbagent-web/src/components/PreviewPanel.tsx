@@ -345,8 +345,24 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
       }
       prevHtmlHash.current = hashKey
 
+      // Ensure UTF-8: without charset in both the Blob MIME AND the HTML
+      // itself, Chrome's blob: loader defaults to Latin-1 and mangles Serbian
+      // diacritics (ć → Ä‡, š → Å¡, etc.). Belt-and-suspenders:
+      //   1. Inject <meta charset="UTF-8"> right after <head> if missing.
+      //   2. Set the Blob MIME type to text/html;charset=utf-8.
+      let finalHtml = html
+      if (!/<meta[^>]+charset/i.test(finalHtml)) {
+        if (/<head[^>]*>/i.test(finalHtml)) {
+          finalHtml = finalHtml.replace(/<head([^>]*)>/i, '<head$1><meta charset="UTF-8">')
+        } else if (/<html[^>]*>/i.test(finalHtml)) {
+          finalHtml = finalHtml.replace(/<html([^>]*)>/i, '<html$1><head><meta charset="UTF-8"></head>')
+        } else {
+          finalHtml = '<meta charset="UTF-8">\n' + finalHtml
+        }
+      }
+
       if (prevBlobUrl.current) URL.revokeObjectURL(prevBlobUrl.current)
-      const blob = new Blob([html], { type: 'text/html' })
+      const blob = new Blob([finalHtml], { type: 'text/html;charset=utf-8' })
       const url = URL.createObjectURL(blob)
       prevBlobUrl.current = url
       iframeRef.current.src = url
@@ -542,7 +558,10 @@ ${sharedStyles}
               } else {
                 const fullSite = buildFullSiteBlob()
                 if (fullSite) {
-                  const blob = new Blob([fullSite], { type: 'text/html' })
+                  const withCharset = /<meta[^>]+charset/i.test(fullSite)
+                    ? fullSite
+                    : fullSite.replace(/<head([^>]*)>/i, '<head$1><meta charset="UTF-8">')
+                  const blob = new Blob([withCharset], { type: 'text/html;charset=utf-8' })
                   window.open(URL.createObjectURL(blob), '_blank')
                 }
               }
