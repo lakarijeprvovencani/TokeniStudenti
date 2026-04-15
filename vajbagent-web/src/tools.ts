@@ -261,4 +261,36 @@ export const TOOL_DEFINITIONS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'git_status',
+      description: 'Proveri da li je korisnik povezao GitHub nalog i vrati username. Pozovi ovo pre git_push da budes siguran da je konekcija aktivna.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'git_list_repos',
+      description: 'Lista GitHub repozitorijuma korisnika (max 30 skorasnjih). Koristi ovo da nadjes ime repoa pre git_push.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'git_push',
+      description: 'Push-uje trenutno stanje projekta na GitHub repozitorijum. Automatski preskace .env, kljuceve, node_modules i druge secret/build fajlove. Ako repo ne postoji, kreira ga. Koristi git_status prvo da potvrdis konekciju.',
+      parameters: {
+        type: 'object',
+        properties: {
+          repo: { type: 'string', description: 'Ime repozitorijuma (samo name, bez owner/). Npr. "moj-sajt".' },
+          message: { type: 'string', description: 'Commit poruka (kratko opisi izmenu).' },
+          create_if_missing: { type: 'boolean', description: 'Ako je true i repo ne postoji, kreira ga kao private. Default: true.' },
+        },
+        required: ['repo', 'message'],
+      },
+    },
+  },
 ]

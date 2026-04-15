@@ -17,7 +17,7 @@ import './ChatPanel.css'
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Message {
-  role: 'user' | 'assistant' | 'tool'
+  role: 'user' | 'assistant' | 'tool' | 'system'
   content: string
   tool_calls?: ToolCall[]
   tool_call_id?: string
@@ -62,7 +62,7 @@ interface ChatPanelProps {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://vajbagent.com'
-const MAX_ITERATIONS = 20
+const MAX_ITERATIONS = 50
 const MAX_RETRIES = 3
 const RETRY_PATTERN = /timeout|predugo|idle|ECONNRESET|ENOTFOUND|socket hang up|429|502|503|529|rate.limit|ETIMEDOUT|ECONNREFUSED|Stream prekinut|Failed to fetch|NetworkError|Load failed/i
 
@@ -479,6 +479,9 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
         if (m.role === 'tool') {
           return { role: 'tool' as const, content: m.content, tool_call_id: m.tool_call_id }
         }
+        if (m.role === 'system') {
+          return { role: 'system' as const, content: m.content }
+        }
         if (m.tool_calls) {
           return { role: 'assistant' as const, content: m.content || null, tool_calls: m.tool_calls }
         }
@@ -653,11 +656,11 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
         // Check abort
         if (abortRef.current?.signal.aborted) break
 
-        // Warn agent if approaching iteration limit
+        // Warn agent if approaching iteration limit (mid-conversation system directive).
         if (iteration === MAX_ITERATIONS - 10) {
           historyRef.current.push({
-            role: 'user',
-            content: '[SYSTEM] You are approaching the tool call limit. Wrap up your current work — summarize what you did and what remains, then STOP calling tools.',
+            role: 'system',
+            content: 'You are approaching the tool call limit. Wrap up your current work — summarize what you did and what remains, then STOP calling tools.',
           })
         }
 
@@ -846,7 +849,7 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
             else if (toolName === 'list_files') statusLabel = `Pregledam fajlove`
             else if (toolName === 'replace_in_file') statusLabel = `Menjam ${args.path}`
             else if (toolName === 'execute_command') statusLabel = `${(args.command || '').substring(0, 40)}`
-          } catch {}
+          } catch { /* streaming args may still be partial JSON — fall back to generic label */ }
 
           setDisplayMessages(prev => [...prev, { role: 'status', content: statusLabel }])
           setStatusText(statusLabel)
@@ -977,7 +980,12 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
   }
 
   return (
-    <div className="chat-panel">
+    <div
+      className="chat-panel"
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+    >
       <div className="chat-header">
         <img src="/logo.svg" alt="V" style={{ width: 16, height: 16 }} />
         <span>Chat sa VajbAgentom</span>

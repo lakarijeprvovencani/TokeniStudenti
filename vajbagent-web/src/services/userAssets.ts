@@ -329,6 +329,10 @@ export function isDataUrl(value: string): boolean {
 /**
  * Upload a single data-URL image to R2 via the backend presign flow.
  * Returns the public R2 URL, or null if the upload fails (caller keeps data URL).
+ *
+ * Retries transient failures (network errors, 5xx, 408, 429) up to 3 times with
+ * exponential backoff. Client errors (4xx other than 408/429) fail immediately
+ * since retry won't help (wrong size, auth expired, etc).
  */
 export async function uploadImageToR2(
   projectId: string,
@@ -347,25 +351,42 @@ export async function uploadImageToR2(
   }
   const contentType = mimeMap[ext] || 'application/octet-stream'
 
-  try {
-    const { uploadUrl, r2Key } = await signUpload(projectId, filePath, contentType, bytes.length)
+  const MAX_ATTEMPTS = 3
+  const isRetryableStatus = (s: number) => s >= 500 || s === 408 || s === 429
+  const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
-    const putResp = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': contentType },
-      body: bytes as unknown as BodyInit,
-    })
-    if (!putResp.ok) {
-      console.warn('[userAssets] R2 PUT failed:', putResp.status)
-      return null
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const { uploadUrl, r2Key } = await signUpload(projectId, filePath, contentType, bytes.length)
+
+      const putResp = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': contentType },
+        body: bytes as unknown as BodyInit,
+      })
+
+      if (!putResp.ok) {
+        const retryable = isRetryableStatus(putResp.status)
+        console.warn(`[userAssets] R2 PUT failed (attempt ${attempt}/${MAX_ATTEMPTS}):`, putResp.status, filePath)
+        if (!retryable || attempt === MAX_ATTEMPTS) return null
+        await sleep(500 * Math.pow(3, attempt - 1)) // 500ms, 1500ms
+        continue
+      }
+
+      const { url } = await commitUpload(projectId, r2Key, filePath)
+      if (attempt > 1) {
+        console.log(`[userAssets] R2 upload succeeded for ${filePath} on attempt ${attempt}`)
+      }
+      return url
+    } catch (err) {
+      // Network errors, CORS, timeouts — all retryable
+      console.warn(`[userAssets] R2 upload threw (attempt ${attempt}/${MAX_ATTEMPTS}) for ${filePath}:`, err)
+      if (attempt === MAX_ATTEMPTS) return null
+      await sleep(500 * Math.pow(3, attempt - 1))
     }
-
-    const { url } = await commitUpload(projectId, r2Key, filePath)
-    return url
-  } catch (err) {
-    console.warn('[userAssets] R2 upload failed for', filePath, err)
-    return null
   }
+
+  return null
 }
 
 /**

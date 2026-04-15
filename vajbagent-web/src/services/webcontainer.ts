@@ -195,6 +195,11 @@ function ensurePreviewErrorListener(wc: WebContainer) {
     }
     console.warn('[WebContainer] Preview error:', err)
     previewErrors.push(err)
+    // Cap buffer to prevent unbounded growth over long sessions —
+    // drop oldest when we hit 100 entries.
+    if (previewErrors.length > 100) {
+      previewErrors = previewErrors.slice(-100)
+    }
     for (const cb of previewErrorCallbacks) cb(err)
   })
 }
@@ -348,7 +353,7 @@ export async function runCommand(cmd: string, args: string[]): Promise<string> {
       if (done) break
       output += value
     }
-  } catch {}
+  } catch { /* reader throws when timeout kills the process mid-read — harmless */ }
 
   clearTimeout(timeout)
   const exitCode = await process.exit

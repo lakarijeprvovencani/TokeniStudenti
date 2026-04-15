@@ -1,6 +1,8 @@
 import { writeFile, readFile, listFiles, runCommand, getAllFiles } from './webcontainer'
 import { parseToolCallArguments } from './toolArgsParse'
 import { scopedStorage } from './storageScope'
+import * as ghInt from './githubIntegration'
+import { filterForPush, scanForSecrets, redactSecrets, ensureGitignoreSafety, DEFAULT_GITIGNORE } from './pushFilter'
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://vajbagent.com'
 
@@ -62,6 +64,73 @@ export async function executeToolCall(
       case 'write_file': {
         const path = (args.path as string || '').replace(/^\/+/, '')
         let content = (args.content as string) || ''
+
+        // Double-escape fix: konvertuj literal \\n → \n SAMO ako fajl
+        // nema nijedan pravi newline (model je ceo fajl zbio u jednu liniju).
+        // Ovaj konzervativan pristup (portovan iz vajbagent-vscode/src/tools.ts:499)
+        // ne moze da slomi multi-line JS stringove jer cim ima bilo koji pravi
+        // \n u fajlu, preskace konverziju u potpunosti.
+        if (content.includes('\\n') && !content.includes('\n')) {
+          content = content.replace(/\\n/g, '\n')
+        }
+
+        // Truncation detection — odbij presecene fajlove umesto da pisemo slomljen kod.
+        // Portovano iz vajbagent-vscode/src/tools.ts:504-537.
+        const lowerPath = path.toLowerCase()
+        if (lowerPath.endsWith('.html') || lowerPath.endsWith('.htm')) {
+          const trimmed = content.trimEnd()
+          if (trimmed.length > 200 && !/<\/html>\s*$/i.test(trimmed)) {
+            return {
+              tool_call_id: tc.id,
+              role: 'tool',
+              content: `GRESKA: HTML je presecen — nedostaje </html>. Fajl ${path} NIJE upisan. Ako je fajl velik, razdvoji u manje komponente ili koristi replace_in_file za ciljane izmene.`,
+            }
+          }
+        }
+        if (/\.(jsx?|tsx?|css|scss|vue|svelte|json)$/i.test(lowerPath) && content.length > 500) {
+          // Broj zagrada izvan stringova/komentara — jednostavan state machine
+          // koji preskace '...', "...", `...`, // line comment i /* block comment */.
+          let opens = 0, closes = 0
+          let i = 0
+          const len = content.length
+          while (i < len) {
+            const ch = content[i]
+            const next = content[i + 1]
+            // Line comment
+            if (ch === '/' && next === '/') {
+              while (i < len && content[i] !== '\n') i++
+              continue
+            }
+            // Block comment
+            if (ch === '/' && next === '*') {
+              i += 2
+              while (i < len - 1 && !(content[i] === '*' && content[i + 1] === '/')) i++
+              i += 2
+              continue
+            }
+            // String literal (single, double, backtick) — skip until matching quote
+            if (ch === '"' || ch === "'" || ch === '`') {
+              const quote = ch
+              i++
+              while (i < len) {
+                if (content[i] === '\\') { i += 2; continue }
+                if (content[i] === quote) { i++; break }
+                i++
+              }
+              continue
+            }
+            if (ch === '{') opens++
+            else if (ch === '}') closes++
+            i++
+          }
+          if (opens - closes >= 2) {
+            return {
+              tool_call_id: tc.id,
+              role: 'tool',
+              content: `GRESKA: Kod u ${path} je presecen — ${opens} otvorenih { vs ${closes} zatvorenih }. Fajl NIJE upisan. Koristi replace_in_file za ciljane izmene ili razdvoji kod u manje fajlove.`,
+            }
+          }
+        }
 
         // Protect user-uploaded binary assets — the agent must never
         // stomp on a real image the user dragged in, even if it gets
@@ -146,15 +215,77 @@ export async function executeToolCall(
         const path = (args.path as string || '').replace(/^\/+/, '')
         const oldText = args.old_text as string || ''
         const newText = args.new_text as string || ''
-        const content = await readFile(path)
-        if (!content.includes(oldText)) {
-          return { tool_call_id: tc.id, role: 'tool', content: `Tekst nije pronadjen u ${path}` }
+
+        if (!oldText) {
+          return { tool_call_id: tc.id, role: 'tool', content: 'GRESKA: old_text je prazan.' }
         }
-        const updated = content.replace(oldText, newText)
+        if (oldText === newText) {
+          return { tool_call_id: tc.id, role: 'tool', content: 'Nema izmena: old_text i new_text su identicni.' }
+        }
+
+        const content = await readFile(path)
+        if (content.startsWith('Greska:')) {
+          return { tool_call_id: tc.id, role: 'tool', content }
+        }
+
+        let matchedOldText = oldText
+        let matchCount = 0
+        let usedFuzzy = false
+
+        if (content.includes(oldText)) {
+          // Exact match path — count occurrences to detect ambiguity.
+          let idx = 0
+          while ((idx = content.indexOf(oldText, idx)) !== -1) {
+            matchCount++
+            idx += oldText.length
+          }
+        } else {
+          // Fuzzy fallback: trim trailing whitespace per line and retry.
+          // Ported from vajbagent-vscode/src/tools.ts:598-619.
+          const contentLines = content.split('\n')
+          const oldLines = oldText.split('\n')
+          const normContent = contentLines.map(l => l.trimEnd())
+          const normOld = oldLines.map(l => l.trimEnd())
+
+          let firstMatchStart = -1
+          for (let i = 0; i <= normContent.length - normOld.length; i++) {
+            let found = true
+            for (let j = 0; j < normOld.length; j++) {
+              if (normContent[i + j] !== normOld[j]) { found = false; break }
+            }
+            if (found) {
+              if (firstMatchStart < 0) firstMatchStart = i
+              matchCount++
+            }
+          }
+
+          if (firstMatchStart < 0) {
+            return {
+              tool_call_id: tc.id,
+              role: 'tool',
+              content: `Tekst nije pronadjen u ${path}. Proveri da li old_text tacno odgovara sadrzaju fajla (whitespace, indentacija, navodnici). Procitaj fajl ponovo sa read_file da vidis tacan sadrzaj.`,
+            }
+          }
+
+          // Use original lines (with real whitespace) so replacement preserves indentation.
+          matchedOldText = contentLines.slice(firstMatchStart, firstMatchStart + oldLines.length).join('\n')
+          usedFuzzy = true
+        }
+
+        if (matchCount > 1) {
+          return {
+            tool_call_id: tc.id,
+            role: 'tool',
+            content: `GRESKA: old_text se pojavljuje ${matchCount} puta u ${path}. Prosiri old_text sa vise konteksta (nekoliko okolnih linija) da bude jedinstven, pa probaj ponovo. Ovo sprecava zamenu pogresne instance.`,
+          }
+        }
+
+        const updated = content.replace(matchedOldText, newText)
         await writeFile(path, updated)
         const allFiles = await getAllFiles()
         onFileChange(allFiles)
-        return { tool_call_id: tc.id, role: 'tool', content: `Fajl azuriran: ${path}` }
+        const fuzzyNote = usedFuzzy ? ' (fuzzy match — whitespace razlika ignorisana)' : ''
+        return { tool_call_id: tc.id, role: 'tool', content: `Fajl azuriran: ${path}${fuzzyNote}` }
       }
 
       case 'execute_command': {
@@ -250,6 +381,21 @@ export async function executeToolCall(
 
       case 'download_file': {
         const result = await handleDownloadFile(args, onFileChange)
+        return { tool_call_id: tc.id, role: 'tool', content: result }
+      }
+
+      case 'git_status': {
+        const result = await handleGitStatus()
+        return { tool_call_id: tc.id, role: 'tool', content: result }
+      }
+
+      case 'git_list_repos': {
+        const result = await handleGitListRepos()
+        return { tool_call_id: tc.id, role: 'tool', content: result }
+      }
+
+      case 'git_push': {
+        const result = await handleGitPush(args)
         return { tool_call_id: tc.id, role: 'tool', content: result }
       }
 
@@ -741,5 +887,126 @@ async function handleSupabaseUpdateAuthConfig(args: Record<string, unknown>): Pr
     return `Auth config updated successfully. Changed: ${updated}`
   } catch (err) {
     return `Greska: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+// ─── Git tools ───────────────────────────────────────────────────────────────
+//
+// Reuses the same backend push flow as the "Objavi na GitHub" button in the UI:
+// filters secrets, patches .gitignore, redacts hardcoded keys. The agent cannot
+// bypass any of these safeguards — they run unconditionally.
+
+async function handleGitStatus(): Promise<string> {
+  try {
+    const status = await ghInt.getStatus()
+    if (!status.configured) {
+      return 'GRESKA: GitHub integracija nije konfigurisana na backendu. Javi korisniku da proveri Settings.'
+    }
+    if (!status.connected) {
+      return 'GitHub nije povezan. Javi korisniku da ide u Settings → Integracije → GitHub → "Poveži GitHub" pre nego sto pokusas git_push.'
+    }
+    const user = status.info?.username || '(nepoznat)'
+    return `GitHub je povezan. Username: ${user}. Mozes da koristis git_list_repos i git_push.`
+  } catch (err) {
+    return `Greska pri proveri GitHub statusa: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+async function handleGitListRepos(): Promise<string> {
+  try {
+    const repos = await ghInt.listRepos()
+    if (!repos || repos.length === 0) {
+      return 'Korisnik nema nijedan GitHub repozitorijum jos — git_push sa create_if_missing:true ce kreirati novi.'
+    }
+    const lines = [`GitHub repozitorijumi (${repos.length}):`]
+    for (const r of repos.slice(0, 30)) {
+      const priv = r.private ? '[private]' : '[public]'
+      lines.push(`- ${r.name} ${priv} (branch: ${r.default_branch})`)
+    }
+    if (repos.length > 30) lines.push(`... i jos ${repos.length - 30} repoa`)
+    return lines.join('\n')
+  } catch (err) {
+    return `Greska pri listanju repoa: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
+
+async function handleGitPush(args: Record<string, unknown>): Promise<string> {
+  const repo = ((args.repo as string) || '').trim()
+  const message = ((args.message as string) || '').trim() || 'Update from VajbAgent'
+  const createIfMissing = args.create_if_missing !== false
+
+  if (!repo) return 'GRESKA: "repo" parametar je obavezan (ime repozitorijuma).'
+  if (repo.includes('/')) {
+    return 'GRESKA: "repo" mora biti samo ime (npr. "moj-sajt"), bez owner/ prefixa — korisnikov username se automatski koristi.'
+  }
+
+  // Preflight: mora biti povezan
+  try {
+    const status = await ghInt.getStatus()
+    if (!status.connected) {
+      return 'GRESKA: GitHub nije povezan. Javi korisniku da ide u Settings → Integracije → GitHub → "Poveži GitHub".'
+    }
+  } catch (err) {
+    return `Greska pri proveri GitHub statusa: ${err instanceof Error ? err.message : String(err)}`
+  }
+
+  // Pokupi live stanje fajlova iz WebContainer-a
+  let allFiles: Record<string, string>
+  try {
+    allFiles = await getAllFiles()
+  } catch (err) {
+    return `Greska pri citanju fajlova: ${err instanceof Error ? err.message : String(err)}`
+  }
+  if (!allFiles || Object.keys(allFiles).length === 0) {
+    return 'GRESKA: Nema fajlova za push. Prvo kreiraj sadrzaj projekta.'
+  }
+
+  // Isti security filter kao UI push
+  const { kept, skipped } = filterForPush(allFiles)
+  const secretSkips = skipped.filter(s => s.reason === 'secret').map(s => s.path)
+  const buildSkips = skipped.filter(s => s.reason === 'build').length
+
+  // Patch/create .gitignore sa safe defaults
+  const existingGitignore = kept['.gitignore']
+  const patched = ensureGitignoreSafety(existingGitignore)
+  if (patched !== null) {
+    kept['.gitignore'] = patched
+  } else if (!existingGitignore) {
+    kept['.gitignore'] = DEFAULT_GITIGNORE
+  }
+
+  // Auto-redact hardcoded secrete u sadrzaju fajlova (API key-evi, tokeni)
+  const findings = scanForSecrets(kept)
+  let redactNote = ''
+  if (findings.length > 0) {
+    const redacted = redactSecrets(kept)
+    Object.assign(kept, redacted)
+    redactNote = ` · Auto-redact-ovano ${findings.length} hardcoded secret-a`
+  }
+
+  if (Object.keys(kept).length === 0) {
+    return 'GRESKA: Posle filtriranja nema fajlova za push (sve je bilo u skip liste).'
+  }
+
+  try {
+    const result = await ghInt.pushFiles({
+      repo,
+      files: kept,
+      message,
+      createIfMissing,
+    })
+    const parts = [
+      `Push uspesan na ${result.owner}/${result.repo}@${result.branch}`,
+      `Fajlova: ${result.files_count}`,
+      `Commit: ${result.commit_sha.substring(0, 7)}`,
+      `URL: ${result.url}`,
+    ]
+    if (secretSkips.length > 0) parts.push(`Preskoceno (secrets): ${secretSkips.join(', ')}`)
+    if (buildSkips > 0) parts.push(`Preskoceno (build/deps): ${buildSkips} fajlova`)
+    if (redactNote) parts.push(redactNote.trim().replace(/^· /, ''))
+    return parts.join('\n')
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return `Git push failed: ${msg}`
   }
 }
