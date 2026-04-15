@@ -829,11 +829,17 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
           if (!lazyNudgeUsed && noFilesCreatedYet && hasBuildIntent && looksLikeParroting) {
             lazyNudgeUsed = true
             console.warn('[Agent] Lazy-parroting detected — injecting build nudge and retrying')
-            // Persist the model's text so the user can see it was ignored,
-            // but keep it in history so the model has context for why we're nudging.
+            // Keep the model's text visible to the user so the flow is transparent:
+            // they see what the model said, then a status explaining the auto-nudge,
+            // then tool calls appear. No UI "flash and vanish" anymore.
             if (result.text) {
               historyRef.current = [...historyRef.current, { role: 'assistant', content: result.text }]
+              setDisplayMessages(prev => [...prev, { role: 'assistant', content: result.text }])
             }
+            setDisplayMessages(prev => [...prev, {
+              role: 'status',
+              content: 'Detektovan opis umesto build-a — automatski prelazim na izgradnju fajlova…',
+            }])
             historyRef.current.push({
               role: 'system',
               content: 'You returned only text. The user asked you to BUILD a website — not to summarize the brief. You MUST now call write_file to create the first file (usually index.html or src/App.tsx or similar depending on the stack). Do NOT describe the plan again. Start writing files immediately with write_file. Keep each file under 120 lines; split into multiple files if needed.',

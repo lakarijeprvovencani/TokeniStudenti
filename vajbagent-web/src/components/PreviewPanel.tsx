@@ -236,6 +236,7 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
   // Generate blob URL for current page — debounced
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevBlobUrl = useRef<string | null>(null)
+  const prevHtmlHash = useRef<string | null>(null)
 
   useEffect(() => {
     if (previewMode === 'dev-server' || previewMode === 'none') return
@@ -245,7 +246,6 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
 
     debounceRef.current = setTimeout(() => {
       if (!iframeRef.current) return
-      if (prevBlobUrl.current) URL.revokeObjectURL(prevBlobUrl.current)
 
       let html: string | null = null
 
@@ -266,6 +266,24 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
 
       if (!html) return
 
+      // Skip iframe reload if the rendered HTML is bit-identical to the previous
+      // one. This prevents the "preview flash" that happened after autosave swapped
+      // data: URLs for R2 URLs, or when a tool call touched a non-visible file —
+      // the files state changes but the actual preview output does not.
+      // A fast FNV-1a hash on the string gives us ~1μs comparison without storing
+      // megabytes of HTML strings.
+      let h = 2166136261
+      for (let i = 0; i < html.length; i++) {
+        h ^= html.charCodeAt(i)
+        h = (h * 16777619) >>> 0
+      }
+      const hashKey = `${h}:${currentPage}`
+      if (prevHtmlHash.current === hashKey) {
+        return // identical preview — leave the iframe alone
+      }
+      prevHtmlHash.current = hashKey
+
+      if (prevBlobUrl.current) URL.revokeObjectURL(prevBlobUrl.current)
       const blob = new Blob([html], { type: 'text/html' })
       const url = URL.createObjectURL(blob)
       prevBlobUrl.current = url
