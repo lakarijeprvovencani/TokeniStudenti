@@ -660,6 +660,13 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
 
     let lastAssistantHadText = false
 
+    // ─── Rewrite guard ──────────────────────────────────────────────
+    // Track successful write_file calls per file path across all iterations
+    // of this sendMessage() turn. Allows 2 successful writes (create + one
+    // retry if first was truncated), blocks 3rd+ to break rewrite loops
+    // where the model endlessly "improves" the same file.
+    const fileWriteCounts = new Map<string, number>()
+
     try {
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
         // Check abort
@@ -895,6 +902,24 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
           setDisplayMessages(prev => [...prev, { role: 'status', content: statusLabel }])
           setStatusText(statusLabel)
 
+          // ─── Rewrite guard: block 3rd+ write_file to same path ──────
+          if (toolName === 'write_file') {
+            try {
+              const wArgs = JSON.parse(tc.function.arguments)
+              const wPath = (wArgs.path as string || '').replace(/^\/+/, '')
+              const wCount = fileWriteCounts.get(wPath) || 0
+              if (wPath && wCount >= 2) {
+                const blockMsg = `BLOCKED: You already wrote ${wPath} ${wCount} times. Each rewrite flashes the preview and wastes tokens. The file is complete. Do NOT call write_file for ${wPath} again. If you need a small fix, use replace_in_file. Otherwise, write your final summary message to the user.`
+                historyRef.current = [...historyRef.current, {
+                  role: 'tool' as const,
+                  content: blockMsg,
+                  tool_call_id: tc.id,
+                }]
+                continue
+              }
+            } catch { /* unparseable args — let executeToolCall handle it */ }
+          }
+
           const toolResult = await executeToolCall(tc, (files) => {
             onFilesChanged(files)
           })
@@ -904,6 +929,18 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
             content: toolResult.content,
             tool_call_id: toolResult.tool_call_id,
           }]
+
+          // Track successful write_file for rewrite guard (only count non-errors)
+          if (toolName === 'write_file') {
+            const isErr = /^(GRESKA:|Greska:|Ne možeš|BLOKIRANO|BLOCKED)/.test(toolResult.content)
+            if (!isErr) {
+              try {
+                const wArgs = JSON.parse(tc.function.arguments)
+                const wPath = (wArgs.path as string || '').replace(/^\/+/, '')
+                if (wPath) fileWriteCounts.set(wPath, (fileWriteCounts.get(wPath) || 0) + 1)
+              } catch { /* args already handled above */ }
+            }
+          }
 
           // Show error to user if tool failed
           if (toolResult.content.startsWith('GRESKA:') || toolResult.content.startsWith('Greska:')) {
