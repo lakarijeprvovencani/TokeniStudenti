@@ -167,17 +167,20 @@
   padding: 2px 0;
 }
 
-/* ── Cursor blink ── */
+/* ── Streaming indicator (inline spinner after text) ── */
 .cursor-blink {
   display: inline-block;
-  width: 2px;
-  height: 1em;
-  background: var(--orange);
-  margin-left: 2px;
-  vertical-align: text-bottom;
-  animation: pulse 0.8s step-end infinite;
-  border-radius: 1px;
-  box-shadow: 0 0 6px rgba(249, 115, 22, 0.4);
+  width: 12px;
+  height: 12px;
+  margin-left: 6px;
+  vertical-align: middle;
+  border: 2px solid rgba(249, 115, 22, 0.25);
+  border-top-color: var(--orange);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ── Thinking state ── */

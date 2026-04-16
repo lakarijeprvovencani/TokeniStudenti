@@ -74,19 +74,14 @@ export async function executeToolCall(
           content = content.replace(/\\n/g, '\n')
         }
 
-        // Truncation detection — odbij presecene fajlove umesto da pisemo slomljen kod.
-        // Portovano iz vajbagent-vscode/src/tools.ts:504-537.
+        // Truncation detection — only for pure JS/TS/CSS/JSON files.
+        // HTML check removed: models routinely write valid HTML that doesn't
+        // end with </html> (e.g. partials, components, templates with trailing
+        // scripts). The </html> check caused false rejections on 370-line
+        // complete pages, forcing the model to rewrite them shorter.
+        // Brace check also skips HTML because inline <script> tags make
+        // brace counting unreliable.
         const lowerPath = path.toLowerCase()
-        if (lowerPath.endsWith('.html') || lowerPath.endsWith('.htm')) {
-          const trimmed = content.trimEnd()
-          if (trimmed.length > 200 && !/<\/html>\s*$/i.test(trimmed)) {
-            return {
-              tool_call_id: tc.id,
-              role: 'tool',
-              content: `GRESKA: HTML je presecen — nedostaje </html>. Fajl ${path} NIJE upisan. Pokusaj ponovo sa kompletnim HTML-om koji zavrsava sa </html>.`,
-            }
-          }
-        }
         if (/\.(jsx?|tsx?|css|scss|vue|svelte|json)$/i.test(lowerPath) && content.length > 500) {
           // Broj zagrada izvan stringova/komentara — jednostavan state machine
           // koji preskace '...', "...", `...`, // line comment i /* block comment */.
