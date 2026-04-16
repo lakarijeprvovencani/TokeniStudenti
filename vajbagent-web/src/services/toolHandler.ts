@@ -36,7 +36,7 @@ export async function executeToolCall(
     args = JSON.parse(tc.function.arguments)
   } catch {
     if (name === 'write_file') {
-      const truncMsg = 'GRESKA: Sadrzaj fajla je presecen (JSON isecen). Fajl NIJE upisan. MORAS da razdvojis kod u vise manjih fajlova — svaki ispod 120 linija.'
+      const truncMsg = 'GRESKA: Sadrzaj fajla je presecen (JSON isecen). Fajl NIJE upisan. Pokusaj ponovo — napisi kompletan fajl u jednom write_file pozivu.'
       console.error('[Tool] write_file truncated JSON — rejected')
       return { tool_call_id: tc.id, role: 'tool', content: truncMsg }
     }
@@ -83,7 +83,7 @@ export async function executeToolCall(
             return {
               tool_call_id: tc.id,
               role: 'tool',
-              content: `GRESKA: HTML je presecen — nedostaje </html>. Fajl ${path} NIJE upisan. Ako je fajl velik, razdvoji u manje komponente ili koristi replace_in_file za ciljane izmene.`,
+              content: `GRESKA: HTML je presecen — nedostaje </html>. Fajl ${path} NIJE upisan. Pokusaj ponovo sa kompletnim HTML-om koji zavrsava sa </html>.`,
             }
           }
         }
@@ -127,7 +127,7 @@ export async function executeToolCall(
             return {
               tool_call_id: tc.id,
               role: 'tool',
-              content: `GRESKA: Kod u ${path} je presecen — ${opens} otvorenih { vs ${closes} zatvorenih }. Fajl NIJE upisan. Koristi replace_in_file za ciljane izmene ili razdvoji kod u manje fajlove.`,
+              content: `GRESKA: Kod u ${path} je presecen — ${opens} otvorenih { vs ${closes} zatvorenih }. Fajl NIJE upisan. Pokusaj ponovo — dopisi zatvorene zagrade/tagove koji nedostaju.`,
             }
           }
         }
