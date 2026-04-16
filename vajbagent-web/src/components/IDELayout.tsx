@@ -831,6 +831,11 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
 
   return (
     <motion.div className="ide" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+      {/* Ambient background — soft breathing orbs + dot grid. Purely
+          decorative, sits behind every panel to give depth and warmth.
+          Styles live in index.css. */}
+      <div className="ambient-bg" aria-hidden="true" />
+      <div className="dot-grid" aria-hidden="true" />
       {/* ── Preview Ready Overlay ── */}
       <AnimatePresence>
         {showPreviewReady && (
@@ -1107,7 +1112,7 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
         {/* Explorer — always mounted, just hidden via CSS */}
         <div className={`explorer-wrap ${explorerOpen ? 'open' : 'closed'}`}>
           <FileExplorer
-            files={files}
+            files={filesForEditor}
             activeFile={activeFile}
             onSelectFile={(p) => { setActiveFile(p); if (view === 'preview') setView('code') }}
             onCreateFile={handleCreateFile}
