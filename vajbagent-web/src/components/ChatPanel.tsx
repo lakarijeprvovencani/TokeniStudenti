@@ -510,7 +510,7 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
         messages: apiMessages,
         tools: TOOL_DEFINITIONS,
         stream: true,
-        max_tokens: 16384,
+        max_tokens: 32000,
       }),
       signal,
     })
