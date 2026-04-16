@@ -376,25 +376,46 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
   // Build a self-contained multi-page HTML for "open in new tab"
   // All pages are embedded with a hash router (#about, #projects, etc.)
   const buildFullSiteBlob = useCallback((): string | null => {
-    if (previewMode === 'static' && htmlFile) {
-      return buildFullHtml(htmlFile)
-    }
-    if (previewMode !== 'build' || !distIndexHtml) return null
-
-    // Collect all HTML pages from build output
-    const prefix = buildDir + '/'
+    // Collect candidate pages (name → processed HTML).
+    //
+    // In STATIC mode the navigation intercept used by the in-iframe preview
+    // talks to `window.parent` via postMessage — which doesn't exist in a
+    // standalone tab. So without this branch, clicking "kontakt" in the
+    // opened tab would do absolutely nothing. We detect the multi-page
+    // case (index.html + kontakt.html + usluge.html …) and bundle them
+    // into the same hash-router shell we use for multi-page builds.
     const pages: Record<string, string> = {}
-    for (const [path, content] of Object.entries(files)) {
-      if (!path.startsWith(prefix) || !path.endsWith('.html')) continue
-      // Derive page name: out/about.html → about, out/index.html → index
-      let pageName = path.slice(prefix.length).replace(/\.html$/, '').replace(/\/index$/, '')
-      if (!pageName) pageName = 'index'
-      pages[pageName] = buildPageHtml(content)
-    }
 
-    if (Object.keys(pages).length <= 1 && pages['index']) {
-      // Single page — just return it
-      return pages['index']
+    if (previewMode === 'static' && htmlFile) {
+      for (const [path, content] of Object.entries(files)) {
+        if (!/\.html?$/i.test(path)) continue
+        if (path.startsWith('dist/') || path.startsWith('out/')) continue
+        if (path.includes('node_modules/')) continue
+        if (path.includes('/')) continue // top-level pages only
+        let pageName = path.replace(/\.html?$/, '')
+        if (!pageName || pageName === 'index') pageName = 'index'
+        pages[pageName] = buildFullHtml(content)
+      }
+      if (Object.keys(pages).length === 0) {
+        return buildFullHtml(htmlFile)
+      }
+      if (Object.keys(pages).length === 1 && pages['index']) {
+        return pages['index']
+      }
+      // fall through to multi-page wrapper
+    } else if (previewMode === 'build' && distIndexHtml) {
+      const prefix = buildDir + '/'
+      for (const [path, content] of Object.entries(files)) {
+        if (!path.startsWith(prefix) || !path.endsWith('.html')) continue
+        let pageName = path.slice(prefix.length).replace(/\.html$/, '').replace(/\/index$/, '')
+        if (!pageName) pageName = 'index'
+        pages[pageName] = buildPageHtml(content)
+      }
+      if (Object.keys(pages).length <= 1 && pages['index']) {
+        return pages['index']
+      }
+    } else {
+      return null
     }
 
     // Multi-page: wrap all pages in a hash-router shell

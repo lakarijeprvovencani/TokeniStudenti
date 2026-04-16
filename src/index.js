@@ -1818,6 +1818,13 @@ async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, st
     ...(stream && { stream_options: { include_usage: true } }),
     ...(isReasoning && { reasoning_effort: maxTokens <= 2048 ? 'low' : 'medium' }),
     ...(Array.isArray(openAITools) && openAITools.length > 0 && { tools: openAITools }),
+    // OpenAI routes cache lookups by a stable per-user key. Without it the
+    // cache bucket is load-balancer-dependent and the same prompt prefix
+    // from the same user can miss cache on back-to-back requests. With
+    // keyId as the cache key we pin every user's conversation to the same
+    // cache shard → higher hit rate → lower billed input tokens for us
+    // AND for the student.
+    ...(keyId && { prompt_cache_key: String(keyId) }),
   };
 
   const poolEntry = acquireFromPool(openaiPool, 'OpenAI');
