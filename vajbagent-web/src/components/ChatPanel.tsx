@@ -509,7 +509,7 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
         messages: apiMessages,
         tools: TOOL_DEFINITIONS,
         stream: true,
-        max_tokens: 16000,
+        max_tokens: 32000,
       }),
       signal,
     })
@@ -661,13 +661,11 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
     let lastAssistantHadText = false
 
     // ─── Rewrite guard ──────────────────────────────────────────────
-    // Track write_file attempts per file path within this sendMessage() turn.
-    // Two hard rules:
-    //   1. Once a file is written SUCCESSFULLY → block all further writes
-    //   2. Max 3 TOTAL attempts per file (success or fail) → stop trying
-    // Rule 1 prevents rewrite loops. Rule 2 prevents infinite failure loops
-    // (model generates huge file → truncated JSON → fail → retry → same).
-    const fileWriteState = new Map<string, { ok: number; total: number }>()
+    // One rule: once a file is written SUCCESSFULLY, block further write_file
+    // to that path. Model must use replace_in_file for changes.
+    // Failed writes are NOT tracked — model can retry unlimited (same as
+    // the VS Code extension which has no guard at all and works fine).
+    const fileWriteOk = new Set<string>()
 
     try {
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
@@ -903,29 +901,17 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
 
           // ─── Rewrite guard ─────────────────────────────────────────────
           // Silent in UI — blocked writes never show "Pišem ..." status.
-          // Uses regex to extract path (not JSON.parse) because the model
-          // often generates truncated JSON that toolHandler can recover via
-          // jsonrepair, but JSON.parse cannot. Without regex, truncated
-          // writes are never tracked and the guard is bypassed entirely.
+          // ─── Rewrite guard: block write_file to paths already written ──
           if (toolName === 'write_file') {
             const pathMatch = tc.function.arguments.match(/"path"\s*:\s*"([^"]+)"/)
             const wPath = pathMatch ? pathMatch[1].replace(/^\/+/, '') : ''
-            const state = wPath ? fileWriteState.get(wPath) : undefined
-            if (state) {
-              let blockMsg = ''
-              if (state.ok >= 1) {
-                blockMsg = `BLOCKED: ${wPath} was already written successfully. Do NOT rewrite it — use replace_in_file for small changes. Write your final summary message to the user.`
-              } else if (state.total >= 3) {
-                blockMsg = `BLOCKED: ${wPath} failed ${state.total} times (content too large). Write a SHORTER version with fewer sections, then add more with replace_in_file.`
-              }
-              if (blockMsg) {
-                historyRef.current = [...historyRef.current, {
-                  role: 'tool' as const,
-                  content: blockMsg,
-                  tool_call_id: tc.id,
-                }]
-                continue
-              }
+            if (wPath && fileWriteOk.has(wPath)) {
+              historyRef.current = [...historyRef.current, {
+                role: 'tool' as const,
+                content: `BLOCKED: ${wPath} was already written successfully. Use replace_in_file for changes.`,
+                tool_call_id: tc.id,
+              }]
+              continue
             }
           }
 
@@ -942,17 +928,13 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
             tool_call_id: toolResult.tool_call_id,
           }]
 
-          // Track write_file results for rewrite guard (regex, not JSON.parse)
+          // Track successful write_file for rewrite guard
           if (toolName === 'write_file') {
-            const isFail = /^(GRESKA:|Greska:|Ne možeš|BLOKIRANO|BLOCKED)/.test(toolResult.content)
-            const pathMatch = tc.function.arguments.match(/"path"\s*:\s*"([^"]+)"/)
-            const wPath = pathMatch ? pathMatch[1].replace(/^\/+/, '') : ''
-            if (wPath) {
-              const prev = fileWriteState.get(wPath) || { ok: 0, total: 0 }
-              fileWriteState.set(wPath, {
-                ok: isFail ? prev.ok : prev.ok + 1,
-                total: prev.total + 1,
-              })
+            const isOk = !/^(GRESKA:|Greska:|Ne možeš|BLOKIRANO|BLOCKED)/.test(toolResult.content)
+            if (isOk) {
+              const pathMatch = tc.function.arguments.match(/"path"\s*:\s*"([^"]+)"/)
+              const wPath = pathMatch ? pathMatch[1].replace(/^\/+/, '') : ''
+              if (wPath) fileWriteOk.add(wPath)
             }
           }
 
