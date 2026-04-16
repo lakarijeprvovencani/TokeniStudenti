@@ -65,7 +65,7 @@ interface ChatPanelProps {
 const API_URL = import.meta.env.VITE_API_URL || 'https://vajbagent.com'
 const MAX_ITERATIONS = 50
 const MAX_RETRIES = 3
-const RETRY_PATTERN = /timeout|predugo|idle|ECONNRESET|ENOTFOUND|socket hang up|429|502|503|529|rate.limit|ETIMEDOUT|ECONNREFUSED|Stream prekinut|Failed to fetch|NetworkError|Load failed/i
+const RETRY_PATTERN = /timeout|predugo|idle|ECONNRESET|ENOTFOUND|socket hang up|429|502|503|529|rate.limit|ETIMEDOUT|ECONNREFUSED|Stream prekinut|Failed to fetch|network.?error|Load failed/i
 
 const CONTEXT_LIMITS: Record<string, number> = {
   'vajb-agent-lite': 400000,
