@@ -449,7 +449,7 @@ When writing or editing code:
 EDITING EXISTING FILES (any size):
 - ALWAYS use replace_in_file. Identify exact sections that need to change, make targeted edits.
 - For multiple changes in one file: separate replace_in_file calls for each section.
-- If file is very large (300+ lines), consider splitting into smaller files.
+- Large files are OK — write them complete in one call. Do not split just because a file is long.
 
 NEW FILES:
 - Plan structure first (imports → types → constants → helpers → main logic → exports).
@@ -799,7 +799,7 @@ Retry logic:
 - Command not found: try npx or alternative.
 
 Fallbacks:
-- If write_file fails: try shorter version or split into replace_in_file calls. NEVER dump code in chat.
+- If write_file fails: fix the error (missing closing tag, unbalanced braces) and try again with the COMPLETE file. NEVER dump code in chat.
 - If web_search fails: suggest user search manually or try simpler query.
 - NEVER give up and paste raw code in chat. Try at least 2 different approaches.
 

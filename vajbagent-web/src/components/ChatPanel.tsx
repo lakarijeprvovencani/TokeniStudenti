@@ -681,7 +681,7 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
           '2. Every section must be VISIBLE WITHOUT SCROLLING DEPENDENCIES. If you add fade-in or reveal animations, the INITIAL CSS state must be opacity:1 (or add a fallback that marks elements visible on DOMContentLoaded). The preview runs in a blob iframe where IntersectionObserver is unreliable — assume it will NOT fire.',
           '3. Use a cohesive design system: pick a real palette (3-5 colors), one heading font + one body font, consistent spacing scale (8/16/24/32/48/64px), clear hierarchy. No default browser fonts, no unstyled elements.',
           '4. For images: use search_images to get real Unsplash photos tailored to the project topic. Do NOT use placeholder gradients as fake "images".',
-          '5. Write files of reasonable size (up to ~200 lines each is fine). Split into multiple files only when it genuinely helps clarity — do not fragment a single cohesive landing page into 8 stubs.',
+          '5. Write COMPLETE files — do NOT split a file just because it is long. A 400-line HTML or CSS file is perfectly fine. For static sites use exactly: index.html + style.css + script.js. NEVER create style2.css, nav.css, hero.css, etc.',
           '6. Before you finish, mentally review: "Would a paying customer go WOW at the first screen?" If any section renders empty, unstyled, or generic — fix it BEFORE stopping.',
           '',
           'Start building now. Do NOT describe the plan back to the user — they already wrote it. Call write_file immediately.',
