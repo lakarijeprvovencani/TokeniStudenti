@@ -114,6 +114,16 @@
   animation: ctxFadeIn 0.15s ease;
 }
 
+/* Viewport-anchored variant used by right-click menus. `top` / `left`
+   are supplied inline from the click coordinates, and a JS effect
+   nudges them back inside the window so the last file's menu never
+   gets chopped off at the bottom of the explorer pane. */
+.ctx-menu-fixed {
+  position: fixed;
+  margin-top: 0;
+  left: auto;
+}
+
 @keyframes ctxFadeIn {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }

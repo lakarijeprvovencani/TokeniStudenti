@@ -71,10 +71,18 @@ interface FileRowProps {
 
 function FileRow({ path, displayName, nested, active, preview, onSelect, onDelete, onRename, onUploadImages }: FileRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  // Menu position is computed from the right-click coordinates at open
+  // time and the final menu dimensions after mount. Storing {x, y} here
+  // lets us use `position: fixed` (viewport-relative) instead of the old
+  // `position: absolute` under the row — which got clipped by the
+  // explorer's scroll container whenever the last file was clicked and
+  // there was no room below it.
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
   const [renaming, setRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState(displayName)
   const inputRef = useRef<HTMLInputElement>(null)
   const rowUploadRef = useRef<HTMLInputElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (renaming) {
@@ -82,8 +90,22 @@ function FileRow({ path, displayName, nested, active, preview, onSelect, onDelet
     }
   }, [renaming])
 
+  // After the menu renders, measure it and flip up / left if it would
+  // overflow the viewport. Runs once per open because menu items are
+  // static and dimensions won't change.
+  useEffect(() => {
+    if (!menuOpen || !menuRef.current || !menuPos) return
+    const rect = menuRef.current.getBoundingClientRect()
+    const pad = 8
+    let { x, y } = menuPos
+    if (x + rect.width + pad > window.innerWidth) x = window.innerWidth - rect.width - pad
+    if (y + rect.height + pad > window.innerHeight) y = Math.max(pad, menuPos.y - rect.height)
+    if (x !== menuPos.x || y !== menuPos.y) setMenuPos({ x, y })
+  }, [menuOpen, menuPos])
+
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
+    setMenuPos({ x: e.clientX, y: e.clientY })
     setMenuOpen(true)
   }
 
@@ -134,10 +156,14 @@ function FileRow({ path, displayName, nested, active, preview, onSelect, onDelet
         <FileIcon name={path} preview={preview} />
         <span className="file-name">{displayName}</span>
       </motion.button>
-      {menuOpen && (
+      {menuOpen && menuPos && (
         <>
           <div className="ctx-menu-backdrop" onClick={() => setMenuOpen(false)} />
-          <div className="ctx-menu">
+          <div
+            ref={menuRef}
+            className="ctx-menu ctx-menu-fixed"
+            style={{ top: menuPos.y, left: menuPos.x }}
+          >
             {onUploadImages && (
               <button onClick={() => { setMenuOpen(false); rowUploadRef.current?.click() }}>
                 <ImagePlus size={12} /> Dodaj sliku / video
@@ -188,9 +214,11 @@ function FolderGroup({
   const [renameValue, setRenameValue] = useState(folder)
   const [creatingFile, setCreatingFile] = useState(false)
   const [newFileName, setNewFileName] = useState('')
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
   const renameRef = useRef<HTMLInputElement>(null)
   const createRef = useRef<HTMLInputElement>(null)
   const folderUploadRef = useRef<HTMLInputElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (renaming) setTimeout(() => renameRef.current?.focus(), 0)
@@ -200,9 +228,23 @@ function FolderGroup({
     if (creatingFile) setTimeout(() => createRef.current?.focus(), 0)
   }, [creatingFile])
 
+  // Mirror of FileRow's positioning logic — keeps the folder context
+  // menu inside the viewport on the last folder, long explorers, or
+  // narrow panes.
+  useEffect(() => {
+    if (!menuOpen || !menuRef.current || !menuPos) return
+    const rect = menuRef.current.getBoundingClientRect()
+    const pad = 8
+    let { x, y } = menuPos
+    if (x + rect.width + pad > window.innerWidth) x = window.innerWidth - rect.width - pad
+    if (y + rect.height + pad > window.innerHeight) y = Math.max(pad, menuPos.y - rect.height)
+    if (x !== menuPos.x || y !== menuPos.y) setMenuPos({ x, y })
+  }, [menuOpen, menuPos])
+
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    setMenuPos({ x: e.clientX, y: e.clientY })
     setMenuOpen(true)
   }
 
@@ -275,10 +317,14 @@ function FolderGroup({
     <div className="explorer-folder-group">
       {folderLabel}
 
-      {menuOpen && (
+      {menuOpen && menuPos && (
         <>
           <div className="ctx-menu-backdrop" onClick={() => setMenuOpen(false)} />
-          <div className="ctx-menu">
+          <div
+            ref={menuRef}
+            className="ctx-menu ctx-menu-fixed"
+            style={{ top: menuPos.y, left: menuPos.x }}
+          >
             {onCreateFile && (
               <button onClick={() => { setMenuOpen(false); setCreatingFile(true); if (!open) onToggleCollapse() }}>
                 <FilePlus size={12} /> Novi fajl
