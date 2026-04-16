@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Settings as SettingsIcon, Download, Rocket,
@@ -10,6 +10,7 @@ import { saveAs } from 'file-saver'
 import * as ghInt from '../services/githubIntegration'
 import * as nlInt from '../services/netlifyIntegration'
 import { preboot, onServerReady, getServerUrl, writeFile as wcWriteFile, clearFilesystem, onAgentCommand } from '../services/webcontainer'
+import { onLiveWrite } from '../services/liveCodeStream'
 import { addImageFiles, addVideoFiles, hydrateImagesIntoWc, isImagePath, isMediaPath, countImages, countVideos, MAX_IMAGES_PER_PROJECT, MAX_VIDEOS_PER_PROJECT } from '../services/userAssets'
 import { buildEnvFile } from '../services/secretsStore'
 import { filterForPush, ensureGitignoreSafety, DEFAULT_GITIGNORE, scanForSecrets, redactSecrets, type SecretFinding } from '../services/pushFilter'
@@ -52,6 +53,14 @@ const panelVariants = {
 export default function IDELayout({ initialPrompt, initialImages, model, onModelChange, freeTier, resumeProject, onBackToWelcome }: IDELayoutProps) {
   const [files, setFiles] = useState<Record<string, string>>({})
   const [activeFile, setActiveFile] = useState<string | null>(null)
+  // Live-streaming file content while the model is mid-write_file. These
+  // entries override `files` in the editor until the tool call finishes,
+  // at which point they're cleared and the real post-write refresh takes
+  // over. We intentionally keep this separate from `files` so the File
+  // Explorer and other panels still see the real filesystem state.
+  const [liveFiles, setLiveFiles] = useState<Record<string, string>>({})
+  const activeFileRef = useRef<string | null>(null)
+  useEffect(() => { activeFileRef.current = activeFile }, [activeFile])
   const [contextUsed, setContextUsed] = useState(0)
   const [contextLimit, setContextLimit] = useState(0)
   const [isAgentStreaming, setIsAgentStreaming] = useState(false)
@@ -374,6 +383,52 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
     })
     return unsub
   }, [])
+
+  // Live-stream code from the model straight into the editor. As the
+  // model emits write_file arguments chunk-by-chunk, we mirror the
+  // partial content into liveFiles so the user sees the file grow
+  // character-by-character (bolt.new / lovable style). When the tool
+  // call finalizes (isDone), we drop the live override — toolHandler
+  // then writes to the WebContainer filesystem and the regular
+  // post-tool refresh repopulates `files`.
+  useEffect(() => {
+    const unsub = onLiveWrite((e) => {
+      if (e.isDone) {
+        // Small delay before dropping the override so the editor
+        // doesn't briefly flash empty between the live state and the
+        // post-write refresh. 400ms covers a normal write round-trip.
+        setTimeout(() => {
+          setLiveFiles(prev => {
+            if (!(e.path in prev)) return prev
+            const next = { ...prev }
+            delete next[e.path]
+            return next
+          })
+        }, 400)
+        return
+      }
+      setLiveFiles(prev => ({ ...prev, [e.path]: e.content }))
+      // Auto-focus the streaming file on first chunk only — don't
+      // keep yanking the user around if they manually tabbed away.
+      if (activeFileRef.current !== e.path) {
+        setActiveFile(prev => {
+          // Only switch if we haven't shown this file yet during this write.
+          // If the user intentionally navigated away, respect that.
+          if (prev === e.path) return prev
+          return e.path
+        })
+      }
+    })
+    return unsub
+  }, [])
+
+  // Merge live overrides on top of real files for any child that
+  // needs to display content (editor, preview). Keep this cheap — a
+  // shallow merge is fine because liveFiles typically has 0-1 entry.
+  const filesForEditor = useMemo(() => {
+    if (Object.keys(liveFiles).length === 0) return files
+    return { ...files, ...liveFiles }
+  }, [files, liveFiles])
   const [pushing, setPushing] = useState(false)
   const [ghConnected, setGhConnected] = useState(false)
   const [ghUsername, setGhUsername] = useState<string | null>(null)
@@ -1075,12 +1130,12 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
           <AnimatePresence mode="wait">
             {view === 'code' && (
               <motion.div key="code-only" className="panel-animate" variants={panelVariants} initial="initial" animate="animate" exit="exit">
-                <CodeEditor files={files} activeFile={activeFile} onFileEdit={handleFileEdit} onSelectFile={setActiveFile} isAgentStreaming={isAgentStreaming} onSelectionChange={handleSelectionChange} streamingStatus={agentStatus} />
+                <CodeEditor files={filesForEditor} activeFile={activeFile} onFileEdit={handleFileEdit} onSelectFile={setActiveFile} isAgentStreaming={isAgentStreaming} onSelectionChange={handleSelectionChange} streamingStatus={agentStatus} />
               </motion.div>
             )}
             {view === 'split' && (
               <motion.div key="split-view" className="panel-animate" variants={panelVariants} initial="initial" animate="animate" exit="exit">
-                <CodeEditor files={files} activeFile={activeFile} onFileEdit={handleFileEdit} onSelectFile={setActiveFile} isAgentStreaming={isAgentStreaming} onSelectionChange={handleSelectionChange} streamingStatus={agentStatus} />
+                <CodeEditor files={filesForEditor} activeFile={activeFile} onFileEdit={handleFileEdit} onSelectFile={setActiveFile} isAgentStreaming={isAgentStreaming} onSelectionChange={handleSelectionChange} streamingStatus={agentStatus} />
                 <div className="ide-divider" />
                 <PreviewPanel files={files} />
               </motion.div>

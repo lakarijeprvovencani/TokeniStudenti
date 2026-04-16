@@ -11,6 +11,7 @@ import FileMention from './FileMention'
 import ModelSelector from './ModelSelector'
 import { TOOL_DEFINITIONS } from '../tools'
 import { WEB_SYSTEM_PROMPT } from '../systemPrompt'
+import { emitPartialArgs, emitFinalArgs, resetLiveStream } from '../services/liveCodeStream'
 import { type Command } from '../commands'
 import './ChatPanel.css'
 
@@ -824,6 +825,13 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
               if (tc.id) toolCalls[idx].id = tc.id
               if (tc.function?.name) toolCalls[idx].function.name = tc.function.name
               if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments
+              // Live-stream the file content into the editor while the
+              // model is still writing it. No-op for non-write_file tools
+              // and for chunks that don't yet contain a parseable path.
+              const cur = toolCalls[idx]
+              if (cur.function.name && cur.function.arguments) {
+                emitPartialArgs(cur.id, cur.function.name, cur.function.arguments)
+              }
             }
           }
         }
@@ -848,6 +856,14 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
     // completion instead of a fatal error so we don't trigger the retry
     // loop on something that worked.
     const resultToolCalls = Object.values(toolCalls)
+    // Tell the editor the streamed file content is final so it can stop
+    // showing the "live" overlay and fall back to the real file content
+    // (which toolHandler.writeFile will push into WebContainers shortly).
+    for (const tc of resultToolCalls) {
+      if (tc.function.name && tc.function.arguments) {
+        emitFinalArgs(tc.id, tc.function.name, tc.function.arguments)
+      }
+    }
     if (!fullText && resultToolCalls.length === 0) {
       if (finishReason) {
         // Clean stop with no payload — treat as empty assistant response.
@@ -1214,6 +1230,7 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
       onStreamingChange?.(false)
       setStatusText('')
       abortRef.current = null
+      resetLiveStream()
       // If the user aborted mid-tool-run, the transcript ends on an assistant
       // message with tool_calls but missing tool responses. Repair it before
       // we persist so the next request doesn't get rejected.
