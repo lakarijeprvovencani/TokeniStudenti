@@ -86,6 +86,39 @@ export default function TerminalPanel({ onClose }: TerminalProps) {
     ]
     for (const line of BANNER) terminal.writeln(line)
 
+    // Buffer keystrokes the user types before jsh is ready. Without this,
+    // anything typed between terminal-mount and jsh-spawn silently
+    // disappears — which feels like the terminal is broken. We register
+    // onData *immediately* so every keystroke is captured, and flush the
+    // buffer to jsh the moment its stdin writer exists.
+    const pendingInput: string[] = []
+    let writerReady: { write: (data: string) => Promise<void> } | null = null
+    terminal.onData(data => {
+      if (disposed) return
+      if (writerReady) {
+        writerReady.write(data).catch(() => { /* socket closed */ })
+      } else {
+        pendingInput.push(data)
+      }
+    })
+
+    // Auto-focus on any click inside the terminal body so the cursor
+    // always responds to typing — xterm only focuses when you click
+    // *exactly* on the .xterm-helper-textarea, which is easy to miss.
+    const focusHandler = () => { terminal.focus() }
+    termRef.current?.addEventListener('click', focusHandler)
+
+    // Grab focus immediately when the panel appears so the user can
+    // start typing without clicking first.
+    requestAnimationFrame(() => { if (!disposed) terminal.focus() })
+
+    // Show a status line while WebContainers is still booting so the
+    // user doesn't think the terminal is frozen. We'll clear this line
+    // (and everything xterm has rendered since) with \x1b[F\x1b[2K once
+    // jsh actually writes its prompt.
+    terminal.write('  \x1b[38;2;113;113;122m⏳ povezujem jsh shell...\x1b[0m')
+    let bootLineActive = true
+
     getWebContainer().then(async (wc) => {
       if (disposed) return
       // Spawn jsh directly in /home/project (WebContainers' canonical
@@ -101,21 +134,34 @@ export default function TerminalPanel({ onClose }: TerminalProps) {
 
       shell.output.pipeTo(new WritableStream({
         write(data) {
-          if (!disposed) terminal.write(data)
+          if (disposed) return
+          // Erase the "povezujem..." line the first time jsh speaks up,
+          // then let all subsequent output flow through untouched.
+          if (bootLineActive) {
+            terminal.write('\r\x1b[2K')
+            bootLineActive = false
+          }
+          terminal.write(data)
         },
       })).catch(() => { /* stream ended */ })
 
       const writer = shell.input.getWriter()
       inputWriter = writer
-      terminal.onData(data => {
-        if (!disposed) writer.write(data).catch(() => { /* socket closed */ })
-      })
+      writerReady = writer
+      // Flush any keystrokes the user fired before jsh was ready.
+      if (pendingInput.length > 0) {
+        const buffered = pendingInput.splice(0).join('')
+        writer.write(buffered).catch(() => { /* socket closed */ })
+      }
 
       terminal.onResize(({ cols, rows }) => {
         if (!disposed) shell.resize({ cols, rows })
       })
     }).catch(err => {
-      if (!disposed) terminal.writeln('\x1b[31mGreška: WebContainer nije spreman.\x1b[0m')
+      if (disposed) return
+      if (bootLineActive) { terminal.write('\r\x1b[2K'); bootLineActive = false }
+      terminal.writeln('  \x1b[31m✗ Ne mogu da pokrenem jsh shell.\x1b[0m')
+      terminal.writeln('  \x1b[38;2;113;113;122m  ' + (err?.message || String(err)).slice(0, 160) + '\x1b[0m')
       console.error('[Terminal] Error:', err)
     })
 
@@ -161,6 +207,7 @@ export default function TerminalPanel({ onClose }: TerminalProps) {
       disposed = true
       unsubAgent()
       resizeObserver.disconnect()
+      termRef.current?.removeEventListener('click', focusHandler)
       try { inputWriter?.releaseLock() } catch { /* ignore */ }
       try { shellHandle?.kill() } catch { /* ignore */ }
       terminal.dispose()
