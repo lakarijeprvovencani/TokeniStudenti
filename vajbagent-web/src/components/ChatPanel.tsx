@@ -801,7 +801,15 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
         if (!result || signal.aborted) break
 
         // ─── Auto-continuation for truncated output ──────────────────
-        if (result.finishReason === 'length' && result.toolCalls.length > 0) {
+        // Triggers on finish_reason: 'length' (explicit truncation) OR
+        // when tool calls exist but have empty/tiny args (stream ended
+        // without proper finish_reason — Anthropic sometimes returns null
+        // instead of 'length' when output is truncated mid-JSON).
+        const hasEmptyToolArgs = result.toolCalls.length > 0 &&
+          result.toolCalls.some(tc => tc.function.arguments.length < 20)
+        const needsContinuation = result.toolCalls.length > 0 &&
+          (result.finishReason === 'length' || hasEmptyToolArgs)
+        if (needsContinuation) {
           const MAX_CONTINUATIONS = 3
           for (let cont = 0; cont < MAX_CONTINUATIONS; cont++) {
             if (signal.aborted) break

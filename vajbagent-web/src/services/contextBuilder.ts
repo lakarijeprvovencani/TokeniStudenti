@@ -370,5 +370,25 @@ export async function buildFullContext(opts: {
     parts.push(boost)
   }
 
+  // Build strategy — injected on first message of empty project.
+  // Without this, model tries to write 45K-char mega-files that take
+  // 3 minutes to generate and often get truncated. Data shows that
+  // replace_in_file calls take 26-35s and ALWAYS succeed, while large
+  // write_file calls take 67-181s and fail 50% of the time.
+  const fileCount = Object.keys(opts.files).filter(f => !f.endsWith('/') && !f.includes('node_modules/')).length
+  if (opts.isFirstMessage && fileCount <= 1) {
+    parts.push(`<build_strategy>
+MANDATORY BUILD APPROACH for new sites:
+1. Search images first (1-2 search_images calls)
+2. write_file a SKELETON index.html — basic structure with head, nav, hero, empty section placeholders, footer. Under 150 lines. Just the structure.
+3. write_file style.css — core variables, reset, nav, hero, footer styles. Under 200 lines.
+4. Use replace_in_file to ADD content section by section into index.html (services, team, testimonials, FAQ, etc.)
+5. Use replace_in_file to ADD matching CSS for each new section into style.css
+6. write_file script.js if needed
+
+WHY: write_file with 500+ lines takes 3 minutes and often fails (output truncation). replace_in_file takes 30 seconds and always works. Build incrementally.
+</build_strategy>`)
+  }
+
   return parts.join('\n\n')
 }
