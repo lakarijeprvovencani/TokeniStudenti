@@ -301,12 +301,44 @@ export async function clearFilesystem(): Promise<void> {
 // Detect if command is a long-running dev server
 const SERVER_PATTERNS = /\b(dev|start|serve|preview|watch)\b/i
 
+// ─── Agent-command live broadcast ────────────────────────────────────────────
+//
+// The Terminal panel subscribes to these events so the user can watch
+// `npm install`, `npm run build`, `node server.js` etc. stream live as
+// the agent runs them. Same UX as VS Code's integrated terminal: the
+// agent and the user share the pane, agent activity is clearly labeled.
+//
+// We keep the broadcast one-way (no backpressure, no buffer). If nobody
+// is listening (terminal panel closed) events just get dropped. The
+// return value of runCommand — the full output string — is still what
+// the tool handler reports back to the model, so the agent loop is
+// completely unaffected whether or not the terminal panel is open.
+
+export type AgentTerminalEvent =
+  | { type: 'command-start'; cmd: string }
+  | { type: 'command-output'; data: string }
+  | { type: 'command-end'; exitCode: number | null; cmd: string }
+
+const agentTerminalListeners = new Set<(e: AgentTerminalEvent) => void>()
+
+export function onAgentCommand(listener: (e: AgentTerminalEvent) => void): () => void {
+  agentTerminalListeners.add(listener)
+  return () => { agentTerminalListeners.delete(listener) }
+}
+
+function emitAgentCommand(e: AgentTerminalEvent): void {
+  for (const l of agentTerminalListeners) {
+    try { l(e) } catch (err) { console.warn('[WC] agent-terminal listener threw:', err) }
+  }
+}
+
 export async function runCommand(cmd: string, args: string[]): Promise<string> {
   const wc = await getWebContainer()
   ensureServerListener(wc)
 
   const fullCmd = [cmd, ...args].join(' ')
   const isServer = SERVER_PATTERNS.test(fullCmd)
+  emitAgentCommand({ type: 'command-start', cmd: fullCmd })
   const process = await wc.spawn(cmd, args)
 
   let output = ''
@@ -327,7 +359,10 @@ export async function runCommand(cmd: string, args: string[]): Promise<string> {
           ),
         ])
         if (result.done) break
-        if (result.value) output += result.value
+        if (result.value) {
+          output += result.value
+          emitAgentCommand({ type: 'command-output', data: result.value })
+        }
 
         // If server URL detected in output, we can return early
         if (serverUrl || /localhost:\d+|ready in|compiled|Local:/.test(output)) {
@@ -336,7 +371,10 @@ export async function runCommand(cmd: string, args: string[]): Promise<string> {
       }
     } catch { /* stream may error on timeout race, that's fine */ }
 
-    // Don't kill the process, don't await exit
+    // Dev server stays running — emit a synthetic "end" so the terminal
+    // can print a marker and stop highlighting this as in-progress.
+    // exitCode=null signals "still running, detached".
+    emitAgentCommand({ type: 'command-end', exitCode: null, cmd: fullCmd })
     const url = serverUrl || 'starting...'
     return `Dev server pokrenut: ${url}\n\n${output.substring(0, 2000)}`
   }
@@ -355,11 +393,13 @@ export async function runCommand(cmd: string, args: string[]): Promise<string> {
       const { done, value } = await reader.read()
       if (done) break
       output += value
+      emitAgentCommand({ type: 'command-output', data: value })
     }
   } catch { /* reader throws when timeout kills the process mid-read — harmless */ }
 
   clearTimeout(timeout)
   const exitCode = await process.exit
+  emitAgentCommand({ type: 'command-end', exitCode, cmd: fullCmd })
   return output + (exitCode !== 0 ? `\n(exit code: ${exitCode})` : '')
 }
 

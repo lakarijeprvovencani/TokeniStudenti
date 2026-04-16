@@ -9,7 +9,7 @@ import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
 import * as ghInt from '../services/githubIntegration'
 import * as nlInt from '../services/netlifyIntegration'
-import { preboot, onServerReady, getServerUrl, writeFile as wcWriteFile, clearFilesystem } from '../services/webcontainer'
+import { preboot, onServerReady, getServerUrl, writeFile as wcWriteFile, clearFilesystem, onAgentCommand } from '../services/webcontainer'
 import { addImageFiles, addVideoFiles, hydrateImagesIntoWc, isImagePath, isMediaPath, countImages, countVideos, MAX_IMAGES_PER_PROJECT, MAX_VIDEOS_PER_PROJECT } from '../services/userAssets'
 import { buildEnvFile } from '../services/secretsStore'
 import { filterForPush, ensureGitignoreSafety, DEFAULT_GITIGNORE, scanForSecrets, redactSecrets, type SecretFinding } from '../services/pushFilter'
@@ -358,6 +358,22 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
     return () => window.removeEventListener('vajb:open-paywall', handler)
   }, [userInfo?.balance])
   const [terminalOpen, setTerminalOpen] = useState(false)
+
+  // Auto-open the terminal the first time the agent kicks off a command.
+  // Subsequent commands in the same session respect the user's explicit
+  // choice (if they closed it mid-run we don't pop it back open). This
+  // mirrors the Cursor VS Code extension UX the user is used to.
+  useEffect(() => {
+    let autoOpened = false
+    const unsub = onAgentCommand((e) => {
+      if (autoOpened) return
+      if (e.type === 'command-start') {
+        autoOpened = true
+        setTerminalOpen(curr => curr || true)
+      }
+    })
+    return unsub
+  }, [])
   const [pushing, setPushing] = useState(false)
   const [ghConnected, setGhConnected] = useState(false)
   const [ghUsername, setGhUsername] = useState<string | null>(null)

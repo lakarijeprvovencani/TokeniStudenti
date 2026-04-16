@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PRODENT | Usluge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="prodent.css">
+</head>
+<body>
+<header class="pd-header">
+  <nav class="pd-nav" id="pdNav">
+    <a href="prodent.html" class="pd-logo"><div class="pd-logo-icon">🦷</div>PRO<span>DENT</span></a>
+    <ul class="pd-nav-links">
+      <li><a href="prodent.html#usluge">Usluge</a></li>
+      <li><a href="prodent.html#cenovnik">Cenovnik</a></li>
+      <li><a href="prodent.html#tim">Tim</a></li>
+      <li><a href="prodent.html#galerija">Galerija</a></li>
+      <li><a href="prodent.html#utisci">Utisci</a></li>
+      <li><a href="prodent.html#faq">Pitanja</a></li>
+    </ul>
+    <a href="tel:+38111234567" class="pd-nav-phone">📞 011 234-5678</a>
+    <a href="prodent-kontakt.html" class="btn btn-primary pd-nav-cta">Zakaži pregled</a>
+    <button class="pd-hamburger" onclick="document.getElementById('pdNav').classList.toggle('open')" aria-label="Meni">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+</header>
+
+<section class="pd-hero" style="padding:70px 0 60px;">
+  <div class="container">
+    <div class="pd-hero-eyebrow">🦷 Sve naše usluge</div>
+    <h1 style="font-size:clamp(2rem,4vw,3rem);font-weight:900;color:#fff;margin-bottom:.8rem;">Usluge PRODENT ordinacije</h1>
+    <p style="color:rgba(255,255,255,.85);font-size:1.05rem;max-width:560px;">Kompletna stomatološka zaštita od preventive do estetike — sve na jednom mestu, uz najsavremeniju opremu.</p>
+  </div>
+</section>
+
+<section class="section" id="opsta">
+  <div class="container">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:start;">
+      <div>
+        <div class="badge">🦷 Opšta stomatologija</div>
+        <h2 class="section-title">Zdravlje zuba za celu porodicu</h2>
+        <p style="color:var(--muted);margin-bottom:1.5rem;">Preventivna stomatologija je temelj zdravog osmeha. Naš tim brine o vašim zubima od prvog mlečnog do svakodnevnih kontrola u odraslom dobu.</p>
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:.9rem;">
+          <li style="display:flex;gap:.9rem;align-items:flex-start;"><span style="font-size:1.3rem;">✅</span><div><strong>Preventivni pregledi</strong><br><span style="color:var(--muted);font-size:.9rem;">Redovni pregledi svaka 6 meseci, rano otkrivanje karijesa i bolesti desni</span></div></li>
+          <li style="display:flex;gap:.9rem;align-items:flex-start;"><span style="font-size:1.3rem;">✅</span><div><strong>Uklanjanje kamenca (scaling)</strong><br><span style="color:var(--muted);font-size:.9rem;">Profesionalno čišćenje ultrazvukom i poliranje za zdrave desni</span></div></li>
+          <li style="display:flex;gap:.9rem;align-items:flex-start;"><span style="font-size:1.3rem;">✅</span><div><strong>Lečenje karijesa</strong><br><span style="color:var(--muted);font-size:.9rem;">Savremene kompozitne plombe u boji zuba, trajne i estetske</span></div></li>
+          <li style="display:flex;gap:.9rem;align-items:flex-start;"><span style="font-size:1.3rem;">✅</span><div><strong>Ekstrakcija zuba</strong><br><span style="color:var(--muted);font-size:.9rem;">Bezbolno vađenje uz lokalnu anesteziju, uključujući umnjake</span></div></li>
+          <li style="display:flex;gap:.9rem;align-items:flex-start;"><span style="font-size:1.3rem;">✅</span><div><strong>Dečja stomatologija</strong><br><span style="color:var(--muted);font-size:.9rem;">Specijalni pristup deci, bez straha i bola od prvog poseta</span></div></li>
+        </ul>
+        <a href="prodent-kontakt.html" class="btn btn-primary" style="margin-top:1.8rem;">📅 Zakaži pregled</a>
+      </div>
+      <div style="background:var(--blue-light);border-radius:var(--radius-lg);padding:2.5rem;text-align:center;font-size:5rem;">🦷<br><span style="font-size:1rem;color:var(--muted);font-weight:600;">Opšta stomatologija</span>
+        <div style="margin-top:2rem;background:#fff;border-radius:var(--radius);padding:1.5rem;text-align:left;">
+          <div style="font-weight:800;margin-bottom:1rem;color:var(--text);">Cene usluga</div>
+          <div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.9rem;"><span>Pregled</span><strong>BESPLATNO</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.9rem;"><span>Uklanjanje kamenca</span><strong>3.500 din</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.9rem;"><span>Plomba (kompozit)</span><strong>5.000 din</strong></div>
+          <div style="display:flex;justify-content:space-between;padding:.4rem 0;font-size:.9rem;"><span>Ekstrakcija</span><strong>od 2.500 din</strong></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-alt" id="protetika">
+  <div class="container">
+    <div class="text-center"><div class="badge">👑 Protetika</div>
+      <h2 class="section-title">Proteze i krune koje izgledaju prirodno</h2>
+      <p class="section-sub">Moderna protetika podrazumeva krunice, mostove i proteze izrađene u digitalnoj laboratoriji — precizno, trajno i estetski savršeno.</p>
+    </div>
+    <div class="pd-services-grid">
+      <div class="pd-service-card"><div class="pd-service-icon">👑</div><h3>Keramičke krune</h3><p>Bezmetalne krune od visokokvalitetne keramike koja imitira prirodnu translucencu zuba. Od 350€ po komadu.</p></div>
+      <div class="pd-service-card"><div class="pd-service-icon">💎</div><h3>Cirkonske krune</h3><p>Najčvršći materijal u protetici. Cirkon je hipoalergen, neverovatno jak i izgleda prirodno. Od 450€.</p></div>
+      <div class="pd-service-card"><div class="pd-service-icon">🌉</div><h3>Keramički mostovi</h3><p>Trajno rešenje za jedan ili više izgubljenih zuba bez implanta. Tročlani most od 1.000€.</p></div>
+      <div class="pd-service-card"><div class="pd-service-icon">😁</div><h3>Mobilne proteze</h3><p>Akrilatne i skeletirane proteze za delimičan ili potpun gubitak zuba. Precizna izrada u sopstvenoj lab.</p></div>
+      <div class="pd-service-card"><div class="pd-service-icon">🔬</div><h3>Digitalna protetika (CAD/CAM)</h3><p>Skeniranje, 3D dizajn i glodanje krune za sat vremena. Bez otisaka, bez čekanja.</p></div>
+      <div class="pd-service-card"><div class="pd-service-icon">🎯</div><h3>Teleskopske proteze</h3><p>Kombinovana fiksno-mobilna rešenja koja nude stabilnost fiksnih i praktičnost mobilnih proteza.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="implantologija">
+  <div class="container">
+    <div class="text-center"><div class="badge">🔩 Implantologija</div>
+      <h2 class="section-title">Implanti koji traju ceo život</h2>
+      <p class="section-sub">Dentalni implantat je jedino trajno rešenje za izgubljen zub. Koristimo isključivo sertifikovane švajcarske implante (Straumann, Nobel Biocare) sa doživotnom garancijom.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;margin-bottom:3rem;">
+      <div class="pd-price-card"><div class="pd-price-cat">Korak 1</div><div class="pd-price-name">Konsultacija i planiranje</div><p style="font-size:.88rem;color:var(--muted);">3D CBCT snimak, analiza kosti, digitalni plan implantacije. Konsultacija je besplatna.</p></div>
+      <div class="pd-price-card featured"><div class="pd-price-cat">Korak 2</div><div class="pd-price-name">Ugradnja implanta</div><p style="font-size:.88rem;color:rgba(255,255,255,.85);">Ambulantna hirurgija pod lokalnom anestezijom. Trajanje 30-60 min. Potpuno bezbolno.</p></div>
+      <div class="pd-price-card"><div class="pd-price-cat">Korak 3</div><div class="pd-price-name">Kruna i finalizacija</div><p style="font-size:.88rem;color:var(--muted);">Nakon 3-6 meseci (oseointegracija) postavljamo cirkonsku ili keramičku krunu.</p></div>
+    </div>
+    <div style="background:var(--blue-light);border-radius:var(--radius-lg);padding:2rem;text-align:center;">
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:.5rem;">Straumann i Nobel Biocare implanti — doživotna garancija</div>
+      <p style="color:var(--muted);margin-bottom:1.5rem;">Radimo isključivo sa svetski priznatim švajcarskim proizvođačima implantata koji garantuju uspešnost ugradnje iznad 98%.</p>
+      <a href="prodent-kontakt.html" class="btn btn-primary">Zakazi besplatnu konsultaciju za implantat</a>
+    </div>
+  </div>
+</section>
+
+<section class="section section-alt" id="estetska">
+  <div class="container">
+    <div class="text-center"><div class="badge">✨ Estetska stomatologija</div>
+      <h2 class="section-title">Dizajn osmeha koji menja život</h2>
+      <p class="section-sub">Estetska stomatologija je umetnost. Naš tim koristi digitalne alate za planiranje osmeha — vidite rezultat pre nego što počnemo.</p>
+    </div>
+    <div class="pd-services-grid">
+      <div class="pd-service-card"><div class="pd-service-icon">⚪</div><h3>Beljenje zuba (Zoom)</h3><p>Profesionalno beljenje u ordinaciji tehnologijom Philips Zoom. Za 60 minuta do 8 nijansi beli osmeh.</p></div>
+      <div class="pd-service-card"><div class="pd-service-icon">🪄</div><h3>Keramičke ljuspice (Veneers)</h3><p>Ultra-tanke keramičke ljuspice za savršen oblik i boju zuba. Minimalno brušenje, maksimalni efekat.</p></div>
+      <div class="pd-service-card"><div class="pd-service-icon">🎨</div><h3>Kompozitne facete</h3><p>Direktna metoda bez brušenja — kompozitni materijal nanet na zub za estetsku transformaciju za jedan poseta.</p></div>
+      <div class="pd-service-card"><div class="pd-service-icon">😊</div><h3>Dizajn osmeha (DSD)</h3><p>Digital Smile Design — digitalno planiramo vaš novi osmeh, vidite simulaciju pre tretmana.</p></div>
+      <div class="pd-service-card"><div class="pd-service-icon">🌸</div><h3>Gingivalni dizajn</h3><p>Korekcija "gingival smile" — laserska korekcija desni za savršenu liniju osmeha.</p></div>
+      <div class="pd-service-card"><div class="pd-service-icon">📐</div><h3>Okluzija i bruksizam</h3><p>Udlage za bruksizam, korekcija zagrižaja koji uzrokuje bol u vilici i trošenje zuba.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="endodoncija">
+  <div class="container">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center;">
+      <div>
+        <div class="badge">🔬 Endodoncija</div>
+        <h2 class="section-title">Spasavamo zube pod mikroskopom</h2>
+        <p style="color:var(--muted);margin-bottom:1.5rem;">Endodoncija je tretman kanala korena. Uz dentalni mikroskop, dr Marković postiže preciznost koja je bila nemoguća klasičnom metodom. Spasavamo zube koji su ranije morali biti vađeni.</p>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+          <div style="display:flex;gap:.9rem;align-items:flex-start;"><span style="font-size:1.3rem;">🔬</span><div><strong>Mikroskopska endodoncija</strong><br><span style="color:var(--muted);font-size:.9rem;">Do 25x uvećanje za precizno lečenje i čišćenje kanala</span></div></div>
+          <div style="display:flex;gap:.9rem;align-items:flex-start;"><span style="font-size:1.3rem;">🌡️</span><div><strong>Rotacioni instrumenti</strong><br><span style="color:var(--muted);font-size:.9rem;">Nikl-titan instrumenti za bezbolno i brzo čišćenje kanala</span></div></div>
+          <div style="display:flex;gap:.9rem;align-items:flex-start;"><span style="font-size:1.3rem;">📡</span><div><strong>Apeks lokator</strong><br><span style="color:var(--muted);font-size:.9rem;">Elektronsko merenje dužine kanala — nikad previše ni premalo</span></div></div>
+        </div>
+        <a href="prodent-kontakt.html" class="btn btn-primary" style="margin-top:1.8rem;">📅 Zakaži konsultaciju</a>
+      </div>
+      <div style="background:var(--teal-light);border-radius:var(--radius-lg);padding:2.5rem;text-align:center;font-size:5rem;">🔬<br><span style="font-size:.95rem;color:var(--muted);font-weight:600;">Mikroskopska endodoncija</span>
+        <div style="margin-top:1.5rem;font-size:.88rem;color:var(--muted);text-align:left;">Lečenje kanala korena je jedina alternativa vađenju zuba kada je pulpa upaljana ili nekrotična. Uz mikroskop, stopa uspeha je preko 95%.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-alt" id="ortodoncija">
+  <div class="container">
+    <div class="text-center"><div class="badge">😁 Ortodoncija</div>
+      <h2 class="section-title">Pravi zubi u svakom dobu</h2>
+      <p class="section-sub">Ortodontski tretman nije samo za decu. Sve više odraslih ispravlja zube diskretno uz Invisalign providne folije.</p>
+    </div>
+    <div class="pd-services-grid">
+      <div class="pd-service-card"><div class="pd-service-icon">😶</div><h3>Invisalign (providne folije)</h3><p>Gotovo nevidljivi aparati koji se skidaju za jelo. Sertifikovani Invisalign Gold provajder.</p></div>
+      <div class="pd-service-card"><div class="pd-service-icon">🔧</div><h3>Fiksni metalni aparati</h3><p>Klasično i pouzdano rešenje za kompleksne ortodontske slučajeve u svim uzrastima.</p></div>
+      <div class="pd-service-card"><div class="pd-service-icon">🪩</div><h3>Keramički aparati</h3><p>Estetski kompromis između Invisalign i metalnih aparata — manje vidljivi, jednako efikasni.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer class="pd-footer">
+  <div class="pd-footer-inner">
+    <div class="pd-footer-grid">
+      <div class="pd-footer-brand">
+        <a href="prodent.html" class="pd-footer-logo"><div class="pd-logo-icon" style="width:36px;height:36px;font-size:1.1rem;">🦷</div>PRODENT</a>
+        <p class="pd-footer-desc">Moderna stomatološka ordinacija u Beogradu. Vaš osmeh je naša misija.</p>
+      </div>
+      <div class="pd-footer-col"><h5>Usluge</h5><ul>
+        <li><a href="#opsta">Opšta stomatologija</a></li>
+        <li><a href="#protetika">Protetika</a></li>
+        <li><a href="#implantologija">Implantologija</a></li>
+        <li><a href="#estetska">Estetska stomatologija</a></li>
+        <li><a href="#endodoncija">Endodoncija</a></li>
+        <li><a href="#ortodoncija">Ortodoncija</a></li>
+      </ul></div>
+      <div class="pd-footer-col"><h5>Navigacija</h5><ul>
+        <li><a href="prodent.html">Početna</a></li>
+        <li><a href="prodent.html#tim">Tim lekara</a></li>
+        <li><a href="prodent.html#cenovnik">Cenovnik</a></li>
+        <li><a href="prodent-kontakt.html">Kontakt</a></li>
+      </ul></div>
+      <div class="pd-footer-col"><h5>Kontakt</h5><ul>
+        <li><a href="tel:+38111234567">011 234-5678</a></li>
+        <li><a href="mailto:info@prodent.rs">info@prodent.rs</a></li>
+        <li><a href="#">Kralja Milana 42, Beograd</a></li>
+      </ul></div>
+    </div>
+    <div class="pd-footer-bottom"><span>© 2025 PRODENT stomatološka ordinacija.</span><span>🦷 Vaš osmeh je naša misija</span></div>
+  </div>
+</footer>
+<script>
+const revealEls = document.querySelectorAll(".reveal");
+const obs = new IntersectionObserver(entries => entries.forEach(e => { if(e.isIntersecting){e.target.classList.add("visible");obs.unobserve(e.target);} }), {threshold:0.12});
+revealEls.forEach(el => obs.observe(el));
+</script>
+</body></html>

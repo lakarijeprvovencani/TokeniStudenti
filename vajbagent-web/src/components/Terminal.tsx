@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Terminal as XTerminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
-import { getWebContainer } from '../services/webcontainer'
+import { getWebContainer, onAgentCommand } from '../services/webcontainer'
 import { X, Terminal as TerminalIcon } from 'lucide-react'
 import '@xterm/xterm/css/xterm.css'
 import './Terminal.css'
@@ -124,8 +124,42 @@ export default function TerminalPanel({ onClose }: TerminalProps) {
     })
     if (termRef.current) resizeObserver.observe(termRef.current)
 
+    // Mirror every agent-issued command into this terminal. We prefix
+    // start/end lines with colored markers so the user can clearly
+    // separate their own input from agent activity. Raw stdout/stderr
+    // bytes from the spawned process get written verbatim so colored
+    // output from npm / vite / next stays colored.
+    //
+    // Note: the agent's process and the interactive jsh process are
+    // separate children of WebContainers. Output interleaving with an
+    // in-flight user command is possible but rare — the panel is
+    // passive most of the time.
+    const AGENT_START = '\x1b[38;2;249;115;22m▶ agent\x1b[0m \x1b[38;2;113;113;122m·\x1b[0m '
+    const AGENT_OK = '\x1b[38;2;34;197;94m✓ agent\x1b[0m'
+    const AGENT_FAIL = '\x1b[38;2;239;68;68m✗ agent\x1b[0m'
+    const AGENT_DETACH = '\x1b[38;2;59;130;246m◆ agent\x1b[0m'
+    const unsubAgent = onAgentCommand((e) => {
+      if (disposed) return
+      if (e.type === 'command-start') {
+        terminal.writeln('')
+        terminal.writeln(`${AGENT_START}${e.cmd}`)
+      } else if (e.type === 'command-output') {
+        terminal.write(e.data)
+      } else if (e.type === 'command-end') {
+        if (e.exitCode === null) {
+          terminal.writeln(`\r\n${AGENT_DETACH} dev server radi u pozadini`)
+        } else if (e.exitCode === 0) {
+          terminal.writeln(`\r\n${AGENT_OK} završeno`)
+        } else {
+          terminal.writeln(`\r\n${AGENT_FAIL} exit ${e.exitCode}`)
+        }
+        terminal.writeln('')
+      }
+    })
+
     return () => {
       disposed = true
+      unsubAgent()
       resizeObserver.disconnect()
       try { inputWriter?.releaseLock() } catch { /* ignore */ }
       try { shellHandle?.kill() } catch { /* ignore */ }
