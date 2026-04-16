@@ -684,7 +684,7 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
           '5. Write COMPLETE files — do NOT split a file just because it is long. A 400-line HTML or CSS file is perfectly fine. For static sites use exactly: index.html + style.css + script.js. NEVER create style2.css, nav.css, hero.css, etc.',
           '6. Before you finish, mentally review: "Would a paying customer go WOW at the first screen?" If any section renders empty, unstyled, or generic — fix it BEFORE stopping.',
           '',
-          'Start building now. Do NOT describe the plan back to the user — they already wrote it. Call write_file immediately.',
+          'Start building now. Do NOT describe the plan back to the user — they already wrote it. Call write_file immediately. IMPORTANT: write ONE file per tool call response — do NOT batch multiple write_file calls in one response, it causes JSON truncation.',
         ].join('\n'),
       }
       // Insert the directive directly before the user message so the model

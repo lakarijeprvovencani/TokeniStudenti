@@ -36,7 +36,7 @@ export async function executeToolCall(
     args = JSON.parse(tc.function.arguments)
   } catch {
     if (name === 'write_file') {
-      const truncMsg = 'GRESKA: Sadrzaj fajla je presecen (JSON isecen). Fajl NIJE upisan. Pokusaj ponovo — napisi kompletan fajl u jednom write_file pozivu.'
+      const truncMsg = 'GRESKA: JSON argumenti su preseceni jer si pokusao da napises previse fajlova odjednom. Ovaj fajl NIJE upisan. Pisi JEDAN fajl po pozivu — pozovi write_file ponovo samo za ovaj fajl.'
       console.error('[Tool] write_file truncated JSON — rejected')
       return { tool_call_id: tc.id, role: 'tool', content: truncMsg }
     }
@@ -122,7 +122,7 @@ export async function executeToolCall(
             return {
               tool_call_id: tc.id,
               role: 'tool',
-              content: `GRESKA: Kod u ${path} je presecen — ${opens} otvorenih { vs ${closes} zatvorenih }. Fajl NIJE upisan. Pokusaj ponovo — dopisi zatvorene zagrade/tagove koji nedostaju.`,
+              content: `GRESKA: Kod u ${path} je presecen — ${opens} otvorenih { vs ${closes} zatvorenih }. Fajl NIJE upisan. Pozovi write_file PONOVO samo za ovaj fajl sa kompletnim sadrzajem.`,
             }
           }
         }
