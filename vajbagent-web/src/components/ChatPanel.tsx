@@ -661,11 +661,12 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
     let lastAssistantHadText = false
 
     // ─── Rewrite guard ──────────────────────────────────────────────
-    // Track successful write_file calls per file path across all iterations
-    // of this sendMessage() turn. Allows 2 successful writes (create + one
-    // retry if first was truncated), blocks 3rd+ to break rewrite loops
-    // where the model endlessly "improves" the same file.
-    const fileWriteCounts = new Map<string, number>()
+    // Track write_file calls per file path across all iterations of this
+    // sendMessage() turn. Once a file is written SUCCESSFULLY, block any
+    // further write_file to that path — model must use replace_in_file
+    // for changes. But always allow retry after a FAILED write (truncation,
+    // brace mismatch, etc.) so error recovery works unlimited.
+    const fileWriteState = new Map<string, { ok: number; lastFailed: boolean }>()
 
     try {
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
@@ -902,14 +903,18 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
           setDisplayMessages(prev => [...prev, { role: 'status', content: statusLabel }])
           setStatusText(statusLabel)
 
-          // ─── Rewrite guard: block 3rd+ write_file to same path ──────
+          // ─── Rewrite guard: block rewriting a file that already succeeded ──
+          // If the last write to this path SUCCEEDED, block further write_file
+          // calls. But if the last write FAILED (truncation, brace mismatch,
+          // etc.), always allow a retry so error recovery works regardless of
+          // how many attempts it takes.
           if (toolName === 'write_file') {
             try {
               const wArgs = JSON.parse(tc.function.arguments)
               const wPath = (wArgs.path as string || '').replace(/^\/+/, '')
-              const wCount = fileWriteCounts.get(wPath) || 0
-              if (wPath && wCount >= 2) {
-                const blockMsg = `BLOCKED: You already wrote ${wPath} ${wCount} times. Each rewrite flashes the preview and wastes tokens. The file is complete. Do NOT call write_file for ${wPath} again. If you need a small fix, use replace_in_file. Otherwise, write your final summary message to the user.`
+              const state = wPath ? fileWriteState.get(wPath) : undefined
+              if (state && state.ok >= 1 && !state.lastFailed) {
+                const blockMsg = `BLOCKED: ${wPath} was already written successfully. Do NOT rewrite it — use replace_in_file for changes instead. Finish with your summary message to the user.`
                 historyRef.current = [...historyRef.current, {
                   role: 'tool' as const,
                   content: blockMsg,
@@ -930,16 +935,20 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
             tool_call_id: toolResult.tool_call_id,
           }]
 
-          // Track successful write_file for rewrite guard (only count non-errors)
+          // Track write_file results for rewrite guard
           if (toolName === 'write_file') {
-            const isErr = /^(GRESKA:|Greska:|Ne možeš|BLOKIRANO|BLOCKED)/.test(toolResult.content)
-            if (!isErr) {
-              try {
-                const wArgs = JSON.parse(tc.function.arguments)
-                const wPath = (wArgs.path as string || '').replace(/^\/+/, '')
-                if (wPath) fileWriteCounts.set(wPath, (fileWriteCounts.get(wPath) || 0) + 1)
-              } catch { /* args already handled above */ }
-            }
+            const isFail = /^(GRESKA:|Greska:|Ne možeš|BLOKIRANO|BLOCKED)/.test(toolResult.content)
+            try {
+              const wArgs = JSON.parse(tc.function.arguments)
+              const wPath = (wArgs.path as string || '').replace(/^\/+/, '')
+              if (wPath) {
+                const prev = fileWriteState.get(wPath) || { ok: 0, lastFailed: false }
+                fileWriteState.set(wPath, {
+                  ok: isFail ? prev.ok : prev.ok + 1,
+                  lastFailed: isFail,
+                })
+              }
+            } catch { /* args already handled above */ }
           }
 
           // Show error to user if tool failed
