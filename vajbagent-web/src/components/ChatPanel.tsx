@@ -661,12 +661,13 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
     let lastAssistantHadText = false
 
     // ─── Rewrite guard ──────────────────────────────────────────────
-    // Track write_file calls per file path across all iterations of this
-    // sendMessage() turn. Once a file is written SUCCESSFULLY, block any
-    // further write_file to that path — model must use replace_in_file
-    // for changes. But always allow retry after a FAILED write (truncation,
-    // brace mismatch, etc.) so error recovery works unlimited.
-    const fileWriteState = new Map<string, { ok: number; lastFailed: boolean }>()
+    // Track write_file attempts per file path within this sendMessage() turn.
+    // Two hard rules:
+    //   1. Once a file is written SUCCESSFULLY → block all further writes
+    //   2. Max 3 TOTAL attempts per file (success or fail) → stop trying
+    // Rule 1 prevents rewrite loops. Rule 2 prevents infinite failure loops
+    // (model generates huge file → truncated JSON → fail → retry → same).
+    const fileWriteState = new Map<string, { ok: number; total: number }>()
 
     try {
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
@@ -900,21 +901,24 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
             statusLabel = FRIENDLY[toolName] || toolName
           }
 
-          setDisplayMessages(prev => [...prev, { role: 'status', content: statusLabel }])
-          setStatusText(statusLabel)
-
-          // ─── Rewrite guard: block rewriting a file that already succeeded ──
-          // If the last write to this path SUCCEEDED, block further write_file
-          // calls. But if the last write FAILED (truncation, brace mismatch,
-          // etc.), always allow a retry so error recovery works regardless of
-          // how many attempts it takes.
+          // ─── Rewrite guard ─────────────────────────────────────────────
+          // Silent in UI — blocked writes never show "Pišem ..." status.
+          // Uses regex to extract path (not JSON.parse) because the model
+          // often generates truncated JSON that toolHandler can recover via
+          // jsonrepair, but JSON.parse cannot. Without regex, truncated
+          // writes are never tracked and the guard is bypassed entirely.
           if (toolName === 'write_file') {
-            try {
-              const wArgs = JSON.parse(tc.function.arguments)
-              const wPath = (wArgs.path as string || '').replace(/^\/+/, '')
-              const state = wPath ? fileWriteState.get(wPath) : undefined
-              if (state && state.ok >= 1 && !state.lastFailed) {
-                const blockMsg = `BLOCKED: ${wPath} was already written successfully. Do NOT rewrite it — use replace_in_file for changes instead. Finish with your summary message to the user.`
+            const pathMatch = tc.function.arguments.match(/"path"\s*:\s*"([^"]+)"/)
+            const wPath = pathMatch ? pathMatch[1].replace(/^\/+/, '') : ''
+            const state = wPath ? fileWriteState.get(wPath) : undefined
+            if (state) {
+              let blockMsg = ''
+              if (state.ok >= 1) {
+                blockMsg = `BLOCKED: ${wPath} was already written successfully. Do NOT rewrite it — use replace_in_file for small changes. Write your final summary message to the user.`
+              } else if (state.total >= 3) {
+                blockMsg = `BLOCKED: ${wPath} failed ${state.total} times (content too large). Write a SHORTER version with fewer sections, then add more with replace_in_file.`
+              }
+              if (blockMsg) {
                 historyRef.current = [...historyRef.current, {
                   role: 'tool' as const,
                   content: blockMsg,
@@ -922,8 +926,11 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
                 }]
                 continue
               }
-            } catch { /* unparseable args — let executeToolCall handle it */ }
+            }
           }
+
+          setDisplayMessages(prev => [...prev, { role: 'status', content: statusLabel }])
+          setStatusText(statusLabel)
 
           const toolResult = await executeToolCall(tc, (files) => {
             onFilesChanged(files)
@@ -935,20 +942,18 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
             tool_call_id: toolResult.tool_call_id,
           }]
 
-          // Track write_file results for rewrite guard
+          // Track write_file results for rewrite guard (regex, not JSON.parse)
           if (toolName === 'write_file') {
             const isFail = /^(GRESKA:|Greska:|Ne možeš|BLOKIRANO|BLOCKED)/.test(toolResult.content)
-            try {
-              const wArgs = JSON.parse(tc.function.arguments)
-              const wPath = (wArgs.path as string || '').replace(/^\/+/, '')
-              if (wPath) {
-                const prev = fileWriteState.get(wPath) || { ok: 0, lastFailed: false }
-                fileWriteState.set(wPath, {
-                  ok: isFail ? prev.ok : prev.ok + 1,
-                  lastFailed: isFail,
-                })
-              }
-            } catch { /* args already handled above */ }
+            const pathMatch = tc.function.arguments.match(/"path"\s*:\s*"([^"]+)"/)
+            const wPath = pathMatch ? pathMatch[1].replace(/^\/+/, '') : ''
+            if (wPath) {
+              const prev = fileWriteState.get(wPath) || { ok: 0, total: 0 }
+              fileWriteState.set(wPath, {
+                ok: isFail ? prev.ok : prev.ok + 1,
+                total: prev.total + 1,
+              })
+            }
           }
 
           // Show error to user if tool failed
