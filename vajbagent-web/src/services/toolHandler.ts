@@ -35,12 +35,9 @@ export async function executeToolCall(
   try {
     args = JSON.parse(tc.function.arguments)
   } catch {
-    if (name === 'write_file') {
-      const truncMsg = 'GRESKA: JSON argumenti su preseceni jer si pokusao da napises previse fajlova odjednom. Ovaj fajl NIJE upisan. Pisi JEDAN fajl po pozivu — pozovi write_file ponovo samo za ovaj fajl.'
-      console.error('[Tool] write_file truncated JSON — rejected')
-      return { tool_call_id: tc.id, role: 'tool', content: truncMsg }
-    }
-
+    // JSON parse failed — try recovery via jsonrepair + manual regex extraction.
+    // This handles truncated tool calls where the model tried to write too many
+    // files in one response and the last one got cut off by max_tokens.
     const recovered = parseToolCallArguments(tc.function.arguments)
     if (recovered && Object.keys(recovered).length > 0) {
       args = recovered
@@ -48,7 +45,10 @@ export async function executeToolCall(
       console.log(`[Tool] Recovered truncated args for ${name}: ${Object.keys(recovered).join(', ')}`)
     } else {
       console.error(`[Tool] Failed to parse args for ${name}:`, tc.function.arguments.substring(0, 200))
-      return { tool_call_id: tc.id, role: 'tool', content: `Greska: neispravan JSON u argumentima za ${name}.` }
+      const hint = name === 'write_file'
+        ? 'Pisi JEDAN fajl po pozivu — pozovi write_file ponovo samo za ovaj fajl.'
+        : ''
+      return { tool_call_id: tc.id, role: 'tool', content: `Greska: neispravan JSON u argumentima za ${name}. ${hint}`.trim() }
     }
   }
 
