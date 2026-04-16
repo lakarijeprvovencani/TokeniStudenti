@@ -788,6 +788,20 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
             const errorMsg = err instanceof Error ? err.message : String(err)
             const isRetryable = RETRY_PATTERN.test(errorMsg)
 
+            // If files were already written and this is the nudge/completion
+            // phase failing, don't retry — just finish gracefully. The site
+            // is built; this was a bonus pass. Retrying 3x on an already-
+            // complete build wastes credits and confuses the user.
+            const filesAlreadyBuilt = iteration > 0 && historyRef.current.some(m =>
+              m.role === 'assistant' && m.tool_calls?.some(tc => tc.function.name === 'write_file')
+            )
+            if (filesAlreadyBuilt) {
+              console.warn('[API] Post-build API call failed, finishing gracefully:', errorMsg)
+              result = { text: '', toolCalls: [], finishReason: 'stop' }
+              lastErr = null
+              break
+            }
+
             if (!isRetryable || attempt >= MAX_RETRIES) {
               // On 403, clean up tool messages from history
               const is403 = /403|forbidden/i.test(errorMsg)
@@ -882,7 +896,14 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
           // contains every section the user mentioned. If not, nudge once
           // to fill in the missing ones. This prevents the "half-empty site"
           // outcome where the model produces hero+footer and skips the body.
-          if (!sectionNudgeUsed && hasWrittenFiles && hasBuildIntent) {
+          // Only fire section nudge if model wrote FEWER than 3 files.
+          // If 3+ files exist, the model made a real attempt and our regex
+          // simply might not match the class names it chose.
+          const writtenFileCount = historyRef.current.filter(m =>
+            m.role === 'assistant' && m.tool_calls?.some(tc => tc.function.name === 'write_file')
+          ).reduce((sum, m) => sum + (m.tool_calls?.filter(tc => tc.function.name === 'write_file').length ?? 0), 0)
+
+          if (!sectionNudgeUsed && hasWrittenFiles && hasBuildIntent && writtenFileCount < 3) {
             try {
               const html = await wcReadFile('index.html').catch(() => null)
               if (html && !html.startsWith('Greska:') && html.length > 200) {
