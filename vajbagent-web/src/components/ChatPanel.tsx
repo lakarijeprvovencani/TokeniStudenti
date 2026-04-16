@@ -78,6 +78,61 @@ const CONTEXT_LIMITS: Record<string, number> = {
 
 const SESSION_KEY = 'vajb_session'
 
+// ─── User-facing error humanization ──────────────────────────────────────────
+// Raw errors from fetch/streaming are technical ("API greska: 503", "Load failed",
+// "ECONNRESET"). They leak straight into the chat as 'error' bubbles. This helper
+// translates them into a single line a non-technical user can act on. Always
+// returns Serbian, never exposes stack traces or HTTP internals.
+function humanizeError(raw: string): string {
+  const s = (raw || '').toString()
+  if (!s) return 'Došlo je do greške. Probaj ponovo.'
+
+  // Already-friendly messages that we emit ourselves — pass through untouched.
+  if (/^(Nema odgovora od servera|Stream prekinut|Timeout:|Zaustavljeno|Zahtev je odbijen|Ponestalo ti je kredita|Prijava je istekla)/i.test(s)) {
+    return s
+  }
+  // Quota / payment
+  if (/402|payment required|insufficient|nedovoljno|kredit/i.test(s)) {
+    return 'Nemaš dovoljno kredita za ovaj model. Dopuni nalog ili izaberi jeftiniji model.'
+  }
+  // Auth
+  if (/401|unauthorized|autenti?fikacija|not authenticated|signed out/i.test(s)) {
+    return 'Prijava je istekla. Uloguj se ponovo pa probaj opet.'
+  }
+  // Forbidden
+  if (/403|forbidden/i.test(s)) {
+    return 'Zahtev je odbijen. Moguće da je kontekst prevelik — osveži stranicu ili pokreni nov chat.'
+  }
+  // Not found
+  if (/404|not found/i.test(s)) {
+    return 'Ruta nije pronađena na serveru. Osveži stranicu i probaj ponovo.'
+  }
+  // Rate limit
+  if (/429|rate.?limit|too many/i.test(s)) {
+    return 'Previše zahteva u kratkom roku. Sačekaj 10-20 sekundi pa probaj ponovo.'
+  }
+  // Overloaded / server errors
+  if (/\b5\d\d\b|overloaded|bad gateway|gateway timeout|service unavailable|server error/i.test(s)) {
+    return 'Server je trenutno preopterećen. Sačekaj par sekundi pa probaj ponovo — obično prođe za minut.'
+  }
+  // Timeout-family
+  if (/timeout|ETIMEDOUT|predugo/i.test(s)) {
+    return 'Zahtev je predugo trajao. Prompt je verovatno pretežak — skrati ga, podeli na manje korake ili probaj drugi model.'
+  }
+  // Network / offline
+  if (/Failed to fetch|Load failed|NetworkError|network.?error|ECONNRESET|ECONNREFUSED|ENOTFOUND|socket hang up/i.test(s)) {
+    return 'Ne mogu da se povežem na server. Proveri internet pa probaj ponovo.'
+  }
+  // Generic API error with status
+  const statusMatch = s.match(/API greska:\s*(\d+)/i) || s.match(/status:?\s*(\d+)/i)
+  if (statusMatch) {
+    return `Server je vratio grešku (${statusMatch[1]}). Probaj ponovo za par sekundi.`
+  }
+  // Default — keep it short, strip any stack/JSON noise.
+  const clean = s.split('\n')[0].replace(/^Error:\s*/i, '').slice(0, 240)
+  return clean || 'Došlo je do greške. Probaj ponovo.'
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Resize image to max dimensions and return base64 data URL */
@@ -796,8 +851,8 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
               }
 
               const userErrMsg = is403
-                ? 'Zahtev je odbijen (403). Moguć razlog: prevelik kontekst ili privremeno ograničenje. Pokušaj ponovo ili osveži stranicu da resetuješ kontekst.'
-                : errorMsg
+                ? 'Zahtev je odbijen. Moguće da je kontekst prevelik — osveži stranicu ili pokreni nov chat.'
+                : humanizeError(errorMsg)
 
               setDisplayMessages(prev => [...prev, { role: 'error', content: userErrMsg }])
               setStreamText('')
@@ -898,30 +953,59 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
             continue
           }
 
-          let statusLabel = toolName
+          // Pretty per-tool status label. Fallback to a friendly generic when
+          // args can't be parsed yet (streaming / truncated JSON). We cover
+          // EVERY tool the backend exposes so the user never sees a raw
+          // snake_case tool name bubble up into the chat.
+          const FRIENDLY: Record<string, string> = {
+            write_file: 'Pišem fajl…',
+            read_file: 'Čitam fajl…',
+            replace_in_file: 'Menjam fajl…',
+            list_files: 'Pregledam fajlove',
+            execute_command: 'Izvršavam komandu…',
+            search_files: 'Pretražujem fajlove',
+            search_images: 'Tražim slike',
+            fetch_url: 'Učitavam stranicu…',
+            web_search: 'Pretražujem internet…',
+            download_file: 'Preuzimam fajl…',
+            git_status: 'Proveravam GitHub…',
+            git_list_repos: 'Učitavam GitHub repoe…',
+            git_push: 'Objavljujem na GitHub…',
+            supabase_list_tables: 'Čitam Supabase tabele…',
+            supabase_describe_table: 'Čitam strukturu tabele…',
+            supabase_get_auth_config: 'Čitam Supabase Auth…',
+            supabase_list_functions: 'Čitam Edge Functions…',
+            supabase_deploy_function: 'Objavljujem Edge Function…',
+            supabase_delete_function: 'Brišem Edge Function…',
+            supabase_update_auth_config: 'Menjam Supabase Auth…',
+            supabase_sql: 'Izvršavam SQL…',
+          }
+          let statusLabel = FRIENDLY[toolName] || 'Radim…'
           try {
             const args = JSON.parse(tc.function.arguments)
-            if (toolName === 'write_file') statusLabel = `Pišem ${args.path}`
-            else if (toolName === 'read_file') statusLabel = `Čitam ${args.path}`
-            else if (toolName === 'list_files') statusLabel = `Pregledam fajlove`
-            else if (toolName === 'replace_in_file') statusLabel = `Menjam ${args.path}`
-            else if (toolName === 'execute_command') statusLabel = `${(args.command || '').substring(0, 40)}`
-            else if (toolName === 'search_files') statusLabel = 'Pretražujem fajlove'
-            else if (toolName === 'search_images') statusLabel = 'Tražim slike'
-            else if (toolName === 'git_push') statusLabel = 'Objavljujem na GitHub'
-            else if (toolName === 'git_status') statusLabel = 'Proveravam GitHub'
-          } catch {
-            // JSON partial/truncated — use friendly generic labels instead of raw tool name
-            const FRIENDLY: Record<string, string> = {
-              write_file: 'Pišem fajl…',
-              read_file: 'Čitam fajl…',
-              replace_in_file: 'Menjam fajl…',
-              list_files: 'Pregledam fajlove',
-              execute_command: 'Izvršavam komandu…',
-              search_files: 'Pretražujem fajlove',
-              search_images: 'Tražim slike',
+            if (toolName === 'write_file' && args.path) statusLabel = `Pišem ${args.path}`
+            else if (toolName === 'read_file' && args.path) statusLabel = `Čitam ${args.path}`
+            else if (toolName === 'replace_in_file' && args.path) statusLabel = `Menjam ${args.path}`
+            else if (toolName === 'execute_command' && args.command) {
+              const cmd = String(args.command).trim().split('\n')[0]
+              statusLabel = cmd.length > 48 ? `${cmd.slice(0, 45)}…` : cmd
             }
-            statusLabel = FRIENDLY[toolName] || toolName
+            else if (toolName === 'fetch_url' && args.url) {
+              try { statusLabel = `Učitavam ${new URL(args.url).hostname}…` } catch { /* keep default */ }
+            }
+            else if (toolName === 'web_search' && args.query) statusLabel = `Pretražujem: ${String(args.query).slice(0, 40)}`
+            else if (toolName === 'search_images' && args.query) statusLabel = `Tražim slike: ${String(args.query).slice(0, 40)}`
+            else if (toolName === 'search_files' && args.pattern) statusLabel = `Pretražujem: ${String(args.pattern).slice(0, 40)}`
+            else if (toolName === 'download_file' && args.path) statusLabel = `Preuzimam ${args.path}`
+            else if (toolName === 'supabase_sql' && args.query) {
+              const q = String(args.query).trim().replace(/\s+/g, ' ').slice(0, 50)
+              statusLabel = `SQL: ${q}`
+            }
+            else if (toolName === 'supabase_describe_table' && args.table) statusLabel = `Čitam tabelu ${args.table}…`
+            else if (toolName === 'supabase_deploy_function' && args.name) statusLabel = `Objavljujem function ${args.name}…`
+            else if (toolName === 'supabase_delete_function' && args.name) statusLabel = `Brišem function ${args.name}…`
+          } catch {
+            // JSON partial/truncated — FRIENDLY default already set above.
           }
 
           setDisplayMessages(prev => [...prev, { role: 'status', content: statusLabel }])
@@ -956,8 +1040,8 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
       if ((err as Error).name === 'AbortError') {
         setDisplayMessages(prev => [...prev, { role: 'status', content: 'Zaustavljeno.' }])
       } else {
-        const errMsg = err instanceof Error ? err.message : 'Greška pri povezivanju'
-        setDisplayMessages(prev => [...prev, { role: 'error', content: errMsg }])
+        const rawMsg = err instanceof Error ? err.message : 'Greška pri povezivanju'
+        setDisplayMessages(prev => [...prev, { role: 'error', content: humanizeError(rawMsg) }])
       }
       setStreamText('')
     } finally {
@@ -1127,7 +1211,7 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
               <span />
               <span />
             </div>
-            <span>{statusText || 'Razmišljam...'}</span>
+            <ThinkingLabel statusText={statusText} />
           </div>
         )}
       </div>
@@ -1229,5 +1313,42 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
         </div>
       </div>
     </div>
+  )
+}
+
+// ─── Rotating thinking phrases ───────────────────────────────────────────────
+// When `statusText` is empty the agent is usually in the model-reasoning phase
+// (no tool calls yet, no output tokens). On Power-tier reasoning models this
+// can silently last 60-180 seconds. Showing a static "Razmišljam…" the whole
+// time feels frozen, so we rotate through a few natural Serbian phrases.
+const THINKING_PHRASES = [
+  'Razmišljam…',
+  'Analiziram zahtev…',
+  'Planiram korake…',
+  'Biram najbolji pristup…',
+  'Još malo, sklapam plan…',
+  'Pripremam rešenje…',
+]
+
+function ThinkingLabel({ statusText }: { statusText: string }) {
+  const [phraseIdx, setPhraseIdx] = useState(0)
+  useEffect(() => {
+    if (statusText) return
+    const t = setInterval(() => {
+      setPhraseIdx(i => (i + 1) % THINKING_PHRASES.length)
+    }, 4000)
+    return () => clearInterval(t)
+  }, [statusText])
+  if (statusText) return <span>{statusText}</span>
+  return (
+    <motion.span
+      key={phraseIdx}
+      initial={{ opacity: 0, y: 3 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -3 }}
+      transition={{ duration: 0.25 }}
+    >
+      {THINKING_PHRASES[phraseIdx]}
+    </motion.span>
   )
 }
