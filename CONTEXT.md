@@ -86,14 +86,15 @@ Browser-based AI code editor (like Bolt.new). React + Vite + WebContainers.
 | Tier | Backend Model | Context Window | Max Output | Reasoning | Notes |
 |------|--------------|---------------|------------|-----------|-------|
 | Lite | GPT-5 Mini | 400K | 128K | Yes (`reasoning_effort`) | Cheapest, fast |
-| Turbo | GPT-4.1 | 1M | 32K | No | Fast, strong at coding |
+| Turbo | Claude Haiku 4.5 | 200K | 64K | No | Fast, cheap Anthropic tool-caller |
 | Pro | GPT-5 | 400K | 128K | Yes (`reasoning_effort`) | Strong generalist |
-| Max | Claude Sonnet 4.6 | 1M | 64K | No | Balanced quality |
+| Max | Claude Sonnet 4.6 | 1M | 64K | No | **Default on web** — best balance |
 | Power | GPT-5.4 | 1.05M | 128K | Yes (`reasoning_effort`) | Flagship OpenAI |
 | Ultra | Claude Opus 4.6 | 1M | 128K | No | Premium Anthropic |
 | Architect | Claude Opus 4.6 | 1M | 128K | No | Opus + architect system prompt |
 
 Students select tier in extension UI; backend resolves to real provider model.
+Web extension default is **Max (Sonnet 4.6)** as of April 2026. VS Code extension default is still Turbo.
 
 ## Billing
 - Students have USD balances topped up via admin or Stripe
@@ -251,10 +252,9 @@ Cloudflare R2 (bucket: vajbagent):
 - Without this, GPT-5 Mini spent all output tokens on reasoning, returning empty `content` with `finish_reason: "length"`
 - `reasoning_effort: 'low'` for small requests (<=2048 tokens), `'medium'` for coding tasks
 
-### Newline/Escape Fix (toolHandler.ts)
-- AI models sometimes send double-escaped `\\n` in tool call arguments for `write_file`
-- Heuristic in `write_file` handler: if textual file has `\\n` literals AND (<=3 lines OR avg line >500 chars), auto-converts `\\n`→`\n`, `\\t`→`\t`, `\\"`→`"`
-- Prevents HTML/CSS appearing as single-line code with visible `\n` characters
+### Newline/Escape Fix (toolHandler.ts) — REPLACED in session 2026-04-15
+- **Old heuristic (removed):** if textual file has `\\n` literals AND (<=3 lines OR avg line >500 chars), auto-converts. This was fragile and broke JS strings with legitimate `\\n`.
+- **New (conservative):** convert `\\n`→`\n` ONLY if the file has ZERO real newlines (model collapsed entire file into one line). Ported from vajbagent-vscode/src/tools.ts:499.
 
 ### Prompt Enhancer (Welcome.tsx, Welcome.css)
 - "Poboljšaj prompt" button (Sparkles icon) on Welcome screen
@@ -292,15 +292,111 @@ Cloudflare R2 (bucket: vajbagent):
 ### Backend Fix (index.js)
 - `req` parameter was undefined in `handleOpenAINonStream` and `handleOpenAIStream` — fixed by passing it from `chatCompletionsHandler`
 
+### Session 2026-04-15/16 — Major Web Extension Hardening
+
+#### Tool Parsing Overhaul (toolHandler.ts)
+- **Fuzzy whitespace matching in `replace_in_file`**: ported from vajbagent-vscode/src/tools.ts:598-619. Trims trailing whitespace per line and does sequential line-by-line match. Falls back to this when exact `.includes()` fails. Also adds duplicate-match guard: if `old_text` appears >1 time, rejects with "proširite old_text" instead of silently replacing the wrong instance.
+- **Newline heuristic replaced**: old heuristic (<=3 lines OR avg >500 chars) was fragile. New: convert `\\n`→`\n` ONLY when content has zero real `\n` chars (model collapsed entire file). Cannot break multi-line files.
+- **Truncation detection for write_file**: HTML checked for missing `</html>`, JS/TS/CSS/JSON checked for unbalanced braces via a string/comment-aware state machine (skips `'...'`, `"..."`, `` `...` ``, `//...`, `/*...*/`). This is MORE accurate than the VS Code extension's naive brace count.
+
+#### Git Agent Tools (toolHandler.ts, tools.ts)
+- 3 new tools: `git_status`, `git_list_repos`, `git_push`
+- Reuse backend GitHub OAuth flow (`githubIntegration.ts` + `src/githubOAuth.js`)
+- Same security filters as UI push button: `filterForPush()` strips .env/secrets, `ensureGitignoreSafety()` patches .gitignore, `scanForSecrets()` + `redactSecrets()` auto-redacts hardcoded API keys
+- Agent cannot bypass any security — filters run unconditionally
+
+#### R2 Upload Retry (userAssets.ts)
+- `uploadImageToR2()` now retries 3x with exponential backoff (500ms, 1500ms)
+- Retry on 5xx, 408, 429, network errors. Fail-fast on 4xx (wrong size, expired auth)
+- Existing data-URL fallback in caller (`uploadAllImagesToR2`) preserved — if all retries fail, data URL stays in files map
+
+#### Agent Loop Improvements (ChatPanel.tsx)
+- **MAX_ITERATIONS 20 → 50**: complex builds need more steps
+- **Iteration warning as `role: 'system'`** instead of `role: 'user'` with `[SYSTEM]` prefix
+- **max_tokens: 32000** sent to API (was missing entirely → backend defaulted to 4096 → truncated CSS → "write_file truncated JSON — rejected" → model wasted 3 min splitting CSS into 5 tiny files). 32K is well within all models' MAX_OUTPUT (64K–128K), no cost penalty.
+- **Lazy-parroting recovery**: if model returns text-only on a clear build prompt with no files written yet, injects runtime system nudge and retries once. Fully silent — no UI messages.
+- **Section completeness check**: when model finishes and wrote <3 files, reads index.html and checks for missing sections the user requested (stem-based Serbian patterns: `/uslug/`, `/tim/`, `/cena/`). If missing → silent nudge to add them. Does NOT fire if model wrote 3+ files (real attempt, our regex just might not match the class names).
+- **Graceful post-build failures**: if an API call fails after files are already written, catch block ends gracefully instead of retrying 3x. The site is built; the failing call was a bonus pass.
+- **Retry status messages only in footer bar**, not as chat bubbles.
+
+#### First-Shot Quality Directive (ChatPanel.tsx)
+- On first user message with build intent (>40 chars + build keywords), a high-priority system message is injected before the user message in historyRef. Tells model: complete every section, no lorem ipsum, no placeholders, use search_images for real photos, cohesive design system, WOW first impression.
+- Runtime context injection — systemPrompt.ts is NOT modified.
+
+#### Preview Flash Fix (PreviewPanel.tsx)
+- FNV-1a hash of rendered HTML prevents iframe reload when the output is bit-identical to the previous frame. Autosave, R2 URL swap, non-visible file writes no longer cause visible flashing.
+
+#### Preview Reveal Shield (PreviewPanel.tsx)
+- JS-only shield (NO !important CSS) injected into blob preview HTML
+- Adds marker classes (`visible`, `in-view`, `aos-animate`, `animated`, `revealed`) to known scroll-reveal selectors (`.fade-in`, `.reveal`, `.slide-in`, `[data-aos]`, etc.)
+- Runs on DOMContentLoaded + 50ms/300ms/1000ms intervals
+- Previous version used CSS `[class*="fade-"]` with `!important` — broke legitimate layouts (mobile menu toggles, Tailwind classes). Removed entirely.
+
+#### UTF-8 Fix (PreviewPanel.tsx)
+- Blob preview iframe now gets `<meta charset="UTF-8">` injected into `<head>` if missing
+- Blob MIME type set to `text/html;charset=utf-8`
+- Fixes Serbian diacritics (ć/č/š/đ/ž) rendering as Latin-1 mojibake
+
+#### Prompt Caching (balance.js, index.js)
+- **Anthropic tools caching**: last tool in array gets `cache_control: { type: 'ephemeral' }` so the ~4-5K token tools block is cached alongside system prompt
+- **`providerCostUsdWithCache()` / `costUsdWithCache()`**: split billable input into uncached (100%), cache-read (10%), cache-create (Anthropic 125%, OpenAI 100%)
+- **Anthropic stream + non-stream**: reads `cache_read_input_tokens` and `cache_creation_input_tokens` from usage, logs cache hits, applies discounted cost
+- **OpenAI stream + non-stream**: reads `prompt_tokens_details.cached_tokens`, applies same discounted logic
+- Estimated savings for 20-iteration Sonnet session: ~80% reduction in input token costs
+- Old `costUsd()` remains for backward compatibility (admin dashboard, legacy paths)
+
+#### Early WebContainer Preboot (App.tsx)
+- `preboot()` called on app mount instead of waiting for IDELayout mount
+- WC boots in parallel with auth check, project list fetch, and user typing their first prompt
+- By the time user clicks Send, WC is usually already warm — saves 3-8s on first-run preview
+- `preboot()` is idempotent, second call from IDELayout is a no-op
+
+#### Model Swap: Turbo GPT-4.1 → Claude Haiku 4.5
+- `src/index.js` VAJB_MODELS: Turbo now routes to `backend: 'anthropic'`, `backendModel: 'claude-haiku-4-5'`
+- `src/index.js` MAX_OUTPUT: added `'claude-haiku-4-5': 64000`
+- `src/convert.js` MODEL_INPUT_LIMITS: Haiku promoted from legacy section (`130000 tokens / 520000 chars`)
+- `src/balance.js`: Haiku pricing already existed ($1 input / $5 output per 1M tokens)
+- **Why**: GPT-4.1 had weak tool-calling discipline and consistently parroted long briefs back to users instead of calling write_file. Haiku 4.5 is Anthropic's fast tier with aggressive tool-calling behavior. Cheaper ($1/$5 vs $2/$8), faster, and eliminates lazy-parroting entirely.
+- `isReasoning` check does NOT apply to Haiku (routes through `handleAnthropic`, never enters `handleOpenAI`).
+
+#### Web Extension Default Model: Max (Sonnet 4.6)
+- `vajbagent-web/src/models.ts`: `DEFAULT_MODEL = 'vajb-agent-max'`
+- Max tagged as "Preporučeno" in model selector UI
+- Model descriptions no longer expose vendor names (no "Claude Haiku" or "Claude Sonnet" in UI)
+- VS Code extension default unchanged — still Turbo (now Haiku under the hood)
+
+#### Context Limits Fixed (ChatPanel.tsx)
+- Turbo: 1M → 200K (Haiku 4.5 has 200K context)
+- Max: 200K → 1M (was stale — Sonnet 4.6 has 1M since March 2026)
+- Ultra: 200K → 1M (same — Opus 4.6 has 1M)
+- Architect: 200K → 1M
+
+#### WebContainer Memory Leak Fix (webcontainer.ts)
+- `previewErrors` array capped at 100 entries to prevent unbounded growth over long sessions
+
+#### Empty Catch Blocks
+- Added clarifying comments to bare `catch {}` blocks in ChatPanel.tsx and webcontainer.ts
+
 ---
 
 **What to watch for (next agent):**
 - `src/convert.js` — `MODEL_INPUT_LIMITS` must match real context windows. If Anthropic/OpenAI release new models, update here.
 - `src/index.js` line ~62 — `MAX_OUTPUT` table must match official max output tokens.
-- `src/index.js` line ~1791 — `isReasoning` check: any new reasoning model needs to be included here.
+- `src/index.js` line ~77 — `VAJB_MODELS`: Turbo now routes to Anthropic (`backend: 'anthropic'`, `backendModel: 'claude-haiku-4-5'`). Do NOT accidentally change it back to OpenAI.
+- `src/index.js` line ~1791 — `isReasoning` check: any new reasoning model needs to be included here. Haiku is NOT a reasoning model and does NOT enter this branch (it goes through `handleAnthropic`, not `handleOpenAI`).
 - `src/index.js` line ~1800 — `reasoning_effort` logic: `'low'` for small requests, `'medium'` for coding. GPT-5 supports: minimal, low, medium, high, xhigh.
-- `vajbagent-web/src/services/toolHandler.ts` — newline heuristic in `write_file`: watch for false positives (files that legitimately contain `\\n`).
-- Model specs verified April 2026: GPT-5 Mini (400K/128K), GPT-4.1 (1M/32K), GPT-5 (400K/128K), GPT-5.4 (1.05M/128K), Claude Sonnet 4.6 (1M/64K), Claude Opus 4.6 (1M/128K).
+- `vajbagent-web/src/services/toolHandler.ts` — newline heuristic: convert `\\n`→`\n` ONLY if file has zero real newlines. DO NOT make it more aggressive — previous fragile heuristic broke JS strings.
+- `vajbagent-web/src/services/toolHandler.ts` — truncation detection uses string/comment-aware brace counting. If it produces false positives on valid code, check the state machine (quote/comment skip logic).
+- `vajbagent-web/src/services/toolHandler.ts` — `replace_in_file` fuzzy matching: trims trailing whitespace per line. Does NOT normalize leading whitespace (intentional — prevents wrong-indent replacement). Rejects if >1 match found.
+- `vajbagent-web/src/components/ChatPanel.tsx` — section completeness check only fires for <3 written files. If model wrote 3+ files, it's assumed to be a real attempt. Do NOT remove the file count guard — it caused false nudges on complete builds.
+- `vajbagent-web/src/components/ChatPanel.tsx` — `max_tokens: 32000` sent to API. Do NOT reduce below 16384 — CSS truncation will return. Do NOT remove — backend defaults to 4096 without it.
+- `vajbagent-web/src/components/ChatPanel.tsx` — first-shot quality directive: injected as runtime system message for first build prompts. NOT a change to systemPrompt.ts.
+- `vajbagent-web/src/components/PreviewPanel.tsx` — reveal shield is JS-only. Do NOT add !important CSS selectors — previous attempt with `[class*="fade-"]` broke layouts by overriding legitimate display/visibility CSS.
+- `vajbagent-web/src/components/PreviewPanel.tsx` — UTF-8 charset: injected in blob HTML AND set in Blob MIME type. Both needed for Serbian diacritics.
+- `vajbagent-web/src/models.ts` — DEFAULT_MODEL is `vajb-agent-max`. Do not expose vendor model names (Haiku, Sonnet, Opus) in UI descriptions.
+- **Render env var `SELF_REGISTER_BONUS`**: should be changed from `0.3` to `0.9` to give new users enough credit for a real Max session. This is NOT in code — must be set in Render dashboard.
+- **Sentry**: NOT yet integrated. Next session should add Sentry to both backend (Node.js, Render) and frontend (React, Netlify). Free tier = 5K errors/month.
+- Model specs verified April 2026: GPT-5 Mini (400K/128K), Claude Haiku 4.5 (200K/64K), GPT-5 (400K/128K), GPT-5.4 (1.05M/128K), Claude Sonnet 4.6 (1M/64K), Claude Opus 4.6 (1M/128K).
 
 ## Building the Extension
 - Extension source: `vajbagent-vscode/`
