@@ -2089,6 +2089,11 @@ async function handleAnthropicStream(req, res, keyId, resolved, payload, client)
   let usage = { input_tokens: 0, output_tokens: 0 };
   const toolCalls = [];
   let currentToolIndex = -1;
+  // Capture Anthropic stop_reason so we can translate it to a proper OpenAI
+  // finish_reason. Without this, truncation due to max_tokens is invisible to
+  // the client and the agent loop cannot detect that a tool call was cut off
+  // mid-JSON. Anthropic emits this on `message_delta` events.
+  let anthropicStopReason = null;
 
   const STREAM_TIMEOUT = 2 * 60 * 1000;
   const KEEPALIVE_INTERVAL = 15000;
@@ -2177,11 +2182,18 @@ async function handleAnthropicStream(req, res, keyId, resolved, payload, client)
         currentToolIndex = -1;
       }
       
-      if (event.type === 'message_delta' && event.usage) {
-        if (event.usage.input_tokens != null) usage.input_tokens = event.usage.input_tokens;
-        if (event.usage.output_tokens != null) usage.output_tokens = event.usage.output_tokens;
-        if (event.usage.cache_read_input_tokens != null) usage.cache_read_input_tokens = event.usage.cache_read_input_tokens;
-        if (event.usage.cache_creation_input_tokens != null) usage.cache_creation_input_tokens = event.usage.cache_creation_input_tokens;
+      if (event.type === 'message_delta') {
+        if (event.usage) {
+          if (event.usage.input_tokens != null) usage.input_tokens = event.usage.input_tokens;
+          if (event.usage.output_tokens != null) usage.output_tokens = event.usage.output_tokens;
+          if (event.usage.cache_read_input_tokens != null) usage.cache_read_input_tokens = event.usage.cache_read_input_tokens;
+          if (event.usage.cache_creation_input_tokens != null) usage.cache_creation_input_tokens = event.usage.cache_creation_input_tokens;
+        }
+        // Capture stop_reason so we can emit a correct OpenAI finish_reason.
+        // Values: "end_turn" | "max_tokens" | "tool_use" | "stop_sequence" | "refusal"
+        if (event.delta?.stop_reason) {
+          anthropicStopReason = event.delta.stop_reason;
+        }
       }
     }
   } catch (streamErr) {
@@ -2191,27 +2203,58 @@ async function handleAnthropicStream(req, res, keyId, resolved, payload, client)
   clearInterval(timeoutCheck);
   clearInterval(keepAlive);
 
+  // Map Anthropic stop_reason → OpenAI finish_reason.
+  // Critical: when Anthropic hits max_tokens mid-stream (especially in a tool_use
+  // JSON block), we MUST report finish_reason: 'length' so the client knows the
+  // tool call arguments are truncated. Previously we hardcoded 'tool_calls' here,
+  // which silently swallowed truncation and forced the model to retry its
+  // half-written huge file in an endless loop.
+  let mappedFinishReason;
+  if (anthropicStopReason === 'max_tokens') {
+    mappedFinishReason = 'length';
+  } else if (anthropicStopReason === 'refusal') {
+    mappedFinishReason = 'content_filter';
+  } else if (toolCalls.length > 0) {
+    // tool_use OR end_turn-with-tools → tool_calls
+    mappedFinishReason = 'tool_calls';
+  } else {
+    // end_turn | stop_sequence | unknown → stop
+    mappedFinishReason = 'stop';
+  }
+
   if (toolCalls.length > 0) {
     // Validate accumulated JSON for each tool call (fix if broken)
     for (const tc of toolCalls) {
       try {
         JSON.parse(tc.inputStr || '{}');
       } catch (parseErr) {
-        console.warn(`Tool call JSON parse failed for ${tc.name}: ${parseErr.message}. Raw: ${(tc.inputStr || '').slice(0, 200)}...`);
+        console.warn(`Tool call JSON parse failed for ${tc.name} (stop=${anthropicStopReason}): ${parseErr.message}. Raw: ${(tc.inputStr || '').slice(0, 200)}...`);
       }
     }
-    // Send finish_reason: tool_calls (args were already streamed via deltas)
     const finishChunk = {
       id: streamId,
       object: 'chat.completion.chunk',
       created: Math.floor(Date.now() / 1000),
       model: resolved.id,
-      choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }],
+      choices: [{ index: 0, delta: {}, finish_reason: mappedFinishReason }],
     };
     res.write('data: ' + JSON.stringify(finishChunk) + '\n\n');
     if (res.flush) res.flush();
   } else {
-    res.write(toOpenAIStreamChunk('', { id: streamId, model: resolved.id, finish: true }));
+    // Pure text (or empty) response — use `finish: true` for 'stop', otherwise
+    // emit a custom finish chunk so we propagate 'length'/'content_filter'.
+    if (mappedFinishReason === 'stop') {
+      res.write(toOpenAIStreamChunk('', { id: streamId, model: resolved.id, finish: true }));
+    } else {
+      const finishChunk = {
+        id: streamId,
+        object: 'chat.completion.chunk',
+        created: Math.floor(Date.now() / 1000),
+        model: resolved.id,
+        choices: [{ index: 0, delta: {}, finish_reason: mappedFinishReason }],
+      };
+      res.write('data: ' + JSON.stringify(finishChunk) + '\n\n');
+    }
     if (res.flush) res.flush();
   }
 

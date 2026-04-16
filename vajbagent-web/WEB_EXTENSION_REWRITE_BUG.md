@@ -1,5 +1,12 @@
 # Web Extension — Write Loop / Slow Build Bug
 
+> **STATUS (2026-04-16): RESOLVED.** Root cause was NOT "model generates too many tokens" as originally theorized. Real root cause: backend `handleAnthropicStream` in `src/index.js` was not reading Anthropic's `stop_reason` from `message_delta` events, so whenever Anthropic truncated output at `max_tokens`, the client received `finish_reason: 'tool_calls'` instead of `'length'`. The client's truncation-detection and continuation logic never fired, the tool call was executed with unparseable JSON, the handler returned an error that told the model to retry, and the model looped rewriting the same 45K-character file. Fixed by:
+> 1. `src/index.js` / `src/convert.js`: map Anthropic `stop_reason` → OpenAI `finish_reason` (`max_tokens` → `length`, `refusal` → `content_filter`, etc.) in both streaming and non-streaming paths.
+> 2. `vajbagent-web/src/components/ChatPanel.tsx`: removed the broken "continuation via fake user message" pattern (which violated the tool_use protocol anyway) and replaced with a clean "short-circuit truncated tool call with an actionable tool-response" approach. Also removed the rewrite guard — no longer needed.
+> 3. `vajbagent-web/src/services/toolHandler.ts`: rewrote the truncation error messages to steer the model to "skeleton + replace_in_file" instead of telling it to retry the same huge write.
+>
+> The content below is the historical investigation. Preserved for context but do NOT act on its "What Hasn't Been Tried" recommendations — most were wrong.
+
 ## Problem
 When a user sends a complex prompt (e.g. "build a dental clinic website with hero, services, team, FAQ, contact..."), the web extension takes 15-20+ minutes and often fails to produce a working site. The same prompt in the VS Code extension (Cursor) works fine in 3-5 minutes.
 

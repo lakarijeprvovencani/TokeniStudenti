@@ -313,7 +313,7 @@ Cloudflare R2 (bucket: vajbagent):
 #### Agent Loop Improvements (ChatPanel.tsx)
 - **MAX_ITERATIONS 20 → 50**: complex builds need more steps
 - **Iteration warning as `role: 'system'`** instead of `role: 'user'` with `[SYSTEM]` prefix
-- **max_tokens: 32000** sent to API (was missing entirely → backend defaulted to 4096 → truncated CSS → "write_file truncated JSON — rejected" → model wasted 3 min splitting CSS into 5 tiny files). 32K is well within all models' MAX_OUTPUT (64K–128K), no cost penalty.
+- **max_tokens: 16000** sent to API (backend defaults to 4096 without it, causing CSS truncation — "write_file truncated JSON — rejected" loop. 16K is well within all models' MAX_OUTPUT, no cost penalty).
 - **Lazy-parroting recovery**: if model returns text-only on a clear build prompt with no files written yet, injects runtime system nudge and retries once. Fully silent — no UI messages.
 - **Section completeness check**: when model finishes and wrote <3 files, reads index.html and checks for missing sections the user requested (stem-based Serbian patterns: `/uslug/`, `/tim/`, `/cena/`). If missing → silent nudge to add them. Does NOT fire if model wrote 3+ files (real attempt, our regex just might not match the class names).
 - **Graceful post-build failures**: if an API call fails after files are already written, catch block ends gracefully instead of retrying 3x. The site is built; the failing call was a bonus pass.
@@ -389,7 +389,7 @@ Cloudflare R2 (bucket: vajbagent):
 - `vajbagent-web/src/services/toolHandler.ts` — truncation detection uses string/comment-aware brace counting. If it produces false positives on valid code, check the state machine (quote/comment skip logic).
 - `vajbagent-web/src/services/toolHandler.ts` — `replace_in_file` fuzzy matching: trims trailing whitespace per line. Does NOT normalize leading whitespace (intentional — prevents wrong-indent replacement). Rejects if >1 match found.
 - `vajbagent-web/src/components/ChatPanel.tsx` — section completeness check only fires for <3 written files. If model wrote 3+ files, it's assumed to be a real attempt. Do NOT remove the file count guard — it caused false nudges on complete builds.
-- `vajbagent-web/src/components/ChatPanel.tsx` — `max_tokens: 32000` sent to API. Do NOT reduce below 16384 — CSS truncation will return. Do NOT remove — backend defaults to 4096 without it.
+- `vajbagent-web/src/components/ChatPanel.tsx` — `max_tokens: 16000` sent to API. Do NOT remove — backend defaults to 4096 without it and every multi-hundred-line file will truncate. If you reduce, you must also verify truncation recovery still routes the model to `replace_in_file` via the tool error messages in `toolHandler.ts`.
 - `vajbagent-web/src/components/ChatPanel.tsx` — first-shot quality directive: injected as runtime system message for first build prompts. NOT a change to systemPrompt.ts.
 - `vajbagent-web/src/components/PreviewPanel.tsx` — reveal shield is JS-only. Do NOT add !important CSS selectors — previous attempt with `[class*="fade-"]` broke layouts by overriding legitimate display/visibility CSS.
 - `vajbagent-web/src/components/PreviewPanel.tsx` — UTF-8 charset: injected in blob HTML AND set in Blob MIME type. Both needed for Serbian diacritics.

@@ -663,13 +663,6 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
 
     let lastAssistantHadText = false
 
-    // ─── Rewrite guard ──────────────────────────────────────────────
-    // One rule: once a file is written SUCCESSFULLY, block further write_file
-    // to that path. Model must use replace_in_file for changes.
-    // Failed writes are NOT tracked — model can retry unlimited (same as
-    // the VS Code extension which has no guard at all and works fine).
-    const fileWriteOk = new Set<string>()
-
     try {
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
         // Check abort
@@ -803,50 +796,29 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
 
         if (!result || signal.aborted) break
 
-        // ─── Auto-continuation for truncated output ──────────────────
-        // Triggers on finish_reason: 'length' (explicit truncation) OR
-        // when tool calls exist but have empty/tiny args (stream ended
-        // without proper finish_reason — Anthropic sometimes returns null
-        // instead of 'length' when output is truncated mid-JSON).
-        const hasEmptyToolArgs = result.toolCalls.length > 0 &&
-          result.toolCalls.some(tc => tc.function.arguments.length < 20)
-        const needsContinuation = result.toolCalls.length > 0 &&
-          (result.finishReason === 'length' || hasEmptyToolArgs)
-        if (needsContinuation) {
-          const MAX_CONTINUATIONS = 3
-          for (let cont = 0; cont < MAX_CONTINUATIONS; cont++) {
-            if (signal.aborted) break
-            console.log(`[API] Output truncated, continuation ${cont + 1}/${MAX_CONTINUATIONS}`)
-            setStatusText('Nastavljam generisanje...')
-
-            const partialArgs = result.toolCalls.map(tc => tc.function.arguments).join('')
-            const contMessages: Message[] = [
-              ...trimmedHistory,
-              { role: 'assistant', content: result.text, tool_calls: result.toolCalls },
-              {
-                role: 'user',
-                content: '[SYSTEM] Your previous response was cut off (output token limit reached). The last tool call arguments ended with: "...' + partialArgs.slice(-200) + '"\n\nContinue generating ONLY the remaining part of the tool call arguments, starting exactly where you left off. Do NOT repeat what was already generated.',
-              },
-            ]
-
-            try {
-              const contResult = await callAPI(contMessages, signal, fullSystemPrompt)
-
-              if (contResult.toolCalls.length > 0) {
-                const lastTc = result.toolCalls[result.toolCalls.length - 1]
-                lastTc.function.arguments += contResult.toolCalls[0].function.arguments
-              } else if (contResult.text) {
-                const lastTc = result.toolCalls[result.toolCalls.length - 1]
-                lastTc.function.arguments += contResult.text
-              }
-
-              if (contResult.finishReason !== 'length') {
-                console.log(`[API] Continuation complete after ${cont + 1} attempts`)
-                break
-              }
-            } catch (contErr) {
-              console.warn(`[API] Continuation failed:`, (contErr as Error).message)
-              break
+        // ─── Truncation detection ────────────────────────────────────
+        // If the stream was cut off by max_tokens (finish_reason: 'length'),
+        // the LAST tool call is most likely truncated mid-JSON. We do NOT try
+        // to "continue" the stream with a fake user message — that breaks the
+        // tool_use protocol and never actually worked. Instead we mark the
+        // truncated tool call and reply to it with a clear error response
+        // that steers the model to a different strategy (skeleton + replace_in_file).
+        //
+        // We additionally flag any tool call whose arguments won't parse as
+        // JSON even after jsonrepair — that's a truncation signal too, just
+        // without an explicit finish_reason=length (some providers swallow it).
+        const truncatedToolIds = new Set<string>()
+        if (result.toolCalls.length > 0) {
+          const lastTc = result.toolCalls[result.toolCalls.length - 1]
+          const argsStr = lastTc.function.arguments || ''
+          let parsesOk = false
+          try { JSON.parse(argsStr); parsesOk = true } catch { /* broken */ }
+          if (!parsesOk || result.finishReason === 'length' || argsStr.length < 20) {
+            // Only the LAST tool call can actually be truncated — earlier ones
+            // already had a content_block_stop before max_tokens hit.
+            if (!parsesOk || result.finishReason === 'length') {
+              truncatedToolIds.add(lastTc.id)
+              console.warn(`[API] Truncated tool call detected: ${lastTc.function.name} (finish=${result.finishReason}, args_len=${argsStr.length}, parses=${parsesOk})`)
             }
           }
         }
@@ -884,6 +856,30 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
           if (abortRef.current?.signal.aborted) break
 
           const toolName = tc.function.name
+
+          // ─── Truncated tool call: short-circuit with actionable error ─
+          // Do NOT try to execute a tool call whose JSON args are cut off.
+          // Reply to it with a tool role message so the protocol stays valid
+          // (assistant with tool_calls → tool response), and steer the model
+          // toward skeleton + replace_in_file instead of retrying the huge
+          // write. The helpful message is different per tool.
+          if (truncatedToolIds.has(tc.id)) {
+            const truncErr = toolName === 'write_file'
+              ? `GRESKA: Tvoj prethodni odgovor je presečen na granici output tokena — write_file argument NIJE kompletno stigao, fajl NIJE upisan. Ovo se dešava kad pokušaš da napišeš preveliki fajl odjednom.\n\nURADI OVO (obavezno, bez izuzetaka):\n1) Pozovi write_file SAMO sa skeleton verzijom fajla: <!doctype html>, <head> sa meta/title/link na style.css, i prazan <body> sa samo kosturom sekcija (header + main sa 3-4 prazne <section class="..."> taga + footer). Maksimum ~80 linija.\n2) ONDA, za SVAKU sekciju pojedinačno, pozovi replace_in_file da zameniš tu praznu sekciju njenim pravim sadržajem. Svaki replace ~50-200 linija.\n3) NIKAD više ne pokušavaj da pišeš ceo ovaj fajl u jednom write_file pozivu.\n\nKreni sa korakom 1 odmah.`
+              : toolName === 'replace_in_file'
+                ? `GRESKA: Tvoj replace_in_file argument je presečen — izmena NIJE primenjena. new_text je predug za jedan poziv. Podeli izmenu: umesto jedne velike zamene, napravi više manjih replace_in_file poziva, svaki sa kratkim old_text i new_text (max 100-150 linija novi tekst po pozivu).`
+                : `GRESKA: Argumenti za ${toolName} su presečeni. Pokušaj ponovo sa manjim argumentima.`
+
+            setDisplayMessages(prev => [...prev, { role: 'status', content: 'Odgovor presečen — tražim drugačiji pristup…' }])
+            historyRef.current = [...historyRef.current, {
+              role: 'tool' as const,
+              content: truncErr,
+              tool_call_id: tc.id,
+            }]
+            setStatusText('Prilagođavam strategiju…')
+            continue
+          }
+
           let statusLabel = toolName
           try {
             const args = JSON.parse(tc.function.arguments)
@@ -910,22 +906,6 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
             statusLabel = FRIENDLY[toolName] || toolName
           }
 
-          // ─── Rewrite guard ─────────────────────────────────────────────
-          // Silent in UI — blocked writes never show "Pišem ..." status.
-          // ─── Rewrite guard: block write_file to paths already written ──
-          if (toolName === 'write_file') {
-            const pathMatch = tc.function.arguments.match(/"path"\s*:\s*"([^"]+)"/)
-            const wPath = pathMatch ? pathMatch[1].replace(/^\/+/, '') : ''
-            if (wPath && fileWriteOk.has(wPath)) {
-              historyRef.current = [...historyRef.current, {
-                role: 'tool' as const,
-                content: `BLOCKED: ${wPath} was already written successfully. Use replace_in_file for changes.`,
-                tool_call_id: tc.id,
-              }]
-              continue
-            }
-          }
-
           setDisplayMessages(prev => [...prev, { role: 'status', content: statusLabel }])
           setStatusText(statusLabel)
 
@@ -938,16 +918,6 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
             content: toolResult.content,
             tool_call_id: toolResult.tool_call_id,
           }]
-
-          // Track successful write_file for rewrite guard
-          if (toolName === 'write_file') {
-            const isOk = !/^(GRESKA:|Greska:|Ne možeš|BLOKIRANO|BLOCKED)/.test(toolResult.content)
-            if (isOk) {
-              const pathMatch = tc.function.arguments.match(/"path"\s*:\s*"([^"]+)"/)
-              const wPath = pathMatch ? pathMatch[1].replace(/^\/+/, '') : ''
-              if (wPath) fileWriteOk.add(wPath)
-            }
-          }
 
           // Show error to user if tool failed
           if (toolResult.content.startsWith('GRESKA:') || toolResult.content.startsWith('Greska:')) {

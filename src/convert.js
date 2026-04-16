@@ -556,7 +556,21 @@ export function anthropicToOpenAIChoice(anthropicMessage, model = 'vajb-agent') 
     content,
     ...(toolCalls.length > 0 && { tool_calls: toolCalls }),
   };
-  const finish_reason = toolCalls.length > 0 ? 'tool_calls' : 'stop';
+  // Map Anthropic stop_reason → OpenAI finish_reason so the client can
+  // detect truncation (length) and content filter events properly. Without
+  // this, a response truncated by max_tokens would be silently reported as
+  // either 'stop' or 'tool_calls' and the agent loop would never continue.
+  const anthropicStop = anthropicMessage?.stop_reason;
+  let finish_reason;
+  if (anthropicStop === 'max_tokens') {
+    finish_reason = 'length';
+  } else if (anthropicStop === 'refusal') {
+    finish_reason = 'content_filter';
+  } else if (toolCalls.length > 0) {
+    finish_reason = 'tool_calls';
+  } else {
+    finish_reason = 'stop';
+  }
 
   return {
     index: 0,

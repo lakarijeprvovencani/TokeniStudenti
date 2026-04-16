@@ -45,17 +45,23 @@ export async function executeToolCall(
       console.log(`[Tool] Recovered truncated args for ${name}: ${Object.keys(recovered).join(', ')}`)
     } else {
       console.error(`[Tool] Failed to parse args for ${name}:`, tc.function.arguments.substring(0, 200))
+      // Protocol-critical: we MUST return a tool response even for unparseable args,
+      // otherwise the next API request will have an assistant/tool_calls without a
+      // matching tool response and the provider will reject it. Give the model a
+      // clear recovery path instead of telling it to retry the same huge write.
       const hint = name === 'write_file'
-        ? 'Pisi JEDAN fajl po pozivu — pozovi write_file ponovo samo za ovaj fajl.'
-        : ''
-      return { tool_call_id: tc.id, role: 'tool', content: `Greska: neispravan JSON u argumentima za ${name}. ${hint}`.trim() }
+        ? '\n\nOdgovor ti je bio presečen na granici output tokena. NE pokušavaj ponovo isti poziv — previše je veliko. Umesto toga:\n1) Pozovi write_file sa SKELETON verzijom fajla (~80 linija max: <!doctype html>, <head>, prazan <body> sa kosturom sekcija, </html>).\n2) Zatim za svaku sekciju ponaosob pozovi replace_in_file da ubaciš njen sadržaj.\nTako izbegavaš token limit.'
+        : name === 'replace_in_file'
+          ? '\n\nArgumenti su presečeni — new_text je predug. Podeli izmenu na više manjih replace_in_file poziva (max ~100 linija novog teksta po pozivu).'
+          : '\n\nArgumenti su presečeni. Pokušaj ponovo sa manjim argumentima.'
+      return { tool_call_id: tc.id, role: 'tool', content: `GRESKA: neispravan JSON u argumentima za ${name}.${hint}` }
     }
   }
 
   if (wasRecovered && name === 'replace_in_file') {
     const recoveredContent = (args.new_text as string) || ''
     if (recoveredContent.length < 50) {
-      return { tool_call_id: tc.id, role: 'tool', content: 'GRESKA: replace_in_file sadrzaj je presecen. Probaj sa manjom izmenom.' }
+      return { tool_call_id: tc.id, role: 'tool', content: 'GRESKA: replace_in_file je presečen — new_text nije kompletno stigao. Podeli izmenu na više manjih replace_in_file poziva (max ~100 linija po pozivu).' }
     }
   }
 
@@ -66,13 +72,13 @@ export async function executeToolCall(
     const content = (args.content as string) || ''
     const path = (args.path as string) || ''
     if (!content || content.length < 100) {
-      return { tool_call_id: tc.id, role: 'tool', content: `GRESKA: ${path} sadrzaj je presecen. Pozovi write_file PONOVO samo za ovaj fajl — pisi JEDAN fajl po pozivu.` }
+      return { tool_call_id: tc.id, role: 'tool', content: `GRESKA: ${path} je presečen — sadržaj nije stigao. Ovo se dešava kad je fajl preveliki za jedan write_file poziv (granica output tokena).\n\nURADI OVO:\n1) write_file sa SKELETON verzijom (~80 linija: <!doctype html>, <head>, prazan <body> sa kosturom sekcija, </html>).\n2) Zatim replace_in_file za SVAKU sekciju pojedinačno. NIKAD ne pokušavaj ponovo ceo fajl u jednom pozivu.` }
     }
     // If HTML and doesn't end with </html>, it's truncated
     if (/\.html?$/i.test(path)) {
       const trimmed = content.trimEnd()
       if (trimmed.length > 500 && !/<\/html>\s*$/i.test(trimmed)) {
-        return { tool_call_id: tc.id, role: 'tool', content: `GRESKA: ${path} je presecen (nedostaje </html>). Pozovi write_file PONOVO samo za ovaj fajl — pisi JEDAN fajl po pozivu.` }
+        return { tool_call_id: tc.id, role: 'tool', content: `GRESKA: ${path} je presečen na ${content.length} karaktera (nedostaje </html>). Fajl je prevelik za jedan write_file poziv.\n\nURADI OVO:\n1) Pozovi write_file SAMO sa skeleton verzijom (~80 linija: doctype, head, prazan body sa kosturom sekcija, </html>).\n2) Zatim replace_in_file za svaku sekciju ponaosob.\nNIKAD ne pokušavaj ponovo isti veliki write.` }
       }
     }
   }
@@ -140,7 +146,7 @@ export async function executeToolCall(
             return {
               tool_call_id: tc.id,
               role: 'tool',
-              content: `GRESKA: Kod u ${path} je presecen — ${opens} otvorenih { vs ${closes} zatvorenih }. Fajl NIJE upisan. Pozovi write_file PONOVO samo za ovaj fajl sa kompletnim sadrzajem.`,
+              content: `GRESKA: Kod u ${path} je presečen — ${opens} otvorenih { vs ${closes} zatvorenih }. Fajl NIJE upisan, output je pogodio token limit.\n\nURADI OVO:\n1) Pozovi write_file sa SKELETON verzijom fajla (osnovna struktura, prazne funkcije/klase, ~60-80 linija).\n2) Zatim replace_in_file za svaki deo koda ponaosob — zameni prazne stub-ove pravim implementacijama jednim po jednim.\nNIKAD ne pokušavaj ponovo isti veliki write.`,
             }
           }
         }
