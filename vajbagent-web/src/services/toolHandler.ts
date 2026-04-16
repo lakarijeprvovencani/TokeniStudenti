@@ -103,11 +103,11 @@ export async function executeToolCall(
       // matching tool response and the provider will reject it. Give the model a
       // clear recovery path instead of telling it to retry the same huge write.
       const hint = name === 'write_file'
-        ? '\n\nOdgovor ti je bio presečen na granici output tokena. NE pokušavaj ponovo isti poziv — previše je veliko. Umesto toga:\n1) Pozovi write_file sa SKELETON verzijom fajla (~80 linija max: <!doctype html>, <head>, prazan <body> sa kosturom sekcija, </html>).\n2) Zatim za svaku sekciju ponaosob pozovi replace_in_file da ubaciš njen sadržaj.\nTako izbegavaš token limit.'
+        ? '\n\nPoziv je pogodio granicu output tokena pa JSON nije mogao da se parsira. Ne izvinjavaj se korisniku i ne pokušavaj odmah isti ogromni write_file — proveri da li je fajl delimično upisan (read_file), pa ili dopuni ostatak sa replace_in_file, ili nastavi sa sledećim fajlom iz plana.'
         : name === 'replace_in_file'
-          ? '\n\nArgumenti su presečeni — new_text je predug. Podeli izmenu na više manjih replace_in_file poziva (max ~100 linija novog teksta po pozivu).'
-          : '\n\nArgumenti su presečeni. Pokušaj ponovo sa manjim argumentima.'
-      return { tool_call_id: tc.id, role: 'tool', content: `GRESKA: neispravan JSON u argumentima za ${name}.${hint}` }
+          ? '\n\nArgumenti su presečeni — new_text je predug. Podeli izmenu na više manjih replace_in_file poziva (max ~100 linija novog teksta po pozivu). Ne izvinjavaj se, samo kreni.'
+          : '\n\nArgumenti su presečeni. Pokušaj ponovo sa manjim argumentima, bez izvinjenja.'
+      return { tool_call_id: tc.id, role: 'tool', content: `Napomena: neispravan JSON u argumentima za ${name}.${hint}` }
     }
   }
 
@@ -125,13 +125,17 @@ export async function executeToolCall(
     const content = (args.content as string) || ''
     const path = (args.path as string) || ''
     if (!content || content.length < 100) {
-      return { tool_call_id: tc.id, role: 'tool', content: `GRESKA: ${path} je presečen — sadržaj nije stigao. Ovo se dešava kad je fajl preveliki za jedan write_file poziv (granica output tokena).\n\nURADI OVO:\n1) write_file sa SKELETON verzijom (~80 linija: <!doctype html>, <head>, prazan <body> sa kosturom sekcija, </html>).\n2) Zatim replace_in_file za SVAKU sekciju pojedinačno. NIKAD ne pokušavaj ponovo ceo fajl u jednom pozivu.` }
+      return { tool_call_id: tc.id, role: 'tool', content: `Napomena: ${path} je pogodio granicu output tokena i sadržaj nije stigao. Ne izvinjavaj se korisniku. Ili probaj sa manjim fajlom (bez opsežnih komentara, kraći CSS), ili podeli rad: prvo write_file sa skeletonom, pa replace_in_file za pojedinačne sekcije.` }
     }
-    // If HTML and doesn't end with </html>, it's truncated
+    // HTML without </html>: still write it and only warn softly. Many
+    // valid HTML partials do not end in </html>, and even when it IS
+    // truncated the model can append the closing tags with replace_in_file
+    // rather than re-issuing a full rewrite (which just loops).
     if (/\.html?$/i.test(path)) {
       const trimmed = content.trimEnd()
       if (trimmed.length > 500 && !/<\/html>\s*$/i.test(trimmed)) {
-        return { tool_call_id: tc.id, role: 'tool', content: `GRESKA: ${path} je presečen na ${content.length} karaktera (nedostaje </html>). Fajl je prevelik za jedan write_file poziv.\n\nURADI OVO:\n1) Pozovi write_file SAMO sa skeleton verzijom (~80 linija: doctype, head, prazan body sa kosturom sekcija, </html>).\n2) Zatim replace_in_file za svaku sekciju ponaosob.\nNIKAD ne pokušavaj ponovo isti veliki write.` }
+        // Don't block the write — let it through and tell the model what to do.
+        // (falls through to the main write path below)
       }
     }
   }
@@ -151,15 +155,18 @@ export async function executeToolCall(
           content = content.replace(/\\n/g, '\n')
         }
 
-        // Truncation detection — only for pure JS/TS/CSS/JSON files.
-        // HTML check removed: models routinely write valid HTML that doesn't
-        // end with </html> (e.g. partials, components, templates with trailing
-        // scripts). The </html> check caused false rejections on 370-line
-        // complete pages, forcing the model to rewrite them shorter.
-        // Brace check also skips HTML because inline <script> tags make
-        // brace counting unreliable.
+        // Truncation detection — only for pure JS/TS/JSON files.
+        // HTML, CSS, SCSS, Vue and Svelte are EXCLUDED because brace counting
+        // is unreliable there: inline <script>/<style> tags, url(data:...)
+        // with raw SVG, @media/@supports nesting, escape sequences in
+        // strings, and CSS custom-property fallbacks routinely produce
+        // false positives. A legitimate 400-line stylesheet was being
+        // rejected as "truncated" → model apologized and rewrote the whole
+        // file from scratch in a loop. Better to let it through and trust
+        // the CSS/HTML to surface issues at render time than to gaslight
+        // the model with a false failure.
         const lowerPath = path.toLowerCase()
-        if (/\.(jsx?|tsx?|css|scss|vue|svelte|json)$/i.test(lowerPath) && content.length > 500) {
+        if (/\.(jsx?|tsx?|json)$/i.test(lowerPath) && content.length > 500) {
           // Broj zagrada izvan stringova/komentara — jednostavan state machine
           // koji preskace '...', "...", `...`, // line comment i /* block comment */.
           let opens = 0, closes = 0
@@ -195,7 +202,12 @@ export async function executeToolCall(
             else if (ch === '}') closes++
             i++
           }
-          if (opens - closes >= 2) {
+          // Threshold 5+ (was 2) — small mismatches routinely appear in
+          // valid code (e.g. template literal with stringified JSON,
+          // regex containing a brace, or a genuine bug the model will
+          // fix on its own next iteration). Only a big delta is a
+          // reliable truncation signal worth blocking the write for.
+          if (opens - closes >= 5) {
             return {
               tool_call_id: tc.id,
               role: 'tool',

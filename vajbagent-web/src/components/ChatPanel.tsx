@@ -711,7 +711,7 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
         messages: apiMessages,
         tools: TOOL_DEFINITIONS,
         stream: true,
-        max_tokens: 16000,
+        max_tokens: 24000,
       }),
       signal,
     })
@@ -1111,26 +1111,34 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
 
           const toolName = tc.function.name
 
-          // ─── Truncated tool call: short-circuit with actionable error ─
-          // Do NOT try to execute a tool call whose JSON args are cut off.
-          // Reply to it with a tool role message so the protocol stays valid
-          // (assistant with tool_calls → tool response), and steer the model
-          // toward skeleton + replace_in_file instead of retrying the huge
-          // write. The helpful message is different per tool.
+          // ─── Truncated tool call: short-circuit with NEUTRAL hint ─────
+          // When the LAST tool call's JSON literally won't parse we can't
+          // execute it, but we also don't want to alarm the model into a
+          // rewrite/apology loop. The previous message told it "file NOT
+          // written, start over with a skeleton" — which made the model
+          // apologize ("Izvinjavam se — imao sam problem sa CSS fajlom…")
+          // and call write_file again with the exact same full content,
+          // hitting the same cap. Loop.
+          //
+          // New tone: acknowledge the cut-off, tell it to NOT apologize,
+          // NOT rewrite the same file, and just move on or append the
+          // missing tail with replace_in_file. This ends the loop because
+          // the model has a productive next move that isn't "write_file
+          // style.css from scratch again".
           if (truncatedToolIds.has(tc.id)) {
             const truncErr = toolName === 'write_file'
-              ? `GRESKA: Tvoj prethodni odgovor je presečen na granici output tokena — write_file argument NIJE kompletno stigao, fajl NIJE upisan. Ovo se dešava kad pokušaš da napišeš preveliki fajl odjednom.\n\nURADI OVO (obavezno, bez izuzetaka):\n1) Pozovi write_file SAMO sa skeleton verzijom fajla: <!doctype html>, <head> sa meta/title/link na style.css, i prazan <body> sa samo kosturom sekcija (header + main sa 3-4 prazne <section class="..."> taga + footer). Maksimum ~80 linija.\n2) ONDA, za SVAKU sekciju pojedinačno, pozovi replace_in_file da zameniš tu praznu sekciju njenim pravim sadržajem. Svaki replace ~50-200 linija.\n3) NIKAD više ne pokušavaj da pišeš ceo ovaj fajl u jednom write_file pozivu.\n\nKreni sa korakom 1 odmah.`
+              ? `Napomena: prethodni write_file poziv za ${(() => { try { const m = tc.function.arguments.match(/"path"\s*:\s*"([^"]+)/); return m ? m[1] : 'fajl' } catch { return 'fajl' } })()} je pogodio granicu output tokena i nije kompletno stigao. Moguće je da je deo sadržaja već upisan.\n\nURADI OVO:\n- NE izvinjavaj se korisniku i NE zovi write_file za ISTI fajl ponovo sa istim sadržajem (loop).\n- Pozovi read_file(${(() => { try { const m = tc.function.arguments.match(/"path"\s*:\s*"([^"]+)/); return m ? m[1] : 'fajl' } catch { return 'fajl' } })()}) da vidiš šta je stvarno upisano.\n- Ako fajl postoji i skoro kompletan: koristi replace_in_file da dodaš samo ono što fali (kratki old_text na kraju fajla → new_text sa ostatkom).\n- Ako fajl ne postoji ili je praznjikav: nastavi sa sledećim fajlom iz plana, pa se vrati posle.\n- Nastavi rad u istom tonu, bez izvinjenja.`
               : toolName === 'replace_in_file'
-                ? `GRESKA: Tvoj replace_in_file argument je presečen — izmena NIJE primenjena. new_text je predug za jedan poziv. Podeli izmenu: umesto jedne velike zamene, napravi više manjih replace_in_file poziva, svaki sa kratkim old_text i new_text (max 100-150 linija novi tekst po pozivu).`
-                : `GRESKA: Argumenti za ${toolName} su presečeni. Pokušaj ponovo sa manjim argumentima.`
+                ? `Napomena: prethodni replace_in_file poziv je pogodio granicu output tokena i new_text nije kompletno stigao. Izmena NIJE primenjena.\n\nNastavi sa manjim koracima: podeli izmenu na više replace_in_file poziva, svaki max ~100-150 linija new_text-a. Ne izvinjavaj se, samo kreni.`
+                : `Napomena: argumenti za ${toolName} su presečeni. Probaj ponovo sa manjim argumentima, bez izvinjenja.`
 
-            setDisplayMessages(prev => [...prev, { role: 'status', content: 'Odgovor presečen — tražim drugačiji pristup…' }])
+            setDisplayMessages(prev => [...prev, { role: 'status', content: 'Nastavljam sa sledećim korakom…' }])
             historyRef.current = [...historyRef.current, {
               role: 'tool' as const,
               content: truncErr,
               tool_call_id: tc.id,
             }]
-            setStatusText('Prilagođavam strategiju…')
+            setStatusText('Nastavljam…')
             continue
           }
 
