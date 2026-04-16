@@ -2019,16 +2019,16 @@ async function handleAnthropic(req, res, keyId, resolved, messages, openAITools,
 
   try {
     if (stream) {
-      await handleAnthropicStream(res, keyId, resolved, payload, poolEntry.client);
+      await handleAnthropicStream(req, res, keyId, resolved, payload, poolEntry.client);
     } else {
-      await handleAnthropicNonStream(res, keyId, resolved, payload, poolEntry.client);
+      await handleAnthropicNonStream(req, res, keyId, resolved, payload, poolEntry.client);
     }
   } finally {
     releaseFromPool(poolEntry);
   }
 }
 
-async function handleAnthropicNonStream(res, keyId, resolved, payload, client) {
+async function handleAnthropicNonStream(req, res, keyId, resolved, payload, client) {
   const response = await withRetry(() => client.messages.create({ ...payload, stream: false }));
 
   // Validate response has content
@@ -2073,7 +2073,7 @@ async function handleAnthropicNonStream(res, keyId, resolved, payload, client) {
   res.json(openAIResponse);
 }
 
-async function handleAnthropicStream(res, keyId, resolved, payload, client) {
+async function handleAnthropicStream(req, res, keyId, resolved, payload, client) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
