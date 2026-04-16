@@ -25,6 +25,7 @@ interface IntegrationDef {
   fields?: { key: string; label: string; placeholder: string; type?: string }[]
   docsUrl?: string
   oauth?: boolean  // Supabase has OAuth
+  note?: string
 }
 
 const INTEGRATIONS: IntegrationDef[] = [
@@ -71,14 +72,14 @@ const INTEGRATIONS: IntegrationDef[] = [
   {
     key: 'stripe',
     name: 'Stripe',
-    description: 'Integracija online plaćanja',
+    description: 'Integracija online plaćanja — samo Publishable key u browseru',
     icon: <CreditCard size={20} />,
     color: '#635bff',
     fields: [
       { key: 'vajb_stripe_pk', label: 'Publishable Key', placeholder: 'pk_test_xxxxxxxxxxxx' },
-      { key: 'vajb_stripe_sk', label: 'Secret Key', placeholder: 'sk_test_xxxxxxxxxxxx', type: 'password' },
     ],
     docsUrl: 'https://dashboard.stripe.com/apikeys',
+    note: 'Secret key (sk_…) NE sme u browser. Dodaj ga kao env varijablu u Netlify/Render backend — agent ima instrukcije da nikad ne traži SK u klijentskom kodu.',
   },
 ]
 
@@ -477,6 +478,13 @@ export default function Settings({ open, onClose }: SettingsProps) {
                       </a>
                     )}
                   </div>
+
+                  {currentIntegration.note && (
+                    <div className="integration-detail-note">
+                      <Info size={14} />
+                      <span>{currentIntegration.note}</span>
+                    </div>
+                  )}
 
                   {/* Supabase OAuth Section */}
                   {currentIntegration.key === 'supabase' && supaStatus?.configured && (

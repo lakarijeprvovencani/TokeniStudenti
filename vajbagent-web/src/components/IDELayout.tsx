@@ -493,9 +493,10 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
   const handleDeleteFile = useCallback(async (path: string) => {
     if (!confirm(`Obriši "${path}"?`)) return
     try {
-      const { getWebContainer } = await import('../services/webcontainer')
+      const { getWebContainer, invalidateAllFilesCache } = await import('../services/webcontainer')
       const wc = await getWebContainer()
       await wc.fs.rm(path)
+      invalidateAllFilesCache()
       setFiles(prev => {
         const next = { ...prev }
         delete next[path]
@@ -519,7 +520,7 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
     }
     try {
       const content = filesRef.current[oldPath] || ''
-      const { getWebContainer } = await import('../services/webcontainer')
+      const { getWebContainer, invalidateAllFilesCache } = await import('../services/webcontainer')
       const wc = await getWebContainer()
       // mkdir for parent if needed, then write new, delete old
       const dir = newPath.substring(0, newPath.lastIndexOf('/'))
@@ -528,6 +529,7 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
       }
       await wc.fs.writeFile(newPath, content)
       await wc.fs.rm(oldPath)
+      invalidateAllFilesCache()
       setFiles(prev => {
         const next = { ...prev }
         delete next[oldPath]

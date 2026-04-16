@@ -11,7 +11,7 @@ import FileMention from './FileMention'
 import ModelSelector from './ModelSelector'
 import { TOOL_DEFINITIONS } from '../tools'
 import { WEB_SYSTEM_PROMPT } from '../systemPrompt'
-import { ALL_COMMANDS, type Command } from '../commands'
+import { type Command } from '../commands'
 import './ChatPanel.css'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -191,11 +191,15 @@ function getContextLimit(model: string): number {
 }
 
 function trimHistory(history: Message[], model: string): Message[] {
-  const trimmed = history.map(m => ({ ...m }))
+  const trimmed = history.map(m => ({
+    ...m,
+    tool_calls: m.tool_calls ? m.tool_calls.map(tc => ({ ...tc, function: { ...tc.function } })) : undefined,
+  }))
   const keepRecent = Math.min(10, trimmed.length)
   const trimZone = trimmed.length - keepRecent
 
-  // Phase 0 (ALWAYS): Compact old tool results
+  // Phase 0 (ALWAYS): Compact old tool results — biggest offender, typically
+  // read_file / execute_command dumps that the agent already consumed.
   for (let i = 0; i < trimZone; i++) {
     const msg = trimmed[i]
     if (msg.role === 'tool' && msg.content.length > 500) {
@@ -216,11 +220,39 @@ function trimHistory(history: Message[], model: string): Message[] {
     }
   }
 
-  // Phase 2: If still over threshold, drop oldest messages
-  const trimmedTokens = Math.ceil(
-    trimmed.reduce((sum, m) => sum + m.content.length, 0) / 3.5
-  )
-  if (trimmedTokens > limit * 0.85 && trimmed.length > 20) {
+  // Phase 1.5: Compact old tool_call.arguments. write_file / replace_in_file
+  // arguments routinely weigh 20K+ characters — they dominate the context and
+  // the old token-count ignored them. We keep the shape (path + a short hint)
+  // so the model can still see "I already wrote index.html" without reading
+  // the whole file back.
+  for (let i = 0; i < trimZone; i++) {
+    const msg = trimmed[i]
+    if (msg.role === 'assistant' && msg.tool_calls) {
+      for (const tc of msg.tool_calls) {
+        const argsStr = tc.function.arguments || ''
+        if (argsStr.length > 600) {
+          let compact = argsStr.substring(0, 200) + ' ... (earlier args trimmed)'
+          try {
+            const parsed = JSON.parse(argsStr)
+            const hint: Record<string, unknown> = {}
+            if (parsed.path) hint.path = parsed.path
+            if (parsed.command) hint.command = String(parsed.command).slice(0, 200)
+            if (parsed.url) hint.url = parsed.url
+            if (parsed.query) hint.query = String(parsed.query).slice(0, 120)
+            hint._trimmed = `original ${argsStr.length} chars`
+            compact = JSON.stringify(hint)
+          } catch { /* keep byte-trimmed fallback */ }
+          tc.function.arguments = compact
+        }
+      }
+    }
+  }
+
+  // Phase 2: If still over threshold, drop oldest messages. Use the same
+  // estimator everywhere so we actually measure the real payload (incl.
+  // tool_calls args we just compacted) rather than only message content.
+  const afterCompactTokens = estimateTokens(trimmed, WEB_SYSTEM_PROMPT)
+  if (afterCompactTokens > limit * 0.85 && trimmed.length > 20) {
     let dropCount = Math.min(Math.floor(trimmed.length * 0.3), trimmed.length - 20)
     if (dropCount > 0) {
       // Don't break tool_call/tool response pairs
@@ -241,39 +273,139 @@ function trimHistory(history: Message[], model: string): Message[] {
   return trimmed
 }
 
+/**
+ * Fix up a transcript so the provider doesn't 400 us. Problems we handle:
+ *   - Assistant message with tool_calls but missing tool responses (happens
+ *     when the user clicks Stop in the middle of a tool loop, or when a
+ *     previous page reload cut the stream mid-tool-execution).
+ *   - Orphan tool messages with no preceding assistant+tool_calls.
+ *   - Transcript ending on assistant+tool_calls with zero responses — the
+ *     next request would be invalid.
+ * Repairs in place by injecting synthetic tool responses ("Zaustavljeno —
+ * nastavi normalno.") and dropping orphans. Cheap, idempotent, always safe.
+ */
+function repairHistory(history: Message[]): Message[] {
+  const fixed: Message[] = []
+  for (let i = 0; i < history.length; i++) {
+    const msg = history[i]
+    if (msg.role === 'tool') {
+      // Keep only tool responses that follow an assistant+tool_calls message
+      // with a matching id. Otherwise drop (orphan).
+      const prev = fixed[fixed.length - 1]
+      const prevAssistant = prev && prev.role === 'assistant' && prev.tool_calls
+      const hasMatchingCall = prevAssistant
+        ? prev!.tool_calls!.some(tc => tc.id === msg.tool_call_id)
+        : false
+      // Also accept if the assistant+tool_calls is earlier in `fixed` (not
+      // immediately preceding) — but the response must still come before the
+      // NEXT assistant message for the protocol to be valid.
+      if (hasMatchingCall) {
+        fixed.push(msg)
+      } else {
+        // Look back through consecutive tool + assistant-with-tool_calls
+        // block to find the matching id.
+        let found = false
+        for (let j = fixed.length - 1; j >= 0; j--) {
+          const m = fixed[j]
+          if (m.role === 'assistant' && m.tool_calls) {
+            if (m.tool_calls.some(tc => tc.id === msg.tool_call_id)) {
+              found = true
+            }
+            break
+          }
+          if (m.role === 'tool') continue
+          break
+        }
+        if (found) fixed.push(msg)
+        // else: drop orphan silently
+      }
+      continue
+    }
+    fixed.push(msg)
+  }
+
+  // Scan assistant+tool_calls messages and ensure every tool_call id has a
+  // tool response somewhere before the next assistant/user message.
+  const result: Message[] = []
+  for (let i = 0; i < fixed.length; i++) {
+    const msg = fixed[i]
+    result.push(msg)
+    if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+      // Gather the tool responses that immediately follow
+      const responses = new Set<string>()
+      let j = i + 1
+      while (j < fixed.length && fixed[j].role === 'tool') {
+        const id = fixed[j].tool_call_id
+        if (id) responses.add(id)
+        result.push(fixed[j])
+        j++
+      }
+      // Synthesize missing responses
+      for (const tc of msg.tool_calls) {
+        if (!responses.has(tc.id)) {
+          result.push({
+            role: 'tool',
+            content: 'Zaustavljeno — nastavi kad korisnik dâ sledeću instrukciju.',
+            tool_call_id: tc.id,
+          })
+        }
+      }
+      i = j - 1
+    }
+  }
+
+  return result
+}
+
 function buildFallbackSummary(history: Message[]): string {
   const created: string[] = []
   const modified: string[] = []
   const commands: string[] = []
+  let lastToolFailed = false
+  let sawAnyWrite = false
+  let iterations = 0
 
   for (const msg of history) {
     if (msg.role === 'assistant' && msg.tool_calls) {
+      iterations++
       for (const tc of msg.tool_calls) {
         try {
           const args = JSON.parse(tc.function.arguments)
           const fname = (args.path || '').split('/').pop() || ''
           if (tc.function.name === 'write_file' && fname) {
+            sawAnyWrite = true
             if (!created.includes(fname)) created.push(fname)
           } else if (tc.function.name === 'replace_in_file' && fname) {
+            sawAnyWrite = true
             if (!modified.includes(fname)) modified.push(fname)
           } else if (tc.function.name === 'execute_command' && args.command) {
             commands.push(args.command)
           }
-        } catch { /* skip */ }
+        } catch { /* skip unparseable */ }
       }
+    }
+    if (msg.role === 'tool' && typeof msg.content === 'string' && /^GRESKA:|^Greska:/i.test(msg.content)) {
+      lastToolFailed = true
+    } else if (msg.role === 'tool') {
+      lastToolFailed = false
     }
   }
 
-  const parts: string[] = ['Gotovo!']
-  if (created.length > 0) {
-    parts.push(`Kreirani fajlovi: ${created.join(', ')}`)
-  }
-  if (modified.length > 0) {
-    parts.push(`Izmenjeni fajlovi: ${modified.join(', ')}`)
-  }
-  if (commands.length > 0) {
-    parts.push(`Izvršene komande: ${commands.join(', ')}`)
-  }
+  // Never say "Gotovo!" if nothing was actually done, or the last tool run
+  // errored out, or the loop hit the iteration limit without finishing.
+  const hitIterationCap = iterations >= MAX_ITERATIONS - 1
+  const didNothing = created.length === 0 && modified.length === 0 && commands.length === 0
+
+  let header = 'Gotovo.'
+  if (didNothing) header = 'Agent je završio bez izmena.'
+  else if (lastToolFailed) header = 'Završeno, ali poslednji korak je vratio grešku — proveri rezultat.'
+  else if (hitIterationCap) header = 'Dostignut je maksimum iteracija — agent je stao. Proveri šta je uspelo, pa pošalji sledeću instrukciju.'
+  else if (sawAnyWrite) header = 'Gotovo.'
+
+  const parts: string[] = [header]
+  if (created.length > 0) parts.push(`Kreirani fajlovi: ${created.join(', ')}`)
+  if (modified.length > 0) parts.push(`Izmenjeni fajlovi: ${modified.join(', ')}`)
+  if (commands.length > 0) parts.push(`Izvršene komande: ${commands.slice(0, 5).join(', ')}${commands.length > 5 ? ` (+${commands.length - 5})` : ''}`)
   return parts.join('\n')
 }
 
@@ -323,6 +455,12 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
   const didInit = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
   const queuedRef = useRef<string | null>(null)
+  // Flips synchronously inside handleSubmit. The `streaming` state bit is
+  // driven by `setState` and doesn't update until the next render, which
+  // means a very fast double-click (two mousedowns in one JS tick) would
+  // bypass the `if (streaming) queue` check and fire two back-to-back
+  // sendMessage calls. This ref closes that gap.
+  const sendInFlightRef = useRef(false)
 
   // Sync chat history to parent for auto-save whenever displayMessages change
   useEffect(() => {
@@ -338,7 +476,9 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
 
     // Priority: resumeProject > localStorage session > fresh start
     if (resumeHistory && resumeHistory.length > 0) {
-      historyRef.current = resumeHistory as Message[]
+      // Repair the transcript before using it — projects saved mid-tool-run
+      // (browser crash, abort, reload) are otherwise rejected by the API.
+      historyRef.current = repairHistory(resumeHistory as Message[])
       if (resumeDisplayMessages && resumeDisplayMessages.length > 0) {
         setDisplayMessages(resumeDisplayMessages as { role: string; content: string }[])
       }
@@ -353,7 +493,7 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
 
     const session = loadSession()
     if (session && session.history.length > 0 && !initialPrompt) {
-      historyRef.current = session.history
+      historyRef.current = repairHistory(session.history)
       setDisplayMessages(session.displayMessages)
     } else if (initialPrompt) {
       // Pass Welcome-attached images directly as an override so the very
@@ -557,6 +697,12 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        // Signal to the backend that this request already carries its own
+        // complete WebContainers-aware system prompt — so the generic
+        // VajbAgent / Power prompts meant for the VS Code extension are NOT
+        // prepended on top. Two stacked system prompts waste 2-5K tokens per
+        // call and introduce contradictory instructions.
+        'X-Vajb-Client': 'web',
       },
       credentials: 'include',
       body: JSON.stringify({
@@ -628,43 +774,57 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
           const data = trimmed.slice(6)
           if (data === '[DONE]') continue
 
+          // Parse first — if JSON is malformed, log & skip. Then dispatch
+          // OUTSIDE the parse-try so real error conditions (upstream failure,
+          // finish_reason='error') can throw out to the retry loop instead
+          // of being swallowed alongside transient JSON artifacts.
+          let parsed: any
           try {
-            const parsed = JSON.parse(data)
-            const choice = parsed.choices?.[0]
-            if (!choice) continue
-
-            if (choice.finish_reason) {
-              finishReason = choice.finish_reason
-            }
-
-            if (choice.delta?.content) {
-              fullText += choice.delta.content
-              setStreamText(fullText)
-              // Real-time context update — throttled every ~400 chars
-              if (fullText.length > 0 && fullText.length - lastCtxUpdate > 400) {
-                lastCtxUpdate = fullText.length
-                const streamingUsed = estimateTokens([...messages, { role: 'assistant', content: fullText }], systemPrompt)
-                onContextUpdate?.(streamingUsed, getContextLimit(model))
-              }
-            }
-
-            if (choice.delta?.tool_calls) {
-              for (const tc of choice.delta.tool_calls) {
-                const idx = tc.index ?? 0
-                if (!toolCalls[idx]) {
-                  toolCalls[idx] = {
-                    id: tc.id || `tc_${idx}`,
-                    type: 'function',
-                    function: { name: '', arguments: '' },
-                  }
-                }
-                if (tc.id) toolCalls[idx].id = tc.id
-                if (tc.function?.name) toolCalls[idx].function.name = tc.function.name
-                if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments
-              }
-            }
+            parsed = JSON.parse(data)
           } catch (e) {
             console.warn('[SSE] Failed to parse:', data, e)
+            continue
+          }
+
+          if (parsed.error?.message) {
+            throw new Error(String(parsed.error.message))
+          }
+
+          const choice = parsed.choices?.[0]
+          if (!choice) continue
+
+          if (choice.finish_reason) {
+            finishReason = choice.finish_reason
+            if (choice.finish_reason === 'error') {
+              throw new Error('Stream prekinut: upstream greška.')
+            }
+          }
+
+          if (choice.delta?.content) {
+            fullText += choice.delta.content
+            setStreamText(fullText)
+            // Real-time context update — throttled every ~400 chars
+            if (fullText.length > 0 && fullText.length - lastCtxUpdate > 400) {
+              lastCtxUpdate = fullText.length
+              const streamingUsed = estimateTokens([...messages, { role: 'assistant', content: fullText }], systemPrompt)
+              onContextUpdate?.(streamingUsed, getContextLimit(model))
+            }
+          }
+
+          if (choice.delta?.tool_calls) {
+            for (const tc of choice.delta.tool_calls) {
+              const idx = tc.index ?? 0
+              if (!toolCalls[idx]) {
+                toolCalls[idx] = {
+                  id: tc.id || `tc_${idx}`,
+                  type: 'function',
+                  function: { name: '', arguments: '' },
+                }
+              }
+              if (tc.id) toolCalls[idx].id = tc.id
+              if (tc.function?.name) toolCalls[idx].function.name = tc.function.name
+              if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments
+            }
           }
         }
       }
@@ -735,6 +895,7 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
     userScrolledUp.current = false
 
     let lastAssistantHadText = false
+    let textContinuationUsed = false
 
     try {
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
@@ -870,42 +1031,46 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
         if (!result || signal.aborted) break
 
         // ─── Truncation detection ────────────────────────────────────
-        // If the stream was cut off by max_tokens (finish_reason: 'length'),
-        // the LAST tool call is most likely truncated mid-JSON. We do NOT try
-        // to "continue" the stream with a fake user message — that breaks the
-        // tool_use protocol and never actually worked. Instead we mark the
-        // truncated tool call and reply to it with a clear error response
-        // that steers the model to a different strategy (skeleton + replace_in_file).
-        //
-        // We additionally flag any tool call whose arguments won't parse as
-        // JSON even after jsonrepair — that's a truncation signal too, just
-        // without an explicit finish_reason=length (some providers swallow it).
+        // Only the LAST tool call can be truncated — earlier ones had a
+        // content_block_stop before max_tokens fired. We flag it as truncated
+        // *only* when its JSON can't be parsed; a valid-JSON tool call with
+        // finishReason='length' is fine to execute (the model just wanted to
+        // say more afterward). The reply is a `tool` role message steering
+        // the model toward skeleton + replace_in_file instead of retrying
+        // the giant write.
         const truncatedToolIds = new Set<string>()
         if (result.toolCalls.length > 0) {
           const lastTc = result.toolCalls[result.toolCalls.length - 1]
           const argsStr = lastTc.function.arguments || ''
           let parsesOk = false
           try { JSON.parse(argsStr); parsesOk = true } catch { /* broken */ }
-          if (!parsesOk || result.finishReason === 'length' || argsStr.length < 20) {
-            // Only the LAST tool call can actually be truncated — earlier ones
-            // already had a content_block_stop before max_tokens hit.
-            if (!parsesOk || result.finishReason === 'length') {
-              truncatedToolIds.add(lastTc.id)
-              console.warn(`[API] Truncated tool call detected: ${lastTc.function.name} (finish=${result.finishReason}, args_len=${argsStr.length}, parses=${parsesOk})`)
-            }
+          if (!parsesOk) {
+            truncatedToolIds.add(lastTc.id)
+            console.warn(`[API] Truncated tool call detected: ${lastTc.function.name} (finish=${result.finishReason}, args_len=${argsStr.length}, parses=false)`)
           }
         }
 
         // ─── Process result ──────────────────────────────────────────
 
         if (result.toolCalls.length === 0) {
-          // Pure text response — done.
+          // Pure text response. If the model ran out of tokens mid-sentence
+          // (finishReason='length'), inject a system note and loop so it can
+          // finish its thought. We do this at most once per turn to avoid a
+          // runaway loop if the model keeps producing huge walls of text.
           if (result.text) {
             historyRef.current = [...historyRef.current, { role: 'assistant', content: result.text }]
             setDisplayMessages(prev => [...prev, { role: 'assistant', content: result.text }])
             lastAssistantHadText = true
           }
           setStreamText('')
+          if (result.finishReason === 'length' && !textContinuationUsed) {
+            textContinuationUsed = true
+            historyRef.current.push({
+              role: 'system',
+              content: 'Prethodni odgovor je presečen (iskorišćen je maksimum tokena). Nastavi odmah odakle si stao — ne ponavljaj već napisano, ne pozdravljaj ponovo, samo dovrši misao u 2-3 rečenice.',
+            })
+            continue
+          }
           break
         }
 
@@ -1049,7 +1214,10 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
       onStreamingChange?.(false)
       setStatusText('')
       abortRef.current = null
-      // Save session (use ref to get latest displayMessages, not stale closure)
+      // If the user aborted mid-tool-run, the transcript ends on an assistant
+      // message with tool_calls but missing tool responses. Repair it before
+      // we persist so the next request doesn't get rejected.
+      historyRef.current = repairHistory(historyRef.current)
       saveSession(historyRef.current, displayMessagesRef.current, model)
       onChatHistoryUpdate?.(historyRef.current, displayMessagesRef.current)
       // Refresh balance and warn at multiple levels
@@ -1092,43 +1260,29 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
     const trimmed = input.trim()
     if (!trimmed) return
 
-    if (streaming) {
-      // Queue the message — will be sent when agent finishes
+    if (streaming || sendInFlightRef.current) {
       queuedRef.current = trimmed
       setInput('')
       setDisplayMessages(prev => [...prev, { role: 'queued', content: trimmed }])
       return
     }
 
-    sendMessage(trimmed)
+    sendInFlightRef.current = true
+    try {
+      sendMessage(trimmed)
+    } finally {
+      // Release on next tick — by then `streaming` state has propagated
+      // and subsequent submits hit the queue branch above.
+      setTimeout(() => { sendInFlightRef.current = false }, 0)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // If command palette is open, let it handle Enter/Tab/Arrow keys
-    if (showCommands && (e.key === 'Enter' || e.key === 'Tab')) {
-      e.preventDefault()
-      const slashIdx = input.lastIndexOf('/')
-      const query = slashIdx >= 0 ? input.substring(slashIdx + 1).toLowerCase() : ''
-      const filtered = query
-        ? ALL_COMMANDS.filter(c => c.name.includes(query) || c.description.toLowerCase().includes(query))
-        : ALL_COMMANDS
-      if (filtered.length > 0) {
-        handleCommandSelect(filtered[0])
-      }
-      return
-    }
-    if (showCommands && e.key === 'Escape') {
-      e.preventDefault()
-      setShowCommands(false)
-      // Only clear the /command part, keep text before it
-      const slashIdx = input.lastIndexOf('/')
-      if (slashIdx > 0) {
-        setInput(input.substring(0, slashIdx))
-      } else {
-        setInput('')
-      }
-      return
-    }
+    // When the command palette is open, its own capture-phase listener
+    // claims Enter/Tab/Arrow/Escape before this handler runs. We still
+    // need to avoid triggering chat submission on those keys, so we
+    // early-return instead of falling through to the submit branch.
+    if (showCommands) return
 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -1271,6 +1425,12 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
             inputValue={input}
             visible={showCommands && !showFileMention}
             onSelect={handleCommandSelect}
+            onClose={() => {
+              setShowCommands(false)
+              const slashIdx = input.lastIndexOf('/')
+              if (slashIdx > 0) setInput(input.substring(0, slashIdx))
+              else setInput('')
+            }}
           />
           <FileMention
             files={files}

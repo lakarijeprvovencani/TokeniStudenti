@@ -59,27 +59,39 @@ export default function TerminalPanel({ onClose }: TerminalProps) {
       fitAddon.fit()
     })
 
-    // Connect to WebContainers jsh shell
+    // Shell + writer handles live in closures we need to reach from the
+    // cleanup effect. Without these references we'd leak a running jsh
+    // process every time the panel closes — and a couple of those add up
+    // fast on mobile browsers that evict WebContainers after a few minutes
+    // of inactivity.
+    let shellHandle: { kill: () => Promise<void> | void } | null = null
+    let inputWriter: { releaseLock: () => void } | null = null
+    let disposed = false
+
     getWebContainer().then(async (wc) => {
+      if (disposed) return
       const shell = await wc.spawn('jsh', {
         terminal: { cols: terminal.cols, rows: terminal.rows },
       })
+      shellHandle = shell
 
       shell.output.pipeTo(new WritableStream({
         write(data) {
-          terminal.write(data)
+          if (!disposed) terminal.write(data)
         },
-      }))
+      })).catch(() => { /* stream ended */ })
 
       const writer = shell.input.getWriter()
-      terminal.onData(data => writer.write(data))
+      inputWriter = writer
+      terminal.onData(data => {
+        if (!disposed) writer.write(data).catch(() => { /* socket closed */ })
+      })
 
-      // Resize shell when terminal resizes
       terminal.onResize(({ cols, rows }) => {
-        shell.resize({ cols, rows })
+        if (!disposed) shell.resize({ cols, rows })
       })
     }).catch(err => {
-      terminal.writeln('\x1b[31mGreška: WebContainer nije spreman.\x1b[0m')
+      if (!disposed) terminal.writeln('\x1b[31mGreška: WebContainer nije spreman.\x1b[0m')
       console.error('[Terminal] Error:', err)
     })
 
@@ -89,7 +101,10 @@ export default function TerminalPanel({ onClose }: TerminalProps) {
     if (termRef.current) resizeObserver.observe(termRef.current)
 
     return () => {
+      disposed = true
       resizeObserver.disconnect()
+      try { inputWriter?.releaseLock() } catch { /* ignore */ }
+      try { shellHandle?.kill() } catch { /* ignore */ }
       terminal.dispose()
     }
   }, [])

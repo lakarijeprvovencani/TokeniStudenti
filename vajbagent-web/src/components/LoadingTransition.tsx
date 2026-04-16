@@ -19,17 +19,19 @@ export default function LoadingTransition({ onComplete }: LoadingTransitionProps
   useEffect(() => {
     let stepIdx = 0
     let progressVal = 0
+    let cancelled = false
+    const timers: number[] = []
+    let intervalId: number | null = null
 
     const advanceStep = () => {
+      if (cancelled) return
       if (stepIdx >= STEPS.length) {
-        // All done — trigger completion
-        setTimeout(onComplete, 300)
+        timers.push(window.setTimeout(() => { if (!cancelled) onComplete() }, 300))
         return
       }
 
       setCurrentStep(stepIdx)
 
-      // Animate progress during this step
       const stepDuration = STEPS[stepIdx].duration
       const startProgress = (stepIdx / STEPS.length) * 100
       const endProgress = ((stepIdx + 1) / STEPS.length) * 100
@@ -38,24 +40,30 @@ export default function LoadingTransition({ onComplete }: LoadingTransitionProps
       const increment = (endProgress - startProgress) / ticks
       let tickCount = 0
 
-      const progressTimer = setInterval(() => {
+      intervalId = window.setInterval(() => {
+        if (cancelled) {
+          if (intervalId) window.clearInterval(intervalId)
+          return
+        }
         tickCount++
         progressVal = startProgress + increment * tickCount
         setProgress(Math.min(progressVal, endProgress))
 
         if (tickCount >= ticks) {
-          clearInterval(progressTimer)
+          if (intervalId) window.clearInterval(intervalId)
+          intervalId = null
           stepIdx++
-          setTimeout(advanceStep, 200)
+          timers.push(window.setTimeout(advanceStep, 200))
         }
       }, interval)
     }
 
-    // Small initial delay so user sees the screen appear
-    const startTimer = setTimeout(advanceStep, 300)
+    timers.push(window.setTimeout(advanceStep, 300))
 
     return () => {
-      clearTimeout(startTimer)
+      cancelled = true
+      if (intervalId) window.clearInterval(intervalId)
+      for (const id of timers) window.clearTimeout(id)
     }
   }, [onComplete])
 

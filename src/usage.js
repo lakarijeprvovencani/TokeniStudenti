@@ -70,22 +70,74 @@ async function writeUsage(usage) {
   try { writeUsageFile(usage); } catch {}
 }
 
-export async function logUsage(apiKeyId, { input_tokens, output_tokens, model }) {
-  const usage = await readUsage();
-  const key = apiKeyId || 'unknown';
-  if (!usage[key]) usage[key] = { input_tokens: 0, output_tokens: 0, requests: 0, by_model: {} };
-  if (!usage[key].by_model) usage[key].by_model = {};
-  usage[key].input_tokens += input_tokens;
-  usage[key].output_tokens += output_tokens;
-  usage[key].requests += 1;
-  usage[key].last_used = new Date().toISOString();
-  if (model) {
-    if (!usage[key].by_model[model]) usage[key].by_model[model] = { input_tokens: 0, output_tokens: 0, requests: 0 };
-    usage[key].by_model[model].input_tokens += input_tokens;
-    usage[key].by_model[model].output_tokens += output_tokens;
-    usage[key].by_model[model].requests += 1;
+// Per-process lock + optional Redis lock so concurrent logUsage calls don't
+// overwrite each other (two streams for the same key finish simultaneously →
+// classic read-modify-write race).
+const usageLocks = new Map();
+
+async function acquireUsageRedisLock(ttlMs = 3000) {
+  const r = getRedis();
+  if (!r) return null;
+  const token = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const lockKey = 'vajb:lock:usage';
+  const deadline = Date.now() + 2500;
+  while (Date.now() < deadline) {
+    try {
+      const ok = await r.set(lockKey, token, { nx: true, px: ttlMs });
+      if (ok) return { lockKey, token };
+    } catch {
+      return null;
+    }
+    await new Promise(res => setTimeout(res, 15 + Math.random() * 40));
   }
-  await writeUsage(usage);
+  return null;
+}
+
+async function releaseUsageRedisLock(lock) {
+  if (!lock) return;
+  const r = getRedis();
+  if (!r) return;
+  try {
+    const current = await r.get(lock.lockKey);
+    if (current === lock.token) await r.del(lock.lockKey);
+  } catch { /* ignore */ }
+}
+
+async function withUsageLock(fn) {
+  const gate = 'global';
+  while (usageLocks.has(gate)) await usageLocks.get(gate);
+  let resolve;
+  const p = new Promise(r => { resolve = r; });
+  usageLocks.set(gate, p);
+  const redisLock = await acquireUsageRedisLock();
+  try {
+    usageCache = null; // force fresh read while lock is held
+    return await fn();
+  } finally {
+    await releaseUsageRedisLock(redisLock);
+    usageLocks.delete(gate);
+    resolve();
+  }
+}
+
+export async function logUsage(apiKeyId, { input_tokens, output_tokens, model }) {
+  return withUsageLock(async () => {
+    const usage = await readUsage();
+    const key = apiKeyId || 'unknown';
+    if (!usage[key]) usage[key] = { input_tokens: 0, output_tokens: 0, requests: 0, by_model: {} };
+    if (!usage[key].by_model) usage[key].by_model = {};
+    usage[key].input_tokens += input_tokens;
+    usage[key].output_tokens += output_tokens;
+    usage[key].requests += 1;
+    usage[key].last_used = new Date().toISOString();
+    if (model) {
+      if (!usage[key].by_model[model]) usage[key].by_model[model] = { input_tokens: 0, output_tokens: 0, requests: 0 };
+      usage[key].by_model[model].input_tokens += input_tokens;
+      usage[key].by_model[model].output_tokens += output_tokens;
+      usage[key].by_model[model].requests += 1;
+    }
+    await writeUsage(usage);
+  });
 }
 
 export async function getUsageSummary() {

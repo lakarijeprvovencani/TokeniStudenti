@@ -7,6 +7,17 @@ export function keyId(key) {
   return key.trim();
 }
 
+/**
+ * Non-reversible public identifier for a student. Derived from the raw key so
+ * it's stable across sessions, but on its own can't be used as an API key.
+ * Safe to ship to the browser / localStorage / logs.
+ */
+export function publicUserId(key) {
+  if (!key) return 'anon';
+  const h = crypto.createHash('sha256').update(String(key).trim()).digest('hex');
+  return 'u_' + h.slice(0, 24);
+}
+
 // Short identifier for logging — never expose full key in logs.
 export function keyIdShort(key) {
   if (!key) return 'unknown';

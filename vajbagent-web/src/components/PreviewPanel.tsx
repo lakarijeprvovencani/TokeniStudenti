@@ -562,7 +562,13 @@ ${sharedStyles}
                     ? fullSite
                     : fullSite.replace(/<head([^>]*)>/i, '<head$1><meta charset="UTF-8">')
                   const blob = new Blob([withCharset], { type: 'text/html;charset=utf-8' })
-                  window.open(URL.createObjectURL(blob), '_blank')
+                  const url = URL.createObjectURL(blob)
+                  window.open(url, '_blank')
+                  // Browsers hold the blob as long as any tab references it,
+                  // so we can safely release our URL handle after a short
+                  // delay. Without this, every "open in new tab" click
+                  // leaks a few hundred KB of HTML for the life of the tab.
+                  setTimeout(() => URL.revokeObjectURL(url), 60_000)
                 }
               }
             }}

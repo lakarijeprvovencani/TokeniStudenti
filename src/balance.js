@@ -78,35 +78,80 @@ export async function getBalance(keyId) {
   return typeof v === 'number' ? v : 0;
 }
 
+// In-process lock (sufficient when running a single worker) and a Redis-backed
+// lock (required when scaled horizontally). With file/JSON storage both
+// readers hit the same blob, so a distributed lock is the only way to avoid
+// classic read-modify-write lost updates.
 const balanceLocks = new Map();
+
+async function acquireRedisLock(keyId, ttlMs = 5000) {
+  const r = getRedis();
+  if (!r) return null;
+  const token = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const lockKey = `vajb:lock:balance:${keyId}`;
+  const deadline = Date.now() + 3000;
+  while (Date.now() < deadline) {
+    try {
+      // Upstash client: options object — { nx: true, px: ms }
+      const ok = await r.set(lockKey, token, { nx: true, px: ttlMs });
+      if (ok) return { lockKey, token };
+    } catch {
+      return null;
+    }
+    await new Promise(res => setTimeout(res, 25 + Math.random() * 50));
+  }
+  return null;
+}
+
+async function releaseRedisLock(lock) {
+  if (!lock) return;
+  const r = getRedis();
+  if (!r) return;
+  try {
+    // Best-effort: only delete if we still own it.
+    const current = await r.get(lock.lockKey);
+    if (current === lock.token) await r.del(lock.lockKey);
+  } catch { /* ignore */ }
+}
+
 async function withBalanceLock(keyId, fn) {
   while (balanceLocks.has(keyId)) await balanceLocks.get(keyId);
   let resolve;
   const p = new Promise(r => { resolve = r; });
   balanceLocks.set(keyId, p);
-  try { return await fn(); }
-  finally { balanceLocks.delete(keyId); resolve(); }
+  const redisLock = await acquireRedisLock(keyId);
+  try {
+    // Force a fresh read while holding the lock
+    balanceCache = null;
+    return await fn();
+  } finally {
+    await releaseRedisLock(redisLock);
+    balanceLocks.delete(keyId);
+    resolve();
+  }
 }
 
 export async function addBalance(keyId, amountUsd) {
   return withBalanceLock(keyId, async () => {
-    balanceCache = null;
     const b = await readBalances();
     const current = typeof b[keyId] === 'number' ? b[keyId] : 0;
     const next = Math.round((current + amountUsd) * 100) / 100;
     b[keyId] = next;
     await writeBalances(b);
-    await trackDeposit(keyId, amountUsd);
+    if (amountUsd > 0) await trackDeposit(keyId, amountUsd);
     return next;
   });
 }
 
 export async function deductBalance(keyId, amountUsd) {
   return withBalanceLock(keyId, async () => {
-    balanceCache = null;
     const b = await readBalances();
     const current = typeof b[keyId] === 'number' ? b[keyId] : 0;
-    const next = Math.round((current - amountUsd) * 100) / 100;
+    // Floor at zero — even tiny negative balances compound into real money
+    // loss across thousands of streamed requests. If callers want to be
+    // warned about overdrafts they should compare `current` before calling.
+    const raw = current - amountUsd;
+    const next = Math.round(Math.max(0, raw) * 100) / 100;
     b[keyId] = next;
     await writeBalances(b);
     return next;

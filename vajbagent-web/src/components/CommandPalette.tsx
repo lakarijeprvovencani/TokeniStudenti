@@ -24,9 +24,10 @@ interface Props {
   inputValue: string
   visible: boolean
   onSelect: (command: Command) => void
+  onClose?: () => void
 }
 
-export default function CommandPalette({ inputValue, visible, onSelect }: Props) {
+export default function CommandPalette({ inputValue, visible, onSelect, onClose }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -49,6 +50,38 @@ export default function CommandPalette({ inputValue, visible, onSelect }: Props)
       selected?.scrollIntoView({ block: 'nearest' })
     }
   }, [selectedIndex])
+
+  // Capture-phase keyboard handler. We run in the capture phase so we
+  // preempt the textarea's own Enter/Tab/Arrow handling — without this,
+  // ArrowDown/Up would move the textarea caret and Enter/Tab would submit
+  // the chat instead of picking the highlighted command.
+  useEffect(() => {
+    if (!visible) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        e.stopPropagation()
+        setSelectedIndex(i => Math.min(i + 1, filteredCommands.length - 1))
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        e.stopPropagation()
+        setSelectedIndex(i => Math.max(i - 1, 0))
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        const cmd = filteredCommands[selectedIndex]
+        if (cmd) {
+          e.preventDefault()
+          e.stopPropagation()
+          onSelect(cmd)
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        onClose?.()
+      }
+    }
+    window.addEventListener('keydown', handler, true)
+    return () => window.removeEventListener('keydown', handler, true)
+  }, [visible, filteredCommands, selectedIndex, onSelect, onClose])
 
   if (!visible || filteredCommands.length === 0) return null
 

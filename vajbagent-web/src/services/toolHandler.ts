@@ -24,6 +24,59 @@ interface ToolResult {
   content: string
 }
 
+/**
+ * Tokenize a shell command into argv parts, respecting single- and
+ * double-quoted segments. Not a full shell parser — no expansion, no
+ * backticks, no heredocs, no subshells. Enough to correctly handle:
+ *
+ *   git commit -m "initial commit"                        → 4 tokens
+ *   node -e 'console.log("hi")'                           → 3 tokens
+ *   sh -c "npm install && npm run build"                  → 3 tokens
+ *
+ * Backslash before a quote is treated as a literal escape. Empty input
+ * returns [].
+ */
+function tokenizeCommand(command: string): string[] {
+  const tokens: string[] = []
+  let current = ''
+  let quote: '"' | "'" | null = null
+  let i = 0
+  while (i < command.length) {
+    const ch = command[i]
+    if (ch === '\\' && i + 1 < command.length && (command[i + 1] === '"' || command[i + 1] === "'" || command[i + 1] === '\\')) {
+      current += command[i + 1]
+      i += 2
+      continue
+    }
+    if (quote) {
+      if (ch === quote) {
+        quote = null
+      } else {
+        current += ch
+      }
+      i++
+      continue
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch as '"' | "'"
+      i++
+      continue
+    }
+    if (ch === ' ' || ch === '\t') {
+      if (current.length > 0) {
+        tokens.push(current)
+        current = ''
+      }
+      i++
+      continue
+    }
+    current += ch
+    i++
+  }
+  if (current.length > 0) tokens.push(current)
+  return tokens
+}
+
 export async function executeToolCall(
   tc: ToolCall,
   onFileChange: (files: Record<string, string>) => void
@@ -241,6 +294,16 @@ export async function executeToolCall(
         if (oldText === newText) {
           return { tool_call_id: tc.id, role: 'tool', content: 'Nema izmena: old_text i new_text su identicni.' }
         }
+        // Refuse text-mode edits on files whose extension says "binary" —
+        // reading a PNG/PDF/zip through a text API silently corrupts bytes
+        // and produces a useless file on disk.
+        if (/\.(png|jpe?g|gif|webp|ico|bmp|pdf|zip|tar|gz|tgz|mp3|mp4|webm|wav|ogg|mov|avi|woff2?|ttf|otf|eot|class|wasm|bin|exe|dll|so|dylib)$/i.test(path)) {
+          return {
+            tool_call_id: tc.id,
+            role: 'tool',
+            content: `GRESKA: ${path} izgleda kao binarni fajl. replace_in_file radi samo sa tekstualnim fajlovima. Ako ga zaista treba izmeniti, upotrebi write_file sa ispravnim tekstualnim sadržajem, ili preskoči — binarni asseti ostaju onakvi kakvi jesu.`,
+          }
+        }
 
         const content = await readFile(path)
         if (content.startsWith('Greska:')) {
@@ -309,7 +372,17 @@ export async function executeToolCall(
 
       case 'execute_command': {
         const command = args.command as string || ''
-        const parts = command.split(' ')
+        // Split respecting single / double quotes so multi-word arguments like
+        //   git commit -m "initial commit"
+        // or
+        //   node -e 'console.log("hi")'
+        // reach the child process as one argv entry instead of being shattered
+        // into three. A naive .split(' ') turned every quoted string into a
+        // syntax error, which is what the audit flagged.
+        const parts = tokenizeCommand(command)
+        if (parts.length === 0) {
+          return { tool_call_id: tc.id, role: 'tool', content: 'GRESKA: prazna komanda.' }
+        }
         const result = await runCommand(parts[0], parts.slice(1))
 
         // After build commands, refresh files so dist/ or out/ appears in preview
@@ -627,9 +700,30 @@ async function handleDownloadFile(
 
   if (!url || !path) return 'Greska: url i path su obavezni'
 
+  // Only http/https. Data, file, javascript, blob, ftp — all refused.
+  let parsed: URL
+  try { parsed = new URL(url) } catch {
+    return `Greska: neispravan URL: ${url}`
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    return `Greska: dozvoljen je samo http(s), ne ${parsed.protocol}`
+  }
+  // Block localhost + link-local + all RFC1918 private ranges. Same list as
+  // fetch_url, kept in sync intentionally — download_file was the missing
+  // sibling that could SSRF metadata endpoints (AWS 169.254.169.254, GCP, etc).
+  if (/^(localhost|127\.0\.0\.1|::1|0\.0\.0\.0)$/i.test(parsed.hostname) ||
+      /\.local$/i.test(parsed.hostname) ||
+      /^169\.254\./.test(parsed.hostname) ||
+      /^10\./.test(parsed.hostname) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(parsed.hostname) ||
+      /^192\.168\./.test(parsed.hostname)) {
+    return `Greska: pristup internim/privatnim adresama nije dozvoljen (${parsed.hostname})`
+  }
+
   try {
     const res = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 VajbAgent/1.0' },
+      redirect: 'follow',
       signal: AbortSignal.timeout(30000),
     })
 

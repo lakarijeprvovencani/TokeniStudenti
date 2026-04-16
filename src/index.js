@@ -3,8 +3,12 @@ import 'dotenv/config';
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled rejection:', err);
 });
+// Uncaught exceptions leave the process in an undefined state — log and exit
+// so Render's supervisor can restart cleanly instead of serving traffic from a
+// half-dead worker. 30s grace window lets in-flight SSE streams flush.
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught exception:', err);
+  console.error('Uncaught exception (exiting in 30s):', err);
+  setTimeout(() => process.exit(1), 30_000).unref();
 });
 
 import crypto from 'crypto';
@@ -14,7 +18,7 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { requireStudentAuth, requireAuth, createSession, destroySession, setSessionCookie, clearSessionCookie, parseCookies, validateSession, keyId } from './auth.js';
+import { requireStudentAuth, requireAuth, createSession, destroySession, setSessionCookie, clearSessionCookie, parseCookies, validateSession, keyId, publicUserId } from './auth.js';
 import {
   openAIToAnthropicMessages,
   openAIToolsToAnthropic,
@@ -746,6 +750,7 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   res.json({
     name: result.student.name,
     email: result.student.email,
+    user_id: publicUserId(result.student.key),
     balance_usd: regBal,
     free_tier: regDep <= regBonusVal,
   });
@@ -778,6 +783,7 @@ app.post('/auth/login', loginEmailLimiter, authLimiter, asyncHandler(async (req,
   res.json({
     name: student.name,
     email: student.email,
+    user_id: publicUserId(student.key),
     balance_usd: loginBal,
     free_tier: loginDep <= loginBonusVal,
   });
@@ -800,11 +806,12 @@ app.get('/auth/me', authLimiter, requireAuth, asyncHandler(async (req, res) => {
   const includeKey = req.query.include_key === '1' && !!cookies.vajb_session;
   res.json({
     name: req.studentName,
-    // Stable, non-secret user identifier — hash of the student key, safe to
-    // expose to the SPA for scoping browser-side storage (projects, secrets)
-    // per user so two people sharing a browser profile never see each other's
-    // data.
-    user_id: req.studentKeyId,
+    // Stable, non-secret user identifier — sha256-prefix of the student key,
+    // safe to expose to the SPA for scoping browser-side storage (projects,
+    // secrets) per user so two people sharing a browser profile never see
+    // each other's data, and a leaked localStorage dump can't be replayed as
+    // a Bearer token.
+    user_id: publicUserId(req.studentApiKey),
     balance_usd: balance,
     free_tier: deposited <= regBonus,
     ...(includeKey && { api_key: req.studentApiKey }),
@@ -1725,7 +1732,18 @@ const chatCompletionsHandler = [
     }
 
     try {
-      const enhancedMessages = injectSystemPrompt(messages, resolved.isPower === true);
+      // Web client (vajbagent.com SPA) ships its own ~1000-line WebContainers-
+      // aware prompt. Stacking VAJB/POWER on top would only inflate context
+      // and contradict the web prompt. Detect via explicit header OR via
+      // presence of a substantial system message already in the transcript.
+      const clientHeader = (req.headers['x-vajb-client'] || '').toString().toLowerCase();
+      const existingSystem = messages.find(m => (m.role || '').toLowerCase() === 'system');
+      const existingSystemLen = typeof existingSystem?.content === 'string' ? existingSystem.content.length : 0;
+      const skipInject = clientHeader === 'web' || existingSystemLen > 1500;
+
+      const enhancedMessages = skipInject
+        ? messages
+        : injectSystemPrompt(messages, resolved.isPower === true);
 
       if (resolved.backend === 'openai') {
         await handleOpenAI(req, res, keyId, resolved, enhancedMessages, openAITools, stream, max_tokens);
@@ -1868,6 +1886,14 @@ async function handleOpenAIStream(req, res, keyId, resolved, payload, client) {
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders?.();
 
+  // If the browser disconnects mid-stream (tab closed, navigated away, user
+  // clicked Stop and didn't wait), keep generating upstream = pure waste of
+  // tokens that the user still pays for. We cancel the upstream the moment
+  // the socket goes away.
+  let clientClosed = false;
+  const onClientClose = () => { clientClosed = true; };
+  req.on('close', onClientClose);
+
   // Reasoning models (gpt-5.*) can legitimately "think" silently for 2-3 min
   // before emitting the first token. We must (a) keep the connection from
   // being idle-killed by proxies, and (b) not close the upstream too early.
@@ -1920,9 +1946,15 @@ async function handleOpenAIStream(req, res, keyId, resolved, payload, client) {
   let usage = { input_tokens: 0, output_tokens: 0 };
   let chunkCount = 0;
 
+  let midStreamError = null;
+
   try {
     for await (const chunk of stream) {
-      if (res.writableEnded) break;
+      if (res.writableEnded || clientClosed) {
+        // Stop pulling chunks upstream if the client is gone.
+        try { stream.controller?.abort(); } catch { /* ignore */ }
+        break;
+      }
       lastChunkTime = Date.now();
       if (chunk.usage) {
         usage.input_tokens = chunk.usage.prompt_tokens ?? usage.input_tokens;
@@ -1936,11 +1968,28 @@ async function handleOpenAIStream(req, res, keyId, resolved, payload, client) {
       if (res.flush) res.flush();
     }
   } catch (streamErr) {
+    midStreamError = streamErr;
     console.error('OpenAI stream error mid-flight:', streamErr.message);
   }
 
   clearInterval(timeoutCheck);
   clearInterval(keepAlive);
+  req.off?.('close', onClientClose);
+
+  // If an error was thrown mid-stream, tell the client so it can retry or
+  // surface a proper message instead of treating the partial text as a
+  // successful completion.
+  if (midStreamError && !res.writableEnded && !clientClosed) {
+    const errChunk = {
+      id: 'vajb-error',
+      object: 'chat.completion.chunk',
+      model: resolved.id,
+      choices: [{ index: 0, delta: {}, finish_reason: 'error' }],
+      error: { message: 'Stream prekinut: ' + (midStreamError.message || 'upstream error') },
+    };
+    res.write('data: ' + JSON.stringify(errChunk) + '\n\n');
+    if (res.flush) res.flush();
+  }
 
   if (usage.input_tokens === 0 && usage.output_tokens === 0) {
     const estIn = Math.max(chunkCount * 50, 1000);
@@ -2101,6 +2150,11 @@ async function handleAnthropicStream(req, res, keyId, resolved, payload, client)
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders?.();
 
+  // Cancel upstream when the browser disconnects — same reason as OpenAI.
+  let clientClosed = false;
+  const onClientClose = () => { clientClosed = true; };
+  req.on('close', onClientClose);
+
   const streamId = 'vajb-' + Date.now();
   let usage = { input_tokens: 0, output_tokens: 0 };
   const toolCalls = [];
@@ -2158,9 +2212,14 @@ async function handleAnthropicStream(req, res, keyId, resolved, payload, client)
 
   let isThinking = false;
   let thinkingIndicatorSent = false;
-  
+  let midStreamError = null;
+
   try {
     for await (const event of stream) {
+      if (clientClosed || res.writableEnded) {
+        try { stream.controller?.abort(); } catch { /* ignore */ }
+        break;
+      }
       lastChunkTime = Date.now();
       
       if (event.type === 'message_start' && event.message?.usage) {
@@ -2225,11 +2284,25 @@ async function handleAnthropicStream(req, res, keyId, resolved, payload, client)
       }
     }
   } catch (streamErr) {
+    midStreamError = streamErr;
     console.error('Anthropic stream error:', streamErr.message);
   }
 
   clearInterval(timeoutCheck);
   clearInterval(keepAlive);
+  req.off?.('close', onClientClose);
+
+  if (midStreamError && !res.writableEnded && !clientClosed) {
+    const errChunk = {
+      id: streamId,
+      object: 'chat.completion.chunk',
+      model: resolved.id,
+      choices: [{ index: 0, delta: {}, finish_reason: 'error' }],
+      error: { message: 'Stream prekinut: ' + (midStreamError.message || 'upstream error') },
+    };
+    res.write('data: ' + JSON.stringify(errChunk) + '\n\n');
+    if (res.flush) res.flush();
+  }
 
   // Map Anthropic stop_reason → OpenAI finish_reason.
   // Critical: when Anthropic hits max_tokens mid-stream (especially in a tool_use
@@ -2584,11 +2657,8 @@ app.get('/usage', adminLimiter, requireAdmin, asyncHandler(async (_req, res) => 
 }));
 
 // ---- Admin: full overview (all users, models, earnings) ----
-app.get('/admin/api/overview', adminLimiter, asyncHandler(async (req, res) => {
-  const secret = req.headers['x-admin-secret'] || req.query.secret;
-  if (!safeEqual(secret, process.env.ADMIN_SECRET)) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+app.get('/admin/api/overview', adminLimiter, requireAdmin, asyncHandler(async (_req, res) => {
+  // Auth enforced by requireAdmin middleware (header-only, never query string).
   const allUsage = await getUsageSummary();
   const users = [];
   let totalProviderCost = 0;

@@ -328,8 +328,8 @@ function showApp(){$('login').style.display='none';$('app').style.display='flex'
 function doLogin(){
   secret=$('secretIn').value.trim();
   if(!secret)return;
-  api('GET','/admin/api/overview?secret='+encodeURIComponent(secret))
-    .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.prices=d.prices||null;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;DATA.totals=d.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0};return api('GET','/admin/students?secret='+encodeURIComponent(secret))})
+  api('GET','/admin/api/overview')
+    .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.prices=d.prices||null;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;DATA.totals=d.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0};return api('GET','/admin/students')})
     .then(s=>{if(s.error)throw s;DATA.students=s;localStorage.setItem('vajb_admin',secret);showApp();renderAll()})
     .catch(()=>{showLogin();$('loginErr').style.display='block'});
 }
@@ -348,8 +348,8 @@ function renderAll(){renderOverview();renderStudents();renderModels();renderMark
 
 function refresh(){
   Promise.all([
-    api('GET','/admin/api/overview?secret='+encodeURIComponent(secret)),
-    api('GET','/admin/students?secret='+encodeURIComponent(secret))
+    api('GET','/admin/api/overview'),
+    api('GET','/admin/students')
   ]).then(([ov,st])=>{
     if(!ov.error){DATA.models=ov.models;DATA.users=ov.users;DATA.markup=ov.markup;DATA.prices=ov.prices||null;DATA.model_stats=ov.model_stats||{};DATA.first_use=ov.first_use||null;DATA.totals=ov.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0}}
     if(!st.error)DATA.students=st;
@@ -643,8 +643,8 @@ function doAdminLogout(){localStorage.removeItem('vajb_admin');secret='';showLog
     secret=s;$('secretIn').value=s;
     let retries=0;
     const tryLogin=()=>{
-      api('GET','/admin/api/overview?secret='+encodeURIComponent(secret))
-        .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.prices=d.prices||null;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;DATA.totals=d.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0};return api('GET','/admin/students?secret='+encodeURIComponent(secret))})
+      api('GET','/admin/api/overview')
+        .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.prices=d.prices||null;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;DATA.totals=d.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0};return api('GET','/admin/students')})
         .then(s2=>{if(s2.error)throw s2;DATA.students=s2;showApp();renderAll()})
         .catch(()=>{
           if(retries<2){retries++;setTimeout(tryLogin,2000)}

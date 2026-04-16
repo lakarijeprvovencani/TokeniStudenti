@@ -221,6 +221,7 @@ export async function writeBinaryFile(path: string, data: Uint8Array): Promise<v
   const dir = path.substring(0, path.lastIndexOf('/'))
   if (dir) await wc.fs.mkdir(dir, { recursive: true })
   await wc.fs.writeFile(path, data)
+  allFilesCache = null
 }
 
 export async function writeFile(path: string, content: string): Promise<string> {
@@ -231,6 +232,7 @@ export async function writeFile(path: string, content: string): Promise<string> 
       await wc.fs.mkdir(dir, { recursive: true })
     }
     await wc.fs.writeFile(path, content)
+    allFilesCache = null
     console.log('[WC] Written:', path, `(${content.length} chars)`)
     return `Fajl kreiran: ${path}`
   } catch (err) {
@@ -289,6 +291,7 @@ export async function clearFilesystem(): Promise<void> {
     serverUrl = null
     serverListenerAttached = false
     serverReadyCallbacks = []
+    allFilesCache = null
     console.log('[WebContainer] Filesystem cleared')
   } catch (err) {
     console.warn('[WebContainer] Clear failed:', err)
@@ -362,6 +365,22 @@ export async function runCommand(cmd: string, args: string[]): Promise<string> {
 
 const BINARY_EXT_RE = /\.(jpg|jpeg|png|webp|gif|svg|avif|ico|pdf|woff2?|ttf|otf|eot|mp4|webm|mp3|wav|ogg|zip)$/i
 
+// getAllFiles() used to be called after EVERY tool execution — even for
+// read-only tools like list_files or read_file, which can't possibly have
+// changed the tree. On an npm project with 2000+ files in node_modules (once
+// installed) that meant 2000 separate WC readFile calls per tool → visibly
+// freezing the UI and slamming WebContainer. We dedupe concurrent callers
+// and cache the result for a short window; writeFile/clearFilesystem bust
+// the cache so we never return stale data.
+let allFilesCache: { files: Record<string, string>; at: number } | null = null
+let allFilesInflight: Promise<Record<string, string>> | null = null
+const ALL_FILES_TTL_MS = 750
+
+/** Invalidate the getAllFiles() cache — call after any write. */
+export function invalidateAllFilesCache(): void {
+  allFilesCache = null
+}
+
 /**
  * Read every file in the WC filesystem into a plain object. Binary
  * assets (images, fonts, media) are NOT read here — reading them as
@@ -371,20 +390,34 @@ const BINARY_EXT_RE = /\.(jpg|jpeg|png|webp|gif|svg|avif|ico|pdf|woff2?|ttf|otf|
  * previous state snapshot.
  */
 export async function getAllFiles(): Promise<Record<string, string>> {
-  const wc = await getWebContainer()
-  const paths = await listFiles('.')
-  const files: Record<string, string> = {}
-
-  for (const p of paths) {
-    if (p.endsWith('/')) continue
-    if (BINARY_EXT_RE.test(p)) continue  // leave binary assets to the caller
-    try {
-      files[p] = await wc.fs.readFile(p, 'utf-8')
-    } catch (err) {
-      console.warn('[WC] Failed to read:', p, err)
-    }
+  const now = Date.now()
+  if (allFilesCache && now - allFilesCache.at < ALL_FILES_TTL_MS) {
+    return allFilesCache.files
   }
+  if (allFilesInflight) return allFilesInflight
 
-  console.log('[WC] getAllFiles:', Object.keys(files))
-  return files
+  allFilesInflight = (async () => {
+    try {
+      const wc = await getWebContainer()
+      const paths = await listFiles('.')
+      const files: Record<string, string> = {}
+
+      for (const p of paths) {
+        if (p.endsWith('/')) continue
+        if (BINARY_EXT_RE.test(p)) continue
+        try {
+          files[p] = await wc.fs.readFile(p, 'utf-8')
+        } catch (err) {
+          console.warn('[WC] Failed to read:', p, err)
+        }
+      }
+
+      allFilesCache = { files, at: Date.now() }
+      console.log('[WC] getAllFiles:', Object.keys(files).length, 'files')
+      return files
+    } finally {
+      allFilesInflight = null
+    }
+  })()
+  return allFilesInflight
 }
