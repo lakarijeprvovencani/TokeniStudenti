@@ -367,7 +367,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Secret'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Secret', 'X-Vajb-Client'],
   maxAge: 600,
 }));
 
