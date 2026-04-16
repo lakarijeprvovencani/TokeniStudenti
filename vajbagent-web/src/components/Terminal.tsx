@@ -119,31 +119,53 @@ export default function TerminalPanel({ onClose }: TerminalProps) {
     terminal.write('  \x1b[38;2;113;113;122m⏳ povezujem jsh shell...\x1b[0m')
     let bootLineActive = true
 
-    getWebContainer().then(async (wc) => {
+    // Guard the whole WC+spawn chain with a visible timeout so the user
+    // never sees an indefinite "povezujem..." line. 12s is generous
+    // enough for cold boots on slow networks but short enough that a
+    // genuine hang surfaces as an error the user can react to.
+    const SPAWN_TIMEOUT_MS = 12000
+    const bootRace = Promise.race([
+      (async () => {
+        const wc = await getWebContainer()
+        if (disposed) throw new Error('disposed')
+        console.log('[Terminal] WebContainer ready, spawning jsh...')
+        const shell = await wc.spawn('jsh', {
+          terminal: { cols: terminal.cols, rows: terminal.rows },
+        })
+        console.log('[Terminal] jsh spawned')
+        return shell
+      })(),
+      new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error('timeout after ' + SPAWN_TIMEOUT_MS + 'ms')), SPAWN_TIMEOUT_MS)
+      ),
+    ])
+
+    bootRace.then((shell) => {
       if (disposed) return
-      // Spawn jsh directly in /home/project (WebContainers' canonical
-      // project root). Without `cwd` jsh lands in ~/<random-hash> which
-      // looks like garbage — and then the user has to manually `cd` to
-      // find the files they wrote. This gives them a sensible starting
-      // directory right off the prompt.
-      const shell = await wc.spawn('jsh', {
-        terminal: { cols: terminal.cols, rows: terminal.rows },
-        cwd: '/home/project',
-      })
       shellHandle = shell
 
-      shell.output.pipeTo(new WritableStream({
-        write(data) {
-          if (disposed) return
-          // Erase the "povezujem..." line the first time jsh speaks up,
-          // then let all subsequent output flow through untouched.
-          if (bootLineActive) {
-            terminal.write('\r\x1b[2K')
-            bootLineActive = false
+      // Manual read loop instead of pipeTo — pipeTo locks the stream
+      // permanently and if anything else ever inspects it (devtools,
+      // HMR, StrictMode re-run) the whole terminal dies. A plain
+      // reader is resilient to all of that.
+      const reader = shell.output.getReader()
+      ;(async () => {
+        try {
+          while (!disposed) {
+            const { done, value } = await reader.read()
+            if (done) break
+            if (bootLineActive) {
+              terminal.write('\r\x1b[2K')
+              bootLineActive = false
+            }
+            terminal.write(value)
           }
-          terminal.write(data)
-        },
-      })).catch(() => { /* stream ended */ })
+        } catch (err) {
+          console.warn('[Terminal] output reader ended:', err)
+        } finally {
+          try { reader.releaseLock() } catch { /* ignore */ }
+        }
+      })()
 
       const writer = shell.input.getWriter()
       inputWriter = writer
@@ -157,12 +179,17 @@ export default function TerminalPanel({ onClose }: TerminalProps) {
       terminal.onResize(({ cols, rows }) => {
         if (!disposed) shell.resize({ cols, rows })
       })
+
+      // Nudge jsh: sometimes it holds its prompt until stdin is poked.
+      // A plain newline gives it a push without running any command.
+      writer.write('\n').catch(() => { /* ignore */ })
     }).catch(err => {
       if (disposed) return
       if (bootLineActive) { terminal.write('\r\x1b[2K'); bootLineActive = false }
       terminal.writeln('  \x1b[31m✗ Ne mogu da pokrenem jsh shell.\x1b[0m')
       terminal.writeln('  \x1b[38;2;113;113;122m  ' + (err?.message || String(err)).slice(0, 160) + '\x1b[0m')
-      console.error('[Terminal] Error:', err)
+      terminal.writeln('  \x1b[38;2;113;113;122m  Zatvori i otvori terminal ponovo.\x1b[0m')
+      console.error('[Terminal] spawn error:', err)
     })
 
     const resizeObserver = new ResizeObserver(() => {
