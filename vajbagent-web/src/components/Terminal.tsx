@@ -68,10 +68,34 @@ export default function TerminalPanel({ onClose }: TerminalProps) {
     let inputWriter: { releaseLock: () => void } | null = null
     let disposed = false
 
+    // Colored ANSI banner. Written by xterm directly (not through jsh) so
+    // it survives no matter what jsh prints afterwards. Orange mirrors
+    // the app's cursor/accent color; dim gray is used for hints.
+    const BANNER = [
+      '',
+      '  \x1b[38;2;249;115;22m██╗   ██╗ █████╗      ██╗██████╗ \x1b[0m',
+      '  \x1b[38;2;249;115;22m██║   ██║██╔══██╗     ██║██╔══██╗\x1b[0m',
+      '  \x1b[38;2;249;115;22m██║   ██║███████║     ██║██████╔╝\x1b[0m',
+      '  \x1b[38;2;249;115;22m╚██╗ ██╔╝██╔══██║██   ██║██╔══██╗\x1b[0m',
+      '  \x1b[38;2;249;115;22m ╚████╔╝ ██║  ██║╚█████╔╝██████╔╝\x1b[0m',
+      '  \x1b[38;2;249;115;22m  ╚═══╝  ╚═╝  ╚═╝ ╚════╝ ╚═════╝ \x1b[0m',
+      '',
+      '  \x1b[38;2;212;212;216mVajbAgent terminal  \x1b[38;2;113;113;122m· jsh u WebContainers sandboxu\x1b[0m',
+      '  \x1b[38;2;113;113;122mProbaj:\x1b[0m \x1b[38;2;250;204;21mls\x1b[0m  \x1b[38;2;250;204;21mnpm install\x1b[0m  \x1b[38;2;250;204;21mnpm run dev\x1b[0m  \x1b[38;2;250;204;21mnode -v\x1b[0m',
+      '',
+    ]
+    for (const line of BANNER) terminal.writeln(line)
+
     getWebContainer().then(async (wc) => {
       if (disposed) return
+      // Spawn jsh directly in /home/project (WebContainers' canonical
+      // project root). Without `cwd` jsh lands in ~/<random-hash> which
+      // looks like garbage — and then the user has to manually `cd` to
+      // find the files they wrote. This gives them a sensible starting
+      // directory right off the prompt.
       const shell = await wc.spawn('jsh', {
         terminal: { cols: terminal.cols, rows: terminal.rows },
+        cwd: '/home/project',
       })
       shellHandle = shell
 
