@@ -524,9 +524,12 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
     let sseBuffer = ''
     let finishReason: string | null = null
 
-    // Idle timeout — if no data for N seconds, abort
+    // Idle timeout — if no data for N seconds, abort.
+    // Web extension uses max_tokens: 16000 (vs VS Code's 4096), so
+    // Anthropic needs more thinking time before first chunk arrives.
+    // 45s was too aggressive — continuation calls were timing out.
     const msgCount = messages.length
-    const idleMs = msgCount > 20 ? 90_000 : msgCount > 10 ? 60_000 : 45_000
+    const idleMs = msgCount > 20 ? 180_000 : msgCount > 10 ? 120_000 : 90_000
     let idleTimer: ReturnType<typeof setTimeout> | null = null
 
     const resetIdle = () => {
@@ -538,7 +541,7 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
     }
 
     // Hard timeout — absolute max wait
-    const hardMs = Math.max(idleMs + 30_000, 120_000)
+    const hardMs = Math.max(idleMs + 60_000, 240_000)
     const hardTimer = setTimeout(() => {
       reader.cancel().catch(() => {})
     }, hardMs)
