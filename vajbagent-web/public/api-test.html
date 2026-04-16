@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>VajbAgent API Test</title>
+<style>
+body { font-family: monospace; background: #1a1a2e; color: #0f0; padding: 20px; }
+pre { white-space: pre-wrap; background: #111; padding: 10px; border-radius: 4px; max-height: 400px; overflow: auto; }
+button { background: #fa7315; color: #fff; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; font-size: 16px; margin: 5px; }
+button:disabled { opacity: 0.5; }
+.ok { color: #0f0; } .err { color: #f44; } .warn { color: #ff0; }
+h2 { color: #fa7315; }
+</style>
+</head>
+<body>
+<h1>VajbAgent Web Extension — API Test</h1>
+<p>Ovaj test simulira TAČNO ono što web extension radi: isti model, isti tools, isti max_tokens, session cookie.</p>
+<p>Moraš biti ulogovan na <a href="https://vajbagent.netlify.app" target="_blank">vajbagent.netlify.app</a> pre testa.</p>
+<hr>
+<button onclick="runTest()">▶ Pokreni Test</button>
+<button onclick="abort()" id="btnAbort" disabled>■ Zaustavi</button>
+<div id="output"></div>
+
+<script>
+const API = 'https://vajbagent.com';
+let ctrl = null;
+
+const TOOLS = [
+  { type: "function", function: { name: "write_file", description: "Kreiraj fajl", parameters: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } }, required: ["path", "content"] } } },
+  { type: "function", function: { name: "search_images", description: "Search images", parameters: { type: "object", properties: { query: { type: "string" }, count: { type: "integer" } }, required: ["query"] } } },
+];
+
+const PROMPT = `Napravi jednu HTML stranicu za stomatološku ordinaciju. Hero sekcija, usluge, kontakt forma, footer. Svetla paleta sa plavim akcentima. Koristi write_file.`;
+
+function log(text, cls = '') {
+  const el = document.getElementById('output');
+  const div = document.createElement('pre');
+  div.className = cls;
+  div.textContent = text;
+  el.appendChild(div);
+  div.scrollIntoView();
+}
+
+function abort() {
+  if (ctrl) ctrl.abort();
+}
+
+async function runTest() {
+  document.getElementById('output').innerHTML = '';
+  document.getElementById('btnAbort').disabled = false;
+  ctrl = new AbortController();
+
+  // Test 1: Session check
+  log('═══ TEST 1: Session Check ═══');
+  try {
+    const me = await fetch(API + '/me', { credentials: 'include', signal: ctrl.signal });
+    if (me.ok) {
+      const data = await me.json();
+      log(`✓ Ulogovan: ${data.name || data.email || 'OK'} | Balans: $${data.balance_usd?.toFixed(2)}`, 'ok');
+    } else {
+      log(`✗ Nije ulogovan (${me.status}). Idi na vajbagent.netlify.app i uloguj se.`, 'err');
+      return;
+    }
+  } catch (e) { log('✗ Session check failed: ' + e.message, 'err'); return; }
+
+  // Test 2: API call with max_tokens: 16000 + streaming
+  log('\n═══ TEST 2: Streaming API Call (max_tokens: 16000) ═══');
+  log('Model: vajb-agent-max (Sonnet 4.6)');
+  log('Prompt: ' + PROMPT.substring(0, 80) + '...');
+  log('Šaljem...\n');
+
+  const start = Date.now();
+  let chunkCount = 0, fullText = '', toolCalls = {}, finishReason = null;
+  let firstChunkTime = null, lastChunkTime = null;
+
+  try {
+    const res = await fetch(API + '/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        model: 'vajb-agent-max',
+        messages: [
+          { role: 'system', content: 'You are VajbAgent. Build a static HTML website using write_file tool.' },
+          { role: 'user', content: PROMPT },
+        ],
+        tools: TOOLS,
+        stream: true,
+        max_tokens: 16000,
+      }),
+      signal: ctrl.signal,
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      log(`✗ HTTP ${res.status}: ${errText.substring(0, 300)}`, 'err');
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      if (!firstChunkTime) firstChunkTime = Date.now();
+      lastChunkTime = Date.now();
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data: ')) continue;
+        const data = trimmed.slice(6);
+        if (data === '[DONE]') continue;
+
+        try {
+          const parsed = JSON.parse(data);
+          const choice = parsed.choices?.[0];
+          if (!choice) continue;
+          chunkCount++;
+
+          if (choice.finish_reason) finishReason = choice.finish_reason;
+          if (choice.delta?.content) fullText += choice.delta.content;
+          if (choice.delta?.tool_calls) {
+            for (const tc of choice.delta.tool_calls) {
+              const idx = tc.index ?? 0;
+              if (!toolCalls[idx]) toolCalls[idx] = { id: '', name: '', args: '' };
+              if (tc.id) toolCalls[idx].id = tc.id;
+              if (tc.function?.name) toolCalls[idx].name = tc.function.name;
+              if (tc.function?.arguments) toolCalls[idx].args += tc.function.arguments;
+            }
+          }
+        } catch {}
+      }
+    }
+
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    const ttfb = firstChunkTime ? ((firstChunkTime - start) / 1000).toFixed(1) : '?';
+    const streamDur = (firstChunkTime && lastChunkTime) ? ((lastChunkTime - firstChunkTime) / 1000).toFixed(1) : '?';
+
+    log(`Ukupno vreme: ${elapsed}s`, elapsed < 120 ? 'ok' : 'err');
+    log(`TTFB (do prvog chunk-a): ${ttfb}s`, ttfb < 10 ? 'ok' : 'warn');
+    log(`Stream trajanje: ${streamDur}s`);
+    log(`Chunk-ova: ${chunkCount}`);
+    log(`Finish reason: ${finishReason}`, finishReason === 'length' ? 'warn' : 'ok');
+    log(`Tekst: ${fullText.length} chars`);
+    log(`Tool calls: ${Object.keys(toolCalls).length}`);
+
+    for (const [idx, tc] of Object.entries(toolCalls)) {
+      const pm = tc.args.match(/"path"\s*:\s*"([^"]+)"/);
+      const pathStr = pm ? pm[1] : '?';
+      let jsonOk = false;
+      try { JSON.parse(tc.args); jsonOk = true; } catch {}
+      const contentMatch = tc.args.match(/"content"\s*:\s*"/);
+      const contentLen = contentMatch ? tc.args.length - contentMatch.index : 0;
+
+      const status = jsonOk ? '✓ JSON OK' : '✗ JSON BROKEN (truncated)';
+      const cls = jsonOk ? 'ok' : 'err';
+      log(`  [${idx}] ${tc.name}("${pathStr}") | args: ${tc.args.length} chars | content: ~${contentLen} chars | ${status}`, cls);
+    }
+
+    if (finishReason === 'length') {
+      log('\n⚠️  OUTPUT TRUNCATED — model hit 16K token limit', 'warn');
+      log('Poslednji tool call args (zadnjih 200 chars):', 'warn');
+      const lastTc = Object.values(toolCalls).pop();
+      if (lastTc) log(lastTc.args.slice(-200), 'warn');
+    }
+
+    // Summary
+    log('\n═══ REZULTAT ═══');
+    const tcArr = Object.values(toolCalls);
+    const hasWriteFile = tcArr.some(t => t.name === 'write_file');
+    const writeOk = tcArr.filter(t => t.name === 'write_file').every(t => { try { JSON.parse(t.args); return true; } catch { return false; } });
+
+    if (hasWriteFile && writeOk) {
+      log('✓ Model je generisao write_file sa validnim JSON-om. Ovo bi radilo u web extension-u.', 'ok');
+    } else if (hasWriteFile && !writeOk) {
+      log('⚠ Model je generisao write_file ali JSON je polomljen (trunciran). parseToolCallArguments() će pokušati recovery.', 'warn');
+    } else if (!hasWriteFile && fullText) {
+      log('⚠ Model je vratio samo tekst bez tool calls. Moguć "lazy parroting" problem.', 'warn');
+    } else {
+      log('✗ Nešto nije u redu — nema ni teksta ni tool calls.', 'err');
+    }
+
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      log('Zaustavljeno.', 'warn');
+    } else {
+      log('✗ Error: ' + e.message, 'err');
+    }
+  }
+
+  document.getElementById('btnAbort').disabled = true;
+}
+</script>
+</body>
+</html>

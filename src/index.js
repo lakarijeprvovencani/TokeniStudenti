@@ -1979,13 +1979,18 @@ async function handleAnthropic(req, res, keyId, resolved, messages, openAITools,
   const ctxChars = (system || '').length + anthropicMessages.reduce((s, m) =>
     s + (typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content).length), 0);
 
-  const CURSOR_EDIT_HINT = [
-    'Korisnik radi u Cursor IDE. Kad predlažeš izmene koda:',
-    '- Daj konkretan kod u markdown code block-u sa jasno označenim fajlom ako je poznat.',
-    '- Formuliši tako da IDE može da ponudi primenu (Apply).',
-    '- Ako menjaš postojeći fajl, navedi koji fajl i daj ceo izmenjeni blok.',
-  ].join(' ');
-  const mergedSystem = [CURSOR_EDIT_HINT, system].filter(Boolean).join('\n\n');
+  // Only inject Cursor IDE hint for VS Code extension requests (not web).
+  // Web extension sends its own system prompt with WebContainers context.
+  const isWebExt = isWebOrigin(req);
+  const mergedSystem = isWebExt
+    ? system
+    : [
+        'Korisnik radi u Cursor IDE. Kad predlažeš izmene koda:',
+        '- Daj konkretan kod u markdown code block-u sa jasno označenim fajlom ako je poznat.',
+        '- Formuliši tako da IDE može da ponudi primenu (Apply).',
+        '- Ako menjaš postojeći fajl, navedi koji fajl i daj ceo izmenjeni blok.',
+        system,
+      ].filter(Boolean).join('\n\n');
 
   const anthropicTools = openAIToolsToAnthropic(openAITools);
   const modelMax = MAX_OUTPUT[resolved.backendModel] || 16384;
