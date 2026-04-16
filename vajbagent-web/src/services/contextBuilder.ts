@@ -370,5 +370,20 @@ export async function buildFullContext(opts: {
     parts.push(boost)
   }
 
+  // Build efficiency directive — injected on first message of a fresh project.
+  // Prevents the model from generating massive single files that exceed the
+  // output token limit and cause truncated JSON / 20-minute retry loops.
+  const fileCount = Object.keys(opts.files).filter(f => !f.endsWith('/') && !f.includes('node_modules/')).length
+  if (opts.isFirstMessage && fileCount <= 1) {
+    parts.push(`<build_rules>
+OUTPUT LIMIT: Your output is capped at ~16K tokens per response. Plan accordingly:
+- Write each file ONCE, max 250 lines. Do NOT try to cram everything into one huge file.
+- For static sites: write index.html (structure + content), then style.css, then script.js — one file per response is fine.
+- If a section needs more detail, add it AFTER with replace_in_file — do NOT rewrite the whole file.
+- Search for images FIRST (one search_images call), then write all files using those URLs.
+- Finish in 3-5 tool calls total. Do NOT read files back, do NOT verify, do NOT run sed/node commands to check. Write and move on.
+</build_rules>`)
+  }
+
   return parts.join('\n\n')
 }
