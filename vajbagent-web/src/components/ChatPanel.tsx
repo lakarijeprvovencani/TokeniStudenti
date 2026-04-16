@@ -525,24 +525,33 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
     let finishReason: string | null = null
 
     // Idle timeout — if no data for N seconds, abort.
-    // Web extension uses max_tokens: 16000 (vs VS Code's 4096), so
-    // Anthropic needs more thinking time before first chunk arrives.
-    // 45s was too aggressive — continuation calls were timing out.
+    // Reasoning models (gpt-5.*) can silently "think" for 2-3 minutes
+    // before emitting the first token, especially on large prompts. The
+    // backend sends heartbeat chunks every 10s to prevent this from
+    // looking like an idle connection, but if a proxy in between buffers
+    // SSE we still want a generous baseline here. 180s covers even the
+    // slowest first-token scenarios for GPT-5.4 "Power" and Opus.
     const msgCount = messages.length
-    const idleMs = msgCount > 20 ? 180_000 : msgCount > 10 ? 120_000 : 90_000
+    const idleMs = msgCount > 20 ? 240_000 : msgCount > 10 ? 210_000 : 180_000
     let idleTimer: ReturnType<typeof setTimeout> | null = null
+    // Flags set from timeout callbacks. We do NOT throw inside setTimeout
+    // (that just becomes an uncaught exception floating in the event loop);
+    // instead we set a flag, cancel the reader so reader.read() returns
+    // done=true, and then throw from the main path after the loop exits.
+    let idleTimedOut = false
+    let hardTimedOut = false
 
     const resetIdle = () => {
       if (idleTimer) clearTimeout(idleTimer)
       idleTimer = setTimeout(() => {
+        idleTimedOut = true
         reader.cancel().catch(() => {})
-        throw new Error(`Nema odgovora od servera (${idleMs / 1000}s idle). Probaj ponovo.`)
       }, idleMs)
     }
 
-    // Hard timeout — absolute max wait
-    const hardMs = Math.max(idleMs + 60_000, 240_000)
+    const hardMs = Math.max(idleMs + 120_000, 360_000)
     const hardTimer = setTimeout(() => {
+      hardTimedOut = true
       reader.cancel().catch(() => {})
     }, hardMs)
 
@@ -607,6 +616,15 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
     } finally {
       if (idleTimer) clearTimeout(idleTimer)
       clearTimeout(hardTimer)
+    }
+
+    // If a timer cancelled the reader, surface a retry-able error HERE so
+    // the RETRY_PATTERN below (and the outer auto-retry) can handle it.
+    if (idleTimedOut) {
+      throw new Error(`Nema odgovora od servera (${idleMs / 1000}s idle). Probaj ponovo.`)
+    }
+    if (hardTimedOut) {
+      throw new Error(`Timeout: zahtev je predugo trajao (${hardMs / 1000}s). Probaj ponovo.`)
     }
 
     // Verify we got something. If we got a finish_reason but no text and

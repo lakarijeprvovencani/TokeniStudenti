@@ -1868,13 +1868,29 @@ async function handleOpenAIStream(req, res, keyId, resolved, payload, client) {
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders?.();
 
-  const STREAM_TIMEOUT = 2 * 60 * 1000;
-  const KEEPALIVE_INTERVAL = 15000;
+  // Reasoning models (gpt-5.*) can legitimately "think" silently for 2-3 min
+  // before emitting the first token. We must (a) keep the connection from
+  // being idle-killed by proxies, and (b) not close the upstream too early.
+  const STREAM_TIMEOUT = 5 * 60 * 1000;
+  const KEEPALIVE_INTERVAL = 10000;
   let lastChunkTime = Date.now();
+
+  // Proxies (Cloudflare, some Render edges) sometimes BUFFER SSE comment
+  // lines (those starting with ":") and only flush on real `data:` events.
+  // If that happens the client hits its idle timeout even though the server
+  // is faithfully emitting comments. Work around it by sending a real
+  // no-op data chunk (empty delta) — proxies always pass these through.
+  const heartbeatChunk = {
+    id: 'vajb-heartbeat',
+    object: 'chat.completion.chunk',
+    model: resolved.id,
+    choices: [{ index: 0, delta: {}, finish_reason: null }],
+  };
+  const heartbeatLine = 'data: ' + JSON.stringify(heartbeatChunk) + '\n\n';
 
   const keepAlive = setInterval(() => {
     if (!res.writableEnded) {
-      res.write(': keepalive\n\n');
+      res.write(heartbeatLine);
       if (res.flush) res.flush();
     }
   }, KEEPALIVE_INTERVAL);
@@ -2095,13 +2111,25 @@ async function handleAnthropicStream(req, res, keyId, resolved, payload, client)
   // mid-JSON. Anthropic emits this on `message_delta` events.
   let anthropicStopReason = null;
 
-  const STREAM_TIMEOUT = 2 * 60 * 1000;
-  const KEEPALIVE_INTERVAL = 15000;
+  // Anthropic streams are usually faster to first-token than reasoning
+  // models, but Opus on huge prompts with tools can still take 30-60s of
+  // silence. Keep the same heartbeat-as-data-chunk strategy so proxies
+  // don't buffer our keepalives into oblivion.
+  const STREAM_TIMEOUT = 5 * 60 * 1000;
+  const KEEPALIVE_INTERVAL = 10000;
   let lastChunkTime = Date.now();
+
+  const heartbeatChunk = {
+    id: streamId,
+    object: 'chat.completion.chunk',
+    model: resolved.id,
+    choices: [{ index: 0, delta: {}, finish_reason: null }],
+  };
+  const heartbeatLine = 'data: ' + JSON.stringify(heartbeatChunk) + '\n\n';
 
   const keepAlive = setInterval(() => {
     if (!res.writableEnded) {
-      res.write(': keepalive\n\n');
+      res.write(heartbeatLine);
       if (res.flush) res.flush();
     }
   }, KEEPALIVE_INTERVAL);
