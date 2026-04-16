@@ -59,6 +59,24 @@ export async function executeToolCall(
     }
   }
 
+  // For recovered write_file: check if the content looks complete.
+  // If it was truncated mid-tag or mid-line, don't write a broken file
+  // that the model will then try to "fix" by rewriting from scratch.
+  if (wasRecovered && name === 'write_file') {
+    const content = (args.content as string) || ''
+    const path = (args.path as string) || ''
+    if (!content || content.length < 100) {
+      return { tool_call_id: tc.id, role: 'tool', content: `GRESKA: ${path} sadrzaj je presecen. Pozovi write_file PONOVO samo za ovaj fajl — pisi JEDAN fajl po pozivu.` }
+    }
+    // If HTML and doesn't end with </html>, it's truncated
+    if (/\.html?$/i.test(path)) {
+      const trimmed = content.trimEnd()
+      if (trimmed.length > 500 && !/<\/html>\s*$/i.test(trimmed)) {
+        return { tool_call_id: tc.id, role: 'tool', content: `GRESKA: ${path} je presecen (nedostaje </html>). Pozovi write_file PONOVO samo za ovaj fajl — pisi JEDAN fajl po pozivu.` }
+      }
+    }
+  }
+
   try {
     switch (name) {
       case 'write_file': {
