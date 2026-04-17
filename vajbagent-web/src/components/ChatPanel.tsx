@@ -1342,7 +1342,13 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
         // different sizes, not progressing to other files). Break out
         // gracefully instead of burning through all MAX_ITERATIONS.
         const writeSnapshot = getWriteAttemptsSnapshot()
-        const spiralPath = Object.entries(writeSnapshot).find(([, n]) => n >= 4)?.[0]
+        // Threshold 3: one real write + one soft-cap rejection is tolerable
+        // (models sometimes need a single retry after seeing the rejection
+        // to internalize "stop rewriting"). A THIRD attempt means the
+        // model did not heed either the soft-cap response or the backend
+        // rewrite-loop guard, and will never converge. Bail out now so
+        // we don't waste another 60-90s wall time per iteration.
+        const spiralPath = Object.entries(writeSnapshot).find(([, n]) => n >= 3)?.[0]
         if (spiralPath) {
           console.warn(`[Agent] Spiral detected: ${spiralPath} written ${writeSnapshot[spiralPath]}x — aborting run`)
           setDisplayMessages(prev => [...prev, {

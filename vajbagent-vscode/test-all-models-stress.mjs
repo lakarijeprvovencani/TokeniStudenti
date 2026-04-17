@@ -38,12 +38,33 @@ const MODELS = [
 const MAX_TURNS = 20;
 const REQUEST_TIMEOUT_MS = 6 * 60 * 1000; // 6 min per request (Power/Opus can stall)
 
-// ── Mock filesystem so the agent can actually "work" ──────────────────
+// ── Mock filesystem + soft-cap that mirrors the real frontend ─────────
+// Production frontend (vajbagent-web/src/services/toolHandler.ts) limits
+// real disk writes to MAX_REAL_WRITES_PER_PATH=1 per agent turn; further
+// write_file calls get a synthetic "Fajl kreiran, pređi na sledeći"
+// response that tells the model to stop rewriting. The stress test must
+// simulate the same cap, otherwise it's harder on Sonnet than any real
+// Vajb user would ever be.
+const MAX_REAL_WRITES_PER_PATH = 1;
 function makeFs() {
   const files = new Map();
+  const writeCount = new Map();
   return {
     files,
+    writeCount,
     write(path, content) {
+      const prev = writeCount.get(path) || 0;
+      writeCount.set(path, prev + 1);
+      if (prev >= MAX_REAL_WRITES_PER_PATH) {
+        const prevSize = (files.get(path) || '').length;
+        return {
+          ok: true,
+          capped: true,
+          path,
+          bytes: prevSize,
+          note: `Fajl kreiran: ${path} (${prevSize} karaktera). Projekat je ažuriran. Pređi na sledeći fajl iz plana — NE piši ovaj fajl ponovo. Ako stvarno treba sitna izmena, koristi replace_in_file.`,
+        };
+      }
       files.set(path, content);
       return { ok: true, path, bytes: (content || '').length };
     },
@@ -321,6 +342,11 @@ async function runModel(modelId) {
         const prev = stats.writesByPath.get(args.path) || 0;
         stats.writesByPath.set(args.path, prev + 1);
         if (prev >= 1) stats.duplicateWrites++;
+        // Match production spiral-guard threshold in ChatPanel: the web
+        // app aborts the agent run once any path has been written 3+
+        // times. A test run that needs more than 3 attempts to the same
+        // path would fail in production from the user's perspective,
+        // so we fail it here too.
         if (prev >= 2) stats.loopDetected = true;
       }
     }
@@ -353,7 +379,10 @@ async function runModel(modelId) {
         content = 'GRESKA: Tool args JSON invalid — try again with a smaller payload.';
       } else if (tc.name === 'write_file') {
         const r = fs.write(args.path, args.content);
-        content = JSON.stringify(r);
+        // When the soft-cap fires, the production frontend returns a PLAIN
+        // string (the "pređi na sledeći" note) rather than JSON, and the
+        // model responds better to that shape. Mirror it here.
+        content = r.capped ? r.note : JSON.stringify(r);
       } else if (tc.name === 'read_file') {
         const r = fs.read(args.path);
         content = JSON.stringify(r);

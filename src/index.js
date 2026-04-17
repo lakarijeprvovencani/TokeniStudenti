@@ -295,19 +295,14 @@ function injectRewriteLoopGuard(messages) {
   }
   if (lastUserIdx < 0) return messages;
 
-  // Map tool_call_id → is the matching tool response a success?
-  const successfulCallIds = new Set();
-  for (const m of messages) {
-    if ((m?.role || '').toLowerCase() !== 'tool') continue;
-    const content = typeof m.content === 'string' ? m.content : '';
-    // Heuristic: anything that explicitly starts with an error marker is
-    // treated as a failed call. Guard/"file already written" hints also
-    // count as non-success so the model can legitimately retry ONCE if
-    // our own soft-cap rejected the prior attempt.
-    const looksError = /^(GRESKA|Greska|ERROR|Error|Napomena)/i.test(content.trimStart());
-    if (!looksError && m.tool_call_id) successfulCallIds.add(m.tool_call_id);
-  }
-
+  // Count EVERY write_file tool_call (successful or rejected by the
+  // frontend soft-cap). Earlier we excluded calls whose tool response
+  // looked like an error — the idea was to let the model retry once if
+  // a write genuinely failed. In practice that excluded our own soft-cap
+  // "DUPLIKAT ODBIJEN" responses too, so the guard never fired when the
+  // model was clearly looping. What matters for loop detection is how
+  // many times the model ATTEMPTED to write the same path, not whether
+  // any of those attempts actually touched disk.
   const writesPerPath = new Map();
   for (let i = lastUserIdx + 1; i < messages.length; i++) {
     const m = messages[i];
@@ -315,7 +310,6 @@ function injectRewriteLoopGuard(messages) {
     if (!Array.isArray(m.tool_calls)) continue;
     for (const tc of m.tool_calls) {
       if (tc?.function?.name !== 'write_file') continue;
-      if (!successfulCallIds.has(tc.id)) continue;
       let path = '';
       try {
         const args = JSON.parse(tc.function.arguments || '{}');
@@ -1999,7 +1993,7 @@ const chatCompletionsHandler = [
         const baseUrl = process.env.BASE_URL || 'https://vajbagent.com';
         return res.status(403).json({
           error: {
-            message: `Model "${resolved.name}" je dostupan uz dopunu kredita. Besplatan nalog može da koristi Lite, Turbo, Pro ili Max — probaj Max (preporučeno) ili dopuni na: ${baseUrl}/dashboard`,
+            message: `Model "${resolved.name}" je dostupan uz dopunu kredita. Besplatan nalog može da koristi Lite, Turbo, Pro ili Max. Dopuni kredite na: ${baseUrl}/dashboard`,
             code: 'free_tier_model_locked',
             dashboard_url: `${baseUrl.replace(/\/$/, '')}/dashboard`,
           },

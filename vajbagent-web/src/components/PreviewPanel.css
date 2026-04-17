@@ -91,6 +91,36 @@
   color: var(--text);
 }
 
+/* ── Open-in-new-tab hint ──────────────────────────────────────────────
+   Once a site has been generated we gently nudge the user toward the
+   new-tab preview for full fidelity. Iframe previews hit cross-origin
+   blob restrictions for navigations / fetch() / service-worker pings
+   that the new-tab version doesn't. Visual hint = relative positioning
+   + a small pulsing accent dot in the top-right corner of the icon,
+   plus a very soft outline on the button itself. Purely additive — no
+   existing layout or click behavior changes. */
+.preview-open-btn.has-hint {
+  position: relative;
+  color: var(--text);
+}
+.preview-open-btn.has-hint::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff7a1a;
+  box-shadow: 0 0 0 2px rgba(255, 122, 26, 0.2);
+  animation: preview-hint-pulse 1.8s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes preview-hint-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.15); }
+}
+
 /* ── Empty state ── */
 .preview-empty {
   flex: 1;

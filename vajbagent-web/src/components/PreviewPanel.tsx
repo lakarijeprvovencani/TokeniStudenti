@@ -784,7 +784,7 @@ ${sharedStyles}
             <RefreshCw size={12} />
           </button>
           <button
-            className="preview-action-btn"
+            className={`preview-action-btn preview-open-btn ${htmlFile ? 'has-hint' : ''}`}
             onClick={() => {
               if (previewMode === 'dev-server' && devServerUrl) {
                 window.open(devServerUrl, '_blank')
@@ -805,7 +805,7 @@ ${sharedStyles}
                 }
               }
             }}
-            title="Otvori u novom tabu"
+            title="Otvori u novom tabu — preporučeno za pun, čist prikaz bez iframe ograničenja"
           >
             <ExternalLink size={12} />
           </button>

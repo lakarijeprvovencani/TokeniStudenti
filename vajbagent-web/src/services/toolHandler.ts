@@ -195,18 +195,36 @@ export async function executeToolCall(
         const attempts = (writeAttemptsThisTurn.get(path) || 0) + 1
         writeAttemptsThisTurn.set(path, attempts)
 
-        // Soft cap: after MAX_REAL_WRITES_PER_PATH successful writes in
-        // this turn, silently accept further writes with a success reply
-        // but DON'T touch the disk. The model sees "Fajl kreiran", stops
-        // looping, and moves on; the preview stays on the last known
-        // good version instead of thrashing between half-baked drafts.
+        // Hard rate-limit: after MAX_REAL_WRITES_PER_PATH writes in this
+        // turn, drop the write entirely and return an UNAMBIGUOUS rejection
+        // notice. Earlier wording started with "Fajl kreiran" to keep the
+        // model calm, but Sonnet misread it — it saw the byte count differ
+        // from what it had just sent and concluded "my bigger version was
+        // rejected as empty, let me retry", triggering a fresh spiral. The
+        // new wording opens with "ODBIJEN" so there is zero room for that
+        // reinterpretation. Format is intentionally NOT an error ("GRESKA"
+        // prefix) because the backend rewrite-loop guard would then exclude
+        // it from its counter and never fire; we need the guard to keep
+        // counting these.
         if (attempts > MAX_REAL_WRITES_PER_PATH) {
           const prevSize = writtenThisTurn.get(path) || 0
           console.warn(`[Tool] write_file soft-cap hit: ${path} (attempt ${attempts}, ${content.length} chars proposed, kept ${prevSize}-char version on disk)`)
           return {
             tool_call_id: tc.id,
             role: 'tool',
-            content: `Fajl kreiran: ${path} (${prevSize} karaktera). Projekat je ažuriran. Pređi na sledeći fajl iz plana — NE piši ovaj fajl ponovo. Ako stvarno treba sitna izmena, koristi replace_in_file.`,
+            content:
+              `DUPLIKAT ODBIJEN: već si u ovom agent turn-u napisao ${path} ` +
+              `(${prevSize} karaktera, sačuvano na disku). Tvoja nova verzija ` +
+              `(${content.length} karaktera) NIJE primenjena i NEĆE biti — prethodna ` +
+              `verzija ostaje na disku i to je konačno. Svaki dalji write_file poziv ` +
+              `za ${path} biće odmah odbijen na isti način.\n\n` +
+              `Ovo NIJE greška zbog praznog sadržaja. Nije greška zbog truncation-a. ` +
+              `Fajl je već uspešno napisan i projekat ga vidi. Ne pokušavaj ponovo.\n\n` +
+              `Tvoj sledeći potez MORA biti tačno jedno od:\n` +
+              `1) Završi — napiši korisniku jednu kratku rečenicu šta je urađeno i STANI bez ijednog tool poziva.\n` +
+              `2) write_file za DRUGI fajl iz plana koji još nije napisan.\n` +
+              `3) replace_in_file sa kratkim old_text/new_text ako treba sitna izmena u ${path}.\n\n` +
+              `Ne izvinjavaj se. Ne objašnjavaj korisniku da je bilo duplikata.`,
           }
         }
 
