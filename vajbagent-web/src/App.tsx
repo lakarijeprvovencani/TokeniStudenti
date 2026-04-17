@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import Welcome from './components/Welcome'
 import LoadingTransition from './components/LoadingTransition'
 import IDELayout from './components/IDELayout'
+import ResetPassword from './components/ResetPassword'
 import { DEFAULT_MODEL } from './models'
 import { type UserInfo, fetchUserInfo } from './services/userService'
 import { type SavedProject, loadProject as loadProjectLocal, listProjects as listProjectsLocal } from './services/projectStore'
@@ -12,7 +13,7 @@ import { getScope } from './services/storageScope'
 import { preboot as prebootWebContainer } from './services/webcontainer'
 import './App.css'
 
-type AppState = 'booting' | 'welcome' | 'loading' | 'ide'
+type AppState = 'booting' | 'welcome' | 'loading' | 'ide' | 'reset-password'
 
 const LAST_PROJECT_KEY_BASE = 'vajb_last_active_project'
 const LEGACY_LAST_PROJECT_KEY = 'vajb_last_active_project'
@@ -132,6 +133,7 @@ function AppInner() {
   const [user, setUser] = useState<UserInfo | null>(null)
   const [resumeProject, setResumeProject] = useState<SavedProject | null>(null)
   const [migrationBanner, setMigrationBanner] = useState<{ count: number; running: boolean } | null>(null)
+  const [resetToken, setResetToken] = useState<string>('')
 
   // Warm the WebContainer as soon as the app mounts — this runs in parallel
   // with user auth, project list fetch, and the user typing their first prompt.
@@ -165,6 +167,19 @@ function AppInner() {
   useEffect(() => {
     let cancelled = false
     const boot = async () => {
+      // ?reset=<token> short-circuit: the user clicked a password-reset link
+      // in their email. Skip session restoration entirely — the reset screen
+      // will log them in with a fresh session on submit.
+      try {
+        const params = new URLSearchParams(window.location.search)
+        const token = params.get('reset')
+        if (token && token.length >= 20) {
+          setResetToken(token)
+          setState('reset-password')
+          return
+        }
+      } catch { /* ignore */ }
+
       const userInfo = await fetchUserInfo().catch(() => null)
       if (cancelled) return
       if (!userInfo) {
@@ -318,6 +333,31 @@ function AppInner() {
             borderRadius: '50%',
             animation: 'spin 0.8s linear infinite',
           }} />
+        </motion.div>
+      )}
+
+      {state === 'reset-password' && (
+        <motion.div
+          key="reset-password"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, scale: 0.96 }}
+          transition={{ duration: 0.3 }}
+        >
+          <ResetPassword
+            token={resetToken}
+            onComplete={(info) => {
+              setUser(info)
+              setResetToken('')
+              try { window.history.replaceState({}, '', window.location.pathname) } catch { /* ignore */ }
+              setState('welcome')
+            }}
+            onCancel={() => {
+              setResetToken('')
+              try { window.history.replaceState({}, '', window.location.pathname) } catch { /* ignore */ }
+              setState('welcome')
+            }}
+          />
         </motion.div>
       )}
 

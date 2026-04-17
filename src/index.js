@@ -35,7 +35,7 @@ import { fileURLToPath } from 'url';
 import { logUsage, getUsageSummary, getUsageForKey, getModelStats, getMonthlyAggregates } from './usage.js';
 import { getBalance, deductBalance, costUsd, costUsdWithCache, addBalance, getTotalDeposited, loadStudentMarkupFlags, setStudentNoMarkup, getStudentMarkup, providerCostUsd, getPrices } from './balance.js';
 import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP, addStudentWithPassword, authenticateWithPassword, setStudentPassword, studentHasPassword } from './students.js';
-import { sendWelcomeEmail, sendRecoveryEmail, isEmailConfigured } from './email.js';
+import { sendWelcomeEmail, sendRecoveryEmail, sendPasswordResetEmail, isEmailConfigured } from './email.js';
 import * as supabaseOAuth from './supabaseOAuth.js';
 import * as githubOAuth from './githubOAuth.js';
 import * as netlifyOAuth from './netlifyOAuth.js';
@@ -847,6 +847,148 @@ app.post('/auth/set-password', authLimiter, asyncHandler(async (req, res) => {
 
   console.log(`[Auth] Password set: "${student.name}" <${student.email}>`);
   res.json({ ok: true, name: student.name });
+}));
+
+// ─── Password Reset (email-based, token-gated) ──────────────────────────────
+// Two-step flow:
+//   1. POST /auth/request-password-reset { email }
+//      → generate a one-time token, store in Redis keyed by the token with a
+//        1-hour TTL and the studentKey as the value, email the user a link
+//        containing the token.
+//   2. POST /auth/reset-password { token, new_password }
+//      → look up the token, set the new password, DELETE the token so it
+//        cannot be replayed, invalidate all existing sessions (a previously
+//        stolen session must not survive a password reset), create a fresh
+//        session and return the same user info shape as /auth/login so the
+//        SPA can log the user straight in.
+//
+// The request endpoint always returns a generic success message so attackers
+// can't use it to enumerate which emails are registered (timing aside).
+const PASSWORD_RESET_PREFIX = 'vajb:pwreset:';
+const PASSWORD_RESET_TTL_SEC = 60 * 60; // 1 hour
+
+const passwordResetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => res.status(429).json({ error: 'Previše zahteva za reset. Pokušaj ponovo za sat vremena.' }),
+});
+
+app.post('/auth/request-password-reset', passwordResetLimiter, asyncHandler(async (req, res) => {
+  const { email } = req.body || {};
+  const genericMsg = 'Ako ovaj email postoji u sistemu, poslali smo link za resetovanje lozinke. Proveri inbox i spam folder.';
+
+  if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    return res.status(400).json({ error: 'Unesite ispravnu email adresu.' });
+  }
+
+  if (!isEmailConfigured()) {
+    console.warn('[Auth] Password-reset requested but RESEND_API_KEY not configured');
+    return res.json({ message: genericMsg });
+  }
+
+  const student = await findByEmail(email.trim());
+  if (!student) {
+    // Don't leak whether the address is registered.
+    return res.json({ message: genericMsg });
+  }
+
+  const redis = getRedis();
+  if (!redis) {
+    console.error('[Auth] Cannot create password-reset token — Redis not configured');
+    return res.status(503).json({ error: 'Reset lozinke trenutno nije dostupan. Pokušaj kasnije.' });
+  }
+
+  const token = crypto.randomBytes(32).toString('hex');
+  try {
+    await redis.set(PASSWORD_RESET_PREFIX + token, student.key, { ex: PASSWORD_RESET_TTL_SEC });
+  } catch (err) {
+    console.error('[Auth] Failed to store password-reset token:', err.message);
+    return res.status(503).json({ error: 'Reset lozinke trenutno nije dostupan. Pokušaj kasnije.' });
+  }
+
+  // Build the reset link pointing at the SPA. Defaults to the production
+  // Netlify deploy; override via APP_URL env var if the SPA ever moves.
+  const appUrl = (process.env.APP_URL || 'https://vajbagent.netlify.app').replace(/\/+$/, '');
+  const resetLink = `${appUrl}/?reset=${encodeURIComponent(token)}`;
+
+  sendPasswordResetEmail(student, resetLink).catch(err => {
+    console.error('[Auth] Password-reset email failed:', err.message);
+  });
+  console.log(`[Auth] Password reset requested for ${email.trim().slice(0, 3)}***`);
+
+  res.json({ message: genericMsg });
+}));
+
+app.post('/auth/reset-password', authLimiter, asyncHandler(async (req, res) => {
+  const { token, new_password } = req.body || {};
+
+  if (!token || typeof token !== 'string' || token.length < 20) {
+    return res.status(400).json({ error: 'Neispravan ili istekao link. Zatraži novi reset.' });
+  }
+  if (!new_password || typeof new_password !== 'string' || new_password.length < 8) {
+    return res.status(400).json({ error: 'Lozinka mora imati najmanje 8 karaktera.' });
+  }
+  if (new_password.length > 200) {
+    return res.status(400).json({ error: 'Lozinka je predugačka.' });
+  }
+
+  const redis = getRedis();
+  if (!redis) {
+    return res.status(503).json({ error: 'Reset lozinke trenutno nije dostupan.' });
+  }
+
+  const redisKey = PASSWORD_RESET_PREFIX + token;
+  let studentKey;
+  try {
+    studentKey = await redis.get(redisKey);
+  } catch (err) {
+    console.error('[Auth] Failed to read password-reset token:', err.message);
+    return res.status(503).json({ error: 'Reset lozinke trenutno nije dostupan.' });
+  }
+  if (!studentKey || typeof studentKey !== 'string') {
+    return res.status(400).json({ error: 'Link je istekao ili je već iskorišćen. Zatraži novi reset.' });
+  }
+
+  const student = await findByKey(studentKey);
+  if (!student) {
+    try { await redis.del(redisKey); } catch {}
+    return res.status(400).json({ error: 'Nalog više ne postoji.' });
+  }
+
+  const result = await setStudentPassword(student.key, new_password);
+  if (result.error) return res.status(400).json({ error: result.error });
+
+  // One-shot: burn the token so it can't be replayed.
+  try { await redis.del(redisKey); } catch {}
+
+  // Invalidate every active session for this account — if a session cookie
+  // leaked before the reset, the attacker must not survive it.
+  try {
+    const { destroyAllSessionsForKey } = await import('./auth.js');
+    await destroyAllSessionsForKey(student.key);
+  } catch (e) {
+    console.warn('[Auth] destroyAllSessionsForKey failed during reset:', e.message);
+  }
+
+  // Log the user in with a fresh session so they land straight back in the app.
+  const session = await createSession(student.key);
+  setSessionCookie(res, session.token);
+
+  console.log(`[Auth] Password reset: "${student.name}" <${student.email}>`);
+
+  const resetBal = await getBalance(student.key);
+  const resetDep = await getTotalDeposited(student.key);
+  const resetBonusVal = parseFloat(process.env.SELF_REGISTER_BONUS) || 2;
+
+  res.json({
+    name: student.name,
+    email: student.email,
+    user_id: publicUserId(student.key),
+    balance_usd: resetBal,
+    free_tier: resetDep <= resetBonusVal,
+  });
 }));
 
 // ─── Supabase OAuth Integration ─────────────────────────────────────────────

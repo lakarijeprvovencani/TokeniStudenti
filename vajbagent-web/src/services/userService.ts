@@ -15,11 +15,31 @@ export interface UserInfo {
 
 export interface AuthResult {
   ok: boolean
-  name?: string
+  /** Full user info constructed from the register/login response body. Populated
+   *  on success so the caller can avoid a follow-up `/auth/me` roundtrip — that
+   *  second call used to break registration on browsers that block third-party
+   *  cookies (Safari ITP, Firefox strict, Brave default), causing "provera
+   *  sesije nije uspela" right after a successful signup. */
+  user?: UserInfo
   email?: string
-  balance?: number
-  freeTier?: boolean
   error?: string
+}
+
+/**
+ * Build a UserInfo from an auth response body. Both /auth/register and
+ * /auth/login return the same shape and include `user_id`, so we can skip
+ * the extra /auth/me call that would otherwise require a valid cross-site
+ * session cookie.
+ */
+function userFromAuthResponse(data: any): UserInfo {
+  const info: UserInfo = {
+    name: data.name || '',
+    userId: data.user_id || '',
+    freeTier: data.free_tier ?? true,
+    balance: typeof data.balance_usd === 'number' ? data.balance_usd : 0,
+  }
+  if (info.userId) setScope(info.userId)
+  return info
 }
 
 /** Login with email + password. Sets httpOnly session cookie. */
@@ -33,7 +53,7 @@ export async function login(email: string, password: string): Promise<AuthResult
     })
     const data = await res.json()
     if (!res.ok) return { ok: false, error: data.error || 'Greška pri prijavi.' }
-    return { ok: true, name: data.name, email: data.email, balance: data.balance_usd, freeTier: data.free_tier ?? true }
+    return { ok: true, user: userFromAuthResponse(data), email: data.email }
   } catch {
     return { ok: false, error: 'Ne mogu da se povežem sa serverom.' }
   }
@@ -50,7 +70,40 @@ export async function register(firstName: string, lastName: string, email: strin
     })
     const data = await res.json()
     if (!res.ok) return { ok: false, error: data.error || 'Greška pri registraciji.' }
-    return { ok: true, name: data.name, email: data.email, balance: data.balance_usd, freeTier: data.free_tier ?? true }
+    return { ok: true, user: userFromAuthResponse(data), email: data.email }
+  } catch {
+    return { ok: false, error: 'Ne mogu da se povežem sa serverom.' }
+  }
+}
+
+/** Start a password-reset flow — emails the user a link with a one-time token. */
+export async function requestPasswordReset(email: string): Promise<{ ok: boolean; message?: string; error?: string }> {
+  try {
+    const res = await fetch(`${API_URL}/auth/request-password-reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    const data = await res.json()
+    if (!res.ok) return { ok: false, error: data.error || 'Greška.' }
+    return { ok: true, message: data.message }
+  } catch {
+    return { ok: false, error: 'Ne mogu da se povežem sa serverom.' }
+  }
+}
+
+/** Complete a password reset using the token from the email link. Sets the session cookie on success. */
+export async function resetPassword(token: string, newPassword: string): Promise<AuthResult> {
+  try {
+    const res = await fetch(`${API_URL}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ token, new_password: newPassword }),
+    })
+    const data = await res.json()
+    if (!res.ok) return { ok: false, error: data.error || 'Greška pri resetovanju lozinke.' }
+    return { ok: true, user: userFromAuthResponse(data), email: data.email }
   } catch {
     return { ok: false, error: 'Ne mogu da se povežem sa serverom.' }
   }
@@ -67,7 +120,7 @@ export async function setPassword(email: string, currentKey: string, newPassword
     })
     const data = await res.json()
     if (!res.ok) return { ok: false, error: data.error || 'Greška.' }
-    return { ok: true, name: data.name }
+    return { ok: true }
   } catch {
     return { ok: false, error: 'Ne mogu da se povežem sa serverom.' }
   }

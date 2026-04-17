@@ -130,6 +130,7 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
 
   // New-flow modals (Bolt/Lovable style)
   const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [authModalMode, setAuthModalMode] = useState<'register' | 'login'>('register')
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [pendingPrompt, setPendingPrompt] = useState('')
   const [paySuccessToast, setPaySuccessToast] = useState('')
@@ -272,6 +273,7 @@ Pravila:
       // After register → paywall; after login → onStart fires with the
       // full stashed payload.
       setPendingPrompt(trimmed)
+      setAuthModalMode('register')
       setAuthModalOpen(true)
       return
     }
@@ -347,13 +349,20 @@ Pravila:
 
       {/* Top-right user controls */}
       {!isLoggedIn && (
-        <div className="welcome-topbar">
+        <div className="welcome-topbar welcome-topbar-auth">
           <button
             type="button"
-            className="welcome-auth-link"
-            onClick={() => { setAuthModalOpen(true) }}
+            className="welcome-auth-link welcome-auth-link-secondary"
+            onClick={() => { setAuthModalMode('login'); setAuthModalOpen(true) }}
           >
-            Prijavi se / Registracija
+            Prijavi se
+          </button>
+          <button
+            type="button"
+            className="welcome-auth-link welcome-auth-link-primary"
+            onClick={() => { setAuthModalMode('register'); setAuthModalOpen(true) }}
+          >
+            Registruj se
           </button>
         </div>
       )}
@@ -628,6 +637,7 @@ Pravila:
         onClose={() => setAuthModalOpen(false)}
         onAuthed={handleAuthModalSuccess}
         pendingPrompt={pendingPrompt}
+        initialMode={authModalMode}
       />
       <PaywallModal
         open={paywallOpen}

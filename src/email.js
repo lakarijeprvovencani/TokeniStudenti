@@ -57,6 +57,46 @@ export async function sendRecoveryEmail(student) {
   }
 }
 
+/**
+ * Password-reset email. Contains a one-time link that lands on the SPA
+ * (vajbagent.netlify.app by default) which reads the token from the URL and
+ * posts it to /auth/reset-password.
+ */
+export async function sendPasswordResetEmail(student, resetLink) {
+  if (!resend || !student.email || !resetLink) return false;
+  try {
+    await resend.emails.send({
+      from: FROM,
+      to: student.email,
+      subject: 'VajbAgent — Resetovanje lozinke',
+      html: `
+        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:20px;">
+          <h2 style="color:#FA7315;margin-bottom:16px;">Resetuj lozinku</h2>
+          <p style="color:#333;line-height:1.55;">Zdravo <strong>${student.name || ''}</strong>,</p>
+          <p style="color:#333;line-height:1.55;">Zatražio si resetovanje lozinke za VajbAgent. Klikni na dugme ispod da postaviš novu lozinku. Link važi <strong>1 sat</strong>.</p>
+          <div style="text-align:center;margin:26px 0;">
+            <a href="${resetLink}" style="display:inline-block;padding:13px 28px;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;font-weight:600;text-decoration:none;border-radius:10px;font-size:15px;">
+              Postavi novu lozinku
+            </a>
+          </div>
+          <p style="font-size:12px;color:#888;line-height:1.55;">Ako dugme ne radi, kopiraj ovaj link u browser:<br>
+            <span style="word-break:break-all;color:#555;">${resetLink}</span>
+          </p>
+          <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+          <p style="font-size:12px;color:#888;line-height:1.55;">
+            Ako nisi ti tražio reset lozinke, možeš slobodno ignorisati ovaj email — tvoja lozinka ostaje nepromenjena.
+          </p>
+          <p style="font-size:11px;color:#999;margin-top:14px;">VajbAgent — AI coding assistant za studente</p>
+        </div>
+      `,
+    });
+    return true;
+  } catch (err) {
+    console.error('Password reset email send error:', err.message);
+    return false;
+  }
+}
+
 export function isEmailConfigured() {
   return !!resend;
 }

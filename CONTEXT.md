@@ -88,10 +88,10 @@ Browser-based AI code editor (like Bolt.new). React + Vite + WebContainers.
 | Lite | GPT-5 Mini | 400K | 128K | Yes (`reasoning_effort`) | Cheapest, fast |
 | Turbo | Claude Haiku 4.5 | 200K | 64K | No | Fast, cheap Anthropic tool-caller |
 | Pro | GPT-5 | 400K | 128K | Yes (`reasoning_effort`) | Strong generalist |
-| Max | Claude Sonnet 4.6 | 1M | 64K | No | **Default on web** — best balance |
+| Max | Claude Sonnet 4.6 | 1M | 64K | No | **Default on web** — best balance, **free tier unlocks this** |
 | Power | GPT-5.4 | 1.05M | 128K | Yes (`reasoning_effort`) | Flagship OpenAI |
-| Ultra | Claude Opus 4.6 | 1M | 128K | No | Premium Anthropic |
-| Architect | Claude Opus 4.6 | 1M | 128K | No | Opus + architect system prompt |
+| Ultra | Claude Opus 4.7 | 1M | 128K | Adaptive thinking | Premium Anthropic (released 2026-04-16) |
+| Architect | Claude Opus 4.7 | 1M | 128K | Adaptive thinking | Opus 4.7 + architect system prompt |
 
 Students select tier in extension UI; backend resolves to real provider model.
 Web extension default is **Max (Sonnet 4.6)** as of April 2026. VS Code extension default is still Turbo.
@@ -379,6 +379,188 @@ Cloudflare R2 (bucket: vajbagent):
 
 ---
 
+### Session 2026-04-16/17 — Production hardening + UX overhaul
+
+**Context for this session:** the user reported a 15-20 minute slow-build bug in the web extension. That opened into a full audit; 50+ issues were found and fixed over this round. Everything below is now live in production (backend on Render, frontend on Netlify). The user's explicit goal was "da web extenzija radi bez ikakvih problema" — treat this as the stability baseline going forward.
+
+#### 🛡️ SECURITY + BILLING HARDENING (backend)
+
+All of these are CRITICAL and must not regress:
+
+- **`publicUserId` hashing (`src/auth.js`)** — `/auth/me`, `/auth/login`, `/auth/register` previously returned the raw API key as `user_id`. Now returns a deterministic SHA-256 hash. DO NOT revert — API key must never leave the backend.
+- **Admin secret header-only (`src/index.js` + `public/admin.html`)** — admin endpoints removed `?secret=…` query string support; authentication is header-only (`X-Admin-Secret`). Query strings end up in access logs / Referer headers and were effectively leaking the admin key.
+- **Distributed locking for balance (`src/balance.js`)** — `deductBalance` was a read-modify-write race. Now uses Redis `SET NX EX` lock + process-local lock. Also applies `Math.max(0, raw)` so balance cannot go negative from concurrent calls. Only positive deposits increment the lifetime total.
+- **Distributed locking for usage (`src/usage.js`)** — same pattern as balance; `logUsage` is now serialised across processes.
+- **Uncaught exception → graceful exit (`src/index.js`)** — was only logging and continuing (silently corrupt state). Now logs, gives 30s for in-flight requests, then `process.exit(1)` so Render restarts the worker.
+- **`download_file` SSRF protection (`toolHandler.ts`)** — now blocks private IP ranges, file:// and chrome-extension:// protocols.
+- **`replace_in_file` binary guard (`toolHandler.ts`)** — refuses to run on binary file extensions (png, jpg, webp, ico, zip, etc.) — previously could corrupt them.
+- **`execute_command` arg tokenising (`toolHandler.ts`)** — `tokenizeCommand()` respects quoted arguments. Naive `command.split(' ')` broke paths with spaces.
+- **Stripe secret key removed from frontend (`Settings.tsx`)** — `vajb_stripe_sk` localStorage field deleted. Note added instructing users to set it as an env var on the backend.
+
+#### ⚡ AGENT LOOP STABILITY
+
+**FATAL bug fixed — Anthropic `stop_reason` propagation:**
+Backend was not reading `event.delta.stop_reason` from the Anthropic stream, so every tool-call that finished with `stop_reason: "max_tokens"` surfaced to the client as if it completed normally. Client then treated truncated JSON as valid. Fixed in `src/index.js` stream handler and `src/convert.js` `anthropicToOpenAIChoice`.
+
+**FATAL bug fixed — broken continuation protocol (web + VSCode):**
+Previous continuation logic (`ChatPanel.tsx`, `vajbagent-vscode/src/agent.ts`) appended an `assistant` message with `tool_calls` followed by a `user` `[SYSTEM] continue…` message. This violates the Anthropic tool-call contract (assistant-with-tool_calls MUST be followed by tool-role messages). It caused 400 errors mid-stream AND triggered apology loops. Replaced entirely by **tool-error injection**: when `finish_reason === 'length'` arrives mid tool-call, mark the IDs as truncated, let the tool-execution phase emit a neutral guiding tool-role message ("use `read_file` + `replace_in_file` to continue; do not apologise"). No more assistant→user continuation in either client.
+
+**History repair (`ChatPanel.tsx` `repairHistory`):**
+If a stream aborts mid-tool, an `assistant` message with `tool_calls` can be left without the matching `tool` responses — this breaks Anthropic on the next turn. `repairHistory()` runs on load, on resume, and in the `finally` block of `sendMessage` to clean orphans and inject synthetic tool results.
+
+**`trimHistory` now accounts for tool args (`ChatPanel.tsx`):**
+Previously ignored the size of `tool_calls.arguments`, so huge `write_file` payloads could blow past the context window. Now has a "Phase 1.5" that compacts large tool-call args before dropping messages.
+
+**`max_tokens: 24000` (ChatPanel.tsx)** — was 16000, which was tight for CSS-heavy builds + reasoning models. Do NOT reduce without verifying the truncation recovery path.
+
+**Backend timeouts:**
+- `KEEPALIVE_INTERVAL` tightened, SSE keepalives switched from comment lines to empty `data:` chunks (proxy buffering was eating comments and triggering idle timeout on reasoning models like GPT-5 Power).
+- `STREAM_TIMEOUT` extended.
+- `ChatPanel.tsx` client idle/hard timeouts raised; `throw new Error()` inside `setTimeout` replaced with flag-based detection (exceptions inside timer callbacks were uncatchable).
+
+**Stream safety:**
+- **Client disconnects abort upstream (`src/index.js`)** — `req.on('close', …)` now calls `stream.controller.abort()` so we stop paying the provider when a user closes the tab mid-stream.
+- **Mid-stream error propagation** — `midStreamError` captures upstream failures and emits a special `data:` chunk the client detects and throws on. Previously errors were silently swallowed.
+
+#### 🔧 CSS APOLOGY / REWRITE LOOP KILLED
+
+Multiple complementary fixes — this was the single most-complained-about bug (Turbo especially would rewrite `style.css` 4-5 times, apologise, rewrite again):
+
+1. **`max_tokens` raised 16K → 24K** (`ChatPanel.tsx`).
+2. **HTML / CSS / SCSS / Vue / Svelte excluded from brace counting** (`toolHandler.ts` + `vajbagent-vscode/src/tools.ts`). The check was unreliable on these languages — inline `<style>`/`<script>`, `@media` nesting, `url(data:...)` with raw SVG, and CSS custom-property fallbacks produced false positives.
+3. **JS/TS/JSON brace threshold raised `>=2` → `>=5`** — minor mismatches in minified code or template literals shouldn't block the write.
+4. **Hard HTML `</html>` check removed** (`toolHandler.ts` + `tools.ts`) — false-positived on legitimate snippets and fragments.
+5. **150-lines / 5000-char hard block removed** (VSCode `tools.ts`) — blocked legitimate design-system / Tailwind-config writes.
+6. **Error copy rewritten — everywhere.** Killed every "GREŠKA ... Fajl NIJE upisan ... MORAS razdvojiti ... NE POKUSAVAJ" message that existed. New copy starts with "Napomena:" and explicitly says "ne izvinjavaj se korisniku", guiding the model to `read_file` + incremental `replace_in_file` instead of full rewrite. This is the single biggest behavioural fix — DO NOT undo it.
+
+#### 🧑‍💻 LIVE CODE STREAMING (new — `vajbagent-web/src/services/liveCodeStream.ts`)
+
+Watch the agent type code character-by-character into the Monaco editor, Bolt/Lovable-style.
+
+- `emitPartialArgs(toolCallId, partialJson)` called on every `choice.delta.tool_calls.arguments` chunk.
+- `decodeJsonFragment()` leniently parses incomplete JSON to extract `path` and (partial) `content` even before the full tool call lands.
+- `emitFinalArgs()` fires when the tool call completes; `resetLiveStream()` on stream end.
+- `IDELayout.tsx` subscribes via `onLiveWrite`, maintains a `liveFiles` state that OVERRIDES `files` for the editor, auto-switches `activeFile` to the one being streamed, and passes the merged map to both `CodeEditor` AND `FileExplorer` so files appear in the tree live as they are written.
+
+#### 🖥️ LIVE `execute_command` OUTPUT (terminal)
+
+Previously `runCommand` buffered all stdout and returned it at end. Now:
+- `webcontainer.ts` exposes `onAgentCommand` event bus + `emitAgentCommand({ type: 'start' | 'output' | 'end', ... })`.
+- `runCommand()` emits events for start, each output chunk, and end.
+- `Terminal.tsx` subscribes and mirrors agent commands to the xterm view with ANSI-coloured markers (`▸ command`, raw output, `✓ done` / `✗ failed`).
+- `IDELayout.tsx` auto-opens the terminal panel on first agent command.
+
+#### 🔤 TERMINAL INPUT FIX (multi-bug)
+
+User reported "ne mogu da pisem u terminalnu" (terminal was frozen on "povezujem jsh shell…"). Root causes and fixes, all in `Terminal.tsx`:
+
+1. **Input buffering** — `terminal.onData` now registered immediately; keystrokes buffered in `pendingInput` until `jsh`'s `inputWriter` is ready, then flushed.
+2. **Forced focus** — `requestAnimationFrame(() => terminal.focus())` after mount + click-to-focus handler on the terminal body.
+3. **Boot status** — explicit "⏳ povezujem jsh shell…" banner, cleared with `\r\x1b[2K` on first output. "✗ Ne mogu da pokrenem jsh shell" on failure.
+4. **Reverted `cwd: '/home/project'`** from `wc.spawn('jsh')` — caused hangs on some WebContainer versions.
+5. **Manual `reader.read()` loop** instead of `shell.output.pipeTo(…)` — avoids stream locking issues.
+6. **12-second spawn timeout** via `Promise.race` — no more infinite "povezujem" hang.
+7. **Newline nudge** — `writer.write('\\n')` after successful spawn so `jsh` prints its prompt.
+8. **Shell cleanup on unmount** — `useEffect` cleanup kills the `jsh` process and releases the input writer lock (was leaking shell processes).
+
+#### 🎨 UI POLISH (Lovable/Bolt-style "wow")
+
+All under `src/index.css`, `IDELayout.css`, `ChatPanel.css`, `CodeEditor.css`:
+
+- **Ambient background** — breathing radial orbs (orange + subtle purple, `@keyframes ambientBreath` + `ambientDrift`) + dot grid texture behind the main IDE (`.ambient-bg`, `.dot-grid` fixed-position elements in `IDELayout.tsx`).
+- **Enhanced CTAs** — "Objavi" / deploy button (`.btn-deploy`) and chat send button (`.chat-send.active`) get gradient fills, layered box-shadows, amplified glow on hover/active. New shared `.btn-primary` class for general high-emphasis actions.
+- **Topbar button polish** — hover state gets a soft orange tint + glow (`rgba(249,115,22,0.22)` border, multi-layer shadow).
+- **Editor empty/building state** — `.editor-empty-icon-wrap::after` pulses a radial orange glow; gradient-text `.editor-empty-icon`; `.editor-empty-ring` dashed orange border rotating slowly; `.building-line` skeleton shimmers with a 3s linear gradient animation.
+
+#### 🏗️ FILE EXPLORER FIXES
+
+- **Context menu clipping (`FileExplorer.tsx` + `.css`)** — was clipped at the bottom of the scrollable sidebar. Switched to `position: fixed` with dynamic viewport-aware positioning (`.ctx-menu-fixed`).
+- **Live files in tree** — `FileExplorer` now receives the merged `filesForEditor` prop (static files + live-streaming files) so new files appear in the tree AS the agent types them, not after completion.
+
+#### 🖼️ PREVIEWPANEL — multi-page blob URL support
+
+User reported "internal links break when I open the generated site in a new tab". Root cause: the old `NAV_INTERCEPT_SCRIPT` relied on `window.parent.postMessage` — only works inside the IDE iframe. Refactored `buildFullSiteBlob()` to detect multi-page static sites and emit a **hash-router shell HTML** that works in both the iframe preview AND a new browser tab. Also added `setTimeout(() => URL.revokeObjectURL(url), 60_000)` for the blob opened via the "open in new tab" button — was leaking memory for long sessions.
+
+#### 🧠 SYSTEM PROMPT COHERENCE
+
+The web client already sends a 60KB comprehensive system prompt. Backend was ALSO injecting its own default prompt, resulting in two system messages (wasted tokens + confused model). Fix:
+- `ChatPanel.tsx` sends `X-Vajb-Client: 'web'` header on every request.
+- `src/index.js` `injectSystemPrompt()` skips injection when this header is present OR when an existing system message >2KB is detected.
+- CORS `allowedHeaders` updated to include `X-Vajb-Client` (missing this causes preflight failure → "Ne mogu da se povežem na server" error the user reported).
+
+#### 🌙 FREE-TIER MODEL GATING (critical business change)
+
+User requirement: "new free-plan users MUST get Max as default, so their first experience is wow (like Bolt/Lovable). VS Code extension stays on Lite — I don't care there, but web must default to Max."
+
+- **Backend gating (`src/index.js`)** — `FREE_TIER_ALLOWED` = `{ lite, turbo, pro, max }`. `Power`, `Ultra`, `Architect` remain locked for free users. Error message updated.
+- **Frontend auto-select (`App.tsx`)** — `useEffect` watches `user.freeTier`; if user is on a locked premium tier, auto-switches to `vajb-agent-max` (NOT `lite` as before).
+- **Model selector (`ModelSelector.tsx`)** — shows lock badge + "Dopuni kredite" only for the genuinely locked premium tiers.
+- **Model descriptions (`models.ts`)** — `Max`, `Power`, `Ultra`, `Architect` descriptions updated. Ultra and Architect now reference "Opus 4.7".
+
+DO NOT revert Max to Lite as the free-tier default. Business requirement.
+
+#### 🧠 CLAUDE OPUS 4.7 INTEGRATION (released 2026-04-16)
+
+Ultra and Architect tiers now route to `claude-opus-4-7`. Full integration:
+
+- **`src/index.js`:**
+  - Added `claude-opus-4-7` to `MAX_OUTPUT` (128K).
+  - `VAJB_MODELS` updated: `vajb-agent-ultra` and `vajb-agent-architect` → `backendModel: 'claude-opus-4-7'`.
+  - **Adaptive thinking** is MANDATORY for Opus 4.7. Payload now conditionally sets `thinking: { type: 'adaptive' }` only for `claude-opus-4-7`. The old `thinking: { type: 'enabled', budget_tokens: N }` format produces 400 errors on 4.7.
+- **`src/convert.js`** — `MODEL_INPUT_LIMITS` for `claude-opus-4-7`: `{ tokens: 900000, chars: 2700000 }`. 1M context minus 100K headroom for tools + adaptive-thinking output. Char budget intentionally tighter (~3 chars/token effective) because the new 4.7 tokenizer consumes up to 35% more tokens per text than 4.6.
+- **`src/balance.js`** — pricing: `{ in: 5.00, out: 25.0 }` per 1M tokens (same as 4.6). `getPrice()` resolver: `opus-4-7` / `opus-4.7` variants → 4.7 price; bare `opus` falls back to 4.6.
+- **`vajbagent-web/src/models.ts`** — Ultra/Architect descriptions reference "Opus 4.7".
+
+Prompt caching (`cache_control: ephemeral` on tools and system prompt) is compatible with 4.7 — already working.
+
+⚠️ Real cost of Opus 4.7 is ~35% higher than 4.6 for the same prompt because of the new tokenizer. Factor this into the student markup if profit margin matters.
+
+#### 📊 ADMIN PANEL — MONTHLY EARNINGS BREAKDOWN (new)
+
+Previously admin showed lifetime totals only. Now tracks per-month data so you can answer "how much did I earn in March" / "how much this month".
+
+- **`src/usage.js`:**
+  - `logUsage()` now writes `usage[keyId].by_month["YYYY-MM"]` alongside lifetime totals (UTC-bucketed).
+  - New `getMonthlyAggregates({ isNoMarkup, providerCost, getMarkup })` walks every user's monthly buckets and computes provider cost + charged + profit per model per month. Walks per-model (not from month totals) so models with different prices bill correctly.
+- **`src/index.js`** `/admin/api/overview` — now returns `monthly: [{month, requests, provider_cost_usd, charged_usd, profit_usd, ...}]` sorted ascending + `server_time` for correct current-month detection in admin JS.
+- **`public/admin.html`** — three new cards on the Analytics page:
+  1. **"Ovaj mesec"** — prominent green card with API cost / charged / **profit** / request count for the running month + `▲/▼ XX% vs prev month` trend.
+  2. **"Mesečna projekcija"** — realistic extrapolation of current month at its pace (`profit × dim/dom`) instead of the previous naive lifetime-average heuristic. Falls back to lifetime average only when `by_month` data is empty (fresh install).
+  3. **"Zarada po mesecima"** — last 12 months as a horizontal profit bar chart + numeric table (API / charged / profit). Current month subtly highlighted.
+
+**Important:** legacy `usage.json` without `by_month` renders empty history ("Još nema mesečnih podataka…") — by design, historical data cannot be reconstructed because old records have no timestamp per request. From the deploy of this feature forward, every `logUsage()` call populates the monthly timeline.
+
+#### 🔌 VAJBAGENT-VSCODE v2.1.0 — PORT OF WEB FIXES
+
+The VS Code / Cursor extension carried the same truncation-handling bugs. Ported the critical client-side fixes:
+
+- **`vajbagent-vscode/src/agent.ts`** — killed the old `[SYSTEM] continue` continuation path; now tracks `truncatedToolIds` and feeds tool-error injection on `finish_reason: length`. Rewrote all alarmist `write_file` / `replace_in_file` truncation messages to neutral "Napomena: … ne izvinjavaj se" copy.
+- **`vajbagent-vscode/src/tools.ts`** — same brace-counting relaxation as web (HTML/CSS/SCSS/Vue/Svelte excluded, JS/TS/JSON threshold raised to >=5), dropped 150-line / 5000-char hard block, dropped "block write_file on files >100 lines" rule, dropped the hard HTML `</html>` reject.
+- **Version bumped to 2.1.0** in `package.json`.
+- **VSIX rebuilt and shipped** — `public/vajbagent-latest.vsix` replaced (413KB v2.1.0); landing page label on `public/extenzija.html` updated from "v2.0.3" to "v2.1.0"; a copy also lives in `vajbagent-vscode/vajbagent-2.1.0.vsix` for marketplace upload.
+- Backend fixes (Opus 4.7 + adaptive thinking, SSE keepalive-as-data, billing atomicity, security hardening) automatically benefit this extension since the proxy is shared.
+
+#### 📦 FILES CREATED / TOUCHED THIS SESSION
+
+**New files:**
+- `vajbagent-web/src/services/liveCodeStream.ts` — live code streaming event bus + lenient partial-JSON parser.
+
+**Major rewrites:**
+- `vajbagent-web/src/components/ChatPanel.tsx` — agent loop, truncation handling, humanised errors, `ThinkingLabel`, `trimHistory`/`repairHistory`, first-shot directive, live stream emits, `sendInFlightRef` double-send guard.
+- `vajbagent-web/src/services/toolHandler.ts` — all truncation messages rewritten, SSRF guard, binary guard, `tokenizeCommand`.
+- `src/index.js` — security hardening, stream safety, system-prompt coherence, monthly timeline in overview, Opus 4.7 adaptive thinking.
+- `src/usage.js` — `by_month` tracking + `getMonthlyAggregates()`.
+- `src/balance.js` — distributed locking, Opus 4.7 pricing.
+- `vajbagent-vscode/src/agent.ts` + `tools.ts` — v2.1.0 port.
+- `public/admin.html` — monthly earnings UI.
+
+**Deployment:**
+- Backend on Render — auto-deploys on push to `main`.
+- Frontend on Netlify (`vajbagent-web/`) — deployed via `netlify deploy --prod --dir=dist` from **inside** `vajbagent-web/`. CRITICAL: running netlify deploy from the project root hangs with `Command failed to spawn: Aborted` — must be run from the frontend app directory.
+- VS Code extension — VSIX is at `public/vajbagent-latest.vsix`; user publishes to marketplace manually.
+
+---
+
 **What to watch for (next agent):**
 - `src/convert.js` — `MODEL_INPUT_LIMITS` must match real context windows. If Anthropic/OpenAI release new models, update here.
 - `src/index.js` line ~62 — `MAX_OUTPUT` table must match official max output tokens.
@@ -396,13 +578,41 @@ Cloudflare R2 (bucket: vajbagent):
 - `vajbagent-web/src/models.ts` — DEFAULT_MODEL is `vajb-agent-max`. Do not expose vendor model names (Haiku, Sonnet, Opus) in UI descriptions.
 - **Render env var `SELF_REGISTER_BONUS`**: should be changed from `0.3` to `0.9` to give new users enough credit for a real Max session. This is NOT in code — must be set in Render dashboard.
 - **Sentry**: NOT yet integrated. Next session should add Sentry to both backend (Node.js, Render) and frontend (React, Netlify). Free tier = 5K errors/month.
-- Model specs verified April 2026: GPT-5 Mini (400K/128K), Claude Haiku 4.5 (200K/64K), GPT-5 (400K/128K), GPT-5.4 (1.05M/128K), Claude Sonnet 4.6 (1M/64K), Claude Opus 4.6 (1M/128K).
+- Model specs verified April 2026: GPT-5 Mini (400K/128K), Claude Haiku 4.5 (200K/64K), GPT-5 (400K/128K), GPT-5.4 (1.05M/128K), Claude Sonnet 4.6 (1M/64K), Claude Opus 4.7 (1M/128K, adaptive thinking REQUIRED).
+
+### Watch-outs specific to session 2026-04-16/17
+
+**DO NOT REGRESS these behaviours — they were explicit business / UX requirements:**
+
+- **Free-tier default is `vajb-agent-max`, not `vajb-agent-lite`** — `App.tsx` auto-select + `FREE_TIER_ALLOWED` set in `src/index.js`. Business requirement ("new users must get a wow first experience like Bolt/Lovable"). `Power`, `Ultra`, `Architect` stay locked for free tier.
+- **Opus 4.7 `thinking: { type: 'adaptive' }`** is mandatory. The old `{ type: 'enabled', budget_tokens: N }` format returns 400 on 4.7. The payload in `src/index.js` conditionally sets adaptive thinking ONLY for `claude-opus-4-7` — do not globally apply, other models don't support it.
+- **Opus 4.7 `MODEL_INPUT_LIMITS` char budget is intentionally tight** (`2700000` for 900K tokens = ~3 chars/token, vs ~4 for 4.6). The new 4.7 tokenizer consumes up to 35% more tokens for the same text. Do NOT widen to match 4.6 or context trimming will under-estimate.
+- **`X-Vajb-Client: 'web'` header must stay in `ChatPanel.tsx` requests + in backend `allowedHeaders`.** If the CORS allowlist regresses, the frontend will show "Ne mogu da se povežem na server" after deploy. If the header is removed, backend will re-inject its default system prompt alongside the 60KB web prompt, doubling token cost.
+- **Agent continuation uses TOOL-ERROR INJECTION, not assistant→user `[SYSTEM] continue`** — in BOTH `vajbagent-web/src/components/ChatPanel.tsx` AND `vajbagent-vscode/src/agent.ts`. The old flow violates Anthropic's tool protocol and causes 400s. If you see anyone adding back a continuation path that appends an `assistant` with `tool_calls` followed by a `user` message, STOP.
+- **Truncation error messages are deliberately neutral.** Anywhere in `toolHandler.ts`, `ChatPanel.tsx`, `vajbagent-vscode/src/agent.ts`, or `vajbagent-vscode/src/tools.ts`, the messages for truncated `write_file` / `replace_in_file` start with "Napomena:" and include "ne izvinjavaj se korisniku". DO NOT switch back to "GREŠKA ... Fajl NIJE upisan ... MORAS ..." — that wording was the direct cause of Turbo's apology/rewrite loop on CSS files.
+- **Brace-counting truncation check excludes HTML / CSS / SCSS / Vue / Svelte** in both clients. These languages produce false positives (inline style/script, @media nesting, url(data:…), custom-property fallbacks). Only JS / TS / JSON run the check, with threshold `>=5` (not `>=2`).
+- **`max_tokens: 24000`** in `vajbagent-web/src/components/ChatPanel.tsx`. Was 16000, pushed to 24000 to give reasoning models (especially Turbo with thinking-phase burn) more headroom. Do not reduce without verifying truncation recovery still routes through `replace_in_file`.
+- **Distributed locks in `src/balance.js` + `src/usage.js`** are Redis `SET NX EX`-based. The in-process map is ONLY a micro-optimisation — the Redis lock is what protects across Render workers. If Redis is unavailable, behaviour degrades gracefully but concurrent deductions may race. Don't swap the Redis-lock pattern for plain promise chaining.
+- **Admin monthly timeline** (`usage.js` `by_month`, `getMonthlyAggregates`, `/admin/api/overview` `monthly` field, `public/admin.html` "Ovaj mesec" + "Zarada po mesecima" cards) starts empty on existing installs — legacy `usage.json` has no per-request timestamps. This is documented in the UI. Do NOT backfill with fake data.
+- **Live code streaming** (`vajbagent-web/src/services/liveCodeStream.ts`) parses **incomplete** JSON from the tool-call stream. The `decodeJsonFragment()` function is intentionally lenient — it may return a partial `content` string. The editor shows this as "typing in progress". Do not tighten the JSON parser to reject partial strings — that defeats the whole feature.
+- **Terminal `jsh` spawn** in `Terminal.tsx` — do NOT re-add `cwd: '/home/project'` to the `wc.spawn('jsh')` call. It hangs on some WebContainer versions. The 12s `Promise.race` timeout is the fallback if spawn ever does hang.
+- **`runCommand` in `webcontainer.ts` emits events to `onAgentCommand`** — the Terminal panel subscribes to mirror agent output live. If you refactor `runCommand` to just return output, the terminal stops showing agent activity.
+- **`FileExplorer` receives `filesForEditor`** (merged `files + liveFiles`), NOT `files`. Reverting to raw `files` will break live file-tree updates during streaming.
+- **`PreviewPanel.tsx` multi-page detection + hash-router shell** — do not delete. Previous iframe-only `NAV_INTERCEPT_SCRIPT` broke internal links when user clicked "open in new tab" on a multi-page site (the script relied on `window.parent.postMessage` which doesn't exist in a standalone tab).
+- **`revokeObjectURL(url)` in PreviewPanel** after `setTimeout(…, 60000)` — blob URLs leak memory without this.
+- **Netlify deploys MUST run from `vajbagent-web/`** (the frontend app dir), not project root. `netlify deploy` from root hangs with `Command failed to spawn: Aborted`.
+- **Opus 4.7 effective cost is ~35% higher than headline pricing** because of the new tokenizer. If someone asks "why is my Opus bill so high", this is why.
 
 ## Building the Extension
 - Extension source: `vajbagent-vscode/`
-- Build: `cd vajbagent-vscode && npm run compile && npx @vscode/vsce package --no-dependencies`
-- Output: `vajbagent-vscode/vajbagent-X.Y.Z.vsix`
+- Build: `cd vajbagent-vscode && npm run compile && npx @vscode/vsce package --no-dependencies --out vajbagent-X.Y.Z.vsix`
+- Current version: **2.1.0** (bump in `vajbagent-vscode/package.json`).
 - Install: VS Code/Cursor → `Ctrl+Shift+P` → "Extensions: Install from VSIX..." → pick the `.vsix` file
+- **Shipping to users:**
+  1. Copy the built VSIX to `public/vajbagent-latest.vsix` — this is what the landing page download button serves.
+  2. Also keep a copy at `vajbagent-vscode/vajbagent-X.Y.Z.vsix` — this is what the user selects when publishing to the VS Code marketplace.
+  3. Update the version label on `public/extenzija.html` (the "Preuzmi vX.Y.Z" button text is hard-coded).
+  4. `.gitignore` already whitelists `public/vajbagent-latest.vsix` (`!public/vajbagent-latest.vsix`) while ignoring `*.vsix` everywhere else — so only the public download copy is committed to git.
 
 ## Branding
 - **Name:** VajbAgent (Vajb in white, Agent in orange)
