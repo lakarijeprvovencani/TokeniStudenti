@@ -82,7 +82,12 @@ const VAJB_MODELS = [
   { id: 'vajb-agent-turbo',     name: 'VajbAgent Turbo',     backend: 'anthropic', backendModel: 'claude-haiku-4-5', desc: 'Claude Haiku 4.5 — brz, jeftin, jak tool-caller' },
   { id: 'vajb-agent-pro',       name: 'VajbAgent Pro',       backend: 'openai',    backendModel: 'gpt-5',            desc: 'GPT-5 — ozbiljniji projekti, jak i pametan' },
   { id: 'vajb-agent-max',       name: 'VajbAgent Max',       backend: 'anthropic', backendModel: 'claude-sonnet-4-6', desc: 'Claude Sonnet — kompleksni zadaci' },
-  { id: 'vajb-agent-power',     name: 'VajbAgent Power',     backend: 'openai',    backendModel: 'gpt-5.4',          desc: 'GPT-5.4 — najjači OpenAI, flagship' },
+  // Power was mapped to gpt-5.4 but both the web panel and the Cursor extension
+  // reported multi-minute hangs with no output — likely an account-tier /
+  // rollout limitation on this specific model ID. We temporarily route Power
+  // through gpt-5 (same as Pro) so users don't hit dead ends. gpt-5.4 needs a
+  // separate verification pass before we reintroduce it.
+  { id: 'vajb-agent-power',     name: 'VajbAgent Power',     backend: 'openai',    backendModel: 'gpt-5',            desc: 'GPT-5 — najjači OpenAI (u testu za 5.4)' },
   { id: 'vajb-agent-ultra',     name: 'VajbAgent Ultra',     backend: 'anthropic', backendModel: 'claude-opus-4-7',   desc: 'Claude Opus 4.7 — najjači, long-running coding' },
   { id: 'vajb-agent-architect', name: 'VajbAgent Architect', backend: 'anthropic', backendModel: 'claude-opus-4-7',   desc: 'Opus 4.7 Architect — full-stack arhitekta', isPower: true },
 ];
@@ -2158,8 +2163,24 @@ async function handleOpenAIStream(req, res, keyId, resolved, payload, client) {
 
   let midStreamError = null;
 
+  // Upstream first-chunk watchdog: if OpenAI produces NOTHING for 120s
+  // after we opened the stream, abort. Covers the case where a specific
+  // model silently hangs (we hit this with gpt-5.4) and leaves both the
+  // client and our keepalive loop wasting time. Any real chunk resets it.
+  let firstChunkReceived = false;
+  const firstChunkWatchdog = setTimeout(() => {
+    if (!firstChunkReceived) {
+      console.error(`OpenAI first-chunk timeout for model=${resolved.backendModel}`);
+      try { stream.controller?.abort(); } catch { /* ignore */ }
+    }
+  }, 120_000);
+
   try {
     for await (const chunk of stream) {
+      if (!firstChunkReceived) {
+        firstChunkReceived = true;
+        clearTimeout(firstChunkWatchdog);
+      }
       if (res.writableEnded || clientClosed) {
         // Stop pulling chunks upstream if the client is gone.
         try { stream.controller?.abort(); } catch { /* ignore */ }
@@ -2182,6 +2203,7 @@ async function handleOpenAIStream(req, res, keyId, resolved, payload, client) {
     console.error('OpenAI stream error mid-flight:', streamErr.message);
   }
 
+  clearTimeout(firstChunkWatchdog);
   clearInterval(timeoutCheck);
   clearInterval(keepAlive);
   req.off?.('close', onClientClose);
