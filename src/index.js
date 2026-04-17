@@ -343,6 +343,75 @@ function injectRewriteLoopGuard(messages) {
   return [...messages, guardMsg];
 }
 
+/**
+ * Hard brake for stubborn loopers (Sonnet is the usual suspect): once a
+ * path has been written ≥3 times in the current agent turn, physically
+ * remove the `write_file` tool from the tool list for the next request.
+ * The model literally cannot call it anymore — it has to either finish
+ * with plain text or call a different tool (replace_in_file, read_file).
+ *
+ * This is the only defense that works when the model ignores the soft-
+ * cap tool response AND the rewrite-loop system reminder. We also pair
+ * it with an explicit system message telling the model why write_file
+ * vanished and what it needs to do instead.
+ *
+ * Returns { tools, messages } — messages may be augmented with the
+ * "write_file disabled" directive.
+ */
+function maybeDisableWriteFile(messages, openAITools) {
+  if (!Array.isArray(openAITools) || openAITools.length === 0) {
+    return { tools: openAITools, messages };
+  }
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return { tools: openAITools, messages };
+  }
+
+  let lastUserIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if ((messages[i]?.role || '').toLowerCase() === 'user') { lastUserIdx = i; break; }
+  }
+  if (lastUserIdx < 0) return { tools: openAITools, messages };
+
+  const writesPerPath = new Map();
+  for (let i = lastUserIdx + 1; i < messages.length; i++) {
+    const m = messages[i];
+    if ((m?.role || '').toLowerCase() !== 'assistant') continue;
+    if (!Array.isArray(m.tool_calls)) continue;
+    for (const tc of m.tool_calls) {
+      if (tc?.function?.name !== 'write_file') continue;
+      let path = '';
+      try {
+        const args = JSON.parse(tc.function.arguments || '{}');
+        path = (args.path || '').toString().replace(/^\/+/, '');
+      } catch { continue; }
+      if (!path) continue;
+      writesPerPath.set(path, (writesPerPath.get(path) || 0) + 1);
+    }
+  }
+
+  const maxCount = writesPerPath.size === 0 ? 0 : Math.max(...writesPerPath.values());
+  if (maxCount < 3) return { tools: openAITools, messages };
+
+  const strippedTools = openAITools.filter(t => t?.function?.name !== 'write_file');
+  const loopPaths = Array.from(writesPerPath.entries())
+    .filter(([, n]) => n >= 2)
+    .map(([p, n]) => `${p} (${n} puta)`)
+    .join(', ');
+  const finishDirective = {
+    role: 'system',
+    content:
+      '🚫 write_file je ONEMOGUĆEN do kraja ovog agent turn-a.\n\n' +
+      `Razlog: u ovom turn-u si već pozvao write_file tri ili više puta za isti fajl (${loopPaths}). ` +
+      'Alat ti je privremeno sklonjen iz liste dostupnih alata da bi se presekla petlja.\n\n' +
+      'Šta sada MORAŠ:\n' +
+      '• Odgovori korisniku JEDNOM kratkom rečenicom šta je urađeno (npr. "Sajt je spreman: index.html i style.css su kreirani. Pogledaj preview i javi šta da doteram.") i STANI. Bez ijednog tool poziva.\n' +
+      '• Ne izvinjavaj se. Ne ponavljaj plan. Ne najavljuj šta bi trebalo. Samo završna rečenica.\n' +
+      '• Ako ti baš treba sitna izmena, koristi `replace_in_file` — ali samo ako je strogo neophodno; bolje završi i pusti korisnika da pita.',
+  };
+  console.log(`[guard] write_file DISABLED for this turn (loop paths: ${loopPaths})`);
+  return { tools: strippedTools, messages: [...messages, finishDirective] };
+}
+
 async function withRetry(fn, { retries = 3, delayMs = 1500 } = {}) {
   for (let attempt = 0; ; attempt++) {
     try {
@@ -2024,19 +2093,22 @@ const chatCompletionsHandler = [
         ? messages
         : injectSystemPrompt(messages, resolved.isPower === true);
 
-      // Rewrite-loop guard: Sonnet and Opus sometimes ignore "don't rewrite"
-      // guidance and burn tokens re-generating the same file 3-4 times in a
-      // single agent turn. This is a server-side brake that inspects the
-      // incoming history and, if the model has already written a file ≥2
-      // times in this turn, tacks on a loud system reminder pointing at
-      // replace_in_file as the correct next move. Works across every entry
-      // point (web panel, VS Code extension, raw API).
+      // Two-stage loop defense:
+      //   Stage 1 (≥2 writes to same path): inject a loud REWRITE LOOP
+      //     GUARD system reminder and hope the model behaves.
+      //   Stage 2 (≥3 writes to same path): physically remove write_file
+      //     from the tool list so the model literally cannot loop further,
+      //     and instruct it to close out with plain text.
+      // Both stages work across every entry point (web panel, VS Code
+      // extension, raw API) because they live here in the shared handler.
       const guardedMessages = injectRewriteLoopGuard(enhancedMessages);
+      const { tools: guardedTools, messages: finalMessages } =
+        maybeDisableWriteFile(guardedMessages, openAITools);
 
       if (resolved.backend === 'openai') {
-        await handleOpenAI(req, res, keyId, resolved, guardedMessages, openAITools, stream, max_tokens);
+        await handleOpenAI(req, res, keyId, resolved, finalMessages, guardedTools, stream, max_tokens);
       } else {
-        await handleAnthropic(req, res, keyId, resolved, guardedMessages, openAITools, stream, max_tokens);
+        await handleAnthropic(req, res, keyId, resolved, finalMessages, guardedTools, stream, max_tokens);
       }
     } catch (err) {
       console.error(`${resolved.backend} error [${err.status || '?'}]:`, err.message);
