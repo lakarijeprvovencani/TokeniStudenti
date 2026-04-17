@@ -389,8 +389,14 @@ function maybeDisableWriteFile(messages, openAITools) {
     }
   }
 
+  // Threshold = 2 (matches the frontend soft-cap): as soon as the model
+  // has attempted to write the same path twice in this turn, strip the
+  // tool. The first write hit disk (real write via front-end soft-cap),
+  // the second write is the start of a rewrite spiral — we never want a
+  // third attempt to go out at all. If the model genuinely needs to
+  // amend the file, replace_in_file is still available.
   const maxCount = writesPerPath.size === 0 ? 0 : Math.max(...writesPerPath.values());
-  if (maxCount < 3) return { tools: openAITools, messages };
+  if (maxCount < 2) return { tools: openAITools, messages };
 
   const strippedTools = openAITools.filter(t => t?.function?.name !== 'write_file');
   const loopPaths = Array.from(writesPerPath.entries())
