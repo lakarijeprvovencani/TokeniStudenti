@@ -2155,7 +2155,32 @@ async function handleOpenAIStream(req, res, keyId, resolved, payload, client) {
   } catch (err) {
     clearInterval(timeoutCheck);
     clearInterval(keepAlive);
-    throw err;
+    // SSE headers + init chunk are already on the wire, so we can't
+    // res.status(...).json() anymore — Express would silently drop the
+    // response and the client would hang until its idle timeout (we
+    // observed this with gpt-5.4 returning 400 for unsupported params:
+    // the client saw "Nema odgovora od servera 180s idle" instead of
+    // the real error). Emit the error as an SSE chunk with
+    // finish_reason='error' so the client's stream parser surfaces it
+    // instantly and can retry/display the real message.
+    const msg = err?.message || 'upstream request failed';
+    console.error(`OpenAI create() failed for model=${resolved.backendModel}: ${msg}`);
+    if (!res.writableEnded && !clientClosed) {
+      const errChunk = {
+        id: 'vajb-error',
+        object: 'chat.completion.chunk',
+        model: resolved.id,
+        choices: [{ index: 0, delta: {}, finish_reason: 'error' }],
+        error: { message: 'Stream prekinut: ' + msg },
+      };
+      try {
+        res.write('data: ' + JSON.stringify(errChunk) + '\n\n');
+        res.write('data: [DONE]\n\n');
+        if (res.flush) res.flush();
+        res.end();
+      } catch { /* client already gone */ }
+    }
+    return;
   }
 
   let usage = { input_tokens: 0, output_tokens: 0 };
