@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowUp, Loader2, User, Square } from 'lucide-react'
-import { executeToolCall } from '../services/toolHandler'
+import { executeToolCall, resetTurnState } from '../services/toolHandler'
 import { buildFullContext, invalidateIndex } from '../services/contextBuilder'
 import { fetchBalance } from '../services/userService'
 import { scopedStorage as scopedStorageRef } from '../services/storageScope'
@@ -929,6 +929,10 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
     setStatusText('')
     // Reset scroll — user sent a message, so scroll to bottom
     userScrolledUp.current = false
+    // Fresh agent turn — clear the per-turn duplicate-write tracker so
+    // the model can legitimately re-create files in a new conversation
+    // round (e.g. user asked to redesign the same page).
+    resetTurnState()
 
     let lastAssistantHadText = false
     let textContinuationUsed = false

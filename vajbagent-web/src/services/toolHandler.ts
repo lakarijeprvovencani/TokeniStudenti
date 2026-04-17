@@ -25,6 +25,32 @@ interface ToolResult {
 }
 
 /**
+ * Per-turn duplicate-write guard.
+ *
+ * Models love to call write_file 3-5 times for the same file in a single
+ * agent turn — first the skeleton, then "let me add the hero section",
+ * then "actually let me redo the colors", etc. Each repeat re-sends the
+ * full file content (10K+ tokens) and bills the user for the privilege.
+ *
+ * We intercept duplicates and redirect the model to replace_in_file,
+ * which is what the system prompt already tells it to use for edits.
+ * The redirect:
+ *   - Is NOT phrased as "GRESKA" — that triggers the apology-rewrite
+ *     loop we killed in commit a564dd2. Tone is matter-of-fact.
+ *   - Does NOT block the write (we still report success on the original
+ *     write that already happened) — we only refuse THIS extra call.
+ *   - Includes the current file size so the model knows what state it's
+ *     in and can craft a proper replace_in_file diff.
+ *
+ * Reset between user messages by ChatPanel via resetTurnState().
+ */
+const writtenThisTurn = new Map<string, number>()
+
+export function resetTurnState(): void {
+  writtenThisTurn.clear()
+}
+
+/**
  * Tokenize a shell command into argv parts, respecting single- and
  * double-quoted segments. Not a full shell parser — no expansion, no
  * backticks, no heredocs, no subshells. Enough to correctly handle:
@@ -145,6 +171,25 @@ export async function executeToolCall(
       case 'write_file': {
         const path = (args.path as string || '').replace(/^\/+/, '')
         let content = (args.content as string) || ''
+
+        // Duplicate-write guard. If the model already wrote this exact
+        // path during the current agent turn, refuse the second write
+        // and steer it toward replace_in_file. The first write already
+        // succeeded — there's nothing for us to do here except save the
+        // tokens of accepting (and re-billing for) a near-identical
+        // 10K+ char rewrite. See note above resetTurnState() for full
+        // rationale and history.
+        if (writtenThisTurn.has(path)) {
+          const prevSize = writtenThisTurn.get(path) || 0
+          const newSize = content.length
+          const diff = Math.abs(newSize - prevSize)
+          console.warn(`[Tool] Duplicate write_file blocked: ${path} (was ${prevSize} chars, retry ${newSize} chars)`)
+          return {
+            tool_call_id: tc.id,
+            role: 'tool',
+            content: `Napomena: ${path} je već upisan u ovom odgovoru (${prevSize} karaktera). Drugi write_file za isti fajl je odbijen — koristi replace_in_file za izmene umesto da prepisuješ ceo fajl. Ako misliš da prethodni write nije uspeo, pozovi read_file pa onda replace_in_file za delove koji nedostaju. Razlika u veličini između poziva: ${diff} karaktera.`,
+          }
+        }
 
         // Double-escape fix: konvertuj literal \\n → \n SAMO ako fajl
         // nema nijedan pravi newline (model je ceo fajl zbio u jednu liniju).
@@ -277,6 +322,9 @@ export async function executeToolCall(
         }
 
         const result = await writeFile(path, content)
+        // Track the successful write so the duplicate-write guard can
+        // intercept any follow-up rewrite attempts in the same turn.
+        writtenThisTurn.set(path, content.length)
         const allFiles = await getAllFiles()
         console.log('[Tool] write_file done:', path, '| total files:', Object.keys(allFiles).length)
         onFileChange(allFiles)
