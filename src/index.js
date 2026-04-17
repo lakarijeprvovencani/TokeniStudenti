@@ -748,12 +748,20 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   const regBal = await getBalance(result.student.key);
   const regDep = await getTotalDeposited(result.student.key);
   const regBonusVal = parseFloat(process.env.SELF_REGISTER_BONUS) || 2;
+  // We return the raw api_key in addition to setting the httpOnly session
+  // cookie. The SPA stores it and attaches it as `Authorization: Bearer` on
+  // subsequent calls — that's the only way the web extension can talk to the
+  // API on Safari/Brave/Firefox-strict where third-party cookies are blocked
+  // by default (frontend on vajbagent.netlify.app, API on vajbagent.com is a
+  // cross-site pair). Cookie is still set for same-site browsers, so both
+  // paths work and the strongest available one is used.
   res.json({
     name: result.student.name,
     email: result.student.email,
     user_id: publicUserId(result.student.key),
     balance_usd: regBal,
     free_tier: regDep <= regBonusVal,
+    api_key: result.student.key,
   });
 }));
 
@@ -787,6 +795,7 @@ app.post('/auth/login', loginEmailLimiter, authLimiter, asyncHandler(async (req,
     user_id: publicUserId(student.key),
     balance_usd: loginBal,
     free_tier: loginDep <= loginBonusVal,
+    api_key: student.key,
   });
 }));
 
@@ -988,6 +997,7 @@ app.post('/auth/reset-password', authLimiter, asyncHandler(async (req, res) => {
     user_id: publicUserId(student.key),
     balance_usd: resetBal,
     free_tier: resetDep <= resetBonusVal,
+    api_key: student.key,
   });
 }));
 

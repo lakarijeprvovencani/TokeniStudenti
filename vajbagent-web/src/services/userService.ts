@@ -1,4 +1,5 @@
 import { setScope } from './storageScope'
+import { setApiKey, clearApiKey } from './authToken'
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://vajbagent.com'
 
@@ -39,6 +40,13 @@ function userFromAuthResponse(data: any): UserInfo {
     balance: typeof data.balance_usd === 'number' ? data.balance_usd : 0,
   }
   if (info.userId) setScope(info.userId)
+  // Persist the Bearer-fallback key for browsers that refuse to store our
+  // cross-site session cookie. See services/authToken.ts for the full
+  // reasoning — the key is attached by the global fetch interceptor to
+  // every subsequent API call so the app works on Safari/Brave too.
+  if (typeof data.api_key === 'string' && data.api_key.length > 8) {
+    setApiKey(data.api_key)
+  }
   return info
 }
 
@@ -135,6 +143,9 @@ export async function logout(): Promise<void> {
     })
   } catch { /* ignore */ }
   setScope(null)
+  // Drop the Bearer-fallback key too so a subsequent anonymous visit can't
+  // impersonate the previous user via leftover localStorage.
+  clearApiKey()
 }
 
 /**
@@ -152,6 +163,9 @@ export async function checkSession(opts: { revealKey?: boolean } = {}): Promise<
     })
     if (!res.ok) {
       setScope(null)
+      // Any 401/403 on /auth/me means our stored key is no longer valid —
+      // wipe it so we don't keep retrying with a dead credential.
+      if (res.status === 401 || res.status === 403) clearApiKey()
       return null
     }
     const data = await res.json()
