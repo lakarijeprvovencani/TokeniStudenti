@@ -2820,7 +2820,20 @@ async function handleAnthropic(req, res, keyId, resolved, messages, openAITools,
 
   const anthropicTools = openAIToolsToAnthropic(openAITools);
   const modelMax = MAX_OUTPUT[resolved.backendModel] || 16384;
-  const maxTokens = Math.min(Math.max(Number(max_tokens) || 4096, 1), modelMax);
+  const requestedAnthropic = Number(max_tokens) || 4096;
+  // Anthropic's max_tokens is also an ABSOLUTE cap: extended/adaptive
+  // thinking (Opus 4.7), reasoning traces and the actual text+tool_use
+  // output ALL share it. A 20k-char write_file easily blows an 8k cap —
+  // stream then gets stop_reason='max_tokens', last tool_use block lands
+  // with truncated JSON input, and the frontend ends up in a "was that
+  // call really complete?" dance. Same root cause we just fixed for
+  // gpt-5.4. Raise the floor per model class:
+  //   - Opus 4.7 (adaptive thinking on): large, cover thinking + 1 big write
+  //   - Sonnet/Haiku (no thinking): still give a comfortable write budget
+  // Caller can always ask for more; modelMax still caps the top.
+  const isAnthropicThinking = resolved.backendModel === 'claude-opus-4-7';
+  const anthropicFloor = isAnthropicThinking ? 32000 : 16000;
+  const maxTokens = Math.min(Math.max(requestedAnthropic, anthropicFloor), modelMax);
 
   // Anthropic prompt caching: send system as structured block with cache_control.
   // Cached tokens cost 10% of normal input price on repeat calls; first write costs 1.25x.
