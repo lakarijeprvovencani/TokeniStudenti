@@ -43,7 +43,15 @@ interface ToolResult {
  *
  * Reset between user messages by ChatPanel via resetTurnState().
  */
-const MAX_REAL_WRITES_PER_PATH = 2
+// One real write per path per agent turn. Any further write_file to the
+// same path is silently accepted (model sees "Fajl kreiran") but the disk
+// is NOT touched and the backend's rewrite-loop guard has already been
+// priming the next response to pivot to replace_in_file. Two real writes
+// used to be tolerated, but that window alone burned 10-20k tokens on
+// Sonnet spirals before the soft-cap kicked in. One write is enough: if
+// the model realized something was missing, it can patch with
+// replace_in_file on the next turn.
+const MAX_REAL_WRITES_PER_PATH = 1
 const writtenThisTurn = new Map<string, number>()
 const writeAttemptsThisTurn = new Map<string, number>()
 

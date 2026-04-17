@@ -268,6 +268,87 @@ function injectSystemPrompt(messages, isPower = false) {
   }
 }
 
+/**
+ * Count successful `write_file` tool calls per path since the last user
+ * message — that window is "one agent turn". A call is "successful" if
+ * there's a matching tool result that doesn't read like an error/guard
+ * notice (GRESKA / Error / Napomena).
+ *
+ * If any path has been written ≥ threshold times, append a loud system
+ * reminder telling the model to stop rewriting and use replace_in_file
+ * for tweaks — or to move to the next step.
+ *
+ * This is the ONLY reliable fix for Sonnet's (and stochastically Opus's)
+ * "let me refactor style.css one more time" spiral. The front-end soft-
+ * cap already no-ops the disk writes past MAX_REAL_WRITES_PER_PATH, but
+ * the model still BURNS tokens generating the rewrite. Reminding it
+ * server-side BEFORE it generates the next response is what actually
+ * saves time and money.
+ */
+function injectRewriteLoopGuard(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) return messages;
+
+  // Window = messages AFTER the last user message (the current agent turn).
+  let lastUserIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if ((messages[i]?.role || '').toLowerCase() === 'user') { lastUserIdx = i; break; }
+  }
+  if (lastUserIdx < 0) return messages;
+
+  // Map tool_call_id → is the matching tool response a success?
+  const successfulCallIds = new Set();
+  for (const m of messages) {
+    if ((m?.role || '').toLowerCase() !== 'tool') continue;
+    const content = typeof m.content === 'string' ? m.content : '';
+    // Heuristic: anything that explicitly starts with an error marker is
+    // treated as a failed call. Guard/"file already written" hints also
+    // count as non-success so the model can legitimately retry ONCE if
+    // our own soft-cap rejected the prior attempt.
+    const looksError = /^(GRESKA|Greska|ERROR|Error|Napomena)/i.test(content.trimStart());
+    if (!looksError && m.tool_call_id) successfulCallIds.add(m.tool_call_id);
+  }
+
+  const writesPerPath = new Map();
+  for (let i = lastUserIdx + 1; i < messages.length; i++) {
+    const m = messages[i];
+    if ((m?.role || '').toLowerCase() !== 'assistant') continue;
+    if (!Array.isArray(m.tool_calls)) continue;
+    for (const tc of m.tool_calls) {
+      if (tc?.function?.name !== 'write_file') continue;
+      if (!successfulCallIds.has(tc.id)) continue;
+      let path = '';
+      try {
+        const args = JSON.parse(tc.function.arguments || '{}');
+        path = (args.path || '').toString().replace(/^\/+/, '');
+      } catch { continue; }
+      if (!path) continue;
+      writesPerPath.set(path, (writesPerPath.get(path) || 0) + 1);
+    }
+  }
+
+  // Threshold = 2: a single retry after a legit "I forgot a section" is
+  // fine; a SECOND rewrite is almost always the start of a spiral.
+  const offenders = Array.from(writesPerPath.entries()).filter(([, n]) => n >= 2);
+  if (offenders.length === 0) return messages;
+
+  const lines = offenders.map(([p, n]) => `• ${p} — napisan ${n} puta`).join('\n');
+  const guardMsg = {
+    role: 'system',
+    content:
+      '⚠️ REWRITE LOOP GUARD ⚠️\n\n' +
+      'U ovom agent turn-u si već napisao ove fajlove više puta:\n' +
+      lines + '\n\n' +
+      'STOP. Ne pozivaj `write_file` za ove putanje ponovo — dalji pozivi biće odbačeni i samo troše tokene.\n\n' +
+      'Tvoj sledeći potez MORA biti jedan od:\n' +
+      '1) Ako je sve gotovo — odgovori korisniku jednom kratkom rečenicom šta je urađeno i završi bez dodatnih tool poziva.\n' +
+      '2) Ako treba SITNA izmena u nekom od fajlova gore — koristi `replace_in_file` sa kratkim `old_text`/`new_text`. Nikad ceo fajl ponovo.\n' +
+      '3) Ako treba da napraviš DRUGI fajl iz plana koji još nije napisan — pozovi `write_file` samo za taj novi fajl.\n\n' +
+      'Ne izvinjavaj se. Ne objašnjavaj. Samo izvrši tačno jedan od ova tri poteza.',
+  };
+  console.log(`[guard] Rewrite-loop guard engaged for paths: ${offenders.map(([p, n]) => `${p}×${n}`).join(', ')}`);
+  return [...messages, guardMsg];
+}
+
 async function withRetry(fn, { retries = 3, delayMs = 1500 } = {}) {
   for (let attempt = 0; ; attempt++) {
     try {
@@ -1949,10 +2030,19 @@ const chatCompletionsHandler = [
         ? messages
         : injectSystemPrompt(messages, resolved.isPower === true);
 
+      // Rewrite-loop guard: Sonnet and Opus sometimes ignore "don't rewrite"
+      // guidance and burn tokens re-generating the same file 3-4 times in a
+      // single agent turn. This is a server-side brake that inspects the
+      // incoming history and, if the model has already written a file ≥2
+      // times in this turn, tacks on a loud system reminder pointing at
+      // replace_in_file as the correct next move. Works across every entry
+      // point (web panel, VS Code extension, raw API).
+      const guardedMessages = injectRewriteLoopGuard(enhancedMessages);
+
       if (resolved.backend === 'openai') {
-        await handleOpenAI(req, res, keyId, resolved, enhancedMessages, openAITools, stream, max_tokens);
+        await handleOpenAI(req, res, keyId, resolved, guardedMessages, openAITools, stream, max_tokens);
       } else {
-        await handleAnthropic(req, res, keyId, resolved, enhancedMessages, openAITools, stream, max_tokens);
+        await handleAnthropic(req, res, keyId, resolved, guardedMessages, openAITools, stream, max_tokens);
       }
     } catch (err) {
       console.error(`${resolved.backend} error [${err.status || '?'}]:`, err.message);
