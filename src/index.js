@@ -2008,10 +2008,18 @@ app.post('/chat/completions', chatCompletionsHandler);
 async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, stream, max_tokens) {
   const modelMax = MAX_OUTPUT[resolved.backendModel] || 16384;
   const requested = Number(max_tokens) || 4096;
-  const maxTokens = Math.min(Math.max(requested, 256), modelMax);
+  const isReasoning = resolved.backendModel.startsWith('o') || resolved.backendModel.startsWith('gpt-5');
+  // Reasoning models (o1/o3/o4 & gpt-5.*) count invisible "thinking" tokens
+  // against the same max_output_tokens budget as the real content. Clients
+  // typically ask for ~8k which is plenty for text but leaves almost nothing
+  // for a 20k-char write_file after the model spends 5-10k thinking, so
+  // large tool calls land truncated mid-JSON (finish=tool_calls, parses=false).
+  // Widen the floor for these models so one big write_file comfortably fits
+  // alongside the reasoning trace. The hard ceiling is still modelMax.
+  const reasoningFloor = isReasoning ? 32000 : 256;
+  const maxTokens = Math.min(Math.max(requested, reasoningFloor), modelMax);
   const trimmedMessages = trimOpenAIMessages(messages, resolved.backendModel);
 
-  const isReasoning = resolved.backendModel.startsWith('o') || resolved.backendModel.startsWith('gpt-5');
   // gpt-5.4 rejects reasoning_effort + function tools on /v1/chat/completions.
   // We must dispatch those requests to the Responses API path instead.
   const needsResponsesApi = /^gpt-5\.4/.test(resolved.backendModel);
@@ -2609,6 +2617,12 @@ async function handleOpenAIResponsesStream(req, res, keyId, resolved, payload, c
   let chunkCount = 0;
   let midStreamError = null;
   let sawToolCall = false;
+  // Set to true if the Responses API signals the output ran out of budget
+  // (response.status==='incomplete' with reason='max_output_tokens', or a
+  // dedicated response.incomplete event). We then emit finish_reason='length'
+  // instead of 'tool_calls' so the client's truncation path triggers cleanly
+  // (it already handles that case by retrying the tail in smaller chunks).
+  let hitMaxTokens = false;
 
   // Map Responses item_id → Chat Completions tool_calls[].index. The first
   // time we see an item_id we assign it the next slot; subsequent arg
@@ -2678,13 +2692,23 @@ async function handleOpenAIResponsesStream(req, res, keyId, resolved, payload, c
             }],
           });
         }
-      } else if (t === 'response.completed') {
-        const u = event.response?.usage;
+      } else if (t === 'response.completed' || t === 'response.incomplete') {
+        const r = event.response;
+        const u = r?.usage;
         if (u) {
           usage.input_tokens = u.input_tokens ?? usage.input_tokens;
           usage.output_tokens = u.output_tokens ?? usage.output_tokens;
           usage.reasoning_tokens = u.output_tokens_details?.reasoning_tokens ?? usage.reasoning_tokens;
           usage.cached_input_tokens = u.input_tokens_details?.cached_tokens ?? usage.cached_input_tokens;
+        }
+        // Responses API signals a token-cap overrun via status='incomplete'
+        // and/or incomplete_details.reason='max_output_tokens'. Either form
+        // should surface to the client as finish_reason='length'.
+        if (t === 'response.incomplete'
+            || r?.status === 'incomplete'
+            || r?.incomplete_details?.reason === 'max_output_tokens') {
+          hitMaxTokens = true;
+          console.warn(`OpenAI Responses incomplete: reason=${r?.incomplete_details?.reason || 'unknown'} reasoning=${usage.reasoning_tokens} output=${usage.output_tokens}`);
         }
       } else if (t === 'response.failed' || t === 'error' || t === 'response.error') {
         const msg = event.error?.message || event.message || 'Responses API error';
@@ -2718,8 +2742,11 @@ async function handleOpenAIResponsesStream(req, res, keyId, resolved, payload, c
     if (res.flush) res.flush();
   } else if (!res.writableEnded && !clientClosed) {
     // Emit a final chunk with finish_reason so the client parser flushes
-    // the accumulated tool_calls / content correctly.
-    const finish = sawToolCall ? 'tool_calls' : 'stop';
+    // the accumulated tool_calls / content correctly. When we hit the
+    // max_output_tokens cap we MUST emit 'length' even if there was a
+    // tool call — the frontend's truncation handler keys off that to
+    // retry in smaller chunks instead of executing a half-written call.
+    const finish = hitMaxTokens ? 'length' : (sawToolCall ? 'tool_calls' : 'stop');
     writeChunk({}, finish);
   }
 
