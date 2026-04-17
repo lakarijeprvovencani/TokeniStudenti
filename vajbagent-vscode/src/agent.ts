@@ -1892,6 +1892,11 @@ export class Agent {
 
         let assistantContent = '';
         let toolCalls: ToolCall[] = [];
+        // Tool calls whose JSON arguments are known to be truncated
+        // (finish_reason: length). Filled after the stream request completes
+        // and consumed by the tool-execution loop so the recovery message can
+        // be tailored ("you hit the output cap") instead of generic.
+        const truncatedToolIds = new Set<string>();
 
         const MAX_RETRIES = 3;
         const RETRY_PATTERN = /timeout|predugo|idle|ECONNRESET|ENOTFOUND|socket hang up|429|502|503|529|rate.limit|ETIMEDOUT|ECONNREFUSED|Stream prekinut/i;
@@ -1908,47 +1913,21 @@ export class Agent {
               this._provider.postMessage({ type: 'status', phase: 'thinking', text: `Pokušavam ponovo (${attempt}/${MAX_RETRIES})...` });
               await new Promise(r => setTimeout(r, delay));
             }
-            let result = await this._streamRequest(apiKey, messages);
+            const result = await this._streamRequest(apiKey, messages);
 
-            // Streaming continuation: if output was truncated (finish_reason: "length"),
-            // ask model to continue and concatenate the response. Max 3 continuations.
+            // When finish_reason === 'length' with tool_calls in flight, the
+            // model's JSON arguments are almost certainly truncated. The
+            // previous "inject a user message asking to continue" approach
+            // violated the Anthropic tool protocol (assistant-with-tool_calls
+            // MUST be followed by tool-role messages, not user) and frequently
+            // triggered 400s or apology loops. We now let the broken tool
+            // call through and the tool-execution phase below will detect the
+            // truncation and feed back a neutral "tool error" so the model
+            // can recover on its own turn.
             if (result.finishReason === 'length' && result.toolCalls.length > 0) {
-              const MAX_CONTINUATIONS = 3;
-              for (let cont = 0; cont < MAX_CONTINUATIONS; cont++) {
-                if (this._abortController?.signal.aborted) return;
-                console.log(`[Agent] Output truncated (finish_reason: length), continuation ${cont + 1}/${MAX_CONTINUATIONS}`);
-                this._provider.postMessage({ type: 'status', phase: 'thinking', text: 'Nastavljam generisanje...' });
-
-                // Build partial assistant message with what we have so far
-                const partialArgs = result.toolCalls.map(tc => tc.function.arguments).join('');
-                const contMessages: Message[] = [
-                  ...messages,
-                  { role: 'assistant', content: result.content, tool_calls: result.toolCalls },
-                  { role: 'user', content: '[SYSTEM] Your previous response was cut off (output token limit reached). The last tool call arguments ended with: "...' + partialArgs.slice(-200) + '"\n\nContinue generating ONLY the remaining part of the tool call arguments, starting exactly where you left off. Do NOT repeat what was already generated.' },
-                ];
-
-                try {
-                  const contResult = await this._streamRequest(apiKey, contMessages);
-
-                  // Concatenate: if continuation has tool calls, append arguments to last tool call
-                  if (contResult.toolCalls.length > 0) {
-                    const lastTc = result.toolCalls[result.toolCalls.length - 1];
-                    lastTc.function.arguments += contResult.toolCalls[0].function.arguments;
-                  } else if (contResult.content) {
-                    // Model returned text instead of tool call — append to last tool call args
-                    const lastTc = result.toolCalls[result.toolCalls.length - 1];
-                    lastTc.function.arguments += contResult.content;
-                  }
-
-                  // If this continuation finished normally, we're done
-                  if (contResult.finishReason !== 'length') {
-                    console.log(`[Agent] Continuation complete after ${cont + 1} attempts`);
-                    break;
-                  }
-                } catch (contErr) {
-                  console.log(`[Agent] Continuation failed: ${(contErr as Error).message}`);
-                  break;
-                }
+              console.log('[Agent] Output truncated mid tool_call — truncation will be signalled via tool error');
+              for (const tc of result.toolCalls) {
+                if (tc.id) truncatedToolIds.add(tc.id);
               }
             }
 
@@ -2029,35 +2008,59 @@ export class Agent {
           try {
             args = JSON.parse(tc.function.arguments);
           } catch {
-            // For write_file: NEVER recover from truncated JSON — it always produces broken files
-            if (tc.function.name === 'write_file') {
-              const truncMsg = 'GREŠKA: Sadržaj fajla je presečen (JSON isečen). Fajl NIJE upisan. MORAS da razdvojis kod u vise manjih fajlova — svaki ispod 120 linija. Napravi plan koji fajlovi su potrebni pa ih piši jedan po jedan.';
-              this._provider.postMessage({ type: 'toolCallReady', id: tc.id, name: tc.function.name, args: '(presečeno — prevelik fajl)', status: 'error' });
-              this._provider.postMessage({ type: 'toolResult', id: tc.id, result: truncMsg, success: false });
-              this._history.push({ role: 'tool', tool_call_id: tc.id, content: truncMsg });
-              continue;
-            }
-            // Other tools: try recovery with parseToolCallArguments
+            // Try to salvage a partial JSON first — works for small cutoffs
+            // even on write_file, since the path field almost always arrives
+            // intact and we can tell the model which file was affected.
             const recovered = parseToolCallArguments(tc.function.arguments);
             if (recovered && Object.keys(recovered).length > 0) {
               args = recovered;
               wasRecovered = true;
               console.log(`[Agent] Recovered truncated tool args for ${tc.function.name}: ${Object.keys(recovered).join(', ')}`);
-            } else {
-              argsParseFailed = true;
             }
+
+            // write_file with a truncated JSON payload: we refuse to pass it
+            // through (would write a broken file), but the recovery message
+            // is now neutral and directive instead of alarmist — no more
+            // "GREŠKA ... MORAŠ" which caused apology / rewrite loops.
+            if (tc.function.name === 'write_file') {
+              const pathHint = (args.path as string) || (args.file_path as string) || 'fajlu';
+              const truncMsg = `Napomena: write_file za ${pathHint} je pogodio granicu output tokena i JSON nije kompletan. Ne izvinjavaj se i ne pokušavaj odmah isti ogromni write_file ponovo.\n\nURADI OVO:\n- Ako fajl već postoji: pozovi read_file(${pathHint}) da vidiš šta je upisano, pa koristi replace_in_file da dopuniš samo ostatak (kratki old_text na kraju → new_text sa nastavkom).\n- Ako je fajl prevelik za jedan poziv: napiši skeleton sa write_file, pa postepeno popunjavaj sekcije kroz replace_in_file.\n- Nastavi rad bez ponavljanja istog poziva.`;
+              this._provider.postMessage({ type: 'toolCallReady', id: tc.id, name: tc.function.name, args: '(presečeno output tokenima)', status: 'error' });
+              this._provider.postMessage({ type: 'toolResult', id: tc.id, result: truncMsg, success: false });
+              this._history.push({ role: 'tool', tool_call_id: tc.id, content: truncMsg });
+              continue;
+            }
+
+            if (!wasRecovered) argsParseFailed = true;
           }
 
           // Detect truncated replace_in_file — content too short after recovery
           if (wasRecovered && tc.function.name === 'replace_in_file') {
             const recoveredContent = (args.new_text as string) || '';
             if (recoveredContent.length < 50) {
-              const truncMsg = 'GREŠKA: replace_in_file sadržaj je presečen. Probaj sa manjom izmenom.';
+              const truncMsg = 'Napomena: replace_in_file je pogodio granicu output tokena (sadržaj nije stigao). Ne izvinjavaj se korisniku — podeli izmenu na manje replace_in_file pozive sa kraćim new_text segmentima.';
               this._provider.postMessage({ type: 'toolCallReady', id: tc.id, name: tc.function.name, args: '(presečeno)', status: 'error' });
               this._provider.postMessage({ type: 'toolResult', id: tc.id, result: truncMsg, success: false });
               this._history.push({ role: 'tool', tool_call_id: tc.id, content: truncMsg });
               continue;
             }
+          }
+
+          // Tool call ARRIVED intact JSON-wise but we know from finish_reason
+          // that the stream ended mid-way through it — the payload is almost
+          // certainly short. Replace the execution with a neutral note so the
+          // model restarts the specific piece that got cut, not the whole plan.
+          if (tc.id && truncatedToolIds.has(tc.id) && !wasRecovered) {
+            const pathHint = (args.path as string) || (args.file_path as string) || 'fajl';
+            const truncMsg = tc.function.name === 'write_file'
+              ? `Napomena: prethodni write_file (${pathHint}) je pogodio granicu output tokena. Ne izvinjavaj se. Pozovi read_file(${pathHint}), pa replace_in_file za ostatak, ili nastavi sa sledećim fajlom iz plana.`
+              : tc.function.name === 'replace_in_file'
+                ? `Napomena: replace_in_file je odsečen na granici output tokena. Ne izvinjavaj se — podeli izmenu na manje pozive.`
+                : `Napomena: prethodni poziv (${tc.function.name}) je odsečen na granici output tokena. Probaj manji/inkrementalni korak umesto ponavljanja.`;
+            this._provider.postMessage({ type: 'toolCallReady', id: tc.id, name: tc.function.name, args: '(presečeno)', status: 'error' });
+            this._provider.postMessage({ type: 'toolResult', id: tc.id, result: truncMsg, success: false });
+            this._history.push({ role: 'tool', tool_call_id: tc.id, content: truncMsg });
+            continue;
           }
 
           this._provider.postMessage({

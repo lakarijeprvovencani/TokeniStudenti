@@ -500,48 +500,41 @@ async function toolWriteFile(args: Record<string, unknown>): Promise<ToolCallRes
     newContent = newContent.replace(/\\n/g, '\n');
   }
 
-  // Reject truncated files — model output was cut off
+  // ── Truncation heuristics ────────────────────────────────────────────────
+  // Goal: catch obviously cut-off outputs but STOP producing false positives
+  // (the CSS apology/rewrite loop came from overly strict HTML and CSS checks
+  // that fired on legitimate code). Messages below are intentionally neutral
+  // and directive — no ALL-CAPS "GREŠKA / MORAŠ", no "kreni iz početka" —
+  // so models (Turbo especially) proceed with read_file + replace_in_file
+  // instead of apologising and rewriting the whole file.
   const lowerPath = filePath.toLowerCase();
+
   if (lowerPath.endsWith('.html') || lowerPath.endsWith('.htm')) {
-    const trimmed = newContent.trimEnd();
-    if (trimmed.length > 200 && !trimmed.endsWith('</html>') && !trimmed.endsWith('</HTML>')) {
-      return { success: false, output: 'GREŠKA: HTML je presečen — nedostaje </html>. Fajl NIJE upisan. Ako je fajl velik, razdvoji kod u manje komponente/fajlove ili koristi replace_in_file za ciljane izmene.' };
-    }
+    // Previously: hard-rejected any HTML not ending with </html>. That blew
+    // up on legitimate snippets, partial rewrites, XHTML fragments, and
+    // files the model planned to finish with replace_in_file. Now we
+    // accept the write and trust the model to close the tag via a follow-up
+    // edit. If it's truly catastrophic, the user will notice in preview.
   }
 
-  // Reject truncated OR too-large JS/JSX/TS/TSX/CSS files
-  if (/\.(jsx?|tsx?|css|scss|vue|svelte)$/i.test(lowerPath)) {
-    const lineCount = newContent.split('\n').length;
-    const charCount = newContent.length;
-
-    // Block files over 150 lines OR 5000 chars — force splitting into components
-    if (lineCount > 150 || charCount > 5000) {
-      return { success: false, output: `GREŠKA: Fajl ima ${lineCount} linija / ${charCount} karaktera — PREVISE. Fajl NIJE upisan. MORAS razdvojiti u vise fajlova po max 120 linija. NE POKUSAVAJ ponovo sa ovim fajlom. Napravi plan: koji fajlovi, sta svaki sadrzi, koliko linija otprilike, pa tek onda pisi jedan po jedan.` };
+  // HTML + CSS + SCSS + Vue + Svelte are EXCLUDED from brace counting:
+  // inline <style>/<script>, @media / @supports nesting, url(data:…) with
+  // raw SVG, and CSS custom-property fallbacks routinely trip the check
+  // even on valid files. Only JS / TS / JSON stay.
+  if (/\.(jsx?|tsx?|json)$/i.test(lowerPath) && newContent.length > 500) {
+    let opens = 0, closes = 0;
+    for (const ch of newContent) {
+      if (ch === '{') opens++;
+      else if (ch === '}') closes++;
     }
-
-    // Detect truncation via unbalanced braces
-    if (newContent.length > 500) {
-      let opens = 0, closes = 0;
-      for (const ch of newContent) {
-        if (ch === '{') opens++;
-        else if (ch === '}') closes++;
-      }
-      if (opens > closes && (opens - closes) >= 2) {
-        const existing = fs.existsSync(filePath);
-        const hint = existing
-          ? 'Koristi replace_in_file za ciljane izmene umesto write_file za ceo fajl.'
-          : 'MORAS da razdvojis kod u vise manjih fajlova (svaka komponenta u svoj fajl, maks 150 linija). NE POKUSAVAJ ponovo da upises veliki fajl.';
-        return { success: false, output: `GREŠKA: Kod je presečen — ${opens} otvorenih zagrada vs ${closes} zatvorenih. Fajl NIJE upisan. ${hint}` };
-      }
-    }
-  }
-
-  // Block write_file on large existing files — force replace_in_file
-  if (fs.existsSync(filePath)) {
-    const existingContent = fs.readFileSync(filePath, 'utf-8');
-    const lineCount = existingContent.split('\n').length;
-    if (lineCount > 100 && /\.(jsx?|tsx?|html?|css|scss|vue|svelte|py)$/i.test(lowerPath)) {
-      return { success: false, output: `GREŠKA: Fajl "${path.basename(filePath)}" ima ${lineCount} linija. Za postojeće fajlove preko 100 linija koristi replace_in_file za ciljane izmene — write_file seče velike fajlove.` };
+    // Raised threshold 2 → 5: single-brace mismatches happen in minified
+    // code, template literals, etc. and aren't worth rejecting the write.
+    if (opens > closes && (opens - closes) >= 5) {
+      const existing = fs.existsSync(filePath);
+      const hint = existing
+        ? 'Koristi replace_in_file za ciljane izmene umesto punog write_file.'
+        : 'Ako fajl ima smisla da stoji ovako, ostavi ga — pa dodaj ostatak kroz replace_in_file ili drugi fajl. Ne izvinjavaj se.';
+      return { success: false, output: `Napomena: nije zatvoreno svih ${opens} { (samo ${closes} }) — izgleda kao da je output odsečen. ${hint}` };
     }
   }
 
