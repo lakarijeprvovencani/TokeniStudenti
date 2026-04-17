@@ -4,6 +4,7 @@ import Welcome from './components/Welcome'
 import LoadingTransition from './components/LoadingTransition'
 import IDELayout from './components/IDELayout'
 import ResetPassword from './components/ResetPassword'
+import MobileBlock from './components/MobileBlock'
 import { DEFAULT_MODEL } from './models'
 import { type UserInfo, fetchUserInfo } from './services/userService'
 import { type SavedProject, loadProject as loadProjectLocal, listProjects as listProjectsLocal } from './services/projectStore'
@@ -301,6 +302,7 @@ function AppInner() {
 
   return (
     <>
+    <MobileBlock />
     {migrationBanner && state === 'welcome' && (
       <div style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
