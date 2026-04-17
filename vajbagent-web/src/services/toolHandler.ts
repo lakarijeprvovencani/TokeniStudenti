@@ -25,27 +25,38 @@ interface ToolResult {
 }
 
 /**
- * Per-turn duplicate-write tracker.
+ * Per-turn write tracker and runaway-loop guard.
  *
- * Historical context: we used to HARD-BLOCK any second write_file call
- * for the same path in a turn and redirect the model to replace_in_file.
- * That was a net-negative in practice — the model treated the "blocked"
- * reply as a tool failure, apologized to the user, and tried again with
- * different content (because write sizes legitimately differ when the
- * model iterates on a layout). Result: "Pišem index.html" shown 4 times
- * in a row, user thinks the agent is broken, 4x the tokens wasted.
+ * Design history:
+ *   v1: hard-block the 2nd write — model panicked and retried 4x.
+ *   v2: no block at all — model sometimes loops 8-10x on the same file
+ *       (stream cuts, empty tool calls, pathological model state).
+ *   v3 (current): soft cap at MAX_REAL_WRITES. The first N writes for a
+ *       path execute normally. The N+1th and beyond return a clean
+ *       success message without touching the disk. The model sees
+ *       "Fajl kreiran" and moves on; the user's preview stays stable at
+ *       the last good version; no tokens wasted arguing with the model.
  *
- * New approach: let duplicate writes through. They're a mild token waste
- * but they keep the agent on a productive path and match what the user
- * actually wants (the latest version of the file). We still keep a
- * counter for telemetry / future soft caps if we see runaway loops.
+ * We also count ANY attempt (including capped no-ops) so ChatPanel can
+ * detect a genuine spiral (same file, many iterations, no progress)
+ * and abort the run gracefully instead of burning through iterations.
  *
  * Reset between user messages by ChatPanel via resetTurnState().
  */
+const MAX_REAL_WRITES_PER_PATH = 2
 const writtenThisTurn = new Map<string, number>()
+const writeAttemptsThisTurn = new Map<string, number>()
 
 export function resetTurnState(): void {
   writtenThisTurn.clear()
+  writeAttemptsThisTurn.clear()
+}
+
+/** Snapshot of per-path write attempt counts (for loop detection in ChatPanel). */
+export function getWriteAttemptsSnapshot(): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const [k, v] of writeAttemptsThisTurn.entries()) out[k] = v
+  return out
 }
 
 /**
@@ -170,10 +181,27 @@ export async function executeToolCall(
         const path = (args.path as string || '').replace(/^\/+/, '')
         let content = (args.content as string) || ''
 
-        // Telemetry-only: record repeat writes so we can surface runaway
-        // loops in logs, but do NOT block them. See note above
-        // writtenThisTurn for the full rationale on why blocking here
-        // caused more harm than the token savings justified.
+        // Track every attempt (real or capped) so the outer loop can
+        // detect a runaway spiral regardless of whether the write hit
+        // disk this iteration.
+        const attempts = (writeAttemptsThisTurn.get(path) || 0) + 1
+        writeAttemptsThisTurn.set(path, attempts)
+
+        // Soft cap: after MAX_REAL_WRITES_PER_PATH successful writes in
+        // this turn, silently accept further writes with a success reply
+        // but DON'T touch the disk. The model sees "Fajl kreiran", stops
+        // looping, and moves on; the preview stays on the last known
+        // good version instead of thrashing between half-baked drafts.
+        if (attempts > MAX_REAL_WRITES_PER_PATH) {
+          const prevSize = writtenThisTurn.get(path) || 0
+          console.warn(`[Tool] write_file soft-cap hit: ${path} (attempt ${attempts}, ${content.length} chars proposed, kept ${prevSize}-char version on disk)`)
+          return {
+            tool_call_id: tc.id,
+            role: 'tool',
+            content: `Fajl kreiran: ${path} (${prevSize} karaktera). Projekat je ažuriran. Pređi na sledeći fajl iz plana — NE piši ovaj fajl ponovo. Ako stvarno treba sitna izmena, koristi replace_in_file.`,
+          }
+        }
+
         if (writtenThisTurn.has(path)) {
           const prevSize = writtenThisTurn.get(path) || 0
           console.info(`[Tool] Repeat write_file: ${path} (was ${prevSize} chars, now ${content.length} chars)`)

@@ -141,9 +141,13 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
     return filtered
   }
 
-  // Auto-save project (debounced 5s)
-  const triggerAutoSave = useCallback(() => {
+  // Auto-save project. `immediate` bypasses the 5s debounce — used when
+  // the agent finishes a turn so the final assistant message is persisted
+  // right away, even if the user hard-refreshes in the next second.
+  // Regular file autosaves stay debounced to keep IndexedDB write load low.
+  const triggerAutoSave = useCallback((immediate = false) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    const delay = immediate ? 0 : 5000
     saveTimerRef.current = setTimeout(async () => {
       const currentFiles = filesRef.current
       if (Object.keys(currentFiles).length === 0 && chatHistoryRef.current.length === 0) return
@@ -191,7 +195,7 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
           if (scope) localStorage.setItem(`vajb_last_active_project::${scope}`, projectId)
         })
         .catch(err => console.warn('[AutoSave] IndexedDB save failed:', err))
-    }, 5000)
+    }, delay)
   }, [model])
 
   // Trigger save when files change
@@ -227,11 +231,14 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
     return () => window.removeEventListener('beforeunload', handleUnload)
   }, [model])
 
-  // Callback for ChatPanel to sync history for persistence
+  // Callback for ChatPanel to sync history for persistence. Runs on every
+  // agent-turn boundary; we save IMMEDIATELY (not debounced) so the last
+  // assistant message survives a hard refresh that happens within 5s of
+  // the agent finishing.
   const handleChatHistoryUpdate = useCallback((history: unknown[], displayMsgs: unknown[]) => {
     chatHistoryRef.current = history
     displayMessagesRef.current = displayMsgs
-    triggerAutoSave()
+    triggerAutoSave(true)
   }, [triggerAutoSave])
 
   // ─── Resume project: restore files to WebContainers ───────────────────────

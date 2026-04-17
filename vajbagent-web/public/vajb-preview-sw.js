@@ -138,7 +138,10 @@ self.addEventListener('fetch', (event) => {
     if (!files) {
       return new Response('Preview session not available. Try reloading.', {
         status: 404,
-        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Access-Control-Allow-Origin': '*',
+        },
       });
     }
 
@@ -148,16 +151,21 @@ self.addEventListener('fetch', (event) => {
       hit = lookup(files, path + '.html') || lookup(files, path + '/index.html');
     }
     if (!hit) {
-      // Friendly not-found — if root asks for favicon.ico we don't want to 404-noise
       if (/favicon\.ico$/.test(path)) {
         return new Response(new Uint8Array(0), {
           status: 200,
-          headers: { 'Content-Type': 'image/x-icon' },
+          headers: {
+            'Content-Type': 'image/x-icon',
+            'Access-Control-Allow-Origin': '*',
+          },
         });
       }
       return new Response(`Not found in preview: /${path}`, {
         status: 404,
-        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Access-Control-Allow-Origin': '*',
+        },
       });
     }
 
@@ -170,6 +178,7 @@ self.addEventListener('fetch', (event) => {
         headers: {
           'Content-Type': decoded.type || mime,
           'Cache-Control': 'no-store',
+          'Access-Control-Allow-Origin': '*',
         },
       });
     }
@@ -183,12 +192,16 @@ self.addEventListener('fetch', (event) => {
           headers: {
             'Content-Type': upstream.headers.get('content-type') || mime,
             'Cache-Control': 'no-store',
+            'Access-Control-Allow-Origin': '*',
           },
         });
       } catch {
         return new Response('Upstream fetch failed', {
           status: 502,
-          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+          headers: {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Access-Control-Allow-Origin': '*',
+          },
         });
       }
     }
@@ -197,6 +210,7 @@ self.addEventListener('fetch', (event) => {
       headers: {
         'Content-Type': mime,
         'Cache-Control': 'no-store',
+        'Access-Control-Allow-Origin': '*',
       },
     });
   })());

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowUp, Loader2, User, Square } from 'lucide-react'
-import { executeToolCall, resetTurnState } from '../services/toolHandler'
+import { executeToolCall, resetTurnState, getWriteAttemptsSnapshot } from '../services/toolHandler'
 import { buildFullContext, invalidateIndex } from '../services/contextBuilder'
 import { fetchBalance } from '../services/userService'
 import { scopedStorage as scopedStorageRef } from '../services/storageScope'
@@ -569,9 +569,15 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
       const ext = file.name.split('.').pop()?.toLowerCase() || ''
 
       if (IMAGE_EXTS.has(ext) || file.type.startsWith('image/')) {
-        // Image — resize and convert to base64
+        // Image — resize and convert to base64. Dedupe by name+dataUrl in
+        // case the pick event fires twice (e.g. drop+change, some macOS
+        // Safari file dialogs) — AI users were seeing one image attached
+        // as two thumbnails.
         const dataUrl = await resizeImage(file, MAX_IMAGE_SIZE)
-        setAttachedImages(prev => [...prev, { name: file.name, dataUrl }])
+        setAttachedImages(prev => {
+          if (prev.some(p => p.name === file.name && p.dataUrl === dataUrl)) return prev
+          return [...prev, { name: file.name, dataUrl }]
+        })
       } else if (TEXT_EXTS.has(ext) || file.type.startsWith('text/')) {
         // Text file — read content and append to input
         const text = await file.text()
@@ -711,7 +717,15 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
         messages: apiMessages,
         tools: TOOL_DEFINITIONS,
         stream: true,
-        max_tokens: 24000,
+        // Tight output budget = forced serialization. VS Code extension
+        // runs at the backend default (4096) and "just works" because the
+        // model can't physically emit parallel write_file calls at that
+        // budget — it runs out of tokens mid-first-call. We use 8000 as a
+        // compromise: double VS Code's ceiling for headroom on larger
+        // files, still far below what's needed to fit 2-3 parallel writes
+        // of full HTML/CSS. The old 24000 gave the model enough rope to
+        // try parallel + re-iterate, which triggered the brain-stuck loop.
+        max_tokens: 8000,
       }),
       signal,
     })
@@ -1103,6 +1117,21 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
           console.warn(`[API] Dropped ${droppedEmpty.length} empty tool call(s): ${droppedEmpty.join(', ')}`)
         }
 
+        // Detect the parallel-write_file truncation pattern: the model
+        // tried to emit multiple write_file calls in one response, but the
+        // combined payload overflowed max_tokens, so the provider
+        // truncated all but the first. Symptom: at least one write_file
+        // survived AND we dropped 1+ empty write_file calls in the same
+        // response. When this happens, inject a pointed system reminder
+        // at the end of the iteration so the model switches to
+        // one-write-per-response mode and stops looping.
+        const survivedWrites = result.toolCalls.filter(tc => tc.function.name === 'write_file').length
+        const droppedWrites = droppedEmpty.filter(s => s.startsWith('write_file')).length
+        const parallelTruncationDetected = survivedWrites >= 1 && droppedWrites >= 1
+        if (parallelTruncationDetected) {
+          console.warn(`[API] Parallel write_file truncation detected: ${survivedWrites} survived, ${droppedWrites} empty`)
+        }
+
         // ─── Truncation detection ────────────────────────────────────
         // Only the LAST tool call can be truncated — earlier ones had a
         // content_block_stop before max_tokens fired. We flag it as truncated
@@ -1130,8 +1159,14 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
           // finish its thought. We do this at most once per turn to avoid a
           // runaway loop if the model keeps producing huge walls of text.
           if (result.text) {
+            const assistantDisplay = { role: 'assistant', content: result.text }
             historyRef.current = [...historyRef.current, { role: 'assistant', content: result.text }]
-            setDisplayMessages(prev => [...prev, { role: 'assistant', content: result.text }])
+            // Sync ref synchronously so saveSession() in finally sees the
+            // final assistant message even if React hasn't committed yet.
+            // Without this, users who refreshed right after the agent
+            // replied would lose the last message on reload.
+            displayMessagesRef.current = [...displayMessagesRef.current, assistantDisplay]
+            setDisplayMessages(prev => [...prev, assistantDisplay])
             lastAssistantHadText = true
           }
           setStreamText('')
@@ -1155,7 +1190,9 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
         historyRef.current = [...historyRef.current, assistantMsg]
 
         if (result.text) {
-          setDisplayMessages(prev => [...prev, { role: 'assistant', content: result.text }])
+          const assistantDisplay = { role: 'assistant', content: result.text }
+          displayMessagesRef.current = [...displayMessagesRef.current, assistantDisplay]
+          setDisplayMessages(prev => [...prev, assistantDisplay])
           lastAssistantHadText = true
         }
         setStreamText('')
@@ -1262,7 +1299,14 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
             // JSON partial/truncated — FRIENDLY default already set above.
           }
 
-          setDisplayMessages(prev => [...prev, { role: 'status', content: statusLabel }])
+          setDisplayMessages(prev => {
+            // Dedupe: if the most recent status is identical, don't
+            // stack another copy. Keeps the chat clean when the model
+            // retries the same tool (e.g. same path) multiple times.
+            const last = prev[prev.length - 1]
+            if (last && last.role === 'status' && last.content === statusLabel) return prev
+            return [...prev, { role: 'status', content: statusLabel }]
+          })
           setStatusText(statusLabel)
 
           const toolResult = await executeToolCall(tc, (files) => {
@@ -1281,13 +1325,43 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
           }
         }
 
+        // If the model tried to emit parallel write_file calls and the
+        // provider truncated the later ones, nudge it to switch to
+        // one-write-per-response so it doesn't loop trying to "resend"
+        // the missing files with the same broken pattern.
+        if (parallelTruncationDetected) {
+          historyRef.current.push({
+            role: 'system',
+            content: 'VAŽNO: Upravo si poslao više write_file tool call-ova u istom odgovoru. Drugi i treći pozivi su stigli prazni jer je provider isekao odgovor zbog max_tokens. Na disku je kreiran SAMO prvi fajl. OBAVEZNO U SLEDEĆEM ODGOVORU: izvrši TAČNO JEDAN write_file tool call za sledeći fajl iz plana (NE samo reci da ćeš to uraditi — stvarno pozovi tool). Šalji tačno jedan write_file po odgovoru dok ne završiš sve fajlove. Ne pokušavaj ponovo iste fajlove koji su uspešno napisani, samo nastavi sa sledećim.',
+          })
+        }
+
+        // Spiral guard: if the same file has been written an absurd
+        // number of times in this turn, the model is stuck in a
+        // pathological loop (rewriting the same file with wildly
+        // different sizes, not progressing to other files). Break out
+        // gracefully instead of burning through all MAX_ITERATIONS.
+        const writeSnapshot = getWriteAttemptsSnapshot()
+        const spiralPath = Object.entries(writeSnapshot).find(([, n]) => n >= 4)?.[0]
+        if (spiralPath) {
+          console.warn(`[Agent] Spiral detected: ${spiralPath} written ${writeSnapshot[spiralPath]}x — aborting run`)
+          setDisplayMessages(prev => [...prev, {
+            role: 'status',
+            content: `Prekinuo sam jer se model ponavlja na ${spiralPath}. Sačuvana je trenutna verzija. Probaj novu poruku tipa: "nastavi — napiši sada style.css" da ručno vodiš agenta fajl po fajl.`,
+          }])
+          doneReason = 'error'
+          break
+        }
+
         setStatusText('Agent nastavlja...')
       }
 
       // ─── Fallback summary if agent ended without text ─────────────
       if (!lastAssistantHadText && historyRef.current.length > 1) {
         const summary = buildFallbackSummary(historyRef.current)
-        setDisplayMessages(prev => [...prev, { role: 'assistant', content: summary }])
+        const summaryMsg = { role: 'assistant', content: summary }
+        displayMessagesRef.current = [...displayMessagesRef.current, summaryMsg]
+        setDisplayMessages(prev => [...prev, summaryMsg])
       }
 
     } catch (err) {

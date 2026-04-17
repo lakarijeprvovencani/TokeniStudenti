@@ -465,7 +465,31 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
       if (!firstRun && prevMapHash.current === mapSig) return
 
       const ok = await publishPreview(sessionId, built.map)
-      if (!ok) return // SW disappeared — blob effect below will pick up
+      if (!ok) {
+        console.warn('[Preview] publishPreview failed — falling back to blob')
+        setSwReady(false)
+        return
+      }
+
+      // Proactive probe: verify the SW actually intercepts our virtual
+      // URL. If Netlify's SPA fallback (_redirects) catches it instead,
+      // we'd load the main React app in the iframe which then blows up
+      // with CORS errors. We now return 404 on those paths, so anything
+      // other than a 200-text/html response means the SW isn't on.
+      try {
+        const probeUrl = previewUrl(sessionId, built.entry)
+        const probe = await fetch(probeUrl, { cache: 'no-store' })
+        const ct = probe.headers.get('content-type') || ''
+        if (!probe.ok || !/html/i.test(ct)) {
+          console.warn('[Preview] SW probe failed — status:', probe.status, 'ct:', ct)
+          setSwReady(false)
+          return
+        }
+      } catch (err) {
+        console.warn('[Preview] SW probe error — falling back to blob:', err)
+        setSwReady(false)
+        return
+      }
 
       prevMapHash.current = mapSig
       // On first run: point iframe at the entry page. On refresh-key bump:

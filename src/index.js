@@ -82,12 +82,14 @@ const VAJB_MODELS = [
   { id: 'vajb-agent-turbo',     name: 'VajbAgent Turbo',     backend: 'anthropic', backendModel: 'claude-haiku-4-5', desc: 'Claude Haiku 4.5 — brz, jeftin, jak tool-caller' },
   { id: 'vajb-agent-pro',       name: 'VajbAgent Pro',       backend: 'openai',    backendModel: 'gpt-5',            desc: 'GPT-5 — ozbiljniji projekti, jak i pametan' },
   { id: 'vajb-agent-max',       name: 'VajbAgent Max',       backend: 'anthropic', backendModel: 'claude-sonnet-4-6', desc: 'Claude Sonnet — kompleksni zadaci' },
-  // Power was mapped to gpt-5.4 but both the web panel and the Cursor extension
-  // reported multi-minute hangs with no output — likely an account-tier /
-  // rollout limitation on this specific model ID. We temporarily route Power
-  // through gpt-5 (same as Pro) so users don't hit dead ends. gpt-5.4 needs a
-  // separate verification pass before we reintroduce it.
-  { id: 'vajb-agent-power',     name: 'VajbAgent Power',     backend: 'openai',    backendModel: 'gpt-5',            desc: 'GPT-5 — najjači OpenAI (u testu za 5.4)' },
+  // gpt-5.4 + tools + reasoning_effort doesn't work on /v1/chat/completions —
+  // OpenAI explicitly rejects that combo ("Function tools with reasoning_effort
+  // are not supported for gpt-5.4 in /v1/chat/completions. Please use
+  // /v1/responses instead."). handleOpenAI below detects this model and
+  // dispatches to handleOpenAIResponsesStream which speaks the Responses API
+  // and translates its event stream back into Chat Completions SSE chunks, so
+  // the client parser doesn't need to change.
+  { id: 'vajb-agent-power',     name: 'VajbAgent Power',     backend: 'openai',    backendModel: 'gpt-5.4',          desc: 'GPT-5.4 — najjači OpenAI, flagship' },
   { id: 'vajb-agent-ultra',     name: 'VajbAgent Ultra',     backend: 'anthropic', backendModel: 'claude-opus-4-7',   desc: 'Claude Opus 4.7 — najjači, long-running coding' },
   { id: 'vajb-agent-architect', name: 'VajbAgent Architect', backend: 'anthropic', backendModel: 'claude-opus-4-7',   desc: 'Opus 4.7 Architect — full-stack arhitekta', isPower: true },
 ];
@@ -2002,7 +2004,7 @@ const chatCompletionsHandler = [
 app.post('/v1/chat/completions', chatCompletionsHandler);
 app.post('/chat/completions', chatCompletionsHandler);
 
-// ---- OpenAI backend (Lite, Pro) ----
+// ---- OpenAI backend (Lite, Pro, Power, ...) ----
 async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, stream, max_tokens) {
   const modelMax = MAX_OUTPUT[resolved.backendModel] || 16384;
   const requested = Number(max_tokens) || 4096;
@@ -2010,29 +2012,49 @@ async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, st
   const trimmedMessages = trimOpenAIMessages(messages, resolved.backendModel);
 
   const isReasoning = resolved.backendModel.startsWith('o') || resolved.backendModel.startsWith('gpt-5');
-  const isGpt5 = resolved.backendModel.startsWith('gpt-5');
-
-  const payload = {
-    model: resolved.backendModel,
-    messages: trimmedMessages,
-    max_completion_tokens: maxTokens,
-    stream,
-    ...(stream && { stream_options: { include_usage: true } }),
-    ...(isReasoning && { reasoning_effort: maxTokens <= 2048 ? 'low' : 'medium' }),
-    ...(Array.isArray(openAITools) && openAITools.length > 0 && { tools: openAITools }),
-    // OpenAI routes cache lookups by a stable per-user key. Without it the
-    // cache bucket is load-balancer-dependent and the same prompt prefix
-    // from the same user can miss cache on back-to-back requests. With
-    // keyId as the cache key we pin every user's conversation to the same
-    // cache shard → higher hit rate → lower billed input tokens for us
-    // AND for the student.
-    ...(keyId && { prompt_cache_key: String(keyId) }),
-  };
+  // gpt-5.4 rejects reasoning_effort + function tools on /v1/chat/completions.
+  // We must dispatch those requests to the Responses API path instead.
+  const needsResponsesApi = /^gpt-5\.4/.test(resolved.backendModel);
 
   const poolEntry = acquireFromPool(openaiPool, 'OpenAI');
-  console.log(`OpenAI request: model=${resolved.backendModel}, msgs=${messages.length}→${trimmedMessages.length}, stream=${stream}, pool=${openaiPool.indexOf(poolEntry)+1}/${openaiPool.length}`);
 
   try {
+    if (needsResponsesApi) {
+      console.log(`OpenAI Responses request: model=${resolved.backendModel}, msgs=${messages.length}→${trimmedMessages.length}, stream=${stream}, pool=${openaiPool.indexOf(poolEntry)+1}/${openaiPool.length}`);
+      const responsesPayload = buildResponsesPayload({
+        model: resolved.backendModel,
+        messages: trimmedMessages,
+        openAITools,
+        maxTokens,
+        stream,
+        keyId,
+      });
+      if (stream) {
+        await handleOpenAIResponsesStream(req, res, keyId, resolved, responsesPayload, poolEntry.client);
+      } else {
+        await handleOpenAIResponsesNonStream(req, res, keyId, resolved, responsesPayload, poolEntry.client);
+      }
+      return;
+    }
+
+    const payload = {
+      model: resolved.backendModel,
+      messages: trimmedMessages,
+      max_completion_tokens: maxTokens,
+      stream,
+      ...(stream && { stream_options: { include_usage: true } }),
+      ...(isReasoning && { reasoning_effort: maxTokens <= 2048 ? 'low' : 'medium' }),
+      ...(Array.isArray(openAITools) && openAITools.length > 0 && { tools: openAITools }),
+      // OpenAI routes cache lookups by a stable per-user key. Without it the
+      // cache bucket is load-balancer-dependent and the same prompt prefix
+      // from the same user can miss cache on back-to-back requests. With
+      // keyId as the cache key we pin every user's conversation to the same
+      // cache shard → higher hit rate → lower billed input tokens for us
+      // AND for the student.
+      ...(keyId && { prompt_cache_key: String(keyId) }),
+    };
+    console.log(`OpenAI request: model=${resolved.backendModel}, msgs=${messages.length}→${trimmedMessages.length}, stream=${stream}, pool=${openaiPool.indexOf(poolEntry)+1}/${openaiPool.length}`);
+
     if (stream) {
       await handleOpenAIStream(req, res, keyId, resolved, payload, poolEntry.client);
     } else {
@@ -2041,6 +2063,119 @@ async function handleOpenAI(req, res, keyId, resolved, messages, openAITools, st
   } finally {
     releaseFromPool(poolEntry);
   }
+}
+
+/**
+ * Convert Chat Completions-shaped messages + tools into the Responses API
+ * payload. Notable differences:
+ *   - `messages` → `input` array of heterogeneous items (messages, function_call,
+ *     function_call_output).
+ *   - `tools` top-level shape: `{ type, name, description, parameters }` (no
+ *     nested `function: {...}`).
+ *   - `reasoning_effort` → `reasoning: { effort }`.
+ *   - `max_completion_tokens` → `max_output_tokens`.
+ *
+ * We keep strict: false on tools so schemas that were written against the
+ * non-strict Chat Completions variant don't get rejected for missing
+ * additionalProperties:false / required lists.
+ */
+function buildResponsesPayload({ model, messages, openAITools, maxTokens, stream, keyId }) {
+  // Separate out the system message(s) into `instructions`. Responses API
+  // prefers system guidance there; it still accepts system-role items in
+  // input but instructions is cleaner and caches nicely.
+  const systemParts = [];
+  const nonSystem = [];
+  for (const m of messages) {
+    if (m.role === 'system') {
+      if (typeof m.content === 'string') systemParts.push(m.content);
+      else if (Array.isArray(m.content)) systemParts.push(m.content.map(c => c.text || '').filter(Boolean).join('\n'));
+    } else {
+      nonSystem.push(m);
+    }
+  }
+  const instructions = systemParts.join('\n\n');
+
+  const input = [];
+  for (const m of nonSystem) {
+    if (m.role === 'tool') {
+      // Chat Completions tool result → Responses function_call_output
+      input.push({
+        type: 'function_call_output',
+        call_id: m.tool_call_id,
+        output: typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? ''),
+      });
+      continue;
+    }
+    if (m.role === 'assistant') {
+      // Any assistant message with tool_calls gets split: optional text
+      // message first, then each tool_call as a function_call item.
+      if (m.content) {
+        const text = typeof m.content === 'string' ? m.content : '';
+        if (text) input.push({ role: 'assistant', content: text });
+      }
+      if (Array.isArray(m.tool_calls)) {
+        for (const tc of m.tool_calls) {
+          input.push({
+            type: 'function_call',
+            call_id: tc.id,
+            name: tc.function?.name || '',
+            arguments: tc.function?.arguments || '',
+          });
+        }
+      }
+      continue;
+    }
+    if (m.role === 'user') {
+      // Multimodal content passes through as-is with a remapping:
+      // Chat Completions uses `image_url`/`text`; Responses uses
+      // `input_image`/`input_text`.
+      if (typeof m.content === 'string') {
+        input.push({ role: 'user', content: m.content });
+      } else if (Array.isArray(m.content)) {
+        const parts = m.content.map(c => {
+          if (c.type === 'text') return { type: 'input_text', text: c.text || '' };
+          if (c.type === 'image_url') {
+            const url = typeof c.image_url === 'object' ? c.image_url.url : c.image_url;
+            return { type: 'input_image', image_url: url };
+          }
+          return null;
+        }).filter(Boolean);
+        input.push({ role: 'user', content: parts });
+      }
+      continue;
+    }
+    // Fallback — unknown roles just pass through as plain messages.
+    input.push({ role: m.role || 'user', content: typeof m.content === 'string' ? m.content : '' });
+  }
+
+  const tools = Array.isArray(openAITools) && openAITools.length > 0
+    ? openAITools.map(t => ({
+        type: 'function',
+        name: t.function?.name,
+        description: t.function?.description || '',
+        parameters: t.function?.parameters || { type: 'object', properties: {}, required: [] },
+        strict: false,
+      }))
+    : undefined;
+
+  const payload = {
+    model,
+    input,
+    max_output_tokens: maxTokens,
+    stream,
+    reasoning: { effort: maxTokens <= 2048 ? 'low' : 'medium' },
+    ...(instructions && { instructions }),
+    ...(tools && { tools }),
+    ...(tools && { parallel_tool_calls: true }),
+    // Responses API also honors prompt_cache_key for shard stickiness —
+    // mirrors the Chat Completions config we rely on for cache hit rate.
+    ...(keyId && { prompt_cache_key: String(keyId) }),
+    // Stateless: we always send the full history in input, so we don't
+    // want the server storing per-response state that we'd have to
+    // chain via previous_response_id.
+    store: false,
+  };
+  return payload;
 }
 
 async function handleOpenAINonStream(req, res, keyId, resolved, payload, client) {
@@ -2281,6 +2416,347 @@ async function handleOpenAIStream(req, res, keyId, resolved, payload, client) {
     emitBalanceEvent(res, newBal, resolved.id);
   } catch (billingErr) {
     console.error('Post-stream billing error:', billingErr.message);
+  }
+  if (!res.writableEnded) {
+    res.write('data: [DONE]\n\n');
+    res.end();
+  }
+}
+
+/**
+ * Non-stream Responses API handler. Repackages the Responses output into a
+ * Chat Completions-shaped response so the frontend's single parser path
+ * continues to work.
+ */
+async function handleOpenAIResponsesNonStream(req, res, keyId, resolved, payload, client) {
+  const response = await withRetry(() => client.responses.create(payload));
+
+  // Walk response.output[] and collect assistant text + any function calls.
+  let text = '';
+  const toolCalls = [];
+  let toolIdx = 0;
+  if (Array.isArray(response?.output)) {
+    for (const item of response.output) {
+      if (item.type === 'message' && Array.isArray(item.content)) {
+        for (const c of item.content) {
+          if (c.type === 'output_text' && typeof c.text === 'string') text += c.text;
+        }
+      } else if (item.type === 'function_call') {
+        toolCalls.push({
+          index: toolIdx++,
+          id: item.call_id,
+          type: 'function',
+          function: { name: item.name, arguments: item.arguments || '' },
+        });
+      }
+    }
+  }
+
+  if (!text && toolCalls.length === 0) {
+    console.error('OpenAI Responses returned empty output:', JSON.stringify(response));
+    return res.status(502).json({
+      error: { message: 'Model returned empty response. Please try again.', code: 'empty_response' }
+    });
+  }
+
+  // Responses API usage fields: input_tokens, output_tokens, cached tokens
+  // live under input_tokens_details.cached_tokens, reasoning tokens under
+  // output_tokens_details.reasoning_tokens. Normalize into our internal
+  // usage shape (same fields we already log/bill for Chat Completions).
+  const u = response.usage || {};
+  const totalInput = u.input_tokens ?? 0;
+  const cachedInput = u.input_tokens_details?.cached_tokens ?? 0;
+  const uncachedInput = Math.max(0, totalInput - cachedInput);
+  const outputTokens = u.output_tokens ?? 0;
+  const reasoning = u.output_tokens_details?.reasoning_tokens ?? 0;
+  const usage = {
+    input_tokens: totalInput,
+    output_tokens: outputTokens,
+    cached_input_tokens: cachedInput,
+    model: resolved.backendModel,
+  };
+  if (reasoning > 0) {
+    console.log(`OpenAI Responses reasoning tokens: ${reasoning} (billed as output, total output=${outputTokens})`);
+  }
+  if (cachedInput > 0) {
+    console.log(`OpenAI Responses cache hit: cached=${cachedInput}/${totalInput} input tokens`);
+  }
+  const usd = costUsdWithCache({
+    uncachedInput,
+    cacheReadInput: cachedInput,
+    cacheCreationInput: 0,
+    outputTokens,
+  }, resolved.backendModel, keyId);
+  const newBal = await deductBalance(keyId, usd);
+  await logUsage(keyId, usage);
+
+  const warning = await getBalanceWarning(keyId, newBal, req);
+  let content = text;
+  if (warning) content += warning;
+
+  if (typeof newBal === 'number' && Number.isFinite(newBal)) {
+    res.setHeader('X-Vajb-Balance', Number(newBal.toFixed(6)).toString());
+  }
+
+  const finish = toolCalls.length > 0 ? 'tool_calls' : 'stop';
+  const compat = {
+    id: response.id,
+    object: 'chat.completion',
+    created: Math.floor(Date.now() / 1000),
+    model: resolved.id,
+    choices: [{
+      index: 0,
+      message: {
+        role: 'assistant',
+        content: content || null,
+        ...(toolCalls.length > 0 && { tool_calls: toolCalls.map(({ index, ...rest }) => rest) }),
+      },
+      finish_reason: finish,
+    }],
+    usage: {
+      prompt_tokens: totalInput,
+      completion_tokens: outputTokens,
+      total_tokens: totalInput + outputTokens,
+      prompt_tokens_details: { cached_tokens: cachedInput },
+      completion_tokens_details: { reasoning_tokens: reasoning },
+    },
+  };
+  res.json(compat);
+}
+
+/**
+ * Stream Responses API output, translating each event into a
+ * Chat Completions-shaped SSE chunk on the fly. This keeps the frontend's
+ * SSE parser path (choices[].delta.content / tool_calls) identical between
+ * gpt-5.4 and every other OpenAI model.
+ *
+ * Event mapping:
+ *   response.output_text.delta            → delta.content
+ *   response.output_item.added (fn_call)  → delta.tool_calls seed (id+name)
+ *   response.function_call_arguments.delta→ delta.tool_calls arguments chunk
+ *   response.completed                    → usage + finish_reason
+ *   response.error / error                → emit error chunk
+ */
+async function handleOpenAIResponsesStream(req, res, keyId, resolved, payload, client) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  let clientClosed = false;
+  const onClientClose = () => { clientClosed = true; };
+  req.on('close', onClientClose);
+
+  const STREAM_TIMEOUT = 5 * 60 * 1000;
+  const KEEPALIVE_INTERVAL = 10000;
+  let lastChunkTime = Date.now();
+
+  const heartbeatChunk = {
+    id: 'vajb-heartbeat',
+    object: 'chat.completion.chunk',
+    model: resolved.id,
+    choices: [{ index: 0, delta: {}, finish_reason: null }],
+  };
+  const heartbeatLine = 'data: ' + JSON.stringify(heartbeatChunk) + '\n\n';
+  const keepAlive = setInterval(() => {
+    if (!res.writableEnded) {
+      res.write(heartbeatLine);
+      if (res.flush) res.flush();
+    }
+  }, KEEPALIVE_INTERVAL);
+
+  const timeoutCheck = setInterval(() => {
+    if (Date.now() - lastChunkTime > STREAM_TIMEOUT) {
+      clearInterval(timeoutCheck);
+      clearInterval(keepAlive);
+      if (!res.writableEnded) { res.write('data: [DONE]\n\n'); res.end(); }
+    }
+  }, 30000);
+
+  res.write(': stream-start\n\n');
+  const initChunk = { id: 'vajb-init', object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }] };
+  res.write('data: ' + JSON.stringify(initChunk) + '\n\n');
+  if (res.flush) res.flush();
+
+  let stream;
+  try {
+    stream = await withRetry(() => client.responses.create(payload));
+  } catch (err) {
+    clearInterval(timeoutCheck);
+    clearInterval(keepAlive);
+    const msg = err?.message || 'upstream request failed';
+    console.error(`OpenAI Responses create() failed for model=${resolved.backendModel}: ${msg}`);
+    if (!res.writableEnded && !clientClosed) {
+      const errChunk = {
+        id: 'vajb-error',
+        object: 'chat.completion.chunk',
+        model: resolved.id,
+        choices: [{ index: 0, delta: {}, finish_reason: 'error' }],
+        error: { message: 'Stream prekinut: ' + msg },
+      };
+      try {
+        res.write('data: ' + JSON.stringify(errChunk) + '\n\n');
+        res.write('data: [DONE]\n\n');
+        if (res.flush) res.flush();
+        res.end();
+      } catch { /* client already gone */ }
+    }
+    return;
+  }
+
+  let usage = { input_tokens: 0, output_tokens: 0, reasoning_tokens: 0, cached_input_tokens: 0 };
+  let chunkCount = 0;
+  let midStreamError = null;
+  let sawToolCall = false;
+
+  // Map Responses item_id → Chat Completions tool_calls[].index. The first
+  // time we see an item_id we assign it the next slot; subsequent arg
+  // deltas reuse that index so the client can aggregate correctly.
+  const toolIndexByItemId = new Map();
+  let nextToolIndex = 0;
+
+  const writeChunk = (delta, finish_reason = null) => {
+    if (res.writableEnded || clientClosed) return;
+    const chunk = {
+      id: 'vajb-resp',
+      object: 'chat.completion.chunk',
+      model: resolved.id,
+      choices: [{ index: 0, delta, finish_reason }],
+    };
+    res.write('data: ' + JSON.stringify(chunk) + '\n\n');
+    if (res.flush) res.flush();
+    chunkCount++;
+  };
+
+  let firstChunkReceived = false;
+  const firstChunkWatchdog = setTimeout(() => {
+    if (!firstChunkReceived) {
+      console.error(`OpenAI Responses first-chunk timeout for model=${resolved.backendModel}`);
+      try { stream.controller?.abort(); } catch { /* ignore */ }
+    }
+  }, 120_000);
+
+  try {
+    for await (const event of stream) {
+      if (!firstChunkReceived) {
+        firstChunkReceived = true;
+        clearTimeout(firstChunkWatchdog);
+      }
+      if (res.writableEnded || clientClosed) {
+        try { stream.controller?.abort(); } catch { /* ignore */ }
+        break;
+      }
+      lastChunkTime = Date.now();
+
+      const t = event?.type;
+      if (t === 'response.output_text.delta') {
+        const delta = event.delta || '';
+        if (delta) writeChunk({ content: delta });
+      } else if (t === 'response.output_item.added') {
+        const item = event.item;
+        if (item?.type === 'function_call') {
+          sawToolCall = true;
+          const idx = nextToolIndex++;
+          toolIndexByItemId.set(item.id, idx);
+          writeChunk({
+            tool_calls: [{
+              index: idx,
+              id: item.call_id,
+              type: 'function',
+              function: { name: item.name || '', arguments: '' },
+            }],
+          });
+        }
+      } else if (t === 'response.function_call_arguments.delta') {
+        const idx = toolIndexByItemId.get(event.item_id);
+        if (idx !== undefined && event.delta) {
+          writeChunk({
+            tool_calls: [{
+              index: idx,
+              function: { arguments: event.delta },
+            }],
+          });
+        }
+      } else if (t === 'response.completed') {
+        const u = event.response?.usage;
+        if (u) {
+          usage.input_tokens = u.input_tokens ?? usage.input_tokens;
+          usage.output_tokens = u.output_tokens ?? usage.output_tokens;
+          usage.reasoning_tokens = u.output_tokens_details?.reasoning_tokens ?? usage.reasoning_tokens;
+          usage.cached_input_tokens = u.input_tokens_details?.cached_tokens ?? usage.cached_input_tokens;
+        }
+      } else if (t === 'response.failed' || t === 'error' || t === 'response.error') {
+        const msg = event.error?.message || event.message || 'Responses API error';
+        midStreamError = new Error(msg);
+        break;
+      }
+      // Other event types (response.created, response.in_progress,
+      // response.output_item.done, reasoning.* etc.) are informational —
+      // we don't need to forward them as Chat Completions chunks. The
+      // heartbeat loop keeps the socket warm between meaningful deltas.
+    }
+  } catch (streamErr) {
+    midStreamError = streamErr;
+    console.error('OpenAI Responses stream error mid-flight:', streamErr.message);
+  }
+
+  clearTimeout(firstChunkWatchdog);
+  clearInterval(timeoutCheck);
+  clearInterval(keepAlive);
+  req.off?.('close', onClientClose);
+
+  if (midStreamError && !res.writableEnded && !clientClosed) {
+    const errChunk = {
+      id: 'vajb-error',
+      object: 'chat.completion.chunk',
+      model: resolved.id,
+      choices: [{ index: 0, delta: {}, finish_reason: 'error' }],
+      error: { message: 'Stream prekinut: ' + (midStreamError.message || 'upstream error') },
+    };
+    res.write('data: ' + JSON.stringify(errChunk) + '\n\n');
+    if (res.flush) res.flush();
+  } else if (!res.writableEnded && !clientClosed) {
+    // Emit a final chunk with finish_reason so the client parser flushes
+    // the accumulated tool_calls / content correctly.
+    const finish = sawToolCall ? 'tool_calls' : 'stop';
+    writeChunk({}, finish);
+  }
+
+  if (usage.input_tokens === 0 && usage.output_tokens === 0) {
+    const estIn = Math.max(chunkCount * 50, 1000);
+    const estOut = Math.max(chunkCount * 15, 200);
+    usage.input_tokens = estIn;
+    usage.output_tokens = estOut;
+    console.log(`OpenAI Responses stream: no usage reported, estimating ~${estIn} in / ~${estOut} out from ${chunkCount} chunks`);
+  }
+  if (usage.reasoning_tokens > 0) {
+    console.log(`OpenAI Responses stream reasoning tokens: ${usage.reasoning_tokens} (billed as output, total output=${usage.output_tokens})`);
+  }
+  try {
+    const billingUsage = { ...usage, model: resolved.backendModel };
+    const cachedInput = usage.cached_input_tokens || 0;
+    const uncachedInput = Math.max(0, (usage.input_tokens || 0) - cachedInput);
+    if (cachedInput > 0) {
+      console.log(`OpenAI Responses stream cache hit: cached=${cachedInput}/${usage.input_tokens} input tokens`);
+    }
+    const usd = costUsdWithCache({
+      uncachedInput,
+      cacheReadInput: cachedInput,
+      cacheCreationInput: 0,
+      outputTokens: usage.output_tokens,
+    }, resolved.backendModel, keyId);
+    const newBal = await deductBalance(keyId, usd);
+    await logUsage(keyId, billingUsage);
+
+    const warning = await getBalanceWarning(keyId, newBal, req);
+    if (warning && !res.writableEnded) {
+      const warnChunk = { id: 'vajb-warn', object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { content: warning }, finish_reason: null }] };
+      res.write('data: ' + JSON.stringify(warnChunk) + '\n\n');
+    }
+    emitBalanceEvent(res, newBal, resolved.id);
+  } catch (billingErr) {
+    console.error('Post-stream billing error (Responses):', billingErr.message);
   }
   if (!res.writableEnded) {
     res.write('data: [DONE]\n\n');

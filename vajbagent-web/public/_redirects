@@ -1,1 +1,10 @@
+# Preview paths must be handled by the in-browser Service Worker.
+# If the SW isn't active yet (first visit, not controlling, disabled, etc.),
+# serving /__vajb_preview/... via the SPA fallback would load our entire
+# React app inside the preview iframe, which then fails with CORS noise
+# because the iframe is sandboxed to a null origin. Return 404 instead
+# so the preview layer knows to retry/fall back to blob mode.
+/__vajb_preview/*  /preview-unavailable.html  404
+
+# Default SPA fallback for the main app.
 /*    /index.html   200

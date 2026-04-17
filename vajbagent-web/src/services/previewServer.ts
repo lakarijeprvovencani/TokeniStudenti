@@ -21,6 +21,11 @@ export const PREVIEW_PREFIX = '/__vajb_preview/'
 
 let registrationPromise: Promise<ServiceWorkerRegistration | null> | null = null
 
+/** Captured at module load — used to detect whether we can still safely
+ *  force-reload. If the user has interacted, navigated, or even just sat
+ *  long enough for React to fully mount, we bail. */
+const moduleLoadTime = typeof performance !== 'undefined' ? performance.now() : Date.now()
+
 /**
  * Register the preview service worker if it isn't already. Resolves with
  * the registration once an active worker exists, or null if the browser
@@ -39,10 +44,8 @@ export function ensurePreviewServer(): Promise<ServiceWorkerRegistration | null>
     try {
       const existing = await navigator.serviceWorker.getRegistration(SW_PATH)
       const reg = existing ?? await navigator.serviceWorker.register(SW_PATH, { scope: '/' })
-      // Wait for an active + controlling worker. On the very first visit the
-      // page that *installed* the SW doesn't get controlled until reload —
-      // but publishPreview works via postMessage so that's fine as long as
-      // reg.active exists.
+
+      // Wait for an active worker (install → activate).
       if (!reg.active) {
         const pending = reg.installing || reg.waiting
         if (pending) {
@@ -53,6 +56,48 @@ export function ensurePreviewServer(): Promise<ServiceWorkerRegistration | null>
             pending.addEventListener('statechange', check)
             check()
           })
+        }
+      }
+
+      // CRITICAL: wait until the SW actually *controls* this page.
+      // Without this, fetches to /__vajb_preview/... bypass the worker
+      // and hit Netlify, which returns the SPA fallback (our React app)
+      // inside the preview iframe. On first visit, clients.claim() fires
+      // controllerchange; on revisits, navigator.serviceWorker.controller
+      // is usually set before we even get here.
+      if (!navigator.serviceWorker.controller) {
+        await new Promise<void>((resolve) => {
+          const done = () => resolve()
+          const timer = setTimeout(done, 3000) // hard cap so UI doesn't hang
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            clearTimeout(timer)
+            done()
+          }, { once: true })
+        })
+      }
+
+      // Still no controller? The page was loaded before the SW claimed it
+      // (common on first install). If we're still within the first ~2s of
+      // page load we CAN safely force a silent reload — the user hasn't
+      // had time to click anything or start typing. Past that window we
+      // leave it alone and let PreviewPanel's blob fallback take over, so
+      // we never nuke in-flight user input.
+      if (reg.active && !navigator.serviceWorker.controller) {
+        try {
+          const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+          const elapsed = now - moduleLoadTime
+          const RELOAD_KEY = 'vajb_sw_bootstrap_reloaded'
+          const hasInteracted = document.querySelector('textarea, input[type="text"]') &&
+            (document.querySelector('textarea')?.value || '').length > 0
+          if (elapsed < 2000 && !sessionStorage.getItem(RELOAD_KEY) && !hasInteracted) {
+            sessionStorage.setItem(RELOAD_KEY, '1')
+            console.info('[previewServer] SW active but not controlling — one-time silent reload to claim (boot window)')
+            window.location.reload()
+            await new Promise(() => {}) // never resolves; reload tears the module down
+          }
+        } catch {
+          // sessionStorage or DOM query can throw in weird envs — just
+          // skip the auto-reload and fall back to blob preview path.
         }
       }
       return reg

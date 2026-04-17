@@ -244,16 +244,16 @@ function AppInner() {
     return () => { cancelled = true }
   }, [])
 
-  // Free tier users keep the default Max model so their first build
-  // experience is the "wow" Lovable/Bolt-style demo — they have $2 of
-  // signup credit which comfortably covers 4-6 full Max builds. If they
-  // had previously picked a locked tier (Power/Ultra/Architect) before
-  // going free, we drop them back to Max instead of Lite. See backend
-  // FREE_TIER_ALLOWED set in src/index.js for the authoritative gate.
+  // Free tier users get Turbo (Haiku 4.5) by default — in practice it
+  // finishes typical "make me a site" prompts in 2-3 min with clean
+  // serial tool use, where Max (Sonnet 4.6) regularly brain-stucks on
+  // rewriting the same file 3-4 times. If the user had picked a locked
+  // tier (Power/Ultra/Architect) before going free, drop them to Turbo.
+  // The backend FREE_TIER_ALLOWED set in src/index.js is the authoritative gate.
   useEffect(() => {
     if (!user?.freeTier) return
     const FREE_OK = new Set(['vajb-agent-lite', 'vajb-agent-turbo', 'vajb-agent-pro', 'vajb-agent-max'])
-    if (!FREE_OK.has(model)) setModel('vajb-agent-max')
+    if (!FREE_OK.has(model)) setModel('vajb-agent-turbo')
   }, [user?.freeTier])
 
   const handleAuth = useCallback((userInfo: UserInfo) => {
