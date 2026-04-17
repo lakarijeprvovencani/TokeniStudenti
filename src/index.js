@@ -2094,12 +2094,23 @@ async function handleAnthropic(req, res, keyId, resolved, messages, openAITools,
         : t)
     : anthropicTools;
 
+  // Opus 4.7 (released 2026-04-16) dropped manual extended thinking —
+  // `thinking: { type: "enabled", budget_tokens: N }` is rejected with
+  // HTTP 400. It ONLY supports adaptive thinking, and if you send no
+  // thinking param at all the model skips reasoning entirely, which is
+  // a quality regression for a premium tier. So for 4.7 we explicitly
+  // opt in to adaptive thinking; older models stay on their default
+  // (no thinking param, since adaptive support on Sonnet/Haiku 4.x is
+  // not universally reliable and we prefer not to risk a 400).
+  const wantsAdaptiveThinking = resolved.backendModel === 'claude-opus-4-7';
+
   const payload = {
     model: resolved.backendModel,
     max_tokens: maxTokens,
     messages: anthropicMessages,
     ...(systemPayload && { system: systemPayload }),
     ...(cachedAnthropicTools.length > 0 && { tools: cachedAnthropicTools }),
+    ...(wantsAdaptiveThinking && { thinking: { type: 'adaptive' } }),
   };
 
   const poolEntry = acquireFromPool(anthropicPool, 'Anthropic');
