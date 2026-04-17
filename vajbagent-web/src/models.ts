@@ -10,9 +10,9 @@ export const MODELS: Model[] = [
   { id: 'vajb-agent-turbo',     name: 'Turbo',     desc: 'Brz, jeftin, precizan — jak tool-caller' },
   { id: 'vajb-agent-pro',       name: 'Pro',       desc: 'Ozbiljniji projekti, jak i pametan' },
   { id: 'vajb-agent-max',       name: 'Max',       desc: 'Najbolji balans cene i kvaliteta za sajtove', tag: 'Preporučeno' },
-  { id: 'vajb-agent-power',     name: 'Power',     desc: 'Najjači za zahtevne projekte' },
-  { id: 'vajb-agent-ultra',     name: 'Ultra',     desc: 'Premium kvalitet, vrhunska preciznost', tag: 'Najjači' },
-  { id: 'vajb-agent-architect', name: 'Architect', desc: 'Za složenije frontend projekte i planiranje strukture' },
+  { id: 'vajb-agent-power',     name: 'Power',     desc: 'Najjači OpenAI — flagship GPT-5.4' },
+  { id: 'vajb-agent-ultra',     name: 'Ultra',     desc: 'Opus 4.7 — najjači Anthropic, long-running coding', tag: 'Najjači' },
+  { id: 'vajb-agent-architect', name: 'Architect', desc: 'Opus 4.7 za full-stack arhitekturu i planiranje' },
 ]
 
 export const DEFAULT_MODEL = 'vajb-agent-max'

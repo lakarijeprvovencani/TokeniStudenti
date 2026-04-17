@@ -223,6 +223,11 @@ const PRICES = {
   // Claude models
   'claude-sonnet-4-6': { in: 3.00, out: 15.0 },
   'claude-opus-4-6':   { in: 5.00, out: 25.0 },
+  'claude-opus-4-7':   { in: 5.00, out: 25.0 },   // Released 2026-04-16, same pricing as 4.6.
+                                                   // Note: new tokenizer consumes up to 35% more
+                                                   // tokens for the same text → effective cost is
+                                                   // ~35% higher; factor into student markup if
+                                                   // profit margin matters.
   // Legacy (for historical cost calculations)
   'gpt-4.1-mini': { in: 0.40, out: 1.60 },
   'gpt-4.1':      { in: 2.00, out: 8.00 },
@@ -245,6 +250,7 @@ function getPrice(model) {
   if (m.includes('5.4'))      return PRICES['gpt-5.4'];
   if (m.includes('gpt-5'))    return PRICES['gpt-5'];
   if (m.includes('o4-mini'))  return PRICES['o4-mini'];
+  if (m.includes('opus-4-7') || m.includes('opus-4.7')) return PRICES['claude-opus-4-7'];
   if (m.includes('opus'))     return PRICES['claude-opus-4-6'];
   if (m.includes('sonnet'))   return PRICES['claude-sonnet-4-6'];
   if (m.includes('haiku'))    return PRICES['claude-haiku-4-5'];

@@ -12,7 +12,13 @@ interface ModelSelectorProps {
   freeTier?: boolean
 }
 
-const FREE_MODEL = 'vajb-agent-lite'
+// Free tier has access to Lite, Turbo, Pro, and Max — the last one being
+// our flagship-for-beginners (Claude Sonnet 4.6). This mirrors how Lovable
+// and Bolt let new users build a real site on their best model during the
+// trial. Power, Ultra and Architect stay locked as "premium" tiers that
+// unlock when the user tops up. Source of truth for the gate lives in
+// src/index.js (FREE_TIER_ALLOWED).
+const FREE_ALLOWED = new Set(['vajb-agent-lite', 'vajb-agent-turbo', 'vajb-agent-pro', 'vajb-agent-max'])
 
 export default function ModelSelector({ value, onChange, compact, freeTier }: ModelSelectorProps) {
   const [open, setOpen] = useState(false)
@@ -28,7 +34,7 @@ export default function ModelSelector({ value, onChange, compact, freeTier }: Mo
   }, [])
 
   const handleSelect = (modelId: string) => {
-    if (freeTier && modelId !== FREE_MODEL) return
+    if (freeTier && !FREE_ALLOWED.has(modelId)) return
     onChange(modelId)
     setOpen(false)
   }
@@ -51,7 +57,7 @@ export default function ModelSelector({ value, onChange, compact, freeTier }: Mo
             transition={{ duration: 0.15 }}
           >
             {MODELS.map(m => {
-              const locked = freeTier && m.id !== FREE_MODEL
+              const locked = freeTier && !FREE_ALLOWED.has(m.id)
               return (
                 <button
                   key={m.id}

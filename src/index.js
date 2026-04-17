@@ -71,6 +71,7 @@ const MAX_OUTPUT = {
   'claude-sonnet-4-6': 64000,    // verified: platform.claude.com/docs/en/about-claude/models/overview
   'gpt-5.4':           128000,   // verified: developers.openai.com/api/docs/models/gpt-5.4
   'claude-opus-4-6':   128000,   // verified: platform.claude.com/docs/en/about-claude/models/overview
+  'claude-opus-4-7':   128000,   // verified: anthropic.com/news/claude-opus-4-7 — released 2026-04-16, same 128K max output as 4.6
   // Legacy (fallback)
   'gpt-4.1-mini':      32768,    // verified: developers.openai.com/api/docs/models/gpt-4.1
   'gpt-4.1':           32768,    // verified: developers.openai.com/api/docs/models/gpt-4.1
@@ -82,8 +83,8 @@ const VAJB_MODELS = [
   { id: 'vajb-agent-pro',       name: 'VajbAgent Pro',       backend: 'openai',    backendModel: 'gpt-5',            desc: 'GPT-5 — ozbiljniji projekti, jak i pametan' },
   { id: 'vajb-agent-max',       name: 'VajbAgent Max',       backend: 'anthropic', backendModel: 'claude-sonnet-4-6', desc: 'Claude Sonnet — kompleksni zadaci' },
   { id: 'vajb-agent-power',     name: 'VajbAgent Power',     backend: 'openai',    backendModel: 'gpt-5.4',          desc: 'GPT-5.4 — najjači OpenAI, flagship' },
-  { id: 'vajb-agent-ultra',     name: 'VajbAgent Ultra',     backend: 'anthropic', backendModel: 'claude-opus-4-6',   desc: 'Claude Opus — premium Anthropic' },
-  { id: 'vajb-agent-architect', name: 'VajbAgent Architect', backend: 'anthropic', backendModel: 'claude-opus-4-6',   desc: 'Opus Architect — full-stack arhitekta', isPower: true },
+  { id: 'vajb-agent-ultra',     name: 'VajbAgent Ultra',     backend: 'anthropic', backendModel: 'claude-opus-4-7',   desc: 'Claude Opus 4.7 — najjači, long-running coding' },
+  { id: 'vajb-agent-architect', name: 'VajbAgent Architect', backend: 'anthropic', backendModel: 'claude-opus-4-7',   desc: 'Opus 4.7 Architect — full-stack arhitekta', isPower: true },
 ];
 const DEFAULT_VAJB_MODEL = VAJB_MODELS[0].id;
 
@@ -1706,15 +1707,25 @@ const chatCompletionsHandler = [
       });
     }
 
-    // Free tier: only Lite model allowed
-    if (resolved.id !== 'vajb-agent-lite') {
+    // Free tier: Lite/Turbo/Pro/Max are unlocked (so new users can build
+    // a real "wow" site from their first prompt, the way Lovable and Bolt
+    // do). Only the truly premium tiers — Power, Ultra, Architect — stay
+    // gated behind a credit top-up, so a $2 signup bonus can't evaporate
+    // in a single Opus run.
+    const FREE_TIER_ALLOWED = new Set([
+      'vajb-agent-lite',
+      'vajb-agent-turbo',
+      'vajb-agent-pro',
+      'vajb-agent-max',
+    ]);
+    if (!FREE_TIER_ALLOWED.has(resolved.id)) {
       const totalDep = await getTotalDeposited(keyId);
       const regBonus = parseFloat(process.env.SELF_REGISTER_BONUS) || 2;
       if (totalDep <= regBonus) {
         const baseUrl = process.env.BASE_URL || 'https://vajbagent.com';
         return res.status(403).json({
           error: {
-            message: `Model "${resolved.name}" je dostupan samo uz dopunu kredita. Besplatan nalog koristi Lite model. Dopuni na: ${baseUrl}/dashboard`,
+            message: `Model "${resolved.name}" je dostupan uz dopunu kredita. Besplatan nalog može da koristi Lite, Turbo, Pro ili Max — probaj Max (preporučeno) ili dopuni na: ${baseUrl}/dashboard`,
             code: 'free_tier_model_locked',
             dashboard_url: `${baseUrl.replace(/\/$/, '')}/dashboard`,
           },

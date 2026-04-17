@@ -116,6 +116,10 @@ const MODEL_INPUT_LIMITS = {
   'claude-haiku-4-5':  { tokens: 130000, chars: 520000 },   // 200K context - 64K max output
   'claude-sonnet-4-6': { tokens: 900000, chars: 3600000 },  // 1M context - 64K max output
   'claude-opus-4-6':   { tokens: 870000, chars: 3480000 },  // 1M context - 128K max output
+  'claude-opus-4-7':   { tokens: 180000, chars: 720000 },   // 200K context - 128K max output
+                                                             // (4.7 uses new tokenizer that can
+                                                             // consume up to 35% more tokens, so
+                                                             // we cap char budget conservatively)
   // Legacy
   'gpt-4o-mini':       { tokens: 100000, chars: 400000 },
   'gpt-4o':            { tokens: 100000, chars: 400000 },

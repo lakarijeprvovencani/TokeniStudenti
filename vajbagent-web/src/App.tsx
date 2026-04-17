@@ -216,11 +216,16 @@ function AppInner() {
     return () => { cancelled = true }
   }, [])
 
-  // Auto-select Lite for free tier users
+  // Free tier users keep the default Max model so their first build
+  // experience is the "wow" Lovable/Bolt-style demo — they have $2 of
+  // signup credit which comfortably covers 4-6 full Max builds. If they
+  // had previously picked a locked tier (Power/Ultra/Architect) before
+  // going free, we drop them back to Max instead of Lite. See backend
+  // FREE_TIER_ALLOWED set in src/index.js for the authoritative gate.
   useEffect(() => {
-    if (user?.freeTier && model !== 'vajb-agent-lite') {
-      setModel('vajb-agent-lite')
-    }
+    if (!user?.freeTier) return
+    const FREE_OK = new Set(['vajb-agent-lite', 'vajb-agent-turbo', 'vajb-agent-pro', 'vajb-agent-max'])
+    if (!FREE_OK.has(model)) setModel('vajb-agent-max')
   }, [user?.freeTier])
 
   const handleAuth = useCallback((userInfo: UserInfo) => {
