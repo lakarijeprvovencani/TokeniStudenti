@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { Sparkles, Zap, Crown, X, Loader2, Gift } from 'lucide-react'
@@ -39,6 +39,15 @@ export default function PaywallModal({ open, onClose, variant = 'welcome', onSki
   const [customMode, setCustomMode] = useState(false)
   const [customAmount, setCustomAmount] = useState('10')
 
+  // Esc-to-close, regardless of variant. Attach only while open so we
+  // don't leak listeners when the modal is closed.
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
   const startCheckout = async (usd: number) => {
     if (usd < 1 || usd > 1000) {
       setError('Iznos mora biti između $1 i $1000.')
@@ -75,7 +84,7 @@ export default function PaywallModal({ open, onClose, variant = 'welcome', onSki
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={isOut ? undefined : onClose}
+          onClick={onClose}
         >
           <motion.div
             className="paywall-modal"
@@ -85,11 +94,13 @@ export default function PaywallModal({ open, onClose, variant = 'welcome', onSki
             transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
             onClick={(e) => e.stopPropagation()}
           >
-            {!isOut && (
-              <button className="paywall-close" onClick={onClose}>
-                <X size={18} />
-              </button>
-            )}
+            {/* Close button is always available — even when out of credits
+                the user must be able to dismiss the modal (to go check
+                projects, copy code, etc.). We show the paywall again the
+                next time they try to send a chat message. */}
+            <button className="paywall-close" onClick={onClose} aria-label="Zatvori">
+              <X size={18} />
+            </button>
 
             <div className="paywall-header">
               <div className="paywall-badge">

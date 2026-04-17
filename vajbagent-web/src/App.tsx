@@ -144,6 +144,19 @@ function AppInner() {
     prebootWebContainer()
   }, [])
 
+  // Keep the top-level user.balance in sync with real-time balance events
+  // fired by ChatPanel after each billing cycle. Welcome + IDELayout both
+  // read `user.balance` off props so updating it here is enough.
+  useEffect(() => {
+    const onBalance = (e: Event) => {
+      const detail = (e as CustomEvent<number>).detail
+      if (typeof detail !== 'number' || !Number.isFinite(detail)) return
+      setUser(prev => (prev ? { ...prev, balance: detail } : prev))
+    }
+    window.addEventListener('vajb:balance', onBalance as EventListener)
+    return () => window.removeEventListener('vajb:balance', onBalance as EventListener)
+  }, [])
+
   const migrateLocalProjects = useCallback(async () => {
     setMigrationBanner(prev => prev ? { ...prev, running: true } : null)
     try {

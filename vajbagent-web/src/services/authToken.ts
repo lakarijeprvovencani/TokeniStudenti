@@ -39,13 +39,44 @@ try { API_HOST = new URL(API_URL).host } catch { /* ignore */ }
 let cached: string | null = null
 let installed = false
 
-function readStored(): string | null {
+// Safari Private Mode / Brave Strict Incognito occasionally throw on
+// localStorage.setItem with a QuotaExceededError (or return a window.local
+// Storage that silently drops writes). We fall through to sessionStorage —
+// which those browsers keep functional — so the Bearer fallback still
+// survives a page refresh within the same tab. Without this rescue, users
+// get logged out on every refresh in private windows.
+function readFromStorage(store: Storage | undefined | null): string | null {
+  if (!store) return null
   try {
-    const v = localStorage.getItem(STORAGE_KEY)
+    const v = store.getItem(STORAGE_KEY)
     return v && typeof v === 'string' && v.length > 8 ? v : null
   } catch {
     return null
   }
+}
+
+function writeToStorage(store: Storage | undefined | null, key: string): boolean {
+  if (!store) return false
+  try {
+    store.setItem(STORAGE_KEY, key)
+    // Round-trip verification — some private modes accept setItem but then
+    // drop the value, so we can't trust a clean throw.
+    return store.getItem(STORAGE_KEY) === key
+  } catch {
+    return false
+  }
+}
+
+function removeFromStorage(store: Storage | undefined | null): void {
+  if (!store) return
+  try { store.removeItem(STORAGE_KEY) } catch { /* ignore */ }
+}
+
+function readStored(): string | null {
+  // localStorage first (survives new tabs + full shutdown in normal mode);
+  // sessionStorage second (survives refreshes even in strict private mode).
+  return readFromStorage(typeof localStorage !== 'undefined' ? localStorage : null)
+    || readFromStorage(typeof sessionStorage !== 'undefined' ? sessionStorage : null)
 }
 
 export function getApiKey(): string | null {
@@ -57,11 +88,20 @@ export function getApiKey(): string | null {
 export function setApiKey(key: string | null | undefined): void {
   if (!key) {
     cached = null
-    try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
+    removeFromStorage(typeof localStorage !== 'undefined' ? localStorage : null)
+    removeFromStorage(typeof sessionStorage !== 'undefined' ? sessionStorage : null)
     return
   }
   cached = key
-  try { localStorage.setItem(STORAGE_KEY, key) } catch { /* ignore */ }
+  const wroteLocal = writeToStorage(typeof localStorage !== 'undefined' ? localStorage : null, key)
+  // Always mirror to sessionStorage too — cheap and rescues us when
+  // localStorage silently drops the write.
+  const wroteSession = writeToStorage(typeof sessionStorage !== 'undefined' ? sessionStorage : null, key)
+  if (!wroteLocal && !wroteSession) {
+    console.warn('[authToken] Neither localStorage nor sessionStorage is writable — user will be logged out on refresh.')
+  } else if (!wroteLocal) {
+    console.warn('[authToken] localStorage unavailable (likely private mode). Falling back to sessionStorage — user will be logged out when this tab is closed.')
+  }
 }
 
 export function clearApiKey(): void {

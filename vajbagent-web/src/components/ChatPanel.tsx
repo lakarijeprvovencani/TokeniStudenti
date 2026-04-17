@@ -718,6 +718,17 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
 
     if (!res.ok || !res.body) throw new Error(`API greska: ${res.status}`)
 
+    // Some proxies expose the post-charge balance as a response header on
+    // non-stream responses — forward to listeners if present so the topbar
+    // updates immediately.
+    try {
+      const hdr = res.headers.get('X-Vajb-Balance') || res.headers.get('x-vajb-balance')
+      if (hdr) {
+        const bal = Number(hdr)
+        if (Number.isFinite(bal)) window.dispatchEvent(new CustomEvent('vajb:balance', { detail: bal }))
+      }
+    } catch { /* ignore */ }
+
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
     let fullText = ''
@@ -789,6 +800,15 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
 
           if (parsed.error?.message) {
             throw new Error(String(parsed.error.message))
+          }
+
+          // Backend injects real-time balance updates as specially-marked
+          // chunks after each billing cycle. Forward to any listener so the
+          // topbar can re-render without an extra /auth/me roundtrip.
+          if (typeof parsed.vajb_balance === 'number') {
+            try {
+              window.dispatchEvent(new CustomEvent('vajb:balance', { detail: parsed.vajb_balance }))
+            } catch { /* ignore */ }
           }
 
           const choice = parsed.choices?.[0]

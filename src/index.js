@@ -369,6 +369,10 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Secret', 'X-Vajb-Client'],
+  // Expose X-Vajb-Balance so the SPA can read the post-charge balance off the
+  // /v1/chat/completions response and update the topbar in real time without
+  // waiting for the full stream to finish + a /auth/me roundtrip.
+  exposedHeaders: ['X-Vajb-Balance'],
   maxAge: 600,
 }));
 
@@ -1766,8 +1770,38 @@ function isWebOrigin(req) {
   } catch { return false; }
 }
 
+/**
+ * Emit an SSE event carrying the user's post-charge balance. Frontend picks
+ * this up in-stream and updates the topbar without waiting for a separate
+ * /auth/me roundtrip. The payload is wrapped in a regular OpenAI chat.chunk
+ * envelope so existing SSE parsers don't choke — we embed our value under a
+ * namespaced field (`vajb_balance`) which legit chunks never carry.
+ */
+function emitBalanceEvent(res, balanceUsd, modelId) {
+  if (!res || res.writableEnded || typeof balanceUsd !== 'number' || !Number.isFinite(balanceUsd)) return;
+  const chunk = {
+    id: 'vajb-balance',
+    object: 'chat.completion.chunk',
+    model: modelId,
+    vajb_balance: Number(balanceUsd.toFixed(6)),
+    choices: [{ index: 0, delta: {}, finish_reason: null }],
+  };
+  try {
+    res.write('data: ' + JSON.stringify(chunk) + '\n\n');
+    if (res.flush) res.flush();
+  } catch { /* ignore */ }
+}
+
 async function getBalanceWarning(keyId, newBalance, req) {
   // Web app handles its own low-balance UX via PaywallModal — don't double up.
+  // Two independent signals so we never leak the fallback-message into the
+  // chat bubble of a web user:
+  //   1. X-Vajb-Client header (authoritative, set by ChatPanel.tsx on every
+  //      request). Takes precedence.
+  //   2. isWebOrigin(req) as a fallback for callers that don't set the
+  //      header yet (older extension builds, curl tests).
+  const clientHeader = (req?.headers?.['x-vajb-client'] || '').toString().toLowerCase();
+  if (clientHeader === 'web') return null;
   if (isWebOrigin(req)) return null;
 
   if (newBalance <= LOW_BALANCE_THRESHOLD) {
@@ -2045,6 +2079,12 @@ async function handleOpenAINonStream(req, res, keyId, resolved, payload, client)
     response.choices[0].message.content += warning;
   }
 
+  // Non-stream response: expose the post-charge balance as a header so the
+  // SPA can live-update the topbar.
+  if (typeof newBal === 'number' && Number.isFinite(newBal)) {
+    res.setHeader('X-Vajb-Balance', Number(newBal.toFixed(6)).toString());
+  }
+
   response.model = resolved.id;
   res.json(response);
 }
@@ -2191,6 +2231,7 @@ async function handleOpenAIStream(req, res, keyId, resolved, payload, client) {
       const warnChunk = { id: 'vajb-warn', object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { content: warning }, finish_reason: null }] };
       res.write('data: ' + JSON.stringify(warnChunk) + '\n\n');
     }
+    emitBalanceEvent(res, newBal, resolved.id);
   } catch (billingErr) {
     console.error('Post-stream billing error:', billingErr.message);
   }
@@ -2319,6 +2360,10 @@ async function handleAnthropicNonStream(req, res, keyId, resolved, payload, clie
   const warning = await getBalanceWarning(keyId, newBal, req);
   if (warning && openAIResponse.choices?.[0]?.message?.content) {
     openAIResponse.choices[0].message.content += warning;
+  }
+
+  if (typeof newBal === 'number' && Number.isFinite(newBal)) {
+    res.setHeader('X-Vajb-Balance', Number(newBal.toFixed(6)).toString());
   }
 
   res.json(openAIResponse);
@@ -2566,6 +2611,7 @@ async function handleAnthropicStream(req, res, keyId, resolved, payload, client)
       const warnChunk = { id: streamId + '-warn', object: 'chat.completion.chunk', model: resolved.id, choices: [{ index: 0, delta: { content: warning }, finish_reason: null }] };
       res.write('data: ' + JSON.stringify(warnChunk) + '\n\n');
     }
+    emitBalanceEvent(res, newBal, resolved.id);
   } catch (billingErr) {
     console.error('Post-stream billing error:', billingErr.message);
   }

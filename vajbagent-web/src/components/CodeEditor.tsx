@@ -68,6 +68,11 @@ export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile
   // when the AGENT writes to the currently-open file while the user is idle.
   const lastSyncedContentRef = useRef<string>('')
   const lastSyncedPathRef = useRef<string>('')
+  // Flag set while we programmatically call editor.setValue() so we can
+  // ignore the onChange event Monaco fires in response. Without this,
+  // every live-streaming chunk round-trips through onFileEdit → writeFile
+  // → WebContainers, producing 30+ disk writes per agent tool call.
+  const programmaticSyncRef = useRef(false)
 
   // Track open tabs
   useEffect(() => {
@@ -172,7 +177,16 @@ export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile
 
     // Preserve cursor position when agent updates the current file while user isn't focused
     const position = editor.getPosition()
-    editor.setValue(content)
+    programmaticSyncRef.current = true
+    try {
+      editor.setValue(content)
+    } finally {
+      // Monaco dispatches onDidChangeModelContent synchronously from
+      // setValue, but the @monaco-editor/react wrapper forwards it via a
+      // microtask. Reset the flag on the next tick so that microtask
+      // still sees it as a programmatic sync.
+      Promise.resolve().then(() => { programmaticSyncRef.current = false })
+    }
     if (!fileChanged && position) {
       try { editor.setPosition(position) } catch { /* ignore */ }
     }
@@ -337,10 +351,24 @@ export default function CodeEditor({ files, activeFile, onFileEdit, onSelectFile
         theme="vs-dark"
         onMount={handleEditorMount}
         onChange={(value) => {
-          if (activeFile && onFileEdit && value !== undefined) {
+          if (!activeFile || !onFileEdit || value === undefined) return
+          // Ignore echoes from our own setValue() — those aren't user
+          // edits, and if we pass them through as writes we'd persist
+          // every live-streaming chunk (30+ writes per agent tool call).
+          if (programmaticSyncRef.current) {
             lastSyncedContentRef.current = value
-            onFileEdit(activeFile, value)
+            return
           }
+          // Also short-circuit during agent streaming: the tool call
+          // that's producing these updates will do its own authoritative
+          // writeFile at the end, so persisting intermediate states is
+          // pure waste.
+          if (isAgentStreaming) {
+            lastSyncedContentRef.current = value
+            return
+          }
+          lastSyncedContentRef.current = value
+          onFileEdit(activeFile, value)
         }}
         options={{
           readOnly: false,

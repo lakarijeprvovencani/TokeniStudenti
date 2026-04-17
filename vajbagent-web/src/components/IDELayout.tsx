@@ -95,6 +95,18 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
     if (resumeProject?.name) projectNameRef.current = resumeProject.name
   }, [])
 
+  // Pin `lastProjectId` immediately on mount so a page refresh in the first
+  // few seconds (before the 5s auto-save debounce fires) still brings the
+  // user straight back into this project instead of dumping them on welcome.
+  // Scoped per-user via getScope() — matches App.tsx/lastProjectKey().
+  useEffect(() => {
+    const scope = getScope()
+    if (!scope) return
+    try {
+      localStorage.setItem(`vajb_last_active_project::${scope}`, projectIdRef.current)
+    } catch { /* ignore */ }
+  }, [])
+
   // Filter out build artifacts, keeping source files + small build HTML/CSS for instant preview on resume
   const SKIP_PATTERNS = /^(\.next\/|node_modules\/|\.cache\/|\.turbo\/|coverage\/)/
   const SKIP_EXTENSIONS = /\.(pack|map|d\.ts|tsbuildinfo)$/
@@ -306,6 +318,20 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
       setGhUsername(s.info?.username || null)
     }).catch(() => {})
     nlInt.getStatus().then(s => setNlConnected(s.connected)).catch(() => {})
+  }, [])
+
+  // Real-time balance updates: backend emits `vajb:balance` events (via
+  // ChatPanel SSE parser or response headers) after each billing cycle. We
+  // mutate userInfo.balance in place so the topbar credit counter reflects
+  // the post-charge value without waiting for the stream to fully end.
+  useEffect(() => {
+    const onBalance = (e: Event) => {
+      const detail = (e as CustomEvent<number>).detail
+      if (typeof detail !== 'number' || !Number.isFinite(detail)) return
+      setUserInfo(prev => (prev ? { ...prev, balance: detail } : prev))
+    }
+    window.addEventListener('vajb:balance', onBalance as EventListener)
+    return () => window.removeEventListener('vajb:balance', onBalance as EventListener)
   }, [])
 
   const [hasDevServer, setHasDevServer] = useState(!!getServerUrl())
