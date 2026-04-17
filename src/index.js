@@ -32,7 +32,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { logUsage, getUsageSummary, getUsageForKey, getModelStats } from './usage.js';
+import { logUsage, getUsageSummary, getUsageForKey, getModelStats, getMonthlyAggregates } from './usage.js';
 import { getBalance, deductBalance, costUsd, costUsdWithCache, addBalance, getTotalDeposited, loadStudentMarkupFlags, setStudentNoMarkup, getStudentMarkup, providerCostUsd, getPrices } from './balance.js';
 import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP, addStudentWithPassword, authenticateWithPassword, setStudentPassword, studentHasPassword } from './students.js';
 import { sendWelcomeEmail, sendRecoveryEmail, isEmailConfigured } from './email.js';
@@ -2737,6 +2737,27 @@ app.get('/admin/api/overview', adminLimiter, requireAdmin, asyncHandler(async (_
   const firstUse = Object.values(allUsage)
     .map(u => u.last_used).filter(Boolean).sort()[0] || null;
 
+  // Monthly revenue timeline. The usage store only started tracking per-month
+  // breakdowns from the release that added by_month — older installs will see
+  // an empty / partial timeline until usage accumulates, which is expected.
+  const monthlyRaw = await getMonthlyAggregates({
+    isNoMarkup: async (kid) => {
+      const s = await findByKey(kid);
+      return !!(s && s.noMarkup);
+    },
+    providerCost: (model, inTok, outTok) => providerCostUsd(inTok, outTok, model),
+    getMarkup: (model) => getStudentMarkup(model),
+  });
+  const monthly = monthlyRaw.map(r => ({
+    month: r.month,
+    requests: r.requests,
+    input_tokens: r.input_tokens,
+    output_tokens: r.output_tokens,
+    provider_cost_usd: Math.round(r.provider_cost_usd * 1e6) / 1e6,
+    charged_usd: Math.round(r.charged_usd * 1e6) / 1e6,
+    profit_usd: Math.round(r.profit_usd * 1e6) / 1e6,
+  }));
+
   res.json({
     models: VAJB_MODELS.map((m) => ({
       id: m.id, name: m.name, backend: m.backend, backendModel: m.backendModel, desc: m.desc,
@@ -2759,7 +2780,9 @@ app.get('/admin/api/overview', adminLimiter, requireAdmin, asyncHandler(async (_
       anthropic_cost_usd: Math.round(anthropicCost * 1e6) / 1e6,
     },
     model_stats: modelStats,
+    monthly,
     first_use: firstUse,
+    server_time: new Date().toISOString(),
   });
 }));
 

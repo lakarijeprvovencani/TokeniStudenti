@@ -66,6 +66,23 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .mb-info{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.63rem;color:var(--text);font-weight:500}
 .mb-cost{width:80px;font-size:.78rem;text-align:right;color:var(--red);flex-shrink:0;font-weight:600}
 
+/* Monthly history rows — month label + 3 segmented numbers + profit bar */
+.mo-row{display:grid;grid-template-columns:90px 1fr 90px 90px 100px;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border)}
+.mo-row:last-child{border-bottom:none}
+.mo-row.mo-current{background:linear-gradient(90deg,rgba(34,197,94,.04),transparent);border-radius:8px;padding:10px 12px}
+.mo-month{font-size:.82rem;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.mo-month-sub{font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;font-weight:600}
+.mo-bar-wrap{height:18px;background:var(--surface2);border-radius:5px;overflow:hidden;position:relative}
+.mo-bar{height:100%;background:linear-gradient(90deg,#15803d,#22c55e);border-radius:5px;min-width:2px;transition:width .6s}
+.mo-bar.neg{background:linear-gradient(90deg,#7f1d1d,var(--red))}
+.mo-bar-label{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:.62rem;color:#fff;font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,.4);font-variant-numeric:tabular-nums}
+.mo-num{font-size:.78rem;text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.mo-num.cost{color:var(--text2)}
+.mo-num.charged{color:var(--blue)}
+.mo-num.profit{color:var(--green)}
+.mo-num .lbl{display:block;font-size:.55rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;font-weight:700;margin-bottom:2px}
+.mo-empty{text-align:center;padding:24px;color:var(--text3);font-size:.82rem}
+
 /* Tables */
 table{width:100%;border-collapse:collapse}
 th,td{padding:10px 12px;text-align:left;font-size:.8rem;border-bottom:1px solid var(--border)}
@@ -205,13 +222,37 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
         <div id="modelBreakdown"></div>
       </div>
 
+      <!-- OVAJ MESEC — prominent real-data card for the running month -->
+      <div class="card" style="border-left:3px solid var(--green)">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span id="thisMonthTitle">Ovaj mesec (stvarni podaci)</span>
+          <span id="thisMonthTrend" style="font-size:.7rem;color:var(--text3);text-transform:none;letter-spacing:0;font-weight:500"></span>
+        </div>
+        <div class="summary" style="grid-template-columns:repeat(4,1fr);margin-bottom:0">
+          <div class="sum-card"><div class="sum-label">API trošak</div><div class="sum-val c-red" id="tmCost">$0</div><div class="sum-sub" id="tmCostD"></div></div>
+          <div class="sum-card"><div class="sum-label">Naplaćeno</div><div class="sum-val c-blue" id="tmCharged">$0</div><div class="sum-sub" id="tmChargedD"></div></div>
+          <div class="sum-card" style="border-left:3px solid var(--green)"><div class="sum-label">Zarada</div><div class="sum-val c-green" id="tmProfit">$0</div><div class="sum-sub" id="tmProfitD"></div></div>
+          <div class="sum-card"><div class="sum-label">Zahtevi</div><div class="sum-val" id="tmReqs">0</div><div class="sum-sub" id="tmReqsD"></div></div>
+        </div>
+      </div>
+
+      <!-- MESEČNA PROJEKCIJA — realistic, based on last-30-days trend -->
       <div class="card">
-        <div class="card-title">Mesečna projekcija</div>
+        <div class="card-title">Mesečna projekcija (na osnovu tekućeg tempa)</div>
         <div class="summary" style="grid-template-columns:repeat(3,1fr);margin-bottom:0">
           <div class="sum-card"><div class="sum-label">Procenjeni mesečni API trošak</div><div class="sum-val c-orange" id="projCost">$0</div><div class="sum-sub" id="projCostD"></div></div>
           <div class="sum-card"><div class="sum-label">Procenjeni mesečni prihod</div><div class="sum-val c-orange" id="projRev">$0</div><div class="sum-sub" id="projRevD"></div></div>
           <div class="sum-card"><div class="sum-label">Procenjena mesečna zarada</div><div class="sum-val c-orange" id="projProfit">$0</div><div class="sum-sub" id="projProfitD"></div></div>
         </div>
+      </div>
+
+      <!-- ISTORIJA PO MESECIMA — last 12 months, oldest → newest with mini bars -->
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>Zarada po mesecima (istorija)</span>
+          <span style="font-size:.65rem;color:var(--text3);text-transform:none;letter-spacing:0;font-weight:500">poslednjih do 12 meseci</span>
+        </div>
+        <div id="monthlyBody"></div>
       </div>
 
       <div class="card">
@@ -329,7 +370,7 @@ function doLogin(){
   secret=$('secretIn').value.trim();
   if(!secret)return;
   api('GET','/admin/api/overview')
-    .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.prices=d.prices||null;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;DATA.totals=d.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0};return api('GET','/admin/students')})
+    .then(d=>{if(d.error)throw d;DATA.models=d.models;DATA.users=d.users;DATA.markup=d.markup;DATA.prices=d.prices||null;DATA.model_stats=d.model_stats||{};DATA.first_use=d.first_use||null;DATA.totals=d.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0};DATA.monthly=d.monthly||[];DATA.server_time=d.server_time||null;return api('GET','/admin/students')})
     .then(s=>{if(s.error)throw s;DATA.students=s;localStorage.setItem('vajb_admin',secret);showApp();renderAll()})
     .catch(()=>{showLogin();$('loginErr').style.display='block'});
 }
@@ -351,7 +392,7 @@ function refresh(){
     api('GET','/admin/api/overview'),
     api('GET','/admin/students')
   ]).then(([ov,st])=>{
-    if(!ov.error){DATA.models=ov.models;DATA.users=ov.users;DATA.markup=ov.markup;DATA.prices=ov.prices||null;DATA.model_stats=ov.model_stats||{};DATA.first_use=ov.first_use||null;DATA.totals=ov.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0}}
+    if(!ov.error){DATA.models=ov.models;DATA.users=ov.users;DATA.markup=ov.markup;DATA.prices=ov.prices||null;DATA.model_stats=ov.model_stats||{};DATA.first_use=ov.first_use||null;DATA.totals=ov.totals||{provider_cost_usd:0,charged_usd:0,profit_usd:0};DATA.monthly=ov.monthly||[];DATA.server_time=ov.server_time||null}
     if(!st.error)DATA.students=st;
     renderAll();
   });
@@ -435,26 +476,101 @@ function renderOverview(){
     mb.innerHTML+='<div style="text-align:center;padding:20px;color:var(--text);font-size:.82rem">Nema podataka još. Statistika se popunjava kako studenti koriste modele.</div>';
   }
 
-  // Monthly projection
-  let dates=DATA.users.map(u=>u.last_used).filter(Boolean).sort();
-  let daysSinceStart=7;
-  if(dates.length>=2){
-    const first=new Date(dates[0]),last=new Date(dates[dates.length-1]);
-    daysSinceStart=Math.max((last-first)/(1000*60*60*24),1);
+  // ====== This-month + monthly history (real per-month data from backend) ======
+  const monthly = Array.isArray(DATA.monthly) ? DATA.monthly : [];
+  const now = DATA.server_time ? new Date(DATA.server_time) : new Date();
+  const curKey = now.getUTCFullYear()+'-'+String(now.getUTCMonth()+1).padStart(2,'0');
+  const prevDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth()-1, 1));
+  const prevKey = prevDate.getUTCFullYear()+'-'+String(prevDate.getUTCMonth()+1).padStart(2,'0');
+  const cur = monthly.find(m=>m.month===curKey) || {month:curKey,requests:0,provider_cost_usd:0,charged_usd:0,profit_usd:0};
+  const prev = monthly.find(m=>m.month===prevKey);
+
+  // "Ovaj mesec" panel — real numbers + day-of-month label and trend vs prev.
+  const dom = now.getUTCDate();
+  const dim = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth()+1, 0)).getUTCDate();
+  const monthName = new Intl.DateTimeFormat('sr-Latn',{month:'long',year:'numeric',timeZone:'UTC'}).format(now);
+  $('thisMonthTitle').textContent='Ovaj mesec — '+monthName+' ('+dom+'/'+dim+' dan)';
+  $('tmCost').textContent='$'+cur.provider_cost_usd.toFixed(2);
+  $('tmCostD').textContent='Plaćeno provajderima u '+curKey;
+  $('tmCharged').textContent='$'+cur.charged_usd.toFixed(2);
+  $('tmChargedD').textContent='Skinuto sa balansa studenata';
+  $('tmProfit').textContent='$'+cur.profit_usd.toFixed(2);
+  $('tmProfitD').textContent='Naplaćeno - API trošak';
+  $('tmReqs').textContent=fmt(cur.requests);
+  $('tmReqsD').textContent='zahteva ovog meseca';
+  if (prev && prev.profit_usd !== 0) {
+    const pct = ((cur.profit_usd - prev.profit_usd) / Math.abs(prev.profit_usd)) * 100;
+    const arrow = pct >= 0 ? '▲' : '▼';
+    const cls = pct >= 0 ? 'c-green' : 'c-red';
+    $('thisMonthTrend').innerHTML = '<span class="'+cls+'">'+arrow+' '+Math.abs(pct).toFixed(0)+'%</span> vs prošli mesec ($'+prev.profit_usd.toFixed(2)+')';
+  } else {
+    $('thisMonthTrend').textContent = prev ? '$'+prev.profit_usd.toFixed(2)+' prošli mesec' : '';
   }
-  const dailyCost=provCost/Math.max(daysSinceStart,1);
-  const dailyReqs=totalReqs/Math.max(daysSinceStart,1);
-  const monthlyCost=dailyCost*30;
-  const avgMarkup = typeof DATA.markup === 'object' ? ((DATA.markup.openai + DATA.markup.anthropic) / 2) : DATA.markup;
-  const monthlyRev=monthlyCost*avgMarkup;
-  const monthlyProfit=monthlyRev-monthlyCost;
+
+  // Mesečna projekcija — extrapolate THIS month at its current pace to full
+  // month. Falls back to the lifetime-average heuristic only if we have no
+  // by_month data yet (fresh install).
+  let monthlyCost, monthlyRev, monthlyProfit, projSubLabel;
+  if (cur.requests > 0 && dom > 0) {
+    const factor = dim / dom;
+    monthlyCost = cur.provider_cost_usd * factor;
+    monthlyRev  = cur.charged_usd       * factor;
+    monthlyProfit = cur.profit_usd      * factor;
+    projSubLabel = 'Ekstrapolacija iz '+dom+'/'+dim+' dana ovog meseca';
+  } else {
+    let dates = DATA.users.map(u=>u.last_used).filter(Boolean).sort();
+    let daysSinceStart = 7;
+    if (dates.length>=2){
+      const first=new Date(dates[0]),last=new Date(dates[dates.length-1]);
+      daysSinceStart=Math.max((last-first)/(1000*60*60*24),1);
+    }
+    const avgMk = typeof DATA.markup === 'object' ? ((DATA.markup.openai + DATA.markup.anthropic) / 2) : DATA.markup;
+    monthlyCost = (provCost/Math.max(daysSinceStart,1))*30;
+    monthlyRev  = monthlyCost*avgMk;
+    monthlyProfit = monthlyRev-monthlyCost;
+    projSubLabel = 'Lifetime prosek (još nema mesečnih podataka)';
+  }
 
   $('projCost').textContent='$'+monthlyCost.toFixed(2);
-  $('projCostD').textContent=Math.round(dailyReqs)+' zahteva/dan × 30 dana';
+  $('projCostD').textContent=projSubLabel;
   $('projRev').textContent='$'+monthlyRev.toFixed(2);
   $('projRevD').textContent='Ono što studenti plaćaju';
   $('projProfit').textContent='$'+monthlyProfit.toFixed(2);
-  $('projProfitD').textContent=activeSts.length+' aktivnih × ~'+avgMarkup.toFixed(2)+'x avg markup';
+  $('projProfitD').textContent=activeSts.length+' aktivnih studenata';
+
+  // ====== Monthly history table — last 12 months, oldest → newest ======
+  const moBody = $('monthlyBody');
+  moBody.innerHTML='';
+  if (monthly.length === 0) {
+    moBody.innerHTML = '<div class="mo-empty">Još nema mesečnih podataka. Tabela se popunjava automatski kako studenti šalju zahteve.</div>';
+  } else {
+    const recent = monthly.slice(-12);
+    const maxProfit = Math.max(0.0001, ...recent.map(m=>Math.abs(m.profit_usd)));
+    const monthLabel = (mk)=>{
+      const [y,mm]=mk.split('-');
+      const d=new Date(Date.UTC(+y, +mm-1, 1));
+      return new Intl.DateTimeFormat('sr-Latn',{month:'short',year:'2-digit',timeZone:'UTC'}).format(d);
+    };
+    recent.slice().reverse().forEach(m=>{
+      const isCurrent = m.month === curKey;
+      const pct = Math.max((Math.abs(m.profit_usd)/maxProfit)*100, 2);
+      const negCls = m.profit_usd < 0 ? 'neg' : '';
+      moBody.innerHTML += `
+        <div class="mo-row ${isCurrent?'mo-current':''}">
+          <div>
+            <div class="mo-month">${monthLabel(m.month)}${isCurrent?' •':''}</div>
+            <div class="mo-month-sub">${fmt(m.requests)} zahteva</div>
+          </div>
+          <div class="mo-bar-wrap">
+            <div class="mo-bar ${negCls}" style="width:${pct}%"></div>
+            <div class="mo-bar-label">$${m.profit_usd.toFixed(2)} profit</div>
+          </div>
+          <div class="mo-num cost"><span class="lbl">API</span>$${m.provider_cost_usd.toFixed(2)}</div>
+          <div class="mo-num charged"><span class="lbl">Naplaćeno</span>$${m.charged_usd.toFixed(2)}</div>
+          <div class="mo-num profit"><span class="lbl">Profit</span>$${m.profit_usd.toFixed(2)}</div>
+        </div>`;
+    });
+  }
 
   // Users table
   const tb=$('ovUsersBody');tb.innerHTML='';

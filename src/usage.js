@@ -120,22 +120,54 @@ async function withUsageLock(fn) {
   }
 }
 
+// YYYY-MM bucket key for monthly aggregation. UTC-based so admins in different
+// timezones see consistent month boundaries (and so the year-over-year table
+// isn't off-by-one for requests near midnight local time).
+function monthKey(d = new Date()) {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
 export async function logUsage(apiKeyId, { input_tokens, output_tokens, model }) {
   return withUsageLock(async () => {
     const usage = await readUsage();
     const key = apiKeyId || 'unknown';
-    if (!usage[key]) usage[key] = { input_tokens: 0, output_tokens: 0, requests: 0, by_model: {} };
+    if (!usage[key]) usage[key] = { input_tokens: 0, output_tokens: 0, requests: 0, by_model: {}, by_month: {} };
     if (!usage[key].by_model) usage[key].by_model = {};
+    if (!usage[key].by_month) usage[key].by_month = {};
+
     usage[key].input_tokens += input_tokens;
     usage[key].output_tokens += output_tokens;
     usage[key].requests += 1;
     usage[key].last_used = new Date().toISOString();
+
     if (model) {
       if (!usage[key].by_model[model]) usage[key].by_model[model] = { input_tokens: 0, output_tokens: 0, requests: 0 };
       usage[key].by_model[model].input_tokens += input_tokens;
       usage[key].by_model[model].output_tokens += output_tokens;
       usage[key].by_model[model].requests += 1;
     }
+
+    // Monthly breakdown — same shape as top-level but partitioned by YYYY-MM.
+    // Older records (before this field existed) simply won't have historical
+    // months; the admin panel renders "Nema podataka" for those.
+    const mk = monthKey();
+    if (!usage[key].by_month[mk]) {
+      usage[key].by_month[mk] = { input_tokens: 0, output_tokens: 0, requests: 0, by_model: {} };
+    }
+    usage[key].by_month[mk].input_tokens += input_tokens;
+    usage[key].by_month[mk].output_tokens += output_tokens;
+    usage[key].by_month[mk].requests += 1;
+    if (model) {
+      if (!usage[key].by_month[mk].by_model[model]) {
+        usage[key].by_month[mk].by_model[model] = { input_tokens: 0, output_tokens: 0, requests: 0 };
+      }
+      usage[key].by_month[mk].by_model[model].input_tokens += input_tokens;
+      usage[key].by_month[mk].by_model[model].output_tokens += output_tokens;
+      usage[key].by_month[mk].by_model[model].requests += 1;
+    }
+
     await writeUsage(usage);
   });
 }
@@ -162,4 +194,65 @@ export async function getModelStats() {
 export async function getUsageForKey(keyId) {
   const usage = await readUsage();
   return usage[keyId] || null;
+}
+
+/**
+ * Aggregate every user's by_month data into a single timeline, computing
+ * provider cost, amount charged to the student, and our profit per month.
+ *
+ * @param {Object} opts
+ * @param {(keyId: string) => (boolean|Promise<boolean>)} [opts.isNoMarkup] -
+ *   Called per user to decide whether markup applies; defaults to "markup
+ *   always applies" if omitted.
+ * @param {(model: string, inTok: number, outTok: number) => number}
+ *   opts.providerCost - Computes raw provider cost in USD.
+ * @param {(model: string) => number} opts.getMarkup - Student-facing markup
+ *   multiplier per model (1.0 = no markup).
+ * @returns {Promise<Array<{
+ *   month: string, requests: number, input_tokens: number,
+ *   output_tokens: number, provider_cost_usd: number,
+ *   charged_usd: number, profit_usd: number
+ * }>>} - Sorted ascending by month (oldest first).
+ */
+export async function getMonthlyAggregates({ isNoMarkup, providerCost, getMarkup }) {
+  const usage = await readUsage();
+  const byMonth = {};
+
+  for (const [keyId, data] of Object.entries(usage)) {
+    if (!data || !data.by_month) continue;
+    const noMarkup = isNoMarkup ? await isNoMarkup(keyId) : false;
+
+    for (const [month, mdata] of Object.entries(data.by_month)) {
+      if (!byMonth[month]) {
+        byMonth[month] = {
+          month,
+          requests: 0,
+          input_tokens: 0,
+          output_tokens: 0,
+          provider_cost_usd: 0,
+          charged_usd: 0,
+          profit_usd: 0,
+        };
+      }
+      byMonth[month].requests += mdata.requests || 0;
+      byMonth[month].input_tokens += mdata.input_tokens || 0;
+      byMonth[month].output_tokens += mdata.output_tokens || 0;
+
+      // Walk per-model so the cost and markup apply to the RIGHT model — a
+      // month with only Opus calls should cost differently from a month
+      // with only Haiku, regardless of the top-level token totals.
+      if (mdata.by_model) {
+        for (const [model, stats] of Object.entries(mdata.by_model)) {
+          const p = providerCost(model, stats.input_tokens || 0, stats.output_tokens || 0);
+          byMonth[month].provider_cost_usd += p;
+          byMonth[month].charged_usd += noMarkup ? p : p * (getMarkup(model) || 1);
+        }
+      }
+      byMonth[month].profit_usd =
+        byMonth[month].charged_usd - byMonth[month].provider_cost_usd;
+    }
+  }
+
+  // Ascending month order — oldest first so charts / trend lines flow L→R.
+  return Object.values(byMonth).sort((a, b) => a.month.localeCompare(b.month));
 }
