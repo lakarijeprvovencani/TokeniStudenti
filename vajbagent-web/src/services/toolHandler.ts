@@ -25,22 +25,20 @@ interface ToolResult {
 }
 
 /**
- * Per-turn duplicate-write guard.
+ * Per-turn duplicate-write tracker.
  *
- * Models love to call write_file 3-5 times for the same file in a single
- * agent turn — first the skeleton, then "let me add the hero section",
- * then "actually let me redo the colors", etc. Each repeat re-sends the
- * full file content (10K+ tokens) and bills the user for the privilege.
+ * Historical context: we used to HARD-BLOCK any second write_file call
+ * for the same path in a turn and redirect the model to replace_in_file.
+ * That was a net-negative in practice — the model treated the "blocked"
+ * reply as a tool failure, apologized to the user, and tried again with
+ * different content (because write sizes legitimately differ when the
+ * model iterates on a layout). Result: "Pišem index.html" shown 4 times
+ * in a row, user thinks the agent is broken, 4x the tokens wasted.
  *
- * We intercept duplicates and redirect the model to replace_in_file,
- * which is what the system prompt already tells it to use for edits.
- * The redirect:
- *   - Is NOT phrased as "GRESKA" — that triggers the apology-rewrite
- *     loop we killed in commit a564dd2. Tone is matter-of-fact.
- *   - Does NOT block the write (we still report success on the original
- *     write that already happened) — we only refuse THIS extra call.
- *   - Includes the current file size so the model knows what state it's
- *     in and can craft a proper replace_in_file diff.
+ * New approach: let duplicate writes through. They're a mild token waste
+ * but they keep the agent on a productive path and match what the user
+ * actually wants (the latest version of the file). We still keep a
+ * counter for telemetry / future soft caps if we see runaway loops.
  *
  * Reset between user messages by ChatPanel via resetTurnState().
  */
@@ -172,25 +170,13 @@ export async function executeToolCall(
         const path = (args.path as string || '').replace(/^\/+/, '')
         let content = (args.content as string) || ''
 
-        // Duplicate-write guard. If the model already wrote this exact
-        // path during the current agent turn, refuse the second write
-        // and steer it toward replace_in_file. The first write already
-        // succeeded — there's nothing for us to do here except save the
-        // tokens of accepting (and re-billing for) a near-identical
-        // 10K+ char rewrite. See note above resetTurnState() for full
-        // rationale and history.
+        // Telemetry-only: record repeat writes so we can surface runaway
+        // loops in logs, but do NOT block them. See note above
+        // writtenThisTurn for the full rationale on why blocking here
+        // caused more harm than the token savings justified.
         if (writtenThisTurn.has(path)) {
           const prevSize = writtenThisTurn.get(path) || 0
-          console.warn(`[Tool] Duplicate write_file blocked: ${path} (was ${prevSize} chars, retry ${content.length} chars)`)
-          return {
-            tool_call_id: tc.id,
-            role: 'tool',
-            // Deliberately do NOT suggest read_file — that just makes the model
-            // burn another tool call (and tokens for the returned file content)
-            // verifying something that was already written cleanly. The previous
-            // write succeeded; trust it and move on.
-            content: `Napomena: ${path} je već upisan u ovom odgovoru (${prevSize} karaktera) i sadržaj je tačno onaj koji si poslao. Pređi na sledeći fajl iz plana. Ako stvarno treba da promeniš nešto u ovom fajlu, koristi replace_in_file. NE zovi read_file da proveriš — write je uspeo.`,
-          }
+          console.info(`[Tool] Repeat write_file: ${path} (was ${prevSize} chars, now ${content.length} chars)`)
         }
 
         // Double-escape fix: konvertuj literal \\n → \n SAMO ako fajl

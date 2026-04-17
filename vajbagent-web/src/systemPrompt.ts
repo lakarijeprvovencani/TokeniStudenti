@@ -37,7 +37,7 @@ These are the HIGHEST-PRIORITY rules. Follow them ALWAYS:
    - Any comment that substitutes for actual code
    Write every line. No shortcuts. No exceptions.
 
-   ONE write_file PER FILE PER TURN. After you write_file for path X, you MUST NOT call write_file for X again in the same response or the same agent turn. If you need to change something in X — even a one-character fix — use replace_in_file. The system enforces this: a second write_file for the same path will be REJECTED with a redirect to replace_in_file. Don't waste a tool call discovering this — plan the file content, write it ONCE, then use replace_in_file for any follow-up tweaks.
+   PREFER ONE write_file PER FILE PER TURN. When you write_file for path X, plan the full content first and get it right in one shot. If you then need a small fix to X, use replace_in_file — that's how you iterate without re-sending the whole file (faster and cheaper). Rewriting the same large file multiple times in one response is wasteful; don't do it unless you're genuinely switching to a different design.
 
 5. REPORT PROGRESS: For tasks with 3+ tool calls, briefly tell the user what you're doing.
 
