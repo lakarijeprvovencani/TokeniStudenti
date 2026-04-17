@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Eye, RefreshCw, ExternalLink, Server, Globe, Package } from 'lucide-react'
 import { getServerUrl, onServerReady } from '../services/webcontainer'
+import { ensurePreviewServer, publishPreview, previewUrl, previewSessionId } from '../services/previewServer'
 import './PreviewPanel.css'
 
 interface PreviewPanelProps {
@@ -63,6 +64,32 @@ const PREVIEW_REVEAL_SHIELD = `
 </script>
 `
 
+/**
+ * Tiny reporter injected into SW-served HTML so the parent panel's URL
+ * bar + back-to-home logic stays in sync when the iframe navigates
+ * natively (e.g. user clicks <a href="about.html"> inside the preview).
+ * No navigation interception — native clicks just work under SW mode.
+ */
+const SW_PAGE_REPORTER = `
+<script data-vajb-reporter>
+(function() {
+  function report() {
+    try {
+      var p = location.pathname || '';
+      var m = p.match(/__vajb_preview\\/[^/]+\\/(.*)$/);
+      var page = m ? m[1].replace(/\\.html?$/,'') || 'index' : '';
+      window.parent.postMessage({ type: 'vajb-page-loaded', page: page }, '*');
+    } catch(e) {}
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', report);
+  } else {
+    report();
+  }
+})();
+</script>
+`
+
 /** Script injected into blob HTML to intercept ALL link navigation and enable multi-page preview */
 const NAV_INTERCEPT_SCRIPT = `
 <script>
@@ -100,6 +127,34 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
   const [devServerUrl, setDevServerUrl] = useState<string | null>(getServerUrl())
   const [devServerFailed, setDevServerFailed] = useState(false)
   const [currentPage, setCurrentPage] = useState('index')
+
+  // Service-worker-backed preview state. Once the worker is active we switch
+  // the iframe from blob: URLs to same-origin /__vajb_preview/<sid>/... URLs
+  // so native navigation, fetch(), <link href>, etc. all resolve cleanly.
+  // swReady flips once per mount; before that we silently use the blob path.
+  const [swReady, setSwReady] = useState(false)
+  const sessionIdRef = useRef<string>(previewSessionId())
+
+  useEffect(() => {
+    let cancelled = false
+    ensurePreviewServer().then(reg => {
+      if (!cancelled && reg) setSwReady(true)
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  // Iframe reports the page it just loaded (see SW_PAGE_REPORTER). We mirror
+  // it into currentPage so the URL bar + back-to-home button stay accurate
+  // when the user navigates natively inside the preview.
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'vajb-page-loaded' && typeof e.data.page === 'string') {
+        setCurrentPage(e.data.page || 'index')
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
 
   // Listen for dev server ready
   useEffect(() => {
@@ -295,12 +350,152 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
     return inlineImageRefs(html)
   }, [files, isNextJsBuild, inlineImageRefs])
 
-  // Generate blob URL for current page — debounced
+  /**
+   * Inject standard preview boilerplate into an HTML document: UTF-8 meta
+   * tag, the scroll-reveal shield, and (in SW mode) the page-load reporter.
+   * Shared by both the SW file-map builder and the legacy blob path.
+   */
+  const decorateHtml = useCallback((raw: string, forSW: boolean): string => {
+    let html = raw
+    if (!/<meta[^>]+charset/i.test(html)) {
+      if (/<head[^>]*>/i.test(html)) {
+        html = html.replace(/<head([^>]*)>/i, '<head$1><meta charset="UTF-8">')
+      } else if (/<html[^>]*>/i.test(html)) {
+        html = html.replace(/<html([^>]*)>/i, '<html$1><head><meta charset="UTF-8"></head>')
+      } else {
+        html = '<meta charset="UTF-8">\n' + html
+      }
+    }
+    const headInjection = PREVIEW_REVEAL_SHIELD + (forSW ? SW_PAGE_REPORTER : '')
+    if (html.includes('</head>')) html = html.replace('</head>', headInjection + '\n</head>')
+    else html = headInjection + '\n' + html
+    return html
+  }, [])
+
+  /**
+   * Build the file map for the SW from the current files object.
+   * Returns { map, pageNames, entry } where entry is the initial page to load.
+   *
+   * In `static` mode we publish source files under their own paths. In
+   * `build` mode we strip the dist/|out/ prefix so the iframe can address
+   * pages as /about.html instead of /dist/about.html.
+   */
+  const buildSWFileMap = useCallback((): { map: Record<string, string>; entry: string } | null => {
+    const map: Record<string, string> = {}
+    const skipPrefix = /^(node_modules|\.git|\.next|\.nuxt|\.cache)\//
+
+    if (previewMode === 'build') {
+      const prefix = buildDir + '/'
+      for (const [p, c] of Object.entries(files)) {
+        if (!p.startsWith(prefix)) continue
+        if (skipPrefix.test(p)) continue
+        if (typeof c !== 'string') continue
+        const stripped = p.slice(prefix.length)
+        if (!stripped || stripped.endsWith('/')) continue
+        map[stripped] = stripped.endsWith('.html') ? decorateHtml(c, true) : c
+      }
+      // Also expose uploaded images that live outside dist/ (public/…)
+      for (const [p, c] of Object.entries(files)) {
+        if (p.startsWith(prefix)) continue
+        if (!/\.(jpg|jpeg|png|webp|gif|svg|avif|ico|mp4|webm|mp3|wav|woff2?|ttf|otf)$/i.test(p)) continue
+        if (typeof c !== 'string') continue
+        if (!(c.startsWith('data:') || c.startsWith('http'))) continue
+        const cleaned = p.replace(/^public\//, '')
+        if (!map[cleaned]) map[cleaned] = c
+      }
+      if (!map['index.html']) return null
+      return { map, entry: 'index.html' }
+    }
+
+    if (previewMode === 'static') {
+      for (const [p, c] of Object.entries(files)) {
+        if (skipPrefix.test(p)) continue
+        if (p.startsWith('dist/') || p.startsWith('out/')) continue
+        if (typeof c !== 'string') continue
+        if (p.endsWith('/')) continue
+        // Hoist public/ to root so <img src="/hero.jpg"> works like it will on Netlify.
+        const key = p.replace(/^public\//, '')
+        map[key] = /\.html?$/i.test(p) ? decorateHtml(c, true) : c
+      }
+      if (!map['index.html'] && !map['index.htm']) return null
+      return { map, entry: map['index.html'] ? 'index.html' : 'index.htm' }
+    }
+
+    return null
+  }, [files, previewMode, buildDir, decorateHtml])
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevBlobUrl = useRef<string | null>(null)
   const prevHtmlHash = useRef<string | null>(null)
+  const prevMapHash = useRef<string | null>(null)
+  const iframeInitialized = useRef(false)
+  const initialRefreshKeyRef = useRef(0)
 
+  // Reset SW iframe tracking when preview mode flips (static → build, etc.)
+  // so we reboot the iframe onto the correct entry page.
   useEffect(() => {
+    iframeInitialized.current = false
+    prevMapHash.current = null
+  }, [previewMode])
+
+  // ─── SW-backed preview (primary path) ───────────────────────────────
+  useEffect(() => {
+    if (!swReady) return
+    if (previewMode === 'dev-server' || previewMode === 'none') return
+    if (!iframeRef.current) return
+
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(async () => {
+      if (!iframeRef.current) return
+      const built = buildSWFileMap()
+      if (!built) return
+
+      // Hash the map so we don't re-publish + reload on no-op file changes
+      // (autosave churn, unrelated tool calls, etc.). FNV-1a over the
+      // concatenated key+length tuples is plenty discriminating.
+      let h = 2166136261
+      for (const [k, v] of Object.entries(built.map)) {
+        const sig = k + ':' + (typeof v === 'string' ? v.length : 0) + ':' + (typeof v === 'string' ? v.charCodeAt(0) : 0)
+        for (let i = 0; i < sig.length; i++) { h ^= sig.charCodeAt(i); h = (h * 16777619) >>> 0 }
+      }
+      const sessionId = sessionIdRef.current
+      const mapSig = `${h}:${Object.keys(built.map).length}`
+      const firstRun = !iframeInitialized.current
+
+      if (!firstRun && prevMapHash.current === mapSig) return
+
+      const ok = await publishPreview(sessionId, built.map)
+      if (!ok) return // SW disappeared — blob effect below will pick up
+
+      prevMapHash.current = mapSig
+      // On first run: point iframe at the entry page. On refresh-key bump:
+      // reload via cache-bust. On subsequent file changes: leave iframe
+      // alone unless it's still on the entry page (the user may have
+      // clicked through to about.html and we don't want to yank them
+      // back to index every time CSS changes). Native navigation inside
+      // the iframe continues to work because SW has the fresh files.
+      if (firstRun) {
+        iframeInitialized.current = true
+        initialRefreshKeyRef.current = refreshKey
+        iframeRef.current.src = previewUrl(sessionId, built.entry)
+      } else if (refreshKey !== initialRefreshKeyRef.current) {
+        // User hit refresh — force full reload of whatever page the
+        // iframe is currently on. currentPage is kept in sync by the
+        // SW_PAGE_REPORTER script injected into each served HTML.
+        initialRefreshKeyRef.current = refreshKey
+        const page = currentPage === 'index' ? built.entry : currentPage + '.html'
+        iframeRef.current.src = previewUrl(sessionId, page) + '?v=' + Date.now()
+      }
+    }, 400)
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [swReady, files, refreshKey, previewMode, buildSWFileMap, currentPage])
+
+  // ─── Blob fallback (only runs when SW isn't ready) ──────────────────
+  useEffect(() => {
+    if (swReady) return // SW path above is authoritative once ready
     if (previewMode === 'dev-server' || previewMode === 'none') return
     if (!iframeRef.current) return
 
@@ -312,14 +507,12 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
       let html: string | null = null
 
       if (previewMode === 'build') {
-        // Multi-page: find the right page HTML
         let pageHtml: string | null = null
         if (currentPage === 'index') {
           pageHtml = distIndexHtml
         } else {
           pageHtml = findPageHtml(currentPage)
         }
-        // Fallback to index if page not found
         if (!pageHtml) pageHtml = distIndexHtml
         if (pageHtml) html = buildPageHtml(pageHtml)
       } else if (previewMode === 'static' && htmlFile) {
@@ -328,28 +521,15 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
 
       if (!html) return
 
-      // Skip iframe reload if the rendered HTML is bit-identical to the previous
-      // one. This prevents the "preview flash" that happened after autosave swapped
-      // data: URLs for R2 URLs, or when a tool call touched a non-visible file —
-      // the files state changes but the actual preview output does not.
-      // A fast FNV-1a hash on the string gives us ~1μs comparison without storing
-      // megabytes of HTML strings.
       let h = 2166136261
       for (let i = 0; i < html.length; i++) {
         h ^= html.charCodeAt(i)
         h = (h * 16777619) >>> 0
       }
       const hashKey = `${h}:${currentPage}`
-      if (prevHtmlHash.current === hashKey) {
-        return // identical preview — leave the iframe alone
-      }
+      if (prevHtmlHash.current === hashKey) return
       prevHtmlHash.current = hashKey
 
-      // Ensure UTF-8: without charset in both the Blob MIME AND the HTML
-      // itself, Chrome's blob: loader defaults to Latin-1 and mangles Serbian
-      // diacritics (ć → Ä‡, š → Å¡, etc.). Belt-and-suspenders:
-      //   1. Inject <meta charset="UTF-8"> right after <head> if missing.
-      //   2. Set the Blob MIME type to text/html;charset=utf-8.
       let finalHtml = html
       if (!/<meta[^>]+charset/i.test(finalHtml)) {
         if (/<head[^>]*>/i.test(finalHtml)) {
@@ -371,7 +551,7 @@ export default function PreviewPanel({ files }: PreviewPanelProps) {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [htmlFile, distIndexHtml, files, refreshKey, previewMode, currentPage, buildFullHtml, buildPageHtml, findPageHtml])
+  }, [swReady, htmlFile, distIndexHtml, files, refreshKey, previewMode, currentPage, buildFullHtml, buildPageHtml, findPageHtml])
 
   // Build a self-contained multi-page HTML for "open in new tab"
   // All pages are embedded with a hash router (#about, #projects, etc.)
@@ -546,10 +726,18 @@ ${sharedStyles}
         </div>
 
         <div className="preview-actions">
-          {previewMode === 'build' && currentPage !== 'index' && (
+          {(previewMode === 'build' || (swReady && previewMode === 'static')) && currentPage !== 'index' && (
             <button
               className="preview-action-btn"
-              onClick={() => setCurrentPage('index')}
+              onClick={() => {
+                setCurrentPage('index')
+                // SW mode: iframe is on a different page via native nav,
+                // so setCurrentPage alone won't bring it back. Point src
+                // at index and let it reload.
+                if (swReady && iframeRef.current) {
+                  iframeRef.current.src = previewUrl(sessionIdRef.current, 'index.html') + '?v=' + Date.now()
+                }
+              }}
               title="Početna"
             >
               <Globe size={12} />
