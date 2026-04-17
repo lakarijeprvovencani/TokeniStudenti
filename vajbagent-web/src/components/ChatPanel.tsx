@@ -44,7 +44,7 @@ interface ChatPanelProps {
   model: string
   onModelChange?: (model: string) => void
   onFilesChanged: (files: Record<string, string>) => void
-  onDone?: () => void
+  onDone?: (reason: 'completed' | 'aborted' | 'error') => void
   onContextUpdate?: (used: number, limit: number) => void
   onStreamingChange?: (streaming: boolean) => void
   onStatusChange?: (status: string) => void
@@ -936,11 +936,16 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
 
     let lastAssistantHadText = false
     let textContinuationUsed = false
+    // Track why the agent loop ended so the parent can decide whether to
+    // show the "Sajt je spreman!" overlay. Only 'completed' should trigger
+    // it — aborts (user pressed Stop) and errors must NOT fire the success
+    // popup even when an HTML file happens to exist in the workspace.
+    let doneReason: 'completed' | 'aborted' | 'error' = 'completed'
 
     try {
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
         // Check abort
-        if (abortRef.current?.signal.aborted) break
+        if (abortRef.current?.signal.aborted) { doneReason = 'aborted'; break }
 
         // Warn agent if approaching iteration limit (mid-conversation system directive).
         if (iteration === MAX_ITERATIONS - 10) {
@@ -1068,16 +1073,43 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
           }
         }
 
-        if (!result || signal.aborted) break
+        if (!result || signal.aborted) { if (signal.aborted) doneReason = 'aborted'; break }
+
+        // ─── Stream-artifact filter ─────────────────────────────────
+        // Drop tool calls whose arguments are literally empty or near-empty.
+        // These are stream parsing artifacts: providers occasionally emit a
+        // tool_call wrapper with no actual function call inside — typically
+        // when a finish_reason fires right after the tool_calls envelope
+        // opens but before any argument deltas land. Treating them as real
+        // tool calls causes:
+        //   1. Truncation flag fires → model receives an alarmist message
+        //      → defensive read_file/search_files calls = wasted tokens.
+        //   2. The empty tool_call needs a matching tool response in
+        //      history or the next API call rejects the conversation.
+        // Dropping them eliminates both problems and is safe — there's
+        // genuinely no call for us to execute.
+        const droppedEmpty: string[] = []
+        result.toolCalls = result.toolCalls.filter(tc => {
+          const argsStr = (tc.function.arguments || '').trim()
+          // Accept anything with real content. {} alone is also empty for
+          // every tool we expose (none have all-optional args).
+          if (argsStr.length < 3 || argsStr === '{}') {
+            droppedEmpty.push(`${tc.function.name}(empty)`)
+            return false
+          }
+          return true
+        })
+        if (droppedEmpty.length > 0) {
+          console.warn(`[API] Dropped ${droppedEmpty.length} empty tool call(s): ${droppedEmpty.join(', ')}`)
+        }
 
         // ─── Truncation detection ────────────────────────────────────
         // Only the LAST tool call can be truncated — earlier ones had a
         // content_block_stop before max_tokens fired. We flag it as truncated
-        // *only* when its JSON can't be parsed; a valid-JSON tool call with
-        // finishReason='length' is fine to execute (the model just wanted to
-        // say more afterward). The reply is a `tool` role message steering
-        // the model toward skeleton + replace_in_file instead of retrying
-        // the giant write.
+        // *only* when its JSON can't be parsed (cut off mid-string). A
+        // valid-JSON tool call with finishReason='length' is fine to execute.
+        // The empty-args case is handled by the filter above, so this only
+        // fires on genuinely mid-stream-cut tool calls.
         const truncatedToolIds = new Set<string>()
         if (result.toolCalls.length > 0) {
           const lastTc = result.toolCalls[result.toolCalls.length - 1]
@@ -1131,7 +1163,7 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
 
         // Execute each tool call
         for (const tc of result.toolCalls) {
-          if (abortRef.current?.signal.aborted) break
+          if (abortRef.current?.signal.aborted) { doneReason = 'aborted'; break }
 
           const toolName = tc.function.name
 
@@ -1150,8 +1182,17 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
           // the model has a productive next move that isn't "write_file
           // style.css from scratch again".
           if (truncatedToolIds.has(tc.id)) {
+            const pathFromArgs = (() => {
+              try { const m = tc.function.arguments.match(/"path"\s*:\s*"([^"]+)/); return m ? m[1] : 'fajl' } catch { return 'fajl' }
+            })()
             const truncErr = toolName === 'write_file'
-              ? `Napomena: prethodni write_file poziv za ${(() => { try { const m = tc.function.arguments.match(/"path"\s*:\s*"([^"]+)/); return m ? m[1] : 'fajl' } catch { return 'fajl' } })()} je pogodio granicu output tokena i nije kompletno stigao. Moguće je da je deo sadržaja već upisan.\n\nURADI OVO:\n- NE izvinjavaj se korisniku i NE zovi write_file za ISTI fajl ponovo sa istim sadržajem (loop).\n- Pozovi read_file(${(() => { try { const m = tc.function.arguments.match(/"path"\s*:\s*"([^"]+)/); return m ? m[1] : 'fajl' } catch { return 'fajl' } })()}) da vidiš šta je stvarno upisano.\n- Ako fajl postoji i skoro kompletan: koristi replace_in_file da dodaš samo ono što fali (kratki old_text na kraju fajla → new_text sa ostatkom).\n- Ako fajl ne postoji ili je praznjikav: nastavi sa sledećim fajlom iz plana, pa se vrati posle.\n- Nastavi rad u istom tonu, bez izvinjenja.`
+              // NB: deliberately no read_file suggestion. Most "truncation"
+              // events are streaming artifacts — the file is usually fine.
+              // Pushing read_file here was burning ~5-10k tokens of defensive
+              // verification per turn. The productive next move is to keep
+              // going; if the file really is broken the user will say so and
+              // we'll hear about it in the next turn.
+              ? `Napomena: write_file za ${pathFromArgs} se nije kompletno stream-ovao (ili je artefakt stream parsera, ili je stvarno presečen). Nastavi sa sledećim fajlom iz plana — NE piši isti fajl ponovo, NE zovi read_file da provaravaš, NE izvinjavaj se korisniku. Ako korisnik kasnije javi da fajl ne radi, koristi replace_in_file sa kratkim old_text-om iz kraja fajla → new_text-om sa onim što fali.`
               : toolName === 'replace_in_file'
                 ? `Napomena: prethodni replace_in_file poziv je pogodio granicu output tokena i new_text nije kompletno stigao. Izmena NIJE primenjena.\n\nNastavi sa manjim koracima: podeli izmenu na više replace_in_file poziva, svaki max ~100-150 linija new_text-a. Ne izvinjavaj se, samo kreni.`
                 : `Napomena: argumenti za ${toolName} su presečeni. Probaj ponovo sa manjim argumentima, bez izvinjenja.`
@@ -1252,9 +1293,11 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
     } catch (err) {
       if ((err as Error).name === 'AbortError') {
         setDisplayMessages(prev => [...prev, { role: 'status', content: 'Zaustavljeno.' }])
+        doneReason = 'aborted'
       } else {
         const rawMsg = err instanceof Error ? err.message : 'Greška pri povezivanju'
         setDisplayMessages(prev => [...prev, { role: 'error', content: humanizeError(rawMsg) }])
+        doneReason = 'error'
       }
       setStreamText('')
     } finally {
@@ -1293,7 +1336,7 @@ export default function ChatPanel({ initialPrompt, initialImages, model, onModel
           }])
         }
       })
-      onDone?.()
+      onDone?.(doneReason)
 
       // Process queued message if any
       const queued = queuedRef.current

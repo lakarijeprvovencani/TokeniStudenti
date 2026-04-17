@@ -426,7 +426,7 @@
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
 }
 .preview-ready-content { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
-.preview-ready-icon { color: var(--orange); filter: drop-shadow(0 0 20px rgba(249,115,22,0.5)); animation: floatUp 1.5s ease-in-out infinite; }
+.preview-ready-icon { width: 56px; height: 56px; object-fit: contain; filter: drop-shadow(0 0 24px rgba(249,115,22,0.55)); animation: floatUp 1.5s ease-in-out infinite; }
 .preview-ready-content h2 { font-size: 1.5rem; font-weight: 800; color: var(--text); letter-spacing: -0.03em; }
 .preview-ready-content p { font-size: 0.88rem; color: var(--text3); }
 

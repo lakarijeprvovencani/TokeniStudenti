@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Settings as SettingsIcon, Download, Rocket,
-  Sparkles, User, Zap, ChevronLeft, ChevronRight,
+  User, Zap, ChevronLeft, ChevronRight,
   Terminal, GitBranch, Wallet, LogOut, Copy, Check, Home, Loader2, ExternalLink, X, ChevronDown, Globe, RefreshCw,
 } from 'lucide-react'
 import JSZip from 'jszip'
@@ -336,11 +336,28 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
 
   const [hasDevServer, setHasDevServer] = useState(!!getServerUrl())
 
-  // Listen for dev server ready — auto-switch to preview with animation
+  // "Sajt je spreman!" overlay should only fire on the *first* successful
+  // completion of a project — not on every agent turn. Without this flag
+  // the popup would trigger after "dodaj jedno dugme", after pressing Stop,
+  // after an API error, etc. — any scenario where an HTML file happens to
+  // exist at the moment `onDone` runs. If the user is resuming a project
+  // that already has preview-able output, we pre-set the flag so the first
+  // turn on a resumed project doesn't re-fire the overlay either.
+  const previewReadyShownRef = useRef<boolean>(
+    !!resumeProject ||
+    Object.keys(files).some(f => f.endsWith('.html') || f === 'dist/index.html' || f === 'out/index.html')
+  )
+
+  // Listen for dev server ready — auto-switch to preview with animation.
+  // If this fires it counts as showing the "ready" overlay too, so the
+  // agent-done handler doesn't re-trigger it a second time in the same
+  // session (dev server boot + agent finishing both happen close together).
   useEffect(() => {
-    if (getServerUrl()) { setHasDevServer(true); return }
+    if (getServerUrl()) { setHasDevServer(true); previewReadyShownRef.current = true; return }
     const unsub = onServerReady(() => {
       setHasDevServer(true)
+      if (previewReadyShownRef.current) { setView('preview'); return }
+      previewReadyShownRef.current = true
       setShowPreviewReady(true)
       setTimeout(() => {
         setShowPreviewReady(false)
@@ -671,21 +688,34 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
     selectionRef.current = selection
   }, [])
 
-  const handleAgentDone = useCallback(() => {
+  const handleAgentDone = useCallback((reason: 'completed' | 'aborted' | 'error' = 'completed') => {
+    // Derive name from first prompt if not set yet — do this regardless
+    // of how the agent ended, because even an aborted first turn usually
+    // has enough content to derive a name from the user's prompt.
+    if (!projectNameRef.current && initialPrompt) {
+      deriveProjectName(initialPrompt)
+    }
+
+    // Gate the success overlay. All three must be true:
+    //   1. The agent finished normally (not aborted, not errored).
+    //   2. We haven't already shown the overlay this session.
+    //   3. There's something preview-able (static HTML or a build output),
+    //      no dev server already running (those get their own ready
+    //      event via onServerReady → setShowPreviewReady above).
+    if (reason !== 'completed') return
+    if (previewReadyShownRef.current) return
+
     const currentFiles = Object.keys(filesRef.current)
     const hasHtmlNow = currentFiles.some(f => f.endsWith('.html'))
     const hasBuildNow = currentFiles.some(f => f === 'dist/index.html' || f === 'out/index.html')
     const hasServer = !!getServerUrl()
     if ((hasHtmlNow || hasBuildNow) && !hasServer) {
+      previewReadyShownRef.current = true
       setShowPreviewReady(true)
       setTimeout(() => {
         setShowPreviewReady(false)
         setView('preview')
       }, 1800)
-    }
-    // Derive name from first prompt if not set yet
-    if (!projectNameRef.current && initialPrompt) {
-      deriveProjectName(initialPrompt)
     }
   }, [initialPrompt, deriveProjectName])
 
@@ -873,8 +903,8 @@ export default function IDELayout({ initialPrompt, initialImages, model, onModel
               exit={{ scale: 1.1, opacity: 0 }}
               transition={{ duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }}
             >
-              <Sparkles size={32} className="preview-ready-icon" />
-              <h2>Sajt je spreman!</h2>
+              <img src="/logo.svg" alt="" className="preview-ready-icon" />
+              <h2>Sve je spremno!</h2>
               <p>Otvaram preview...</p>
             </motion.div>
           </motion.div>

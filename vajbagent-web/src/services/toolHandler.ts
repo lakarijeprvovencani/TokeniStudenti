@@ -181,13 +181,15 @@ export async function executeToolCall(
         // rationale and history.
         if (writtenThisTurn.has(path)) {
           const prevSize = writtenThisTurn.get(path) || 0
-          const newSize = content.length
-          const diff = Math.abs(newSize - prevSize)
-          console.warn(`[Tool] Duplicate write_file blocked: ${path} (was ${prevSize} chars, retry ${newSize} chars)`)
+          console.warn(`[Tool] Duplicate write_file blocked: ${path} (was ${prevSize} chars, retry ${content.length} chars)`)
           return {
             tool_call_id: tc.id,
             role: 'tool',
-            content: `Napomena: ${path} je već upisan u ovom odgovoru (${prevSize} karaktera). Drugi write_file za isti fajl je odbijen — koristi replace_in_file za izmene umesto da prepisuješ ceo fajl. Ako misliš da prethodni write nije uspeo, pozovi read_file pa onda replace_in_file za delove koji nedostaju. Razlika u veličini između poziva: ${diff} karaktera.`,
+            // Deliberately do NOT suggest read_file — that just makes the model
+            // burn another tool call (and tokens for the returned file content)
+            // verifying something that was already written cleanly. The previous
+            // write succeeded; trust it and move on.
+            content: `Napomena: ${path} je već upisan u ovom odgovoru (${prevSize} karaktera) i sadržaj je tačno onaj koji si poslao. Pređi na sledeći fajl iz plana. Ako stvarno treba da promeniš nešto u ovom fajlu, koristi replace_in_file. NE zovi read_file da proveriš — write je uspeo.`,
           }
         }
 
