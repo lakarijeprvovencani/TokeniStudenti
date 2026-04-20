@@ -126,6 +126,79 @@ export async function findByEmail(email) {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// ─── Anti-bot heuristics ────────────────────────────────────────────────────
+//
+// Bot farms grind through /auth/register with randomly-generated name parts
+// ("wss wws", "li1tp 9mhe6", "uuanu nw6ny") and throwaway/disposable email
+// addresses. These checks catch the two most common patterns seen in the
+// 2026-04-20 wave without falsely blocking real users — real names contain
+// at least one vowel and aren't all-digits. Error messages stay generic so
+// bots can't trivially learn which heuristic fired.
+
+// Popular disposable/throwaway domains. Not exhaustive (thousands exist) but
+// covers the ones showing up in attack traffic. Extend via env
+// DISPOSABLE_EMAIL_DOMAINS=foo.com,bar.net (merged with this list).
+const DISPOSABLE_EMAIL_DOMAINS = new Set([
+  'mailinator.com', 'guerrillamail.com', 'guerrillamail.net', 'guerrillamail.org',
+  'sharklasers.com', 'grr.la', '10minutemail.com', '10minutemail.net',
+  'yopmail.com', 'yopmail.net', 'tempmail.com', 'tempmail.org', 'tempmail.plus',
+  'temp-mail.org', 'temp-mail.io', 'tempr.email', 'tempail.com', 'tempemail.co',
+  'dispostable.com', 'fakeinbox.com', 'mintemail.com', 'trashmail.com',
+  'trashmail.net', 'throwawaymail.com', 'throwaway.email', 'maildrop.cc',
+  'getnada.com', 'nada.email', 'getairmail.com', 'mohmal.com', 'emailondeck.com',
+  'spam4.me', 'dropmail.me', 'mailnesia.com', 'mailcatch.com', 'emailtemporar.ro',
+  'mytemp.email', 'emailfake.com', 'mvrht.net', 'burnermail.io', 'byom.de',
+  'harakirimail.com', 'tmail.ws', 'tmails.net', 'disposable.email', 'etempmail.com',
+  'inboxbear.com', 'mailhole.de', 'mailnull.com', 'spamgourmet.com', 'mailsac.com',
+  'spambog.com', 'tempmail.email', 'tempmail.ninja', 'throwam.com', 'tempmailaddress.com',
+  'wegwerfemail.de', 'armyspy.com', 'cuvox.de', 'dayrep.com', 'einrot.com',
+  'fleckens.hu', 'gustr.com', 'jourrapide.com', 'rhyta.com', 'superrito.com',
+  'teleworm.us', 'emailondeck.com', 'moakt.com', 'moakt.cc', 'mohmal.tech',
+]);
+const ENV_DISPOSABLE = (process.env.DISPOSABLE_EMAIL_DOMAINS || '')
+  .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+for (const d of ENV_DISPOSABLE) DISPOSABLE_EMAIL_DOMAINS.add(d);
+
+const VOWEL_RE = /[aeiouAEIOUаеиоуАЕИОУ]/;
+
+/**
+ * Returns a short English reason code if the (name_part) looks like
+ * random-generator output rather than a human name. null = looks human.
+ * The checks are deliberately permissive in both directions — Serbian /
+ * Balkan names like "Đorđe" or "Nađa" pass, while bot spew like "wss" or
+ * "9mhe6" fails.
+ */
+function gibberishNameReason(part) {
+  if (!part) return 'empty';
+  const t = part.trim();
+  // Real first/last names are almost always 3+ characters. Bot spew is full
+  // of 2-char tokens like "wss", "xy", "ab". We bias toward blocking to
+  // keep the attack surface tight; users with legitimate 2-char nicknames
+  // can contact support.
+  if (t.length < 3) return 'too_short';
+  // Digits inside a human first/last name are a near-certain bot marker.
+  if (/\d/.test(t)) return 'digits_in_name';
+  // At least one "real" vowel (aeiou, or Cyrillic equivalents) — human
+  // names virtually always have one. `y` is intentionally excluded here
+  // because bot generators produce things like "wyb", "nxy" that would
+  // slip through otherwise.
+  if (!/[aeiouAEIOUаеиоуАЕИОУ]/.test(t)) return 'no_vowel';
+  // Low-entropy 3-char tokens ("aaa", "xyz" repeated chars).
+  if (t.length <= 3) {
+    const uniq = new Set(t.toLowerCase()).size;
+    if (uniq <= 1) return 'repeat_char';
+  }
+  // >4 consecutive consonants (no vowel break) looks like random junk.
+  if (/[bcdfghjklmnpqrstvwxzBCDFGHJKLMNPQRSTVWXZ]{5,}/.test(t)) return 'consonant_run';
+  return null;
+}
+
+function emailDomainOf(email) {
+  const at = email.lastIndexOf('@');
+  if (at < 0) return '';
+  return email.slice(at + 1).toLowerCase();
+}
+
 export async function addStudent(name, email) {
   if (!name || typeof name !== 'string' || name.trim().length < 2) {
     return { error: 'Ime mora imati najmanje 2 karaktera.' };
@@ -143,6 +216,25 @@ export async function addStudent(name, email) {
   const cleanEmail = email.trim().toLowerCase().replace(/[<>"'&;]/g, '');
   const students = await readStudents();
   const trimmed = name.trim().replace(/[<>"'&;]/g, '');
+
+  // Disposable / throwaway email → reject. Generic message on purpose so
+  // bots can't A/B test which domains are flagged.
+  const domain = emailDomainOf(cleanEmail);
+  if (domain && DISPOSABLE_EMAIL_DOMAINS.has(domain)) {
+    console.warn(`[AntiBot] Rejected disposable domain: ${domain}`);
+    return { error: 'Molimo koristi primarnu email adresu (nije dozvoljen privremeni email servis).' };
+  }
+
+  // Gibberish name heuristic — check each whitespace-separated part. Real
+  // "Firstname Lastname" inputs pass; "wss wws" / "li1tp 9mhe6" fail.
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  for (const p of parts) {
+    const reason = gibberishNameReason(p);
+    if (reason) {
+      console.warn(`[AntiBot] Rejected gibberish name part "${p}" (reason=${reason}) <${cleanEmail}>`);
+      return { error: 'Ime ne izgleda ispravno. Unesi svoje pravo ime i prezime.' };
+    }
+  }
 
   if (students.length >= MAX_STUDENTS) {
     return { error: `Maksimalan broj korisnika dostignut (${MAX_STUDENTS}).` };
