@@ -585,6 +585,25 @@ const registerLimiter = rateLimit({
   handler: (_req, res) => res.status(429).json({ error: 'Previše registracija. Pokušaj ponovo za sat vremena.' }),
 });
 
+// Separate (much lighter) limiter for `/register/token`. That endpoint
+// only issues an HMAC-signed timestamp — it does NOT create an account.
+// The real account-creation cost is behind the strict `registerLimiter`
+// on `/auth/register`. Previously both endpoints shared the 3/h bucket,
+// which meant a legitimate user who opened & closed the signup modal a
+// few times (or who got hit by a prior bot wave from the same IP) ended
+// up locked out with "Neispravan sigurnosni token" errors. 60/h gives
+// plenty of headroom for normal UI churn while still blocking tight
+// scripted loops. Still per-IP so a botnet would need >60 IPs/h to farm
+// tokens, at which point other layers (Turnstile, honeypot, delay) kick in.
+const registerTokenLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => isWhitelistedIP(req),
+  handler: (_req, res) => res.status(429).json({ error: 'Previše zahteva. Sačekaj par minuta i pokušaj ponovo.' }),
+});
+
 app.use((req, res, next) => {
   let logPath = req.path;
   // Redact any sensitive query params if they ever appear (defense-in-depth — server now
@@ -2009,7 +2028,7 @@ app.post('/api/projects/:id/uploads/commit', requireAuth, asyncHandler(async (re
 
 // ─── Legacy Registration (extension/landing page) ───────────────────────────
 
-app.get('/register/token', registerLimiter, (_req, res) => {
+app.get('/register/token', registerTokenLimiter, (_req, res) => {
   res.json({
     token: createRegisterToken(),
     // Frontends read this so they can decide whether to render the
