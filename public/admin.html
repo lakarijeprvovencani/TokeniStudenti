@@ -280,6 +280,17 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
           <div class="lbl">Balans</div><div id="nrBal" class="c-orange" style="font-weight:700"></div>
         </div>
       </div>
+      <div class="card" style="border:1px solid rgba(96,165,250,0.3);background:linear-gradient(135deg,rgba(59,130,246,0.05),rgba(37,99,235,0.03));">
+        <div class="card-title" style="color:#93c5fd;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <span>Email servis — dijagnostika</span>
+          <button class="btn btn-sm btn-ghost" onclick="checkEmailStatus()">Proveri Resend setup</button>
+        </div>
+        <p style="font-size:.78rem;color:var(--text);margin:0 0 4px;line-height:1.5">
+          Ako verifikacioni mailovi ne stižu korisnicima, pritisni „Proveri Resend setup" — pokazuje da li je API key postavljen, šta je FROM adresa, i gde je najčešći uzrok problema.
+        </p>
+        <div id="emailStatusRes" style="margin-top:8px;font-size:.82rem"></div>
+      </div>
+
       <div class="card" style="border:1px solid rgba(250,115,21,0.3);background:linear-gradient(135deg,rgba(250,115,21,0.06),rgba(234,88,12,0.03));">
         <div class="card-title" style="color:#ffb27a">Čišćenje bot-naloga</div>
         <p style="font-size:.78rem;color:var(--text);margin:0 0 12px;line-height:1.5">
@@ -653,6 +664,7 @@ function renderStudents(){
       <td style="color:var(--text);font-size:.85rem">${s.last_used ? fmtD(s.last_used) : 'Nikad'}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-sm btn-y" onclick="openCredit('${esc(s.key)}','${esc(s.name)}',${s.balance_usd||0})">Krediti</button>
+        ${s.email_verified===false?`<button class="btn btn-sm btn-ghost" onclick="resendVerify('${esc(s.key)}','${esc(s.email||'')}')" title="Pošalji verifikacioni email ponovo">✉ Verify</button>`:''}
         <button class="btn btn-sm ${s.active?'btn-ghost':'btn-g'}" onclick="toggleStu('${esc(s.key)}',${!s.active})">${s.active?'Deaktiviraj':'Aktiviraj'}</button>
         <button class="btn btn-sm btn-r" onclick="delStu('${esc(s.key)}','${esc(s.name)}')">Obrisi</button>
       </td>
@@ -742,6 +754,34 @@ function delStu(key,name){
   api('DELETE','/admin/students/'+encodeURIComponent(key)).then(d=>{
     if(d.error){toast(d.error);return}
     toast('Obrisan');refresh();
+  });
+}
+
+// Admin-triggered resend of the verification email for a single student.
+// Re-enables their account lifecycle even if the original mail was lost,
+// rejected by ESP, dumped in spam, etc. Surfaces Resend errors in-line.
+function resendVerify(key,email){
+  if(!confirm('Poslati verifikacioni email na "'+(email||key)+'"?'))return;
+  api('POST','/admin/resend-verification/'+encodeURIComponent(key)).then(d=>{
+    if(d.error){toast('❌ '+d.error);return}
+    if(d.already_verified){toast('Već je verifikovan');return}
+    toast('✉ Poslato na '+(d.email||email));
+  });
+}
+
+function checkEmailStatus(){
+  $('emailStatusRes').innerHTML='<span style="color:var(--text)">Proveravam…</span>';
+  api('GET','/admin/email-status').then(d=>{
+    if(d.error){$('emailStatusRes').innerHTML='<span style="color:#ef4444">'+d.error+'</span>';return}
+    const ok=d.resend_configured;
+    $('emailStatusRes').innerHTML=`
+      <div style="border:1px solid ${ok?'rgba(34,197,94,0.3)':'rgba(239,68,68,0.3)'};background:${ok?'rgba(34,197,94,0.06)':'rgba(239,68,68,0.06)'};padding:10px 12px;border-radius:6px;line-height:1.6">
+        <div><strong style="color:${ok?'#86efac':'#fca5a5'}">${ok?'✓ Resend je povezan':'✗ Resend NIJE povezan'}</strong></div>
+        <div style="font-size:.78rem;margin-top:4px"><span style="color:var(--text)">FROM:</span> <code>${esc(d.email_from)}</code></div>
+        <div style="font-size:.78rem"><span style="color:var(--text)">APP_URL:</span> <code>${esc(d.app_url)}</code></div>
+        <div style="font-size:.75rem;color:var(--text);margin-top:8px;line-height:1.5">${esc(d.hint||'')}</div>
+      </div>
+    `;
   });
 }
 

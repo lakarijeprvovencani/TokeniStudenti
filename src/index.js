@@ -1151,6 +1151,54 @@ app.post('/auth/resend-verification', authLimiter, requireAuth, asyncHandler(asy
   }
 }));
 
+// Admin-triggered resend of the verification email for a specific student.
+// Handy when a user mails saying "I never got the link" — we can requeue
+// without them having to log in / remember their password. Also surfaces
+// the real Resend error straight in the response so the admin can tell
+// apart "domain not verified" from "user typo'd email".
+app.post('/admin/resend-verification/:key', adminLimiter, requireAdmin, asyncHandler(async (req, res) => {
+  const student = await findByKey(req.params.key);
+  if (!student) return res.status(404).json({ error: 'Student ne postoji.' });
+  if (student.email_verified === true) {
+    return res.json({ ok: true, already_verified: true });
+  }
+  if (!isEmailConfigured()) {
+    return res.status(503).json({
+      error: 'RESEND_API_KEY nije postavljen na serveru. Podesi env var pa restart.',
+    });
+  }
+  try {
+    const vToken = await createEmailVerificationToken(student.key);
+    if (!vToken) return res.status(500).json({ error: 'Greška pri generisanju tokena.' });
+    const appUrl = (process.env.APP_URL || 'https://vajbagent.netlify.app').replace(/\/+$/, '');
+    const verifyLink = `${appUrl}/?verify_token=${encodeURIComponent(vToken)}`;
+    const ok = await sendEmailVerificationEmail(student, verifyLink);
+    if (!ok) {
+      return res.status(500).json({
+        error: 'Resend je odbio slanje. Proveri: 1) domen verifikovan? 2) FROM adresa ispravna? (vidi Render logs za detalje)',
+      });
+    }
+    console.log(`[Admin] Verification email resent to <${student.email}>`);
+    res.json({ ok: true, email: student.email });
+  } catch (err) {
+    console.error('[Admin] Resend verification failed:', err?.message);
+    res.status(500).json({ error: err?.message || 'Greška pri slanju.' });
+  }
+}));
+
+// Diagnostic: does the server have Resend wired up, and with which FROM?
+// Useful to figure out at a glance why verification emails aren't arriving.
+app.get('/admin/email-status', adminLimiter, requireAdmin, (_req, res) => {
+  res.json({
+    resend_configured: isEmailConfigured(),
+    email_from: process.env.EMAIL_FROM || 'VajbAgent <onboarding@resend.dev> (default)',
+    app_url: process.env.APP_URL || 'https://vajbagent.netlify.app (default)',
+    hint: isEmailConfigured()
+      ? 'RESEND_API_KEY je postavljen. Ako mailovi ne stižu: 1) proveri Resend dashboard za delivery status, 2) verifikuj custom domen ako EMAIL_FROM nije onboarding@resend.dev, 3) proveri Spam folder kod primaoca.'
+      : 'RESEND_API_KEY nije postavljen na Renderu. Dodaj env var i restart.',
+  });
+});
+
 app.post('/auth/logout', asyncHandler(async (_req, res) => {
   const cookies = parseCookies(_req);
   if (cookies.vajb_session) await destroySession(cookies.vajb_session);
