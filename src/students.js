@@ -265,6 +265,30 @@ export async function removeStudent(key) {
   return { removed };
 }
 
+/**
+ * Atomically delete many students in a single read-modify-write cycle.
+ * Prevents the race condition you hit when looping removeStudent() — each
+ * parallel call would re-read the file, potentially from before earlier
+ * writes landed, and lose deletions along the way.
+ *
+ * Returns { removed: Student[], notFound: string[] } so the caller can
+ * report precisely how many actually went away vs. how many were already
+ * gone (e.g. deleted in another tab).
+ */
+export async function removeStudents(keys) {
+  const keySet = new Set((keys || []).filter(Boolean));
+  if (keySet.size === 0) return { removed: [], notFound: [] };
+  const students = await readStudents();
+  const removed = [];
+  const kept = [];
+  for (const s of students) {
+    if (keySet.has(s.key)) { removed.push(s); keySet.delete(s.key); }
+    else kept.push(s);
+  }
+  if (removed.length > 0) await writeStudents(kept);
+  return { removed, notFound: [...keySet] };
+}
+
 export async function toggleStudent(key, active) {
   const students = await readStudents();
   const student = students.find(s => s.key === key);

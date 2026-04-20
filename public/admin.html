@@ -104,6 +104,19 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
 .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text);border-color:var(--border2)}
 .btn-sm{padding:5px 10px;font-size:.72rem}
 
+/* Filter chips */
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:transparent;border:1px solid var(--border);color:var(--text);font-size:.75rem;cursor:pointer;transition:all .15s;font-family:inherit}
+.chip:hover{border-color:var(--border2);color:#fff}
+.chip.active{background:rgba(250,115,21,0.12);border-color:rgba(250,115,21,0.5);color:#ffb27a}
+.chip-n{display:inline-block;min-width:18px;padding:1px 6px;border-radius:999px;background:rgba(255,255,255,0.05);font-size:.68rem;text-align:center}
+.chip.active .chip-n{background:rgba(250,115,21,0.25);color:#ffd19a}
+#bulkBar{display:flex !important}
+#bulkBar[hidden]{display:none !important}
+
+/* Progress bar for bulk ops */
+.progress-wrap{margin-top:8px;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden}
+.progress-bar{height:100%;background:linear-gradient(90deg,#f97316,#ea580c);transition:width .2s ease}
+
 /* Forms */
 .form-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .form-input{padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.84rem;font-family:inherit;outline:none;transition:border-color .2s}
@@ -311,20 +324,41 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
         <div id="purgeRes" style="margin-top:12px;font-size:.82rem"></div>
       </div>
 
-      <div class="card">
+      <div class="card" id="stuCard">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-          <span>Svi studenti</span>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input class="form-input" id="stuSearch" placeholder="Pretraga (ime, email, ključ)…" style="width:220px;font-size:.8rem" oninput="renderStudents()">
-            <button class="btn btn-sm btn-r" id="bulkDelBtn" onclick="bulkDelete()" disabled>Obriši izabrane (<span id="bulkCount">0</span>)</button>
+          <span>Svi studenti <span id="stuCount" style="color:var(--text);font-weight:400;font-size:.78rem;margin-left:6px"></span></span>
+          <input class="form-input" id="stuSearch" placeholder="Pretraga (ime, email, ključ)…" style="width:260px;font-size:.8rem" oninput="renderStudents()">
+        </div>
+
+        <!-- Filter chips: one-click narrowing that reflects real bot-cleanup
+             workflows. Active chip has a filled background; others stay
+             ghosted until clicked. Counts update on every render. -->
+        <div id="stuFilters" style="display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 12px">
+          <button type="button" class="chip" data-filter="all">Svi <span class="chip-n" data-c="all">0</span></button>
+          <button type="button" class="chip" data-filter="unverified">Neverifikovani <span class="chip-n" data-c="unverified">0</span></button>
+          <button type="button" class="chip" data-filter="zero">Balans = $0 <span class="chip-n" data-c="zero">0</span></button>
+          <button type="button" class="chip" data-filter="today">Kreiran danas <span class="chip-n" data-c="today">0</span></button>
+          <button type="button" class="chip" data-filter="never_used">Nikad aktivan <span class="chip-n" data-c="never_used">0</span></button>
+        </div>
+
+        <!-- Sticky bulk-action bar appears when selection > 0. Uses a single
+             atomic bulk-delete endpoint so N deletes become 1 round trip. -->
+        <div id="bulkBar" style="display:none;margin-bottom:10px;padding:10px 14px;border-radius:8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div style="font-size:.85rem"><strong id="bulkCount" style="color:#fca5a5">0</strong> <span style="color:var(--text)">izabrano</span> <span id="bulkBalInfo" style="color:var(--text);margin-left:8px"></span></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm btn-ghost" onclick="clearSelection()">Poništi izbor</button>
+            <button class="btn btn-sm btn-r" id="bulkDelBtn" onclick="bulkDelete()">Obriši izabrane</button>
           </div>
         </div>
-        <table><thead><tr>
-          <th style="width:30px"><input type="checkbox" id="stuSelAll" onchange="toggleSelAll(this.checked)" title="Izaberi sve"></th>
-          <th>Ime</th><th>API ključ</th><th>Balans</th><th>Status</th><th>Marža</th><th>Kreiran</th><th>Poslednja aktivnost</th><th>Akcije</th>
-        </tr></thead>
-        <tbody id="stuBody"></tbody></table>
-        <div id="stuEmpty" style="display:none;text-align:center;padding:28px;color:var(--text);font-size:.85rem">Nema studenata. Dodaj prvog iznad.</div>
+
+        <div style="overflow-x:auto">
+          <table style="min-width:900px"><thead><tr>
+            <th style="width:30px"><input type="checkbox" id="stuSelAll" onchange="toggleSelAll(this.checked)" title="Izaberi sve (u trenutnom filteru)"></th>
+            <th>Ime / Email</th><th>API ključ</th><th>Balans</th><th>Status</th><th>Marža</th><th>Kreiran</th><th>Poslednja aktivnost</th><th>Akcije</th>
+          </tr></thead>
+          <tbody id="stuBody"></tbody></table>
+        </div>
+        <div id="stuEmpty" style="display:none;text-align:center;padding:28px;color:var(--text);font-size:.85rem">Nema studenata koji odgovaraju filteru.</div>
       </div>
     </div>
 
@@ -634,25 +668,73 @@ function renderOverview(){
 }
 
 // ====== STUDENTI ======
-// Selection state for bulk actions. Keyed by API key so filtering /
-// re-rendering never loses the user's picks.
+// ─── Students dashboard state ──────────────────────────────────────────
+// SELECTED: Set of API keys the admin has checked (survives re-renders
+// and filter changes).
+// STU_FILTER: one of 'all' | 'unverified' | 'zero' | 'today' | 'never_used'
 const SELECTED=new Set();
-function renderStudents(){
+let STU_FILTER='all';
+
+// Midnight of the current local day — used by the "today" filter.
+function todayStartMs(){const d=new Date();d.setHours(0,0,0,0);return d.getTime()}
+
+// Filter predicates live in one place so the chip counters stay in sync
+// with the actual row filter. Always add new filters here.
+const STU_FILTERS={
+  all:        () => true,
+  unverified: (s) => s.email_verified === false,
+  zero:       (s) => (s.balance_usd || 0) === 0,
+  today:      (s) => s.created && new Date(s.created).getTime() >= todayStartMs(),
+  never_used: (s) => !s.last_used,
+};
+
+function filteredStudents(){
   const q=($('stuSearch')?.value||'').trim().toLowerCase();
-  const all=DATA.students;
-  const sts=q?all.filter(s=>(s.name||'').toLowerCase().includes(q)||(s.email||'').toLowerCase().includes(q)||(s.key||'').toLowerCase().includes(q)):all;
+  const pred=STU_FILTERS[STU_FILTER]||STU_FILTERS.all;
+  return DATA.students.filter(s=>{
+    if(!pred(s))return false;
+    if(!q)return true;
+    return (s.name||'').toLowerCase().includes(q)
+        || (s.email||'').toLowerCase().includes(q)
+        || (s.key||'').toLowerCase().includes(q);
+  });
+}
+
+function renderStudents(){
+  // Keep selection coherent with the backing data (an account might
+  // have been deleted in another tab or via a purge operation).
+  const validKeys=new Set(DATA.students.map(s=>s.key));
+  for(const k of [...SELECTED]) if(!validKeys.has(k)) SELECTED.delete(k);
+
+  // Update chip counters from the unfiltered dataset.
+  for(const [id,pred] of Object.entries(STU_FILTERS)){
+    const n=DATA.students.filter(pred).length;
+    const el=document.querySelector(`[data-c="${id}"]`);
+    if(el)el.textContent=n;
+  }
+  document.querySelectorAll('#stuFilters .chip').forEach(c=>{
+    c.classList.toggle('active', c.dataset.filter===STU_FILTER);
+  });
+
+  const sts=filteredStudents();
+  $('stuCount').textContent=`(${sts.length}${sts.length!==DATA.students.length?` / ${DATA.students.length}`:''})`;
+
   const tb=$('stuBody');tb.innerHTML='';
   $('stuEmpty').style.display=sts.length?'none':'block';
-  // Drop any selections that no longer exist (account deleted elsewhere).
-  const validKeys=new Set(all.map(s=>s.key));
-  for (const k of [...SELECTED]) if (!validKeys.has(k)) SELECTED.delete(k);
+
   sts.forEach(s=>{
     const hasMarkup=!s.noMarkup;
-    const checked=SELECTED.has(s.key)?'checked':'';
-    tb.innerHTML+=`<tr${SELECTED.has(s.key)?' style="background:rgba(239,68,68,0.06)"':''}>
-      <td><input type="checkbox" class="stu-check" data-key="${esc(s.key)}" ${checked} onchange="toggleSel('${esc(s.key)}',this.checked)"></td>
-      <td style="font-weight:700">${esc(s.name)}${s.email?`<div style="font-size:.72rem;color:var(--text);font-weight:400">${esc(s.email)}</div>`:''}</td>
-      <td class="mono" style="cursor:pointer;color:var(--orange)" onclick="copyText('${esc(s.key)}')" title="Klikni za kopiranje">${esc(s.key)}</td>
+    const isSel=SELECTED.has(s.key);
+    const verTag = s.email_verified===false
+      ? '<span class="tag" style="background:rgba(239,68,68,0.12);color:#fca5a5;margin-left:4px;font-size:.65rem" title="Email nije potvrđen">Neverified</span>'
+      : '';
+    tb.innerHTML+=`<tr${isSel?' style="background:rgba(239,68,68,0.06)"':''}>
+      <td><input type="checkbox" ${isSel?'checked':''} onchange="toggleSel('${esc(s.key)}',this.checked)"></td>
+      <td>
+        <div style="font-weight:700">${esc(s.name)}${verTag}</div>
+        ${s.email?`<div style="font-size:.72rem;color:var(--text);font-weight:400">${esc(s.email)}</div>`:''}
+      </td>
+      <td class="mono" style="cursor:pointer;color:var(--orange);font-size:.72rem" onclick="copyText('${esc(s.key)}')" title="Klikni za kopiranje">${esc(s.key)}</td>
       <td class="c-orange">$${(s.balance_usd||0).toFixed(2)}</td>
       <td>${s.active?'<span class="tag tag-active">Aktivan</span>':'<span class="tag tag-inactive">Neaktivan</span>'}</td>
       <td>
@@ -660,61 +742,84 @@ function renderStudents(){
           ${hasMarkup?'✓ Markup':'Bez marže'}
         </button>
       </td>
-      <td style="color:var(--text)">${fmtD(s.created)}</td>
-      <td style="color:var(--text);font-size:.85rem">${s.last_used ? fmtD(s.last_used) : 'Nikad'}</td>
+      <td style="color:var(--text);font-size:.78rem">${fmtD(s.created)}</td>
+      <td style="color:var(--text);font-size:.78rem">${s.last_used ? fmtD(s.last_used) : 'Nikad'}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-sm btn-y" onclick="openCredit('${esc(s.key)}','${esc(s.name)}',${s.balance_usd||0})">Krediti</button>
-        ${s.email_verified===false?`<button class="btn btn-sm btn-ghost" onclick="resendVerify('${esc(s.key)}','${esc(s.email||'')}')" title="Pošalji verifikacioni email ponovo">✉ Verify</button>`:''}
+        ${s.email_verified===false?`<button class="btn btn-sm btn-ghost" onclick="resendVerify('${esc(s.key)}','${esc(s.email||'')}')" title="Pošalji verifikacioni email ponovo">✉</button>`:''}
         <button class="btn btn-sm ${s.active?'btn-ghost':'btn-g'}" onclick="toggleStu('${esc(s.key)}',${!s.active})">${s.active?'Deaktiviraj':'Aktiviraj'}</button>
-        <button class="btn btn-sm btn-r" onclick="delStu('${esc(s.key)}','${esc(s.name)}')">Obrisi</button>
+        <button class="btn btn-sm btn-r" onclick="delStu('${esc(s.key)}','${esc(s.name)}')">Obriši</button>
       </td>
     </tr>`;
   });
-  updateBulkBtn();
-  // Sync "select all" header checkbox to current visible-rows state.
+
+  // Header "select all" reflects visible-rows state only.
   const selAll=$('stuSelAll');
   if(selAll){
-    const visible=sts;
-    const allChecked=visible.length>0&&visible.every(s=>SELECTED.has(s.key));
+    const allChecked=sts.length>0&&sts.every(s=>SELECTED.has(s.key));
     selAll.checked=allChecked;
-    selAll.indeterminate=!allChecked&&visible.some(s=>SELECTED.has(s.key));
+    selAll.indeterminate=!allChecked&&sts.some(s=>SELECTED.has(s.key));
   }
+  updateBulkBar();
 }
+
+// Wire up chips once — they just set STU_FILTER and re-render.
+document.addEventListener('click', (e) => {
+  const chip = e.target.closest?.('#stuFilters .chip');
+  if(!chip)return;
+  STU_FILTER = chip.dataset.filter || 'all';
+  renderStudents();
+});
+
 function toggleSel(key,on){
   if(on)SELECTED.add(key);else SELECTED.delete(key);
   renderStudents();
 }
 function toggleSelAll(on){
-  const q=($('stuSearch')?.value||'').trim().toLowerCase();
-  const all=DATA.students;
-  const sts=q?all.filter(s=>(s.name||'').toLowerCase().includes(q)||(s.email||'').toLowerCase().includes(q)||(s.key||'').toLowerCase().includes(q)):all;
-  sts.forEach(s=>{ if(on)SELECTED.add(s.key);else SELECTED.delete(s.key); });
+  filteredStudents().forEach(s=>{ if(on)SELECTED.add(s.key);else SELECTED.delete(s.key); });
   renderStudents();
 }
-function updateBulkBtn(){
-  const btn=$('bulkDelBtn');const cnt=$('bulkCount');
-  if(!btn||!cnt)return;
+function clearSelection(){SELECTED.clear();renderStudents()}
+
+function updateBulkBar(){
+  const bar=$('bulkBar');const cnt=$('bulkCount');const info=$('bulkBalInfo');
+  if(!bar||!cnt)return;
   cnt.textContent=SELECTED.size;
-  btn.disabled=SELECTED.size===0;
+  bar.hidden=SELECTED.size===0;
+  if(info){
+    const paid=DATA.students.filter(s=>SELECTED.has(s.key)&&(s.balance_usd||0)>0);
+    info.innerHTML=paid.length>0
+      ? `<span style="color:#fca5a5">⚠ ${paid.length} sa balansom &gt; $0</span>`
+      : '';
+  }
 }
+
 async function bulkDelete(){
   const keys=[...SELECTED];
   if(!keys.length)return;
-  // Extra safety: if any selected account has a non-zero balance, warn loudly.
   const withBalance=DATA.students.filter(s=>SELECTED.has(s.key)&&(s.balance_usd||0)>0);
   const msg=withBalance.length>0
-    ?`Obrisati ${keys.length} naloga?\n\n⚠ ${withBalance.length} od njih ima balans > $0. Ovo je nepovratno.`
+    ?`Obrisati ${keys.length} naloga?\n\n⚠ ${withBalance.length} ima balans > $0.\nOvo je nepovratno.`
     :`Obrisati ${keys.length} naloga?\n\nOvo je nepovratno.`;
   if(!confirm(msg))return;
-  const btn=$('bulkDelBtn');if(btn)btn.disabled=true;
-  let ok=0,fail=0;
-  // Sequential so we don't hammer the admin endpoint + keep order predictable.
-  for(const key of keys){
-    const r=await api('DELETE','/admin/students/'+encodeURIComponent(key));
-    if(r&&!r.error)ok++;else fail++;
+
+  const btn=$('bulkDelBtn');const bar=$('bulkBar');
+  if(btn){btn.disabled=true;btn.textContent='Brisanje…';}
+
+  // Single atomic bulk-delete call. Fixes the old sequential loop where
+  // races between concurrent read-modify-writes could drop deletions.
+  const r=await api('POST','/admin/students/bulk-delete',{keys});
+  if(btn){btn.disabled=false;btn.textContent='Obriši izabrane';}
+
+  if(r?.error){
+    toast('Greška: '+r.error);
+    return;
   }
   SELECTED.clear();
-  toast(`Obrisano ${ok}${fail?` (${fail} greška)`:''}`);
+  const msg2 = r.not_found>0
+    ? `Obrisano ${r.deleted}. ${r.not_found} već nije postojalo.`
+    : `Obrisano ${r.deleted} naloga.`;
+  toast(msg2);
   refresh();
 }
 

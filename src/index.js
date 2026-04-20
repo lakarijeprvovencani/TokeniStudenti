@@ -34,7 +34,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { logUsage, getUsageSummary, getUsageForKey, getModelStats, getMonthlyAggregates } from './usage.js';
 import { getBalance, deductBalance, costUsd, costUsdWithCache, addBalance, getTotalDeposited, loadStudentMarkupFlags, setStudentNoMarkup, getStudentMarkup, providerCostUsd, getPrices } from './balance.js';
-import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP, addStudentWithPassword, authenticateWithPassword, setStudentPassword, studentHasPassword, isStudentEmailVerified, createEmailVerificationToken, findByVerificationToken, markEmailVerified, purgeUnverifiedStudents, claimWelcomeBonus } from './students.js';
+import { seedFromEnv, getAllStudents, addStudent, removeStudent, removeStudents, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP, addStudentWithPassword, authenticateWithPassword, setStudentPassword, studentHasPassword, isStudentEmailVerified, createEmailVerificationToken, findByVerificationToken, markEmailVerified, purgeUnverifiedStudents, claimWelcomeBonus } from './students.js';
 import { sendWelcomeEmail, sendRecoveryEmail, sendPasswordResetEmail, sendEmailVerificationEmail, isEmailConfigured } from './email.js';
 import * as supabaseOAuth from './supabaseOAuth.js';
 import * as githubOAuth from './githubOAuth.js';
@@ -563,18 +563,21 @@ const loginEmailLimiter = rateLimit({
   handler: (_req, res) => res.status(429).json({ error: 'Previše pokušaja prijave za ovaj email. Pokušaj ponovo za 10 minuta.' }),
 });
 
-const adminLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 150,
-  handler: (_req, res) => res.status(429).json({ error: { message: 'Previše admin zahteva. Sačekaj 1 minut.', code: 'rate_limit' } }),
-});
-
 import { normalizeIP, WHITELIST_IPS } from './utils.js';
 
 function isWhitelistedIP(req) {
   const raw = req.ip || req.connection?.remoteAddress || '';
   return WHITELIST_IPS.has(normalizeIP(raw));
 }
+
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  // The admin panel legitimately bursts dozens of calls when bulk-deleting
+  // or refreshing; whitelisted ops IPs shouldn't be throttled at all.
+  skip: (req) => isWhitelistedIP(req),
+  handler: (_req, res) => res.status(429).json({ error: { message: 'Previše admin zahteva. Sačekaj 1 minut.', code: 'rate_limit' } }),
+});
 
 const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -3797,6 +3800,27 @@ app.delete('/admin/students/:key', adminLimiter, requireAdmin, asyncHandler(asyn
   const result = await removeStudent(req.params.key);
   if (result.error) return res.status(404).json({ error: result.error });
   res.json(result);
+}));
+
+/**
+ * Atomic bulk delete — one file read, filter-in-memory, one write.
+ * Fixes the race condition the per-key loop used to have (each DELETE
+ * re-read students.json so parallel/near-parallel calls would silently
+ * lose some deletions). Body: { keys: string[] }.
+ */
+app.post('/admin/students/bulk-delete', adminLimiter, requireAdmin, asyncHandler(async (req, res) => {
+  const keys = Array.isArray(req.body?.keys) ? req.body.keys.filter(k => typeof k === 'string' && k.length > 0) : [];
+  if (keys.length === 0) return res.status(400).json({ error: 'Telo mora biti { keys: string[] } sa bar jednim ključem.' });
+  if (keys.length > 1000) return res.status(400).json({ error: 'Previše ključeva odjednom (max 1000).' });
+  const { removed, notFound } = await removeStudents(keys);
+  console.log(`[Admin] Bulk-deleted ${removed.length}/${keys.length} students (${notFound.length} not found)`);
+  res.json({
+    ok: true,
+    deleted: removed.length,
+    requested: keys.length,
+    not_found: notFound.length,
+    students: removed.map(s => ({ key: s.key, name: s.name, email: s.email })),
+  });
 }));
 
 // Bulk-delete bot signups. Two modes:
