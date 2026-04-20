@@ -301,8 +301,17 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
       </div>
 
       <div class="card">
-        <div class="card-title">Svi studenti</div>
-        <table><thead><tr><th>Ime</th><th>API ključ</th><th>Balans</th><th>Status</th><th>Marža</th><th>Kreiran</th><th>Poslednja aktivnost</th><th>Akcije</th></tr></thead>
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <span>Svi studenti</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="form-input" id="stuSearch" placeholder="Pretraga (ime, email, ključ)…" style="width:220px;font-size:.8rem" oninput="renderStudents()">
+            <button class="btn btn-sm btn-r" id="bulkDelBtn" onclick="bulkDelete()" disabled>Obriši izabrane (<span id="bulkCount">0</span>)</button>
+          </div>
+        </div>
+        <table><thead><tr>
+          <th style="width:30px"><input type="checkbox" id="stuSelAll" onchange="toggleSelAll(this.checked)" title="Izaberi sve"></th>
+          <th>Ime</th><th>API ključ</th><th>Balans</th><th>Status</th><th>Marža</th><th>Kreiran</th><th>Poslednja aktivnost</th><th>Akcije</th>
+        </tr></thead>
         <tbody id="stuBody"></tbody></table>
         <div id="stuEmpty" style="display:none;text-align:center;padding:28px;color:var(--text);font-size:.85rem">Nema studenata. Dodaj prvog iznad.</div>
       </div>
@@ -614,14 +623,24 @@ function renderOverview(){
 }
 
 // ====== STUDENTI ======
+// Selection state for bulk actions. Keyed by API key so filtering /
+// re-rendering never loses the user's picks.
+const SELECTED=new Set();
 function renderStudents(){
-  const sts=DATA.students;
+  const q=($('stuSearch')?.value||'').trim().toLowerCase();
+  const all=DATA.students;
+  const sts=q?all.filter(s=>(s.name||'').toLowerCase().includes(q)||(s.email||'').toLowerCase().includes(q)||(s.key||'').toLowerCase().includes(q)):all;
   const tb=$('stuBody');tb.innerHTML='';
   $('stuEmpty').style.display=sts.length?'none':'block';
+  // Drop any selections that no longer exist (account deleted elsewhere).
+  const validKeys=new Set(all.map(s=>s.key));
+  for (const k of [...SELECTED]) if (!validKeys.has(k)) SELECTED.delete(k);
   sts.forEach(s=>{
     const hasMarkup=!s.noMarkup;
-    tb.innerHTML+=`<tr>
-      <td style="font-weight:700">${esc(s.name)}</td>
+    const checked=SELECTED.has(s.key)?'checked':'';
+    tb.innerHTML+=`<tr${SELECTED.has(s.key)?' style="background:rgba(239,68,68,0.06)"':''}>
+      <td><input type="checkbox" class="stu-check" data-key="${esc(s.key)}" ${checked} onchange="toggleSel('${esc(s.key)}',this.checked)"></td>
+      <td style="font-weight:700">${esc(s.name)}${s.email?`<div style="font-size:.72rem;color:var(--text);font-weight:400">${esc(s.email)}</div>`:''}</td>
       <td class="mono" style="cursor:pointer;color:var(--orange)" onclick="copyText('${esc(s.key)}')" title="Klikni za kopiranje">${esc(s.key)}</td>
       <td class="c-orange">$${(s.balance_usd||0).toFixed(2)}</td>
       <td>${s.active?'<span class="tag tag-active">Aktivan</span>':'<span class="tag tag-inactive">Neaktivan</span>'}</td>
@@ -639,6 +658,52 @@ function renderStudents(){
       </td>
     </tr>`;
   });
+  updateBulkBtn();
+  // Sync "select all" header checkbox to current visible-rows state.
+  const selAll=$('stuSelAll');
+  if(selAll){
+    const visible=sts;
+    const allChecked=visible.length>0&&visible.every(s=>SELECTED.has(s.key));
+    selAll.checked=allChecked;
+    selAll.indeterminate=!allChecked&&visible.some(s=>SELECTED.has(s.key));
+  }
+}
+function toggleSel(key,on){
+  if(on)SELECTED.add(key);else SELECTED.delete(key);
+  renderStudents();
+}
+function toggleSelAll(on){
+  const q=($('stuSearch')?.value||'').trim().toLowerCase();
+  const all=DATA.students;
+  const sts=q?all.filter(s=>(s.name||'').toLowerCase().includes(q)||(s.email||'').toLowerCase().includes(q)||(s.key||'').toLowerCase().includes(q)):all;
+  sts.forEach(s=>{ if(on)SELECTED.add(s.key);else SELECTED.delete(s.key); });
+  renderStudents();
+}
+function updateBulkBtn(){
+  const btn=$('bulkDelBtn');const cnt=$('bulkCount');
+  if(!btn||!cnt)return;
+  cnt.textContent=SELECTED.size;
+  btn.disabled=SELECTED.size===0;
+}
+async function bulkDelete(){
+  const keys=[...SELECTED];
+  if(!keys.length)return;
+  // Extra safety: if any selected account has a non-zero balance, warn loudly.
+  const withBalance=DATA.students.filter(s=>SELECTED.has(s.key)&&(s.balance_usd||0)>0);
+  const msg=withBalance.length>0
+    ?`Obrisati ${keys.length} naloga?\n\n⚠ ${withBalance.length} od njih ima balans > $0. Ovo je nepovratno.`
+    :`Obrisati ${keys.length} naloga?\n\nOvo je nepovratno.`;
+  if(!confirm(msg))return;
+  const btn=$('bulkDelBtn');if(btn)btn.disabled=true;
+  let ok=0,fail=0;
+  // Sequential so we don't hammer the admin endpoint + keep order predictable.
+  for(const key of keys){
+    const r=await api('DELETE','/admin/students/'+encodeURIComponent(key));
+    if(r&&!r.error)ok++;else fail++;
+  }
+  SELECTED.clear();
+  toast(`Obrisano ${ok}${fail?` (${fail} greška)`:''}`);
+  refresh();
 }
 
 function addStudent(){
