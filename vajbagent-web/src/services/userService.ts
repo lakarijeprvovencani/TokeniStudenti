@@ -72,19 +72,47 @@ export async function login(email: string, password: string): Promise<AuthResult
 }
 
 /** Register new account with password. Sets httpOnly session cookie. */
-export async function register(firstName: string, lastName: string, email: string, password: string): Promise<AuthResult> {
+export async function register(
+  firstName: string,
+  lastName: string,
+  email: string,
+  password: string,
+  opts: { token?: string; honeypot?: string; turnstileToken?: string } = {},
+): Promise<AuthResult> {
   try {
     const res = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ first_name: firstName, last_name: lastName, email, password }),
+      body: JSON.stringify({
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        password,
+        token: opts.token || '',
+        honeypot: opts.honeypot || '',
+        turnstile_token: opts.turnstileToken || '',
+      }),
     })
     const data = await res.json()
     if (!res.ok) return { ok: false, error: data.error || 'Greška pri registraciji.' }
     return { ok: true, user: userFromAuthResponse(data), email: data.email }
   } catch {
     return { ok: false, error: 'Ne mogu da se povežem sa serverom.' }
+  }
+}
+
+/** Fetch a fresh HMAC-signed register token (and optional Turnstile site key). */
+export async function fetchRegisterToken(): Promise<{ token: string; turnstileSiteKey: string | null }> {
+  try {
+    const res = await fetch(`${API_URL}/register/token`)
+    const data = await res.json()
+    return {
+      token: typeof data.token === 'string' ? data.token : '',
+      turnstileSiteKey: typeof data.turnstile_site_key === 'string' ? data.turnstile_site_key : null,
+    }
+  } catch {
+    return { token: '', turnstileSiteKey: null }
   }
 }
 

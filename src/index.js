@@ -863,10 +863,80 @@ function verifyRegisterToken(token) {
   return { valid: true };
 }
 
+/**
+ * Verify a Cloudflare Turnstile token against Cloudflare's /siteverify
+ * endpoint. Returns true only on explicit `success: true`. Network /
+ * missing-secret errors fall through as false so the caller can 403.
+ *
+ * Uses the global `fetch` (Node 18+); shaped after the official doc at
+ * https://developers.cloudflare.com/turnstile/get-started/server-side-validation/
+ */
+async function verifyTurnstile(token, remoteIp) {
+  if (!token || typeof token !== 'string') return false;
+  if (!process.env.TURNSTILE_SECRET) return false;
+  try {
+    const body = new URLSearchParams({
+      secret: process.env.TURNSTILE_SECRET,
+      response: token,
+    });
+    if (remoteIp) body.append('remoteip', remoteIp);
+    const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+      // Cloudflare normally replies in <300ms, but don't let a flaky
+      // upstream stall the signup flow for minutes.
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) return false;
+    const data = await r.json().catch(() => null);
+    return !!(data && data.success);
+  } catch (err) {
+    console.warn('[Turnstile] verify error:', err?.message);
+    return false;
+  }
+}
+
 // ─── Web App Auth Routes ────────────────────────────────────────────────────
 
 app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
-  const { first_name, last_name, email, password } = req.body || {};
+  const { first_name, last_name, email, password, honeypot, token, turnstile_token } = req.body || {};
+
+  // Honeypot: hidden form field that is invisible to humans but bot
+  // autofillers will happily populate. Any non-empty value = bot.
+  if (honeypot) {
+    console.warn(`[AntiBot] /auth/register honeypot tripped [IP: ${normalizeIP(req.ip || '?')}]`);
+    return res.status(400).json({ error: 'Neispravan zahtev.' });
+  }
+
+  // Signed register-token: /register/token hands out an HMAC-signed
+  // timestamp. Submitting within <2s (REGISTER_MIN_WAIT_MS) or without a
+  // valid signature means the client didn't load the real form, or
+  // auto-submitted. 30-min expiry window so a user who fills slowly still
+  // works. Legacy accounts (pre-web-app) never hit this path.
+  const tokenCheck = verifyRegisterToken(token);
+  if (!tokenCheck.valid) {
+    console.warn(`[AntiBot] /auth/register bad token reason=${tokenCheck.reason} [IP: ${normalizeIP(req.ip || '?')}]`);
+    if (tokenCheck.reason === 'too_fast') {
+      return res.status(429).json({ error: 'Sačekaj par sekundi pre slanja forme.' });
+    }
+    if (tokenCheck.reason === 'expired') {
+      return res.status(400).json({ error: 'Forma je istekla. Osveži stranicu i pokušaj ponovo.' });
+    }
+    return res.status(400).json({ error: 'Neispravan sigurnosni token. Osveži stranicu i pokušaj ponovo.' });
+  }
+
+  // Optional Cloudflare Turnstile gate. When TURNSTILE_SECRET is set in
+  // the env the frontend renders the widget and attaches turnstile_token.
+  // If the env is not set, we skip silently so local dev / staging
+  // doesn't break before keys are provisioned.
+  if (process.env.TURNSTILE_SECRET) {
+    const ok = await verifyTurnstile(turnstile_token, normalizeIP(req.ip || '')).catch(() => false);
+    if (!ok) {
+      console.warn(`[AntiBot] /auth/register Turnstile failed [IP: ${normalizeIP(req.ip || '?')}]`);
+      return res.status(403).json({ error: 'CAPTCHA verifikacija nije uspela. Osveži stranicu i pokušaj ponovo.' });
+    }
+  }
 
   if (!first_name || typeof first_name !== 'string' || first_name.trim().length < 2) {
     return res.status(400).json({ error: 'Ime mora imati najmanje 2 karaktera.' });
@@ -1940,7 +2010,12 @@ app.post('/api/projects/:id/uploads/commit', requireAuth, asyncHandler(async (re
 // ─── Legacy Registration (extension/landing page) ───────────────────────────
 
 app.get('/register/token', registerLimiter, (_req, res) => {
-  res.json({ token: createRegisterToken() });
+  res.json({
+    token: createRegisterToken(),
+    // Frontends read this so they can decide whether to render the
+    // Turnstile widget; the *secret* never leaves the server.
+    turnstile_site_key: process.env.TURNSTILE_SITE_KEY || null,
+  });
 });
 
 app.post('/register', registerLimiter, asyncHandler(async (req, res) => {

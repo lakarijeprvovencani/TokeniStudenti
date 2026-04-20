@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { X, Loader2, Sparkles, LogIn, UserPlus, ArrowLeft, CheckCircle2, Mail } from 'lucide-react'
-import { register, login, requestPasswordReset, type UserInfo } from '../services/userService'
+import { register, login, requestPasswordReset, fetchRegisterToken, type UserInfo } from '../services/userService'
 import './PaywallModal.css'
 import './AuthModal.css'
 
@@ -40,6 +40,18 @@ export default function AuthModal({ open, onClose, onAuthed, pendingPrompt, init
   const [pendingVerifyUser, setPendingVerifyUser] = useState<UserInfo | null>(null)
   const [pendingVerifyEmail, setPendingVerifyEmail] = useState('')
 
+  // ─── Anti-bot: signed token + countdown + honeypot + Turnstile ─────────
+  // Mirrors the protection the VS Code dashboard has been using. The token
+  // comes from the server and is bound to a timestamp — any submit younger
+  // than 2s or without a valid signature is rejected server-side.
+  const [regToken, setRegToken] = useState('')
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null)
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const [verifyCountdown, setVerifyCountdown] = useState(0)
+  const honeypotRef = useRef<HTMLInputElement>(null)
+  const turnstileContainerRef = useRef<HTMLDivElement>(null)
+  const turnstileWidgetIdRef = useRef<string | null>(null)
+
   // When the modal is (re)opened, honour the requested initialMode so the
   // top-right "Prijavi se" entry point lands on login rather than register.
   useEffect(() => {
@@ -49,8 +61,80 @@ export default function AuthModal({ open, onClose, onAuthed, pendingPrompt, init
       setForgotSent('')
       setPendingVerifyUser(null)
       setPendingVerifyEmail('')
+      setTurnstileToken('')
     }
   }, [open, initialMode])
+
+  // Fetch signed register-token + turnstile site key whenever the user
+  // lands on the register tab. Re-fetch after a failed submit too so the
+  // 30-min expiry window never surprises anyone.
+  useEffect(() => {
+    if (!open || mode !== 'register') return
+    let cancelled = false
+    ;(async () => {
+      const r = await fetchRegisterToken()
+      if (cancelled) return
+      setRegToken(r.token)
+      setTurnstileSiteKey(r.turnstileSiteKey)
+      // 3-second countdown before submit becomes active — matches the
+      // dashboard's anti-autosubmit delay. Bots that fire forms in <300ms
+      // flat-out can't beat this without holding for 3s first, and even
+      // then the server rejects tokens younger than 2s.
+      setVerifyCountdown(3)
+    })()
+    return () => { cancelled = true }
+  }, [open, mode])
+
+  useEffect(() => {
+    if (verifyCountdown <= 0) return
+    const t = setTimeout(() => setVerifyCountdown(n => n - 1), 1000)
+    return () => clearTimeout(t)
+  }, [verifyCountdown])
+
+  // Lazy-load Turnstile script + render the widget once we have a site
+  // key. Cleanup on unmount so re-opening the modal doesn't stack widgets.
+  useEffect(() => {
+    if (!open || mode !== 'register' || !turnstileSiteKey) return
+    const container = turnstileContainerRef.current
+    if (!container) return
+
+    const SCRIPT_ID = 'cf-turnstile-script'
+    const render = () => {
+      const cf = (window as any).turnstile
+      if (!cf || !container) return
+      if (turnstileWidgetIdRef.current) {
+        try { cf.reset(turnstileWidgetIdRef.current) } catch { /* ignore */ }
+        return
+      }
+      turnstileWidgetIdRef.current = cf.render(container, {
+        sitekey: turnstileSiteKey,
+        theme: 'dark',
+        callback: (tok: string) => setTurnstileToken(tok),
+        'error-callback': () => setTurnstileToken(''),
+        'expired-callback': () => setTurnstileToken(''),
+      })
+    }
+
+    if (!document.getElementById(SCRIPT_ID)) {
+      const s = document.createElement('script')
+      s.id = SCRIPT_ID
+      s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+      s.async = true
+      s.defer = true
+      s.onload = render
+      document.head.appendChild(s)
+    } else {
+      render()
+    }
+
+    return () => {
+      const cf = (window as any).turnstile
+      if (cf && turnstileWidgetIdRef.current) {
+        try { cf.remove(turnstileWidgetIdRef.current) } catch { /* ignore */ }
+        turnstileWidgetIdRef.current = null
+      }
+    }
+  }, [open, mode, turnstileSiteKey])
 
   const submit = async () => {
     setError('')
@@ -72,10 +156,37 @@ export default function AuthModal({ open, onClose, onAuthed, pendingPrompt, init
         setError('Lozinka mora imati najmanje 8 karaktera.')
         return
       }
+      if (verifyCountdown > 0) { setError(`Sačekaj još ${verifyCountdown}s pre slanja forme.`); return }
+      if (turnstileSiteKey && !turnstileToken) {
+        setError('Molimo završi CAPTCHA verifikaciju iznad.')
+        return
+      }
       setLoading(true)
-      const result = await register(firstName.trim(), lastName.trim(), email.trim(), password)
+      const result = await register(
+        firstName.trim(),
+        lastName.trim(),
+        email.trim(),
+        password,
+        {
+          token: regToken,
+          honeypot: honeypotRef.current?.value || '',
+          turnstileToken,
+        },
+      )
       setLoading(false)
-      if (!result.ok || !result.user) { setError(result.error || 'Greška pri registraciji.'); return }
+      if (!result.ok || !result.user) {
+        setError(result.error || 'Greška pri registraciji.')
+        // Fetch a fresh token so the user can retry — old one may have
+        // been burned or expired.
+        fetchRegisterToken().then(r => {
+          setRegToken(r.token)
+          setVerifyCountdown(3)
+          setTurnstileToken('')
+          const cf = (window as any).turnstile
+          if (cf && turnstileWidgetIdRef.current) { try { cf.reset(turnstileWidgetIdRef.current) } catch { /* ignore */ } }
+        })
+        return
+      }
       // If the backend issued the account but needs email verification
       // first, show the "check your email" success state inside the modal
       // so the user immediately knows why they can't chat yet. We only
@@ -256,16 +367,42 @@ export default function AuthModal({ open, onClose, onAuthed, pendingPrompt, init
                     autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
                   />
                 )}
+                {mode === 'register' && (
+                  <>
+                    {/* Honeypot: invisible to humans (positioned off-screen with tabIndex=-1
+                        and autoComplete=off) but bot autofillers populate `website`/`name`
+                        fields eagerly. Any non-empty value is a guaranteed bot → server 400. */}
+                    <input
+                      ref={honeypotRef}
+                      type="text"
+                      name="website"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      aria-hidden="true"
+                      style={{ position: 'absolute', left: '-10000px', top: 'auto', width: 1, height: 1, overflow: 'hidden', opacity: 0 }}
+                    />
+                    {turnstileSiteKey && (
+                      <div ref={turnstileContainerRef} className="auth-turnstile" style={{ display: 'flex', justifyContent: 'center', marginTop: 6 }} />
+                    )}
+                  </>
+                )}
               </div>
             )}
 
             {error && !pendingVerifyUser && <div className="paywall-error">{error}</div>}
 
-            {!forgotSent && !pendingVerifyUser && (
-              <button className="btn-primary auth-submit-big" onClick={submit} disabled={loading}>
-                {loading ? <Loader2 size={16} className="spin" /> : submitLabel}
-              </button>
-            )}
+            {!forgotSent && !pendingVerifyUser && (() => {
+              const showCountdown = mode === 'register' && verifyCountdown > 0
+              const disabled = loading || showCountdown
+              const label = showCountdown
+                ? `Verifikacija… ${verifyCountdown}`
+                : submitLabel
+              return (
+                <button className="btn-primary auth-submit-big" onClick={submit} disabled={disabled}>
+                  {loading ? <Loader2 size={16} className="spin" /> : label}
+                </button>
+              )
+            })()}
 
             {mode === 'login' && !forgotSent && (
               <div className="auth-link-row">
