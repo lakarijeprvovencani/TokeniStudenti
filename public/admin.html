@@ -294,6 +294,9 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
           <button class="btn btn-ghost" onclick="purgeDryRun()">Preview (dry-run)</button>
           <button class="btn btn-r" id="purgeGo" onclick="purgeConfirm()" disabled>Obriši definitivno</button>
         </div>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:.78rem;color:var(--text);cursor:pointer">
+          <input type="checkbox" id="purgeIgnoreDeposit"> Ignoriši zero-deposit filter (debug — prikaži <em>sve</em> naloge iz prozora, čak i ako imaju uplatu)
+        </label>
         <div id="purgeRes" style="margin-top:12px;font-size:.82rem"></div>
       </div>
 
@@ -689,23 +692,26 @@ function purgeCutoffIso(){
 }
 function purgeDryRun(){
   const cutoff=purgeCutoffIso();if(!cutoff)return;
-  $('purgeRes').innerHTML='<span style="color:var(--text)">Učitavam preview…</span>';
+  const ignoreDep=$('purgeIgnoreDeposit')?.checked===true;
+  $('purgeRes').innerHTML='<span style="color:var(--text)">Učitavam preview… <code style="color:var(--text);font-size:.7rem">cutoff='+cutoff+' ignore_deposit='+ignoreDep+'</code></span>';
   $('purgeGo').disabled=true;
-  api('POST','/admin/purge-unverified',{created_after:cutoff,dry_run:true}).then(d=>{
+  api('POST','/admin/purge-unverified',{created_after:cutoff,require_zero_deposit:!ignoreDep,dry_run:true}).then(d=>{
     if(d.error){$('purgeRes').innerHTML='<span style="color:#ef4444">'+d.error+'</span>';return}
     PURGE_PREVIEW={cutoff,list:d.students||[]};
     if(!d.students||d.students.length===0){
       $('purgeRes').innerHTML='<span style="color:var(--text)">Nema naloga za brisanje u tom prozoru.</span>';
       return;
     }
-    const rows=d.students.slice(0,15).map(s=>`<tr><td style="padding:4px 8px">${esc(s.name||'?')}</td><td style="padding:4px 8px;color:var(--text)">${esc(s.email||'?')}</td><td style="padding:4px 8px;color:var(--text);font-size:.72rem">${esc((s.created||'').slice(0,16))}</td></tr>`).join('');
+    const rows=d.students.slice(0,15).map(s=>`<tr><td style="padding:4px 8px">${esc(s.name||'?')}</td><td style="padding:4px 8px;color:var(--text)">${esc(s.email||'?')}</td><td style="padding:4px 8px;color:var(--text);font-size:.72rem">${esc((s.created||'').slice(0,16).replace('T',' '))}Z</td><td style="padding:4px 8px;color:var(--text);font-size:.72rem">${s.email_verified===false?'❌ unverified':s.email_verified===true?'✓ verified':'— legacy'}</td></tr>`).join('');
     const more=d.students.length>15?`<div style="padding:6px 8px;color:var(--text);font-size:.75rem">…i još ${d.students.length-15} naloga</div>`:'';
+    const debugNote=ignoreDep?'<div style="margin-top:6px;color:#ffb27a;font-size:.72rem">⚠ Debug mode: prikazani su i plaćeni nalozi. Stvarno brisanje <strong>uvek</strong> preskače naloge sa uplatom, bez obzira na ovaj toggle.</div>':'';
     $('purgeRes').innerHTML=`
       <div style="color:#ffb27a;font-weight:600;margin-bottom:6px">${d.students.length} naloga bi bilo obrisano:</div>
       <div style="max-height:220px;overflow-y:auto;border:1px solid rgba(255,255,255,0.06);border-radius:6px;background:rgba(0,0,0,0.2)">
-        <table style="width:100%;font-size:.78rem"><thead><tr style="background:rgba(250,115,21,0.08)"><th style="text-align:left;padding:6px 8px">Ime</th><th style="text-align:left;padding:6px 8px">Email</th><th style="text-align:left;padding:6px 8px">Kreiran</th></tr></thead><tbody>${rows}</tbody></table>
+        <table style="width:100%;font-size:.78rem"><thead><tr style="background:rgba(250,115,21,0.08)"><th style="text-align:left;padding:6px 8px">Ime</th><th style="text-align:left;padding:6px 8px">Email</th><th style="text-align:left;padding:6px 8px">Kreiran (UTC)</th><th style="text-align:left;padding:6px 8px">Status</th></tr></thead><tbody>${rows}</tbody></table>
         ${more}
       </div>
+      ${debugNote}
       <div style="margin-top:8px;color:var(--text);font-size:.75rem">Ako lista izgleda tačno, klikni <strong>Obriši definitivno</strong>.</div>
     `;
     $('purgeGo').disabled=false;
