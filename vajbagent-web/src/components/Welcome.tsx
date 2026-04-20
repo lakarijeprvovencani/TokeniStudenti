@@ -436,8 +436,8 @@ Pravila:
             <strong>Potvrdi email adresu</strong>
             <span>
               {resendState === 'sent'
-                ? 'Link je ponovo poslat — proveri inbox i spam.'
-                : 'Klikni link koji smo ti poslali na email da aktiviraš nalog i dobiješ kredit dobrodošlice.'}
+                ? 'Link je ponovo poslat — proveri Inbox, a zatim Spam/Junk folder.'
+                : <>Klikni link koji smo ti poslali na email. <strong style={{ color: '#ffd19a' }}>Provera Spam/Junk foldera</strong> najčešće rešava problem ako ga ne vidiš u Inbox-u.</>}
               {resendState === 'error' && resendError && ` (${resendError})`}
             </span>
           </div>

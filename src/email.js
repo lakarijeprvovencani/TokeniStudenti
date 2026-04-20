@@ -123,6 +123,11 @@ export async function sendEmailVerificationEmail(student, verifyLink) {
           <p style="font-size:12px;color:#888;line-height:1.55;">Ako dugme ne radi, kopiraj ovaj link u browser:<br>
             <span style="word-break:break-all;color:#555;">${verifyLink}</span>
           </p>
+          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px 14px;margin:16px 0;">
+            <p style="font-size:12px;color:#9a3412;line-height:1.55;margin:0;">
+              <strong>Tip:</strong> ako si ovaj mail našao u Spam / Promotions folderu, klikni <em>„Not spam"</em> ili <em>„Move to Inbox"</em> da naši sledeći mailovi (potvrde plaćanja, recovery ključa) dolaze pravo u Inbox.
+            </p>
+          </div>
           <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
           <p style="font-size:12px;color:#888;line-height:1.55;">
             Ako nisi ti pravio nalog na VajbAgent-u, slobodno ignoriši ovaj email — nalog ostaje neverifikovan i biće automatski obrisan posle 48h.

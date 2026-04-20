@@ -300,8 +300,25 @@ export default function AuthModal({ open, onClose, onAuthed, pendingPrompt, init
                     <div className="auth-success-text">
                       Poslali smo ti link za potvrdu na <strong>{pendingVerifyEmail}</strong>. Klikni na link da aktiviraš nalog i dobiješ kredit dobrodošlice.
                     </div>
-                    <div className="auth-success-text" style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
-                      Ne vidiš email? Proveri spam folder — stiže za par sekundi.
+                    <div
+                      style={{
+                        marginTop: 12,
+                        padding: '10px 12px',
+                        borderRadius: 8,
+                        background: 'rgba(250, 115, 21, 0.08)',
+                        border: '1px solid rgba(250, 115, 21, 0.25)',
+                        fontSize: 12.5,
+                        lineHeight: 1.55,
+                        color: '#ffb27a',
+                        display: 'flex',
+                        gap: 8,
+                        alignItems: 'flex-start',
+                      }}
+                    >
+                      <span style={{ fontSize: 14, lineHeight: 1 }}>⚠</span>
+                      <span>
+                        <strong style={{ color: '#ffd19a' }}>Bitno:</strong> prvi email najčešće odleti u <strong>Spam / Junk</strong> folder. Ako ga ne vidiš u Inbox-u u sledećih 30 sekundi, proveri tamo.
+                      </span>
                     </div>
                   </div>
                 </div>
