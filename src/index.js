@@ -3657,50 +3657,88 @@ app.delete('/admin/students/:key', adminLimiter, requireAdmin, asyncHandler(asyn
   res.json(result);
 }));
 
-// Bulk-delete bot signups. An unverified account has email_verified=false
-// and never received its welcome bonus (welcome_bonus_granted is falsy),
-// so removing it reclaims nothing but cleans up the students list and
-// frees the email address for a real signup later.
+// Bulk-delete bot signups. Two modes:
+//
+//  1) email_verified=false (new post-deploy bots): matched automatically
+//     within the min_age_minutes / max_age_hours window.
+//
+//  2) Legacy bots that registered *before* the email-verification flag
+//     existed: pass `created_after` (ISO timestamp). Everything newer
+//     than that with zero deposits (i.e. they never paid a cent) is
+//     eligible. The zero-deposit gate is the safety net that protects
+//     legitimate real users who registered in the same window.
 //
 // Body (all optional):
-//   { "min_age_minutes": 5,  "max_age_hours": 72,  "dry_run": true }
-//
-// min_age_minutes: safety buffer so we don't delete a legit user who is
-//   mid-verification (default 0 = delete any expired-token accounts).
-// max_age_hours: only consider accounts younger than this (default 72h).
-// dry_run: just report what *would* be deleted.
+//   {
+//     "min_age_minutes": 0,
+//     "max_age_hours": 72,
+//     "created_after": "2026-04-20T17:47:00Z",
+//     "require_zero_deposit": true,   // default true in created_after mode
+//     "dry_run": true
+//   }
 app.post('/admin/purge-unverified', adminLimiter, requireAdmin, asyncHandler(async (req, res) => {
   const minAgeMinutes = Number(req.body?.min_age_minutes ?? 0);
   const maxAgeHours = Number(req.body?.max_age_hours ?? 72);
   const dryRun = req.body?.dry_run === true;
+  const createdAfter = req.body?.created_after ? new Date(req.body.created_after).getTime() : null;
+  const requireZeroDeposit = req.body?.require_zero_deposit !== false;
 
   const all = await getAllStudents();
-  const candidates = all.filter(s => {
-    if (s.email_verified !== false) return false;
-    const ageMs = Date.now() - (s.created ? new Date(s.created).getTime() : 0);
-    return ageMs >= minAgeMinutes * 60_000 && ageMs <= maxAgeHours * 3_600_000;
-  });
+  const now = Date.now();
+
+  // Build candidate list. In created_after mode, we include *every* account
+  // (verified flag ignored) but then filter out anyone with deposits.
+  let candidates;
+  if (createdAfter && Number.isFinite(createdAfter)) {
+    candidates = all.filter(s => {
+      const createdMs = s.created ? new Date(s.created).getTime() : 0;
+      return createdMs >= createdAfter;
+    });
+    if (requireZeroDeposit) {
+      const checked = [];
+      for (const s of candidates) {
+        const dep = await getTotalDeposited(s.key).catch(() => 0);
+        if ((dep || 0) <= 0) checked.push(s);
+      }
+      candidates = checked;
+    }
+  } else {
+    candidates = all.filter(s => {
+      if (s.email_verified !== false) return false;
+      const ageMs = now - (s.created ? new Date(s.created).getTime() : 0);
+      return ageMs >= minAgeMinutes * 60_000 && ageMs <= maxAgeHours * 3_600_000;
+    });
+  }
 
   if (dryRun) {
     return res.json({
       dry_run: true,
+      mode: createdAfter ? 'created_after' : 'unverified_flag',
       count: candidates.length,
       students: candidates.map(s => ({
         key: s.key,
         name: s.name,
         email: s.email,
         created: s.created,
+        email_verified: s.email_verified,
       })),
     });
   }
 
-  const removed = await purgeUnverifiedStudents({
-    minAgeMinutes,
-    maxAgeHours,
-  });
-  console.log(`[Admin] Purged ${removed.length} unverified students (min_age=${minAgeMinutes}m, max_age=${maxAgeHours}h)`);
+  // Actually delete.
+  let removed = [];
+  if (createdAfter && Number.isFinite(createdAfter)) {
+    for (const s of candidates) {
+      const r = await removeStudent(s.key);
+      if (!r.error) removed.push(s);
+    }
+  } else {
+    removed = await purgeUnverifiedStudents({ minAgeMinutes, maxAgeHours });
+  }
+  console.log(`[Admin] Purged ${removed.length} students (mode=${createdAfter ? 'created_after' : 'unverified_flag'})`);
   res.json({
     ok: true,
+    mode: createdAfter ? 'created_after' : 'unverified_flag',
     count: removed.length,
     students: removed.map(s => ({
       key: s.key,
