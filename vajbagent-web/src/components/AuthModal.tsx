@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { X, Loader2, Sparkles, LogIn, UserPlus, ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { X, Loader2, Sparkles, LogIn, UserPlus, ArrowLeft, CheckCircle2, Mail } from 'lucide-react'
 import { register, login, requestPasswordReset, type UserInfo } from '../services/userService'
 import './PaywallModal.css'
 import './AuthModal.css'
@@ -33,6 +33,12 @@ export default function AuthModal({ open, onClose, onAuthed, pendingPrompt, init
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [forgotSent, setForgotSent] = useState('')
+  // Captured user after a successful but *unverified* registration. While
+  // set, the modal renders a "check your email" success state instead of
+  // the register form, and only calls onAuthed when the user acknowledges
+  // it — so the parent goes straight to welcome with the right context.
+  const [pendingVerifyUser, setPendingVerifyUser] = useState<UserInfo | null>(null)
+  const [pendingVerifyEmail, setPendingVerifyEmail] = useState('')
 
   // When the modal is (re)opened, honour the requested initialMode so the
   // top-right "Prijavi se" entry point lands on login rather than register.
@@ -41,6 +47,8 @@ export default function AuthModal({ open, onClose, onAuthed, pendingPrompt, init
       setMode(initialMode)
       setError('')
       setForgotSent('')
+      setPendingVerifyUser(null)
+      setPendingVerifyEmail('')
     }
   }, [open, initialMode])
 
@@ -68,6 +76,15 @@ export default function AuthModal({ open, onClose, onAuthed, pendingPrompt, init
       const result = await register(firstName.trim(), lastName.trim(), email.trim(), password)
       setLoading(false)
       if (!result.ok || !result.user) { setError(result.error || 'Greška pri registraciji.'); return }
+      // If the backend issued the account but needs email verification
+      // first, show the "check your email" success state inside the modal
+      // so the user immediately knows why they can't chat yet. We only
+      // forward to the parent (onAuthed) once the user acknowledges this.
+      if (result.user.emailVerified === false) {
+        setPendingVerifyUser(result.user)
+        setPendingVerifyEmail(email.trim())
+        return
+      }
       onAuthed(result.user, true)
       return
     }
@@ -144,7 +161,7 @@ export default function AuthModal({ open, onClose, onAuthed, pendingPrompt, init
               </div>
             )}
 
-            {mode !== 'forgot' && (
+            {mode !== 'forgot' && !pendingVerifyUser && (
               <div className="auth-mode-tabs">
                 <button
                   className={`auth-mode-tab ${mode === 'register' ? 'active' : ''}`}
@@ -163,7 +180,33 @@ export default function AuthModal({ open, onClose, onAuthed, pendingPrompt, init
               </div>
             )}
 
-            {forgotSent ? (
+            {pendingVerifyUser ? (
+              <>
+                <div className="auth-success-box">
+                  <Mail size={20} />
+                  <div>
+                    <div className="auth-success-title">Proveri email</div>
+                    <div className="auth-success-text">
+                      Poslali smo ti link za potvrdu na <strong>{pendingVerifyEmail}</strong>. Klikni na link da aktiviraš nalog i dobiješ kredit dobrodošlice.
+                    </div>
+                    <div className="auth-success-text" style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
+                      Ne vidiš email? Proveri spam folder — stiže za par sekundi.
+                    </div>
+                  </div>
+                </div>
+                <button
+                  className="btn-primary auth-submit-big"
+                  onClick={() => {
+                    const u = pendingVerifyUser
+                    setPendingVerifyUser(null)
+                    setPendingVerifyEmail('')
+                    if (u) onAuthed(u, true)
+                  }}
+                >
+                  U redu, proveriću email
+                </button>
+              </>
+            ) : forgotSent ? (
               <div className="auth-success-box">
                 <CheckCircle2 size={20} />
                 <div>
@@ -216,9 +259,9 @@ export default function AuthModal({ open, onClose, onAuthed, pendingPrompt, init
               </div>
             )}
 
-            {error && <div className="paywall-error">{error}</div>}
+            {error && !pendingVerifyUser && <div className="paywall-error">{error}</div>}
 
-            {!forgotSent && (
+            {!forgotSent && !pendingVerifyUser && (
               <button className="btn-primary auth-submit-big" onClick={submit} disabled={loading}>
                 {loading ? <Loader2 size={16} className="spin" /> : submitLabel}
               </button>

@@ -4,6 +4,7 @@ import Welcome from './components/Welcome'
 import LoadingTransition from './components/LoadingTransition'
 import IDELayout from './components/IDELayout'
 import ResetPassword from './components/ResetPassword'
+import VerifyEmail from './components/VerifyEmail'
 import MobileBlock from './components/MobileBlock'
 import { DEFAULT_MODEL } from './models'
 import { type UserInfo, fetchUserInfo } from './services/userService'
@@ -14,7 +15,7 @@ import { getScope } from './services/storageScope'
 import { preboot as prebootWebContainer } from './services/webcontainer'
 import './App.css'
 
-type AppState = 'booting' | 'welcome' | 'loading' | 'ide' | 'reset-password'
+type AppState = 'booting' | 'welcome' | 'loading' | 'ide' | 'reset-password' | 'verify-email'
 
 const LAST_PROJECT_KEY_BASE = 'vajb_last_active_project'
 const LEGACY_LAST_PROJECT_KEY = 'vajb_last_active_project'
@@ -135,6 +136,7 @@ function AppInner() {
   const [resumeProject, setResumeProject] = useState<SavedProject | null>(null)
   const [migrationBanner, setMigrationBanner] = useState<{ count: number; running: boolean } | null>(null)
   const [resetToken, setResetToken] = useState<string>('')
+  const [verifyToken, setVerifyToken] = useState<string>('')
 
   // Warm the WebContainer as soon as the app mounts — this runs in parallel
   // with user auth, project list fetch, and the user typing their first prompt.
@@ -184,12 +186,23 @@ function AppInner() {
       // ?reset=<token> short-circuit: the user clicked a password-reset link
       // in their email. Skip session restoration entirely — the reset screen
       // will log them in with a fresh session on submit.
+      //
+      // ?verify_token=<token> short-circuit: same idea but for the email
+      // verification link sent right after signup. We POST it to
+      // /auth/verify-email which flips email_verified=true and releases the
+      // welcome bonus.
       try {
         const params = new URLSearchParams(window.location.search)
         const token = params.get('reset')
         if (token && token.length >= 20) {
           setResetToken(token)
           setState('reset-password')
+          return
+        }
+        const vToken = params.get('verify_token')
+        if (vToken && vToken.length >= 20) {
+          setVerifyToken(vToken)
+          setState('verify-email')
           return
         }
       } catch { /* ignore */ }
@@ -370,6 +383,34 @@ function AppInner() {
             onCancel={() => {
               setResetToken('')
               try { window.history.replaceState({}, '', window.location.pathname) } catch { /* ignore */ }
+              setState('welcome')
+            }}
+          />
+        </motion.div>
+      )}
+
+      {state === 'verify-email' && (
+        <motion.div
+          key="verify-email"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, scale: 0.96 }}
+          transition={{ duration: 0.3 }}
+        >
+          <VerifyEmail
+            token={verifyToken}
+            onDone={async (success) => {
+              setVerifyToken('')
+              try { window.history.replaceState({}, '', window.location.pathname) } catch { /* ignore */ }
+              // Verification side-effects on the backend (email_verified=true,
+              // welcome bonus released) aren't reflected in our local state
+              // until we refetch. If there's an active session, hydrate the
+              // topbar with the updated balance + verified flag so the user
+              // doesn't have to reload manually.
+              if (success) {
+                const fresh = await fetchUserInfo().catch(() => null)
+                if (fresh) setUser(fresh)
+              }
               setState('welcome')
             }}
           />

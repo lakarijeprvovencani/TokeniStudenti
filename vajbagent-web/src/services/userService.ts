@@ -12,6 +12,9 @@ export interface UserInfo {
   freeTier: boolean
   balance: number
   apiKey?: string
+  /** False only for self-registered web users who haven't clicked the
+   *  verification link yet. Undefined for legacy accounts (grandfathered). */
+  emailVerified?: boolean
 }
 
 export interface AuthResult {
@@ -38,6 +41,7 @@ function userFromAuthResponse(data: any): UserInfo {
     userId: data.user_id || '',
     freeTier: data.free_tier ?? true,
     balance: typeof data.balance_usd === 'number' ? data.balance_usd : 0,
+    emailVerified: typeof data.email_verified === 'boolean' ? data.email_verified : undefined,
   }
   if (info.userId) setScope(info.userId)
   // Persist the Bearer-fallback key for browsers that refuse to store our
@@ -175,6 +179,7 @@ export async function checkSession(opts: { revealKey?: boolean } = {}): Promise<
       freeTier: data.free_tier ?? true,
       balance: data.balance_usd ?? 0,
       apiKey: data.api_key || undefined,
+      emailVerified: typeof data.email_verified === 'boolean' ? data.email_verified : undefined,
     }
     if (info.userId) setScope(info.userId)
     return info
@@ -186,6 +191,47 @@ export async function checkSession(opts: { revealKey?: boolean } = {}): Promise<
 /** Fetch user info — uses session cookie (no api_key in response) */
 export async function fetchUserInfo(): Promise<UserInfo | null> {
   return checkSession()
+}
+
+/**
+ * Confirm the user's email address using the one-time token from the
+ * verification link (?verify_token=...). Backend flips email_verified=true
+ * and releases the welcome bonus ($0.90 by default). Safe to call without
+ * a session — the token itself is the credential.
+ */
+export async function verifyEmail(token: string): Promise<{ ok: boolean; alreadyVerified?: boolean; balanceUsd?: number; error?: string }> {
+  try {
+    const res = await fetch(`${API_URL}/auth/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ token }),
+    })
+    const data = await res.json()
+    if (!res.ok) return { ok: false, error: data?.error || 'Verifikacija nije uspela.' }
+    return {
+      ok: true,
+      alreadyVerified: !!data.already_verified,
+      balanceUsd: typeof data.balance_usd === 'number' ? data.balance_usd : undefined,
+    }
+  } catch {
+    return { ok: false, error: 'Ne mogu da se povežem sa serverom.' }
+  }
+}
+
+/** Ask the backend to re-send the verification email to the logged-in user. */
+export async function resendVerificationEmail(): Promise<{ ok: boolean; alreadyVerified?: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_URL}/auth/resend-verification`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    const data = await res.json()
+    if (!res.ok) return { ok: false, error: data?.error || 'Greška pri slanju emaila.' }
+    return { ok: true, alreadyVerified: !!data.already_verified }
+  } catch {
+    return { ok: false, error: 'Ne mogu da se povežem sa serverom.' }
+  }
 }
 
 /** Reveal the API key — only call from an explicit user action (e.g. "Copy key" button) */

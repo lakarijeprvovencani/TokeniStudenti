@@ -34,8 +34,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { logUsage, getUsageSummary, getUsageForKey, getModelStats, getMonthlyAggregates } from './usage.js';
 import { getBalance, deductBalance, costUsd, costUsdWithCache, addBalance, getTotalDeposited, loadStudentMarkupFlags, setStudentNoMarkup, getStudentMarkup, providerCostUsd, getPrices } from './balance.js';
-import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP, addStudentWithPassword, authenticateWithPassword, setStudentPassword, studentHasPassword } from './students.js';
-import { sendWelcomeEmail, sendRecoveryEmail, sendPasswordResetEmail, isEmailConfigured } from './email.js';
+import { seedFromEnv, getAllStudents, addStudent, removeStudent, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP, addStudentWithPassword, authenticateWithPassword, setStudentPassword, studentHasPassword, isStudentEmailVerified, createEmailVerificationToken, findByVerificationToken, markEmailVerified, purgeUnverifiedStudents, claimWelcomeBonus } from './students.js';
+import { sendWelcomeEmail, sendRecoveryEmail, sendPasswordResetEmail, sendEmailVerificationEmail, isEmailConfigured } from './email.js';
 import * as supabaseOAuth from './supabaseOAuth.js';
 import * as githubOAuth from './githubOAuth.js';
 import * as netlifyOAuth from './netlifyOAuth.js';
@@ -891,21 +891,40 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   }
 
   const fullName = first_name.trim() + ' ' + last_name.trim();
-  const result = await addStudentWithPassword(fullName, email.trim(), password);
+  // Web signup REQUIRES email verification — protects $2 welcome bonus from
+  // bot-farm signups. The credit is granted in /auth/verify-email, not here.
+  const result = await addStudentWithPassword(fullName, email.trim(), password, {
+    requireEmailVerification: true,
+  });
   if (result.error) {
     return res.status(400).json({ error: result.error });
   }
 
-  if (REGISTER_BONUS > 0) {
-    await addBalance(result.student.key, REGISTER_BONUS);
-  }
   await trackRegistrationIP(clientIP);
 
-  // Create session & set cookie
+  // Generate verification token + send email. Until the user clicks the
+  // link, email_verified stays false → chat endpoints reject, welcome bonus
+  // is not granted, balance is $0.
+  try {
+    const vToken = await createEmailVerificationToken(result.student.key);
+    if (vToken) {
+      const appUrl = (process.env.APP_URL || 'https://vajbagent.netlify.app').replace(/\/+$/, '');
+      const verifyLink = `${appUrl}/?verify_token=${encodeURIComponent(vToken)}`;
+      sendEmailVerificationEmail(result.student, verifyLink).catch(err => {
+        console.error('[Auth] Verification email send failed:', err?.message);
+      });
+    }
+  } catch (err) {
+    console.error('[Auth] Verification token/email failed:', err?.message);
+  }
+
+  // Create session & set cookie — user CAN log in and see dashboard, but
+  // chat endpoints remain blocked until email_verified=true. We want
+  // session continuity so the UX flows straight into "check your email".
   const session = await createSession(result.student.key);
   setSessionCookie(res, session.token);
 
-  console.log(`[Auth] Registered: "${fullName}" <${result.student.email}> [IP: ${clientIP}]`);
+  console.log(`[Auth] Registered (unverified): "${fullName}" <${result.student.email}> [IP: ${clientIP}]`);
   const regBal = await getBalance(result.student.key);
   const regDep = await getTotalDeposited(result.student.key);
   const regBonusVal = parseFloat(process.env.SELF_REGISTER_BONUS) || 2;
@@ -923,6 +942,8 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
     balance_usd: regBal,
     free_tier: regDep <= regBonusVal,
     api_key: result.student.key,
+    email_verified: isStudentEmailVerified(result.student),
+    email_verification_required: !isStudentEmailVerified(result.student),
   });
 }));
 
@@ -957,7 +978,88 @@ app.post('/auth/login', loginEmailLimiter, authLimiter, asyncHandler(async (req,
     balance_usd: loginBal,
     free_tier: loginDep <= loginBonusVal,
     api_key: student.key,
+    email_verified: isStudentEmailVerified(student),
+    email_verification_required: !isStudentEmailVerified(student),
   });
+}));
+
+// ─── Email verification ────────────────────────────────────────────────────
+//
+// Flow:
+//  1) /auth/register creates an unverified account, sends a link containing
+//     a one-time token that points to the SPA (…/?verify_token=XYZ).
+//  2) The SPA POSTs { token } here; we validate, flip email_verified=true,
+//     grant the welcome bonus ($2 by default) exactly once, and tell the
+//     client to reload its auth state so chat endpoints unlock.
+//  3) /auth/resend-verification lets a logged-in unverified user request a
+//     fresh email if the first one got lost.
+
+app.post('/auth/verify-email', authLimiter, asyncHandler(async (req, res) => {
+  const { token } = req.body || {};
+  if (!token || typeof token !== 'string') {
+    return res.status(400).json({ error: 'Token je obavezan.' });
+  }
+
+  const student = await findByVerificationToken(token);
+  if (!student) {
+    return res.status(400).json({ error: 'Link za verifikaciju je nevažeći ili je istekao. Zatraži novi email.' });
+  }
+
+  // Already verified? Idempotent success.
+  if (isStudentEmailVerified(student) && student.email_verified === true) {
+    return res.json({ ok: true, already_verified: true });
+  }
+
+  await markEmailVerified(student.key);
+
+  // Grant welcome bonus exactly once, on first verification.
+  if (REGISTER_BONUS > 0) {
+    const claimed = await claimWelcomeBonus(student.key);
+    if (claimed) {
+      try {
+        await addBalance(student.key, REGISTER_BONUS);
+        console.log(`[Auth] Welcome bonus ($${REGISTER_BONUS}) granted to <${student.email}>`);
+      } catch (err) {
+        console.error('[Auth] Welcome bonus grant failed:', err?.message);
+      }
+    }
+  }
+
+  console.log(`[Auth] Email verified: <${student.email}>`);
+  const bal = await getBalance(student.key);
+  res.json({
+    ok: true,
+    already_verified: false,
+    balance_usd: bal,
+    email: student.email,
+  });
+}));
+
+app.post('/auth/resend-verification', authLimiter, requireAuth, asyncHandler(async (req, res) => {
+  const student = await findByKey(req.studentApiKey);
+  if (!student) return res.status(404).json({ error: 'Nalog ne postoji.' });
+  if (isStudentEmailVerified(student) && student.email_verified === true) {
+    return res.json({ ok: true, already_verified: true });
+  }
+
+  if (!isEmailConfigured()) {
+    return res.status(503).json({ error: 'Email servis nije konfigurisan. Kontaktiraj podršku.' });
+  }
+
+  try {
+    const vToken = await createEmailVerificationToken(student.key);
+    if (!vToken) {
+      return res.status(500).json({ error: 'Greška pri generisanju tokena.' });
+    }
+    const appUrl = (process.env.APP_URL || 'https://vajbagent.netlify.app').replace(/\/+$/, '');
+    const verifyLink = `${appUrl}/?verify_token=${encodeURIComponent(vToken)}`;
+    await sendEmailVerificationEmail(student, verifyLink);
+    console.log(`[Auth] Verification email resent to <${student.email}>`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Auth] Resend verification failed:', err?.message);
+    res.status(500).json({ error: 'Greška pri slanju emaila.' });
+  }
 }));
 
 app.post('/auth/logout', asyncHandler(async (_req, res) => {
@@ -971,20 +1073,18 @@ app.get('/auth/me', authLimiter, requireAuth, asyncHandler(async (req, res) => {
   const balance = await getBalance(req.studentApiKey);
   const deposited = await getTotalDeposited(req.studentApiKey);
   const regBonus = parseFloat(process.env.SELF_REGISTER_BONUS) || 2;
-  // Only return the raw api_key when explicitly requested via ?include_key=1
-  // AND authenticated via the session cookie (not Bearer — Bearer already has it).
+  const student = await findByKey(req.studentApiKey);
+  const emailVerified = isStudentEmailVerified(student);
   const cookies = parseCookies(req);
   const includeKey = req.query.include_key === '1' && !!cookies.vajb_session;
   res.json({
     name: req.studentName,
-    // Stable, non-secret user identifier — sha256-prefix of the student key,
-    // safe to expose to the SPA for scoping browser-side storage (projects,
-    // secrets) per user so two people sharing a browser profile never see
-    // each other's data, and a leaked localStorage dump can't be replayed as
-    // a Bearer token.
+    email: student?.email,
     user_id: publicUserId(req.studentApiKey),
     balance_usd: balance,
     free_tier: deposited <= regBonus,
+    email_verified: emailVerified,
+    email_verification_required: student?.email_verified === false,
     ...(includeKey && { api_key: req.studentApiKey }),
   });
 }));
@@ -2001,6 +2101,24 @@ const chatCompletionsHandler = [
   async (req, res) => {
     const body = req.body || {};
     let { messages, stream = false, max_tokens = 4096, model, tools: openAITools } = body;
+
+    // Block unverified accounts from burning any credit / hitting upstream
+    // APIs. This is the anti-bot guard — bots spam /auth/register with fake
+    // emails but never click the verification link, so email_verified stays
+    // false forever and the welcome bonus is never released.
+    try {
+      const _authedStudent = await findByKey(req.studentApiKey);
+      if (_authedStudent && _authedStudent.email_verified === false) {
+        return res.status(403).json({
+          error: {
+            message: 'Potvrdi email adresu da aktiviraš nalog. Proveri inbox (i spam) za link, ili zatraži novi email sa dashboarda.',
+            code: 'email_not_verified',
+          },
+        });
+      }
+    } catch (err) {
+      console.warn('[Chat] email-verification guard lookup failed:', err?.message);
+    }
 
     // First: check model is valid (before balance, so user sees the right error)
     const resolved = resolveModel(model);
@@ -3537,6 +3655,60 @@ app.delete('/admin/students/:key', adminLimiter, requireAdmin, asyncHandler(asyn
   const result = await removeStudent(req.params.key);
   if (result.error) return res.status(404).json({ error: result.error });
   res.json(result);
+}));
+
+// Bulk-delete bot signups. An unverified account has email_verified=false
+// and never received its welcome bonus (welcome_bonus_granted is falsy),
+// so removing it reclaims nothing but cleans up the students list and
+// frees the email address for a real signup later.
+//
+// Body (all optional):
+//   { "min_age_minutes": 5,  "max_age_hours": 72,  "dry_run": true }
+//
+// min_age_minutes: safety buffer so we don't delete a legit user who is
+//   mid-verification (default 0 = delete any expired-token accounts).
+// max_age_hours: only consider accounts younger than this (default 72h).
+// dry_run: just report what *would* be deleted.
+app.post('/admin/purge-unverified', adminLimiter, requireAdmin, asyncHandler(async (req, res) => {
+  const minAgeMinutes = Number(req.body?.min_age_minutes ?? 0);
+  const maxAgeHours = Number(req.body?.max_age_hours ?? 72);
+  const dryRun = req.body?.dry_run === true;
+
+  const all = await getAllStudents();
+  const candidates = all.filter(s => {
+    if (s.email_verified !== false) return false;
+    const ageMs = Date.now() - (s.created ? new Date(s.created).getTime() : 0);
+    return ageMs >= minAgeMinutes * 60_000 && ageMs <= maxAgeHours * 3_600_000;
+  });
+
+  if (dryRun) {
+    return res.json({
+      dry_run: true,
+      count: candidates.length,
+      students: candidates.map(s => ({
+        key: s.key,
+        name: s.name,
+        email: s.email,
+        created: s.created,
+      })),
+    });
+  }
+
+  const removed = await purgeUnverifiedStudents({
+    minAgeMinutes,
+    maxAgeHours,
+  });
+  console.log(`[Admin] Purged ${removed.length} unverified students (min_age=${minAgeMinutes}m, max_age=${maxAgeHours}h)`);
+  res.json({
+    ok: true,
+    count: removed.length,
+    students: removed.map(s => ({
+      key: s.key,
+      name: s.name,
+      email: s.email,
+      created: s.created,
+    })),
+  });
 }));
 
 app.patch('/admin/students/:key', adminLimiter, requireAdmin, asyncHandler(async (req, res) => {

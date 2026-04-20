@@ -317,14 +317,16 @@ export async function authenticateWithPassword(email, password) {
   return valid ? student : null;
 }
 
-export async function addStudentWithPassword(name, email, password) {
+export async function addStudentWithPassword(name, email, password, { requireEmailVerification = false } = {}) {
   if (!password || typeof password !== 'string' || password.length < 6) {
     return { error: 'Lozinka mora imati najmanje 6 karaktera.' };
   }
   const result = await addStudent(name, email);
   if (result.error) return result;
-  // Set password on the newly created student
   result.student.password_hash = await hashPassword(password);
+  if (requireEmailVerification) {
+    result.student.email_verified = false;
+  }
   const students = await readStudents();
   const idx = students.findIndex(s => s.key === result.student.key);
   if (idx !== -1) {
@@ -338,4 +340,99 @@ export async function studentHasPassword(email) {
   if (!email) return false;
   const student = await findByEmail(email);
   return !!(student && student.password_hash);
+}
+
+// ─── Email verification ─────────────────────────────────────────────────────
+//
+// Anti-bot defense for the self-signup flow. New accounts start with
+// email_verified=false and a random 32-byte token. The welcome bonus
+// ($2 credit) is NOT granted until the user clicks the link we email
+// them. Accounts created before this feature existed have email_verified
+// undefined and are treated as grandfathered-verified.
+
+const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+
+export function isStudentEmailVerified(student) {
+  if (!student) return false;
+  // Legacy accounts (no flag set) are grandfathered as verified.
+  return student.email_verified !== false;
+}
+
+export async function createEmailVerificationToken(key) {
+  const students = await readStudents();
+  const student = students.find(s => s.key === key);
+  if (!student) return null;
+  const token = crypto.randomBytes(32).toString('hex');
+  student.email_verification_token = token;
+  student.email_verification_expires_at = Date.now() + VERIFICATION_TOKEN_TTL_MS;
+  await writeStudents(students);
+  return token;
+}
+
+export async function findByVerificationToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  const students = await readStudents();
+  return students.find(s =>
+    s.email_verification_token === token &&
+    (s.email_verification_expires_at || 0) > Date.now()
+  ) || null;
+}
+
+export async function markEmailVerified(key) {
+  const students = await readStudents();
+  const student = students.find(s => s.key === key);
+  if (!student) return null;
+  student.email_verified = true;
+  student.email_verified_at = new Date().toISOString();
+  delete student.email_verification_token;
+  delete student.email_verification_expires_at;
+  await writeStudents(students);
+  return student;
+}
+
+/**
+ * Atomically sets welcome_bonus_granted=true if not already set.
+ * Returns true only the first time (so caller knows to credit $2);
+ * subsequent calls return false and never re-grant.
+ */
+export async function claimWelcomeBonus(key) {
+  const students = await readStudents();
+  const student = students.find(s => s.key === key);
+  if (!student) return false;
+  if (student.welcome_bonus_granted === true) return false;
+  student.welcome_bonus_granted = true;
+  student.welcome_bonus_granted_at = new Date().toISOString();
+  await writeStudents(students);
+  return true;
+}
+
+/**
+ * Bulk-delete unverified accounts that are older than `minAgeMinutes`
+ * and younger than `maxAgeHours`. Used to clean up bot signups.
+ * Returns the list of removed students so the caller can log them.
+ */
+export async function purgeUnverifiedStudents({ minAgeMinutes = 0, maxAgeHours = 72 } = {}) {
+  const students = await readStudents();
+  const now = Date.now();
+  const minAgeMs = minAgeMinutes * 60 * 1000;
+  const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
+
+  const keep = [];
+  const removed = [];
+  for (const s of students) {
+    if (s.email_verified === false) {
+      const createdMs = s.created ? new Date(s.created).getTime() : 0;
+      const ageMs = now - createdMs;
+      if (ageMs >= minAgeMs && ageMs <= maxAgeMs) {
+        removed.push(s);
+        continue;
+      }
+    }
+    keep.push(s);
+  }
+
+  if (removed.length > 0) {
+    await writeStudents(keep);
+  }
+  return removed;
 }

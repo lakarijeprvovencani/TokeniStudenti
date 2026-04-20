@@ -1045,3 +1045,46 @@
     padding: 0 18px;
   }
 }
+
+/* ─── Email-verification banner (shown on Welcome for unverified signups) ─── */
+.verify-banner {
+  margin: 18px auto 0;
+  max-width: 680px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(250,115,21,0.12), rgba(234,88,12,0.08));
+  border: 1px solid rgba(250,115,21,0.3);
+  color: #ffb27a;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  box-shadow: 0 6px 24px -12px rgba(250,115,21,0.35);
+}
+.verify-banner > svg { flex-shrink: 0; color: #ffb27a; }
+.verify-banner-text { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.verify-banner-text strong { color: #fff; font-weight: 600; font-size: 0.9rem; }
+.verify-banner-text span { color: #d9b89b; font-size: 0.82rem; }
+.verify-banner-btn {
+  flex-shrink: 0;
+  padding: 7px 13px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 8px;
+  background: rgba(250,115,21,0.22);
+  border: 1px solid rgba(250,115,21,0.5);
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.verify-banner-btn:hover:not(:disabled) { background: rgba(250,115,21,0.35); }
+.verify-banner-btn:active:not(:disabled) { transform: translateY(1px); }
+.verify-banner-btn:disabled { opacity: 0.6; cursor: default; }
+@media (max-width: 600px) {
+  .verify-banner { margin: 14px 14px 0; flex-wrap: wrap; }
+  .verify-banner-btn { margin-left: auto; }
+}

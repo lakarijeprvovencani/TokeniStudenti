@@ -97,6 +97,47 @@ export async function sendPasswordResetEmail(student, resetLink) {
   }
 }
 
+/**
+ * Email-address confirmation. Sent right after signup; user is NOT yet
+ * considered verified and cannot burn credits / call models until they
+ * click the link. Link lands on the SPA with ?verify_token=... which the
+ * frontend posts to /auth/verify-email.
+ */
+export async function sendEmailVerificationEmail(student, verifyLink) {
+  if (!resend || !student.email || !verifyLink) return false;
+  try {
+    await resend.emails.send({
+      from: FROM,
+      to: student.email,
+      subject: 'VajbAgent — Potvrdi email adresu da aktiviraš nalog',
+      html: `
+        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:20px;">
+          <h2 style="color:#FA7315;margin-bottom:16px;">Potvrdi email</h2>
+          <p style="color:#333;line-height:1.55;">Zdravo <strong>${student.name || ''}</strong>,</p>
+          <p style="color:#333;line-height:1.55;">Hvala na registraciji na VajbAgent! Klikni na dugme ispod da potvrdiš svoju email adresu — tek tada dobijaš dobrodošlicu kredit i možeš početi da koristiš aplikaciju. Link važi <strong>24 sata</strong>.</p>
+          <div style="text-align:center;margin:26px 0;">
+            <a href="${verifyLink}" style="display:inline-block;padding:13px 28px;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;font-weight:600;text-decoration:none;border-radius:10px;font-size:15px;">
+              Potvrdi email
+            </a>
+          </div>
+          <p style="font-size:12px;color:#888;line-height:1.55;">Ako dugme ne radi, kopiraj ovaj link u browser:<br>
+            <span style="word-break:break-all;color:#555;">${verifyLink}</span>
+          </p>
+          <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+          <p style="font-size:12px;color:#888;line-height:1.55;">
+            Ako nisi ti pravio nalog na VajbAgent-u, slobodno ignoriši ovaj email — nalog ostaje neverifikovan i biće automatski obrisan posle 48h.
+          </p>
+          <p style="font-size:11px;color:#999;margin-top:14px;">VajbAgent — AI coding assistant</p>
+        </div>
+      `,
+    });
+    return true;
+  } catch (err) {
+    console.error('Verification email send error:', err.message);
+    return false;
+  }
+}
+
 export function isEmailConfigured() {
   return !!resend;
 }

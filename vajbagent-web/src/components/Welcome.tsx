@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Code2, Globe, Layout, ArrowUp, Plus, Paperclip, Loader2, FolderOpen, Trash2, Clock, Settings as SettingsIcon, LogOut, Sparkles } from 'lucide-react'
-import { logout, checkSession, type UserInfo } from '../services/userService'
+import { Code2, Globe, Layout, ArrowUp, Plus, Paperclip, Loader2, FolderOpen, Trash2, Clock, Settings as SettingsIcon, LogOut, Sparkles, MailWarning } from 'lucide-react'
+import { logout, checkSession, resendVerificationEmail, type UserInfo } from '../services/userService'
 import AuthModal from './AuthModal'
 import PaywallModal from './PaywallModal'
 import { listProjects as listProjectsLocal, deleteProject as deleteProjectLocal, type SavedProject } from '../services/projectStore'
@@ -54,6 +54,8 @@ export default function Welcome({ onStart, onResume, model, onModelChange, onAut
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [enhancing, setEnhancing] = useState(false)
   const [dragging, setDragging] = useState(false)
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const [resendError, setResendError] = useState('')
   const dragDepth = useRef(0)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -277,6 +279,17 @@ Pravila:
       setAuthModalOpen(true)
       return
     }
+    // Unverified users have $0 balance by design — the backend withholds
+    // the welcome bonus until they click the verification link. Showing
+    // the paywall here would be misleading; they need to check their
+    // inbox, not pay. Scroll to the banner we rendered at the top so the
+    // CTA is unmistakable.
+    if (user.emailVerified === false) {
+      try {
+        document.querySelector('.verify-banner')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      } catch { /* ignore */ }
+      return
+    }
     // Pre-flight balance check: a logged-in user with effectively 0 credit
     // can never succeed on the first send — back-end will 402 — so open
     // the paywall immediately instead of letting them watch the spinner.
@@ -306,6 +319,13 @@ Pravila:
     // Fresh registration: show onboarding first (if they haven't dismissed
     // it), then the paywall upsell. shouldShowOnboarding() is already
     // scoped per user so each account only ever sees the overlay once.
+    //
+    // Unverified users skip the paywall — they can't use anything yet, so
+    // pushing a top-up dialog in their face would be obnoxious. The
+    // verify-email banner already tells them exactly what to do.
+    if (info.emailVerified === false) {
+      return
+    }
     if (shouldShowOnboarding()) {
       setShowOnboarding(true)
     }
@@ -402,6 +422,45 @@ Pravila:
             )}
           </div>
         </div>
+      )}
+
+      {isLoggedIn && user?.emailVerified === false && (
+        <motion.div
+          className="verify-banner"
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <MailWarning size={16} />
+          <div className="verify-banner-text">
+            <strong>Potvrdi email adresu</strong>
+            <span>
+              {resendState === 'sent'
+                ? 'Link je ponovo poslat — proveri inbox i spam.'
+                : 'Klikni link koji smo ti poslali na email da aktiviraš nalog i dobiješ kredit dobrodošlice.'}
+              {resendState === 'error' && resendError && ` (${resendError})`}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="verify-banner-btn"
+            disabled={resendState === 'sending' || resendState === 'sent'}
+            onClick={async () => {
+              setResendState('sending')
+              setResendError('')
+              const r = await resendVerificationEmail()
+              if (r.ok) {
+                setResendState('sent')
+                setTimeout(() => setResendState('idle'), 15000)
+              } else {
+                setResendError(r.error || 'Greška.')
+                setResendState('error')
+              }
+            }}
+          >
+            {resendState === 'sending' ? <Loader2 size={13} className="spin" /> : resendState === 'sent' ? 'Poslato' : 'Pošalji ponovo'}
+          </button>
+        </motion.div>
       )}
 
       <motion.div
