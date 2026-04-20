@@ -280,6 +280,23 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
           <div class="lbl">Balans</div><div id="nrBal" class="c-orange" style="font-weight:700"></div>
         </div>
       </div>
+      <div class="card" style="border:1px solid rgba(250,115,21,0.3);background:linear-gradient(135deg,rgba(250,115,21,0.06),rgba(234,88,12,0.03));">
+        <div class="card-title" style="color:#ffb27a">Čišćenje bot-naloga</div>
+        <p style="font-size:.78rem;color:var(--text);margin:0 0 12px;line-height:1.5">
+          Briše naloge koji su se samoregistrovali posle zadatog datuma i <strong>nisu uplatili ni dolar</strong> (zero-deposit safety).
+          Koristi se za masovni cleanup bot napada. Uvek pusti prvo <strong>Preview</strong> pa tek onda <strong>Obriši</strong>.
+        </p>
+        <div class="form-row" style="align-items:flex-end;flex-wrap:wrap">
+          <div>
+            <div style="font-size:.72rem;color:var(--text);margin-bottom:4px">Obriši sve registrovane posle:</div>
+            <input class="form-input" id="purgeAfter" type="datetime-local" style="width:220px">
+          </div>
+          <button class="btn btn-ghost" onclick="purgeDryRun()">Preview (dry-run)</button>
+          <button class="btn btn-r" id="purgeGo" onclick="purgeConfirm()" disabled>Obriši definitivno</button>
+        </div>
+        <div id="purgeRes" style="margin-top:12px;font-size:.82rem"></div>
+      </div>
+
       <div class="card">
         <div class="card-title">Svi studenti</div>
         <table><thead><tr><th>Ime</th><th>API ključ</th><th>Balans</th><th>Status</th><th>Marža</th><th>Kreiran</th><th>Poslednja aktivnost</th><th>Akcije</th></tr></thead>
@@ -659,6 +676,63 @@ function delStu(key,name){
     toast('Obrisan');refresh();
   });
 }
+
+// ─── Bulk purge of unverified bot signups ──────────────────────────────
+// Two-step flow: dry-run first to let the admin eyeball the list, then
+// "Obriši definitivno" actually removes them. Real users are guarded by
+// the server-side zero-deposit check.
+let PURGE_PREVIEW=null;
+function purgeCutoffIso(){
+  const raw=$('purgeAfter').value;
+  if(!raw){toast('Izaberi datum/vreme.');return null}
+  try{return new Date(raw).toISOString()}catch{return null}
+}
+function purgeDryRun(){
+  const cutoff=purgeCutoffIso();if(!cutoff)return;
+  $('purgeRes').innerHTML='<span style="color:var(--text)">Učitavam preview…</span>';
+  $('purgeGo').disabled=true;
+  api('POST','/admin/purge-unverified',{created_after:cutoff,dry_run:true}).then(d=>{
+    if(d.error){$('purgeRes').innerHTML='<span style="color:#ef4444">'+d.error+'</span>';return}
+    PURGE_PREVIEW={cutoff,list:d.students||[]};
+    if(!d.students||d.students.length===0){
+      $('purgeRes').innerHTML='<span style="color:var(--text)">Nema naloga za brisanje u tom prozoru.</span>';
+      return;
+    }
+    const rows=d.students.slice(0,15).map(s=>`<tr><td style="padding:4px 8px">${esc(s.name||'?')}</td><td style="padding:4px 8px;color:var(--text)">${esc(s.email||'?')}</td><td style="padding:4px 8px;color:var(--text);font-size:.72rem">${esc((s.created||'').slice(0,16))}</td></tr>`).join('');
+    const more=d.students.length>15?`<div style="padding:6px 8px;color:var(--text);font-size:.75rem">…i još ${d.students.length-15} naloga</div>`:'';
+    $('purgeRes').innerHTML=`
+      <div style="color:#ffb27a;font-weight:600;margin-bottom:6px">${d.students.length} naloga bi bilo obrisano:</div>
+      <div style="max-height:220px;overflow-y:auto;border:1px solid rgba(255,255,255,0.06);border-radius:6px;background:rgba(0,0,0,0.2)">
+        <table style="width:100%;font-size:.78rem"><thead><tr style="background:rgba(250,115,21,0.08)"><th style="text-align:left;padding:6px 8px">Ime</th><th style="text-align:left;padding:6px 8px">Email</th><th style="text-align:left;padding:6px 8px">Kreiran</th></tr></thead><tbody>${rows}</tbody></table>
+        ${more}
+      </div>
+      <div style="margin-top:8px;color:var(--text);font-size:.75rem">Ako lista izgleda tačno, klikni <strong>Obriši definitivno</strong>.</div>
+    `;
+    $('purgeGo').disabled=false;
+  });
+}
+function purgeConfirm(){
+  if(!PURGE_PREVIEW||!PURGE_PREVIEW.cutoff){toast('Prvo pusti Preview.');return}
+  const n=PURGE_PREVIEW.list.length;
+  if(!confirm('Obrisati '+n+' nalog'+(n===1?'':'a')+'? Ovo je nepovratno.'))return;
+  $('purgeGo').disabled=true;
+  $('purgeRes').innerHTML='<span style="color:var(--text)">Brišem…</span>';
+  api('POST','/admin/purge-unverified',{created_after:PURGE_PREVIEW.cutoff}).then(d=>{
+    if(d.error){$('purgeRes').innerHTML='<span style="color:#ef4444">'+d.error+'</span>';$('purgeGo').disabled=false;return}
+    $('purgeRes').innerHTML='<span style="color:var(--orange);font-weight:600">Obrisano '+(d.count||0)+' naloga.</span>';
+    PURGE_PREVIEW=null;
+    toast('Obrisano '+(d.count||0)+' naloga');
+    refresh();
+  });
+}
+// Default cutoff: 2026-04-20 19:47 local time (start of the bot wave).
+// Admin can change before running; value is ignored until Preview is hit.
+(function(){
+  const el=$('purgeAfter');if(!el)return;
+  const d=new Date('2026-04-20T19:47:00');
+  const pad=n=>String(n).padStart(2,'0');
+  el.value=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+})();
 
 // Credit modal
 let cmKey='';
