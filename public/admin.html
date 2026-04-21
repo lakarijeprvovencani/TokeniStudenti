@@ -318,6 +318,17 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
         <div id="regStatsRes" style="margin-top:4px;font-size:.82rem"></div>
       </div>
 
+      <div class="card" style="border:1px solid rgba(239,68,68,0.3);background:linear-gradient(135deg,rgba(185,28,28,0.08),rgba(127,29,29,0.04));">
+        <div class="card-title" style="color:#fca5a5;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <span>Napadi — uživo (odakle dolaze)</span>
+          <button class="btn btn-sm btn-ghost" onclick="loadAttacks()">Osveži</button>
+        </div>
+        <p style="font-size:.78rem;color:var(--text);margin:0 0 8px;line-height:1.5">
+          Poslednjih 100 blokiranih registracija sa IP-jem, državom i provajderom. Koristi ovo da vidiš da li je napad iz jedne zemlje/jednog subneta — onda možeš da primeniš ciljani blok.
+        </p>
+        <div id="attacksRes" style="margin-top:4px;font-size:.82rem"></div>
+      </div>
+
       <div class="card" style="border:1px solid rgba(250,115,21,0.3);background:linear-gradient(135deg,rgba(250,115,21,0.06),rgba(234,88,12,0.03));">
         <div class="card-title" style="color:#ffb27a">Čišćenje bot-naloga</div>
         <p style="font-size:.78rem;color:var(--text);margin:0 0 12px;line-height:1.5">
@@ -477,6 +488,7 @@ function renderAll(){renderOverview();renderStudents();renderModels();renderMark
 
 function refresh(){
   loadRegStats();
+  loadAttacks();
   Promise.all([
     api('GET','/admin/api/overview'),
     api('GET','/admin/students')
@@ -969,6 +981,69 @@ function loadRegStats(){
       </div>
       <div style="margin-top:10px;font-size:.72rem;color:var(--text);line-height:1.5">
         Limiti: globalni ${d.limits.hourly}/sat, ${d.limits.daily}/dan. Po /24 subnet-u: ${d.limits.subnet_daily}/dan. Izmeni preko env vars <code>REGISTRATION_HOURLY_CAP</code>, <code>REGISTRATION_DAILY_CAP</code>, <code>REGISTRATION_SUBNET_DAILY_CAP</code>.
+      </div>
+    `;
+  });
+}
+// Country code → flag emoji (cosmetic; Unicode regional indicator trick).
+function flag(cc){
+  if(!cc||cc.length!==2)return '🏳';
+  const A=127397;
+  return String.fromCodePoint(cc.toUpperCase().charCodeAt(0)+A)+String.fromCodePoint(cc.toUpperCase().charCodeAt(1)+A);
+}
+function timeAgo(ts){
+  const s=Math.max(0,Math.floor((Date.now()-ts)/1000));
+  if(s<60)return s+'s';
+  if(s<3600)return Math.floor(s/60)+'min';
+  if(s<86400)return Math.floor(s/3600)+'h';
+  return Math.floor(s/86400)+'d';
+}
+function loadAttacks(){
+  $('attacksRes').innerHTML='<span style="color:var(--text)">Učitavam…</span>';
+  api('GET','/admin/reg-attacks?limit=100').then(d=>{
+    if(d.error){$('attacksRes').innerHTML='<span style="color:#ef4444">'+d.error+'</span>';return}
+    const entries=d.entries||[];
+    const sum=d.summary||{};
+    if(entries.length===0){
+      $('attacksRes').innerHTML='<div style="padding:16px;text-align:center;color:#86efac;font-size:.85rem">✓ Nema nedavno blokiranih pokušaja. Čisto je.</div>';
+      return;
+    }
+    const countries=(sum.by_country||[]).slice(0,8).map(x=>
+      `<span style="display:inline-block;padding:3px 10px;margin:2px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:.78rem">${flag(x.k)} <strong>${esc(x.k)}</strong> · ${x.v}</span>`
+    ).join('')||'<span style="color:var(--text);font-size:.78rem">nema podataka</span>';
+    const subnets=(sum.by_subnet||[]).slice(0,8).map(x=>
+      `<span style="display:inline-block;padding:3px 10px;margin:2px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:.78rem;font-family:monospace">${esc(x.k)} · ${x.v}</span>`
+    ).join('')||'<span style="color:var(--text);font-size:.78rem">nema podataka</span>';
+    const rows=entries.map(e=>{
+      const loc=[e.city,e.region].filter(Boolean).join(', ')||'—';
+      const uaShort=(e.ua||'').slice(0,60);
+      return `<tr style="border-top:1px solid rgba(255,255,255,0.04)">
+        <td style="padding:4px 8px 4px 0;color:var(--text);font-size:.72rem;white-space:nowrap">${timeAgo(e.t)}</td>
+        <td style="padding:4px 8px 4px 0;font-size:.78rem">${flag(e.country||'')} <strong>${esc(e.country||'?')}</strong></td>
+        <td style="padding:4px 8px 4px 0;color:var(--text);font-size:.72rem">${esc(loc)}</td>
+        <td style="padding:4px 8px 4px 0;font-family:monospace;font-size:.72rem">${esc(e.ip||'—')}</td>
+        <td style="padding:4px 8px 4px 0;font-size:.72rem;color:#fca5a5">${esc(e.reason||'')}</td>
+        <td style="padding:4px 0;color:var(--text);font-size:.7rem;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.ua||'')}">${esc(uaShort)}</td>
+      </tr>`;
+    }).join('');
+    $('attacksRes').innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div style="background:rgba(0,0,0,0.2);padding:10px 12px;border-radius:6px">
+          <div style="color:#fca5a5;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;font-weight:600">Top države</div>
+          <div>${countries}</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.2);padding:10px 12px;border-radius:6px">
+          <div style="color:#fca5a5;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;font-weight:600">Top /24 subnet-i</div>
+          <div>${subnets}</div>
+        </div>
+      </div>
+      <div style="max-height:400px;overflow-y:auto;background:rgba(0,0,0,0.25);border-radius:6px;padding:8px 10px">
+        <table style="width:100%;font-size:.78rem;border-collapse:collapse">
+          <thead><tr style="color:var(--text);font-size:.7rem;text-align:left;text-transform:uppercase">
+            <th style="padding:4px 8px 6px 0">Kad</th><th style="padding:4px 8px 6px 0">Država</th><th style="padding:4px 8px 6px 0">Lokacija</th><th style="padding:4px 8px 6px 0">IP</th><th style="padding:4px 8px 6px 0">Razlog</th><th style="padding:4px 0 6px">Browser</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
       </div>
     `;
   });

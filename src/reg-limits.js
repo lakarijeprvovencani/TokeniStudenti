@@ -18,12 +18,15 @@
 
 import { getRedis } from './redis.js';
 import { normalizeIP, WHITELIST_IPS } from './utils.js';
+import geoip from 'geoip-lite';
 
 const KILL_KEY = 'vajb:reg:kill';
 const HOURLY_PREFIX = 'vajb:reg:hour:';
 const DAILY_PREFIX = 'vajb:reg:day:';
 const SUBNET_PREFIX = 'vajb:reg:subnet:';
 const DENIED_PREFIX = 'vajb:reg:denied:';
+const RECENT_DENIED_KEY = 'vajb:reg:recent_denied'; // Redis list (LPUSH, capped)
+const RECENT_DENIED_MAX = 200; // keep last N blocked attempts for inspection
 
 const HOURLY_TTL = 60 * 60 * 2; // 2h — generous retention for stats
 const DAILY_TTL = 60 * 60 * 36; // 36h
@@ -148,14 +151,80 @@ export async function recordRegistration(ip) {
   }
 }
 
-export async function recordDenied(reason) {
+/**
+ * Map the raw IP to a short geo/ASN hint. Uses the bundled MaxMind
+ * GeoLite2 snapshot via geoip-lite (fully offline, ~50MB data). If
+ * the request came through Cloudflare (orange-cloud proxy), we
+ * prefer its headers — they're always correct even when the edge
+ * gives us a private/proxy IP.
+ */
+function geoLookup(ip, req) {
+  const out = { country: null, region: null, city: null };
+  if (req) {
+    const cfCountry = req.headers?.['cf-ipcountry'];
+    if (cfCountry && cfCountry !== 'XX') out.country = String(cfCountry).toUpperCase();
+  }
+  if (!ip) return out;
+  try {
+    const g = geoip.lookup(normalizeIP(ip));
+    if (g) {
+      if (!out.country) out.country = g.country || null;
+      out.region = g.region || null;
+      out.city = g.city || null;
+    }
+  } catch {}
+  return out;
+}
+
+export async function recordDenied(reason, ip, req) {
   const r = getRedis();
   if (!r) return;
   try {
     const k = DENIED_PREFIX + dayKey() + ':' + (reason || 'unknown');
     await r.incr(k);
     await r.expire(k, DENIED_TTL);
+
+    // Store individual entry for forensics — last 200 blocked attempts
+    // with IP, geo, subnet, and a trimmed user-agent so the admin can
+    // see exactly where an attack is coming from.
+    if (ip) {
+      const geo = geoLookup(ip, req);
+      const uaRaw = req?.headers?.['user-agent'] || '';
+      const ua = typeof uaRaw === 'string' ? uaRaw.slice(0, 180) : '';
+      const entry = {
+        t: Date.now(),
+        ip: normalizeIP(ip),
+        subnet: subnetOf(ip),
+        reason,
+        country: geo.country,
+        region: geo.region,
+        city: geo.city,
+        ua,
+      };
+      await r.lpush(RECENT_DENIED_KEY, JSON.stringify(entry));
+      await r.ltrim(RECENT_DENIED_KEY, 0, RECENT_DENIED_MAX - 1);
+      await r.expire(RECENT_DENIED_KEY, DENIED_TTL);
+    }
   } catch {}
+}
+
+/**
+ * Return the most recent blocked attempts (newest first) so the
+ * admin UI can inspect them. Returns [] if Redis isn't configured
+ * or the list is empty.
+ */
+export async function getRecentDenied(limit = 100) {
+  const r = getRedis();
+  if (!r) return [];
+  try {
+    const raw = await r.lrange(RECENT_DENIED_KEY, 0, Math.min(limit, RECENT_DENIED_MAX) - 1);
+    return (raw || []).map(s => {
+      try { return typeof s === 'string' ? JSON.parse(s) : s; }
+      catch { return null; }
+    }).filter(Boolean);
+  } catch {
+    return [];
+  }
 }
 
 /**

@@ -36,7 +36,7 @@ import { logUsage, getUsageSummary, getUsageForKey, getModelStats, getMonthlyAgg
 import { getBalance, deductBalance, costUsd, costUsdWithCache, addBalance, getTotalDeposited, loadStudentMarkupFlags, setStudentNoMarkup, getStudentMarkup, providerCostUsd, getPrices } from './balance.js';
 import { seedFromEnv, getAllStudents, addStudent, removeStudent, removeStudents, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP, addStudentWithPassword, authenticateWithPassword, setStudentPassword, studentHasPassword, isStudentEmailVerified, createEmailVerificationToken, findByVerificationToken, markEmailVerified, purgeUnverifiedStudents, claimWelcomeBonus } from './students.js';
 import { sendWelcomeEmail, sendRecoveryEmail, sendPasswordResetEmail, sendEmailVerificationEmail, isEmailConfigured } from './email.js';
-import { checkRegistrationAllowed, recordRegistration, recordDenied, setKilled, getStats as getRegStats } from './reg-limits.js';
+import { checkRegistrationAllowed, recordRegistration, recordDenied, setKilled, getStats as getRegStats, getRecentDenied } from './reg-limits.js';
 import * as supabaseOAuth from './supabaseOAuth.js';
 import * as githubOAuth from './githubOAuth.js';
 import * as netlifyOAuth from './netlifyOAuth.js';
@@ -933,7 +933,7 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   // gate, and the kill switch gives us a big red button.
   const floodCheck = await checkRegistrationAllowed(normalizeIP(req.ip || '')).catch(() => ({ ok: true }));
   if (!floodCheck.ok) {
-    recordDenied(floodCheck.reason).catch(() => {});
+    recordDenied(floodCheck.reason, req.ip, req).catch(() => {});
     console.warn(`[AntiBot] /auth/register flood-block reason=${floodCheck.reason} [IP: ${normalizeIP(req.ip || '?')}]`);
     const msg = floodCheck.reason === 'killed'
       ? 'Registracije su trenutno privremeno pauzirane. Pokušaj ponovo kasnije.'
@@ -944,7 +944,7 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   // Honeypot: hidden form field that is invisible to humans but bot
   // autofillers will happily populate. Any non-empty value = bot.
   if (honeypot) {
-    recordDenied('honeypot').catch(() => {});
+    recordDenied('honeypot', req.ip, req).catch(() => {});
     console.warn(`[AntiBot] /auth/register honeypot tripped [IP: ${normalizeIP(req.ip || '?')}]`);
     return res.status(400).json({ error: 'Neispravan zahtev.' });
   }
@@ -956,7 +956,7 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   // works. Legacy accounts (pre-web-app) never hit this path.
   const tokenCheck = verifyRegisterToken(token);
   if (!tokenCheck.valid) {
-    recordDenied('bad_token').catch(() => {});
+    recordDenied('bad_token', req.ip, req).catch(() => {});
     console.warn(`[AntiBot] /auth/register bad token reason=${tokenCheck.reason} [IP: ${normalizeIP(req.ip || '?')}]`);
     if (tokenCheck.reason === 'too_fast') {
       return res.status(429).json({ error: 'Sačekaj par sekundi pre slanja forme.' });
@@ -974,7 +974,7 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   if (process.env.TURNSTILE_SECRET) {
     const ok = await verifyTurnstile(turnstile_token, normalizeIP(req.ip || '')).catch(() => false);
     if (!ok) {
-      recordDenied('turnstile').catch(() => {});
+      recordDenied('turnstile', req.ip, req).catch(() => {});
       console.warn(`[AntiBot] /auth/register Turnstile failed [IP: ${normalizeIP(req.ip || '?')}]`);
       return res.status(403).json({ error: 'CAPTCHA verifikacija nije uspela. Osveži stranicu i pokušaj ponovo.' });
     }
@@ -999,7 +999,7 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   const clientIP = normalizeIP(req.ip || req.connection?.remoteAddress || 'unknown');
   const canReg = await canRegisterFromIP(clientIP);
   if (!canReg) {
-    recordDenied('per_ip').catch(() => {});
+    recordDenied('per_ip', req.ip, req).catch(() => {});
     return res.status(403).json({ error: 'Maksimalan broj naloga sa ove adrese je dostignut.' });
   }
 
@@ -1010,7 +1010,7 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
     requireEmailVerification: true,
   });
   if (result.error) {
-    recordDenied('bad_input').catch(() => {});
+    recordDenied('bad_input', req.ip, req).catch(() => {});
     return res.status(400).json({ error: result.error });
   }
 
@@ -1242,6 +1242,31 @@ app.get('/admin/email-status', adminLimiter, requireAdmin, (_req, res) => {
 app.get('/admin/reg-stats', adminLimiter, requireAdmin, asyncHandler(async (_req, res) => {
   const stats = await getRegStats();
   res.json(stats);
+}));
+// Forensics: list of the most recent blocked registration attempts
+// (IP + geo + subnet + user-agent). Useful for diagnosing "who is
+// attacking me" — top-level countries and ASNs show up immediately.
+app.get('/admin/reg-attacks', adminLimiter, requireAdmin, asyncHandler(async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit || '100', 10) || 100, 200);
+  const entries = await getRecentDenied(limit);
+  // Aggregate summary: count by country, by subnet, by reason.
+  const byCountry = {};
+  const bySubnet = {};
+  const byReason = {};
+  for (const e of entries) {
+    if (e.country) byCountry[e.country] = (byCountry[e.country] || 0) + 1;
+    if (e.subnet) bySubnet[e.subnet] = (bySubnet[e.subnet] || 0) + 1;
+    if (e.reason) byReason[e.reason] = (byReason[e.reason] || 0) + 1;
+  }
+  const toSortedArray = o => Object.entries(o).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ k, v }));
+  res.json({
+    entries,
+    summary: {
+      by_country: toSortedArray(byCountry),
+      by_subnet: toSortedArray(bySubnet).slice(0, 15),
+      by_reason: toSortedArray(byReason),
+    },
+  });
 }));
 app.post('/admin/reg-kill', adminLimiter, requireAdmin, asyncHandler(async (req, res) => {
   const value = req.body?.disabled === true || req.body?.disabled === 'true' || req.body?.disabled === 1;
