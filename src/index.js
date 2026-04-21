@@ -564,7 +564,7 @@ const loginEmailLimiter = rateLimit({
   handler: (_req, res) => res.status(429).json({ error: 'Previše pokušaja prijave za ovaj email. Pokušaj ponovo za 10 minuta.' }),
 });
 
-import { normalizeIP, WHITELIST_IPS } from './utils.js';
+import { normalizeIP, WHITELIST_IPS, getClientIP } from './utils.js';
 
 function isWhitelistedIP(req) {
   const raw = req.ip || req.connection?.remoteAddress || '';
@@ -924,40 +924,34 @@ async function verifyTurnstile(token, remoteIp) {
 
 app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   const { first_name, last_name, email, password, honeypot, token, turnstile_token } = req.body || {};
+  // Resolve the REAL client IP once — behind Cloudflare, req.ip is the
+  // edge-server address (172.68/172.70/104.16 ranges), useless for
+  // per-IP / per-/24 decisions or forensics.
+  const realIP = getClientIP(req);
 
   // Flood-control: kill switch + global hourly/daily + per-/24 subnet
   // caps. Evaluated BEFORE any per-request work so an attacker burning
   // through signed tokens can't exhaust Resend quota in a burst.
-  // Runs even if Turnstile is on — defense-in-depth, per-/24 cap alone
-  // stops botnets that cluster in a few ASNs from abusing any one
-  // gate, and the kill switch gives us a big red button.
-  const floodCheck = await checkRegistrationAllowed(normalizeIP(req.ip || '')).catch(() => ({ ok: true }));
+  const floodCheck = await checkRegistrationAllowed(realIP).catch(() => ({ ok: true }));
   if (!floodCheck.ok) {
-    recordDenied(floodCheck.reason, req.ip, req).catch(() => {});
-    console.warn(`[AntiBot] /auth/register flood-block reason=${floodCheck.reason} [IP: ${normalizeIP(req.ip || '?')}]`);
+    recordDenied(floodCheck.reason, realIP, req).catch(() => {});
+    console.warn(`[AntiBot] /auth/register flood-block reason=${floodCheck.reason} [IP: ${realIP || '?'}]`);
     const msg = floodCheck.reason === 'killed'
       ? 'Registracije su trenutno privremeno pauzirane. Pokušaj ponovo kasnije.'
       : 'Previše registracija u kratkom periodu. Pokušaj ponovo za sat vremena.';
     return res.status(floodCheck.reason === 'killed' ? 503 : 429).json({ error: msg });
   }
 
-  // Honeypot: hidden form field that is invisible to humans but bot
-  // autofillers will happily populate. Any non-empty value = bot.
   if (honeypot) {
-    recordDenied('honeypot', req.ip, req).catch(() => {});
-    console.warn(`[AntiBot] /auth/register honeypot tripped [IP: ${normalizeIP(req.ip || '?')}]`);
+    recordDenied('honeypot', realIP, req).catch(() => {});
+    console.warn(`[AntiBot] /auth/register honeypot tripped [IP: ${realIP || '?'}]`);
     return res.status(400).json({ error: 'Neispravan zahtev.' });
   }
 
-  // Signed register-token: /register/token hands out an HMAC-signed
-  // timestamp. Submitting within <2s (REGISTER_MIN_WAIT_MS) or without a
-  // valid signature means the client didn't load the real form, or
-  // auto-submitted. 30-min expiry window so a user who fills slowly still
-  // works. Legacy accounts (pre-web-app) never hit this path.
   const tokenCheck = verifyRegisterToken(token);
   if (!tokenCheck.valid) {
-    recordDenied('bad_token', req.ip, req).catch(() => {});
-    console.warn(`[AntiBot] /auth/register bad token reason=${tokenCheck.reason} [IP: ${normalizeIP(req.ip || '?')}]`);
+    recordDenied('bad_token', realIP, req).catch(() => {});
+    console.warn(`[AntiBot] /auth/register bad token reason=${tokenCheck.reason} [IP: ${realIP || '?'}]`);
     if (tokenCheck.reason === 'too_fast') {
       return res.status(429).json({ error: 'Sačekaj par sekundi pre slanja forme.' });
     }
@@ -967,15 +961,11 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Neispravan sigurnosni token. Osveži stranicu i pokušaj ponovo.' });
   }
 
-  // Optional Cloudflare Turnstile gate. When TURNSTILE_SECRET is set in
-  // the env the frontend renders the widget and attaches turnstile_token.
-  // If the env is not set, we skip silently so local dev / staging
-  // doesn't break before keys are provisioned.
   if (process.env.TURNSTILE_SECRET) {
-    const ok = await verifyTurnstile(turnstile_token, normalizeIP(req.ip || '')).catch(() => false);
+    const ok = await verifyTurnstile(turnstile_token, realIP).catch(() => false);
     if (!ok) {
-      recordDenied('turnstile', req.ip, req).catch(() => {});
-      console.warn(`[AntiBot] /auth/register Turnstile failed [IP: ${normalizeIP(req.ip || '?')}]`);
+      recordDenied('turnstile', realIP, req).catch(() => {});
+      console.warn(`[AntiBot] /auth/register Turnstile failed [IP: ${realIP || '?'}]`);
       return res.status(403).json({ error: 'CAPTCHA verifikacija nije uspela. Osveži stranicu i pokušaj ponovo.' });
     }
   }
@@ -996,10 +986,10 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Lozinka je predugačka.' });
   }
 
-  const clientIP = normalizeIP(req.ip || req.connection?.remoteAddress || 'unknown');
+  const clientIP = realIP || 'unknown';
   const canReg = await canRegisterFromIP(clientIP);
   if (!canReg) {
-    recordDenied('per_ip', req.ip, req).catch(() => {});
+    recordDenied('per_ip', realIP, req).catch(() => {});
     return res.status(403).json({ error: 'Maksimalan broj naloga sa ove adrese je dostignut.' });
   }
 
@@ -1010,7 +1000,7 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
     requireEmailVerification: true,
   });
   if (result.error) {
-    recordDenied('bad_input', req.ip, req).catch(() => {});
+    recordDenied('bad_input', realIP, req).catch(() => {});
     return res.status(400).json({ error: result.error });
   }
 
@@ -2200,15 +2190,15 @@ app.get('/register/token', registerTokenLimiter, (_req, res) => {
 
 app.post('/register', registerLimiter, asyncHandler(async (req, res) => {
   const { first_name, last_name, email, honeypot, token, turnstile_token } = req.body || {};
+  const realIP = getClientIP(req);
 
   // Same flood-control + Turnstile + forensic pipeline we apply to the
-  // web-app /auth/register. The legacy /register endpoint (powered by
-  // dashboard.html landing page) was the last unprotected surface
-  // where an attacker could farm accounts; now it matches the main
-  // entry-point defences byte-for-byte.
-  const floodCheck = await checkRegistrationAllowed(normalizeIP(req.ip || '')).catch(() => ({ ok: true }));
+  // web-app /auth/register. Resolves the real client IP via
+  // CF-Connecting-IP so per-/24 and per-IP counters actually see the
+  // visitor, not Cloudflare's edge.
+  const floodCheck = await checkRegistrationAllowed(realIP).catch(() => ({ ok: true }));
   if (!floodCheck.ok) {
-    recordDenied(floodCheck.reason, req.ip, req).catch(() => {});
+    recordDenied(floodCheck.reason, realIP, req).catch(() => {});
     const msg = floodCheck.reason === 'killed'
       ? 'Registracije su trenutno privremeno pauzirane. Pokušaj ponovo kasnije.'
       : 'Previše registracija u kratkom periodu. Pokušaj ponovo za sat vremena.';
@@ -2216,21 +2206,21 @@ app.post('/register', registerLimiter, asyncHandler(async (req, res) => {
   }
 
   if (honeypot) {
-    recordDenied('honeypot', req.ip, req).catch(() => {});
+    recordDenied('honeypot', realIP, req).catch(() => {});
     return res.status(400).json({ error: 'Neispravan zahtev.' });
   }
 
-  const clientIP = normalizeIP(req.ip || req.connection?.remoteAddress || 'unknown');
+  const clientIP = realIP || 'unknown';
   console.log(`Registration attempt from IP: ${clientIP} (raw: ${req.ip})`);
   const canReg = await canRegisterFromIP(clientIP);
   if (!canReg) {
-    recordDenied('per_ip', req.ip, req).catch(() => {});
+    recordDenied('per_ip', realIP, req).catch(() => {});
     return res.status(403).json({ error: 'Maksimalan broj naloga sa ove adrese je dostignut.' });
   }
 
   const tokenCheck = verifyRegisterToken(token);
   if (!tokenCheck.valid) {
-    recordDenied('bad_token', req.ip, req).catch(() => {});
+    recordDenied('bad_token', realIP, req).catch(() => {});
     if (tokenCheck.reason === 'too_fast') {
       return res.status(429).json({ error: 'Sačekaj nekoliko sekundi pre slanja forme.' });
     }
@@ -2240,12 +2230,10 @@ app.post('/register', registerLimiter, asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Neispravan sigurnosni token. Osveži stranicu.' });
   }
 
-  // Cloudflare Turnstile — same gate as the web app. When TURNSTILE_SECRET
-  // is unset we silently skip, so local/dev still works.
   if (process.env.TURNSTILE_SECRET) {
-    const ok = await verifyTurnstile(turnstile_token, normalizeIP(req.ip || '')).catch(() => false);
+    const ok = await verifyTurnstile(turnstile_token, realIP).catch(() => false);
     if (!ok) {
-      recordDenied('turnstile', req.ip, req).catch(() => {});
+      recordDenied('turnstile', realIP, req).catch(() => {});
       return res.status(403).json({ error: 'CAPTCHA verifikacija nije uspela. Osveži stranicu i pokušaj ponovo.' });
     }
   }
@@ -2269,7 +2257,7 @@ app.post('/register', registerLimiter, asyncHandler(async (req, res) => {
   const fullName = first_name.trim() + ' ' + last_name.trim();
   const result = await addStudent(fullName, email.trim());
   if (result.error) {
-    recordDenied('bad_input', req.ip, req).catch(() => {});
+    recordDenied('bad_input', realIP, req).catch(() => {});
     return res.status(400).json({ error: result.error });
   }
 
@@ -4121,6 +4109,51 @@ app.get('/admin/emails', adminLimiter, requireAdmin, asyncHandler(async (_req, r
 // ---- Admin usage ----
 app.get('/usage', adminLimiter, requireAdmin, asyncHandler(async (_req, res) => {
   res.json(await getUsageSummary());
+}));
+
+// ---- Admin: recent API activity (who actually called which provider in the
+// last N hours). Used to spot key abuse — e.g. after a bot-wave we check
+// whether any stolen account is burning Anthropic credits.
+app.get('/admin/recent-activity', adminLimiter, requireAdmin, asyncHandler(async (req, res) => {
+  const hours = Math.max(1, Math.min(168, Number(req.query.hours) || 2));
+  const cutoff = Date.now() - hours * 3600 * 1000;
+  const usage = await getUsageSummary();
+  const students = await (await import('./students.js')).getAllStudents();
+  const byKey = new Map(students.map(s => [s.key, s]));
+
+  const rows = [];
+  for (const [keyId, data] of Object.entries(usage)) {
+    const last = data.last_used ? Date.parse(data.last_used) : NaN;
+    if (!Number.isFinite(last) || last < cutoff) continue;
+
+    const byModel = data.by_model || {};
+    const providers = { anthropic: 0, openai: 0, google: 0, other: 0 };
+    for (const [model, s] of Object.entries(byModel)) {
+      const m = String(model).toLowerCase();
+      const reqs = s.requests || 0;
+      if (m.includes('claude')) providers.anthropic += reqs;
+      else if (m.startsWith('gpt') || m.includes('openai') || m.startsWith('o1') || m.startsWith('o3')) providers.openai += reqs;
+      else if (m.includes('gemini') || m.includes('google')) providers.google += reqs;
+      else providers.other += reqs;
+    }
+
+    const student = byKey.get(keyId);
+    rows.push({
+      key: keyId.slice(0, 12) + '…',
+      name: student?.name || '(nepoznat)',
+      email: student?.email || '',
+      last_used: data.last_used,
+      total_requests: data.requests || 0,
+      providers,
+      top_models: Object.entries(byModel)
+        .map(([m, s]) => ({ model: m, requests: s.requests || 0 }))
+        .sort((a, b) => b.requests - a.requests)
+        .slice(0, 5),
+    });
+  }
+
+  rows.sort((a, b) => Date.parse(b.last_used) - Date.parse(a.last_used));
+  res.json({ window_hours: hours, active_keys: rows.length, rows });
 }));
 
 // ---- Admin: full overview (all users, models, earnings) ----

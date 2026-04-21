@@ -329,6 +329,27 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
         <div id="attacksRes" style="margin-top:4px;font-size:.82rem"></div>
       </div>
 
+      <div class="card" style="border:1px solid rgba(59,130,246,0.25);background:linear-gradient(135deg,rgba(30,64,175,0.06),rgba(30,58,138,0.03));">
+        <div class="card-title" style="color:#93c5fd;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <span>API aktivnost — ko koristi ključeve</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="activityHours" class="form-input" style="width:110px;font-size:.78rem" onchange="loadActivity()">
+              <option value="1">1h</option>
+              <option value="2" selected>2h</option>
+              <option value="6">6h</option>
+              <option value="24">24h</option>
+              <option value="72">72h</option>
+              <option value="168">7 dana</option>
+            </select>
+            <button class="btn btn-sm btn-ghost" onclick="loadActivity()">Osveži</button>
+          </div>
+        </div>
+        <p style="font-size:.78rem;color:var(--text);margin:0 0 8px;line-height:1.5">
+          Svaki ključ koji je poslao <em>ijedan</em> zahtev u izabranom prozoru, sa brojem poziva po provajderu (Anthropic/Claude, OpenAI, Google). Koristi da proveriš da li neko neuobičajeno troši Claude — npr. ako vidiš da jedan ključ u 2h ima 500 Claude poziva, to je znak zloupotrebe.
+        </p>
+        <div id="activityRes" style="margin-top:4px;font-size:.82rem"></div>
+      </div>
+
       <div class="card" style="border:1px solid rgba(250,115,21,0.3);background:linear-gradient(135deg,rgba(250,115,21,0.06),rgba(234,88,12,0.03));">
         <div class="card-title" style="color:#ffb27a">Čišćenje bot-naloga</div>
         <p style="font-size:.78rem;color:var(--text);margin:0 0 12px;line-height:1.5">
@@ -489,6 +510,7 @@ function renderAll(){renderOverview();renderStudents();renderModels();renderMark
 function refresh(){
   loadRegStats();
   loadAttacks();
+  loadActivity();
   Promise.all([
     api('GET','/admin/api/overview'),
     api('GET','/admin/students')
@@ -1048,6 +1070,76 @@ function loadAttacks(){
     `;
   });
 }
+// ─── API activity monitor ──────────────────────────────────────────────
+// Answers "did anyone burn my Anthropic/Claude key in the last N hours?"
+// We group requests by provider per key so a single suspicious row (e.g.
+// 800 claude calls from one ključ in 2h) stands out immediately.
+function loadActivity(){
+  const hrs=$('activityHours').value||'2';
+  $('activityRes').innerHTML='<span style="color:var(--text)">Učitavam…</span>';
+  api('GET','/admin/recent-activity?hours='+encodeURIComponent(hrs)).then(d=>{
+    if(d.error){$('activityRes').innerHTML='<span style="color:#ef4444">'+d.error+'</span>';return}
+    const rows=d.rows||[];
+    if(rows.length===0){
+      $('activityRes').innerHTML='<div style="padding:16px;text-align:center;color:#86efac;font-size:.85rem">✓ Nijedan ključ nije korišćen u zadnjih '+esc(hrs)+'h.</div>';
+      return;
+    }
+    const totals=rows.reduce((a,r)=>{
+      a.anthropic+=r.providers.anthropic||0;
+      a.openai+=r.providers.openai||0;
+      a.google+=r.providers.google||0;
+      return a;
+    },{anthropic:0,openai:0,google:0});
+    const trs=rows.map(r=>{
+      const p=r.providers||{};
+      const topModel=(r.top_models&&r.top_models[0])?r.top_models[0].model+' × '+r.top_models[0].requests:'—';
+      const hot=(p.anthropic>=100)?'color:#f87171;font-weight:700':(p.anthropic>=20?'color:#fbbf24':'color:var(--text2)');
+      return `<tr style="border-top:1px solid rgba(255,255,255,0.04)">
+        <td style="padding:5px 8px 5px 0;color:var(--text);font-size:.72rem;white-space:nowrap">${timeAgo(r.last_used)}</td>
+        <td style="padding:5px 8px 5px 0;font-size:.78rem"><strong>${esc(r.name||'(nepoznat)')}</strong><br><span style="color:var(--text);font-size:.7rem">${esc(r.email||'')}</span></td>
+        <td style="padding:5px 8px 5px 0;font-family:monospace;font-size:.7rem;color:var(--text)">${esc(r.key)}</td>
+        <td style="padding:5px 8px 5px 0;font-size:.78rem;text-align:right;${hot}">${p.anthropic||0}</td>
+        <td style="padding:5px 8px 5px 0;font-size:.78rem;text-align:right;color:var(--text2)">${p.openai||0}</td>
+        <td style="padding:5px 8px 5px 0;font-size:.78rem;text-align:right;color:var(--text2)">${p.google||0}</td>
+        <td style="padding:5px 0;font-size:.7rem;color:var(--text)">${esc(topModel)}</td>
+      </tr>`;
+    }).join('');
+    $('activityRes').innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+        <div style="background:rgba(0,0,0,0.25);padding:8px 12px;border-radius:6px;text-align:center">
+          <div style="color:#f87171;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Anthropic/Claude</div>
+          <div style="font-size:1.2rem;font-weight:700">${totals.anthropic}</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.25);padding:8px 12px;border-radius:6px;text-align:center">
+          <div style="color:#86efac;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">OpenAI</div>
+          <div style="font-size:1.2rem;font-weight:700">${totals.openai}</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.25);padding:8px 12px;border-radius:6px;text-align:center">
+          <div style="color:#93c5fd;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Google/Gemini</div>
+          <div style="font-size:1.2rem;font-weight:700">${totals.google}</div>
+        </div>
+      </div>
+      <div style="max-height:420px;overflow-y:auto;background:rgba(0,0,0,0.25);border-radius:6px;padding:8px 10px">
+        <table style="width:100%;font-size:.78rem;border-collapse:collapse">
+          <thead><tr style="color:var(--text);font-size:.7rem;text-align:left;text-transform:uppercase">
+            <th style="padding:4px 8px 6px 0">Poslednje</th>
+            <th style="padding:4px 8px 6px 0">Korisnik</th>
+            <th style="padding:4px 8px 6px 0">Ključ</th>
+            <th style="padding:4px 8px 6px 0;text-align:right">Claude</th>
+            <th style="padding:4px 8px 6px 0;text-align:right">OpenAI</th>
+            <th style="padding:4px 8px 6px 0;text-align:right">Gemini</th>
+            <th style="padding:4px 0 6px">Top model</th>
+          </tr></thead>
+          <tbody>${trs}</tbody>
+        </table>
+      </div>
+      <div style="margin-top:8px;font-size:.7rem;color:var(--text)">
+        Crveno = ≥100 Claude poziva u prozoru (potencijalna zloupotreba). Žuto = ≥20. Ako je sumnjivo, klikni ključ u tabeli studenata → Deaktiviraj.
+      </div>
+    `;
+  });
+}
+
 function toggleKill(){
   const willDisable=!KILL_STATE;
   if(willDisable && !confirm('Pauzirati sve registracije? Postojeći korisnici i dalje mogu da se loguju.'))return;
