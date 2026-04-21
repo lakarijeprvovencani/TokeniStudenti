@@ -1189,18 +1189,61 @@ app.post('/admin/resend-verification/:key', adminLimiter, requireAdmin, asyncHan
   }
 }));
 
-// Diagnostic: does the server have Resend wired up, and with which FROM?
-// Useful to figure out at a glance why verification emails aren't arriving.
+// Diagnostic: does the server have Resend + Redis wired up, and with
+// which FROM? Password reset additionally needs Upstash Redis to store
+// one-time tokens; if it's missing, /auth/request-password-reset
+// silently 503's and no email leaves the server.
 app.get('/admin/email-status', adminLimiter, requireAdmin, (_req, res) => {
+  const resendOK = isEmailConfigured();
+  const redisOK = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+  const hints = [];
+  if (!resendOK) hints.push('RESEND_API_KEY nije postavljen na Renderu. Dodaj env var i restart.');
+  if (!redisOK) hints.push('UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN nisu postavljeni — password reset ne radi (endpoint 503).');
+  if (resendOK && redisOK) {
+    hints.push('Sve je OK. Ako mailovi ne stižu: 1) proveri Resend dashboard za delivery status, 2) verifikuj custom domen ako EMAIL_FROM nije onboarding@resend.dev, 3) proveri Spam folder kod primaoca.');
+  }
   res.json({
-    resend_configured: isEmailConfigured(),
+    resend_configured: resendOK,
+    redis_configured: redisOK,
     email_from: process.env.EMAIL_FROM || 'VajbAgent <onboarding@resend.dev> (default)',
     app_url: process.env.APP_URL || 'https://vajbagent.netlify.app (default)',
-    hint: isEmailConfigured()
-      ? 'RESEND_API_KEY je postavljen. Ako mailovi ne stižu: 1) proveri Resend dashboard za delivery status, 2) verifikuj custom domen ako EMAIL_FROM nije onboarding@resend.dev, 3) proveri Spam folder kod primaoca.'
-      : 'RESEND_API_KEY nije postavljen na Renderu. Dodaj env var i restart.',
+    password_reset_available: resendOK && redisOK,
+    hint: hints.join(' | '),
   });
 });
+
+// Admin-initiated password reset. Bypasses the enumeration-protection
+// of /auth/request-password-reset (which returns a generic message even
+// when the email doesn't exist) and surfaces the *real* reason if the
+// email fails to send. Same token machinery under the hood — so the
+// user's reset link is a proper one-time-use Redis-backed token.
+app.post('/admin/send-password-reset/:key', adminLimiter, requireAdmin, asyncHandler(async (req, res) => {
+  const student = await findByKey(req.params.key);
+  if (!student) return res.status(404).json({ error: 'Student ne postoji.' });
+  if (!student.email) return res.status(400).json({ error: 'Student nema email adresu.' });
+  if (!isEmailConfigured()) {
+    return res.status(503).json({ error: 'RESEND_API_KEY nije postavljen. Dodaj env var i restart servera.' });
+  }
+  const redis = getRedis();
+  if (!redis) {
+    return res.status(503).json({ error: 'UPSTASH_REDIS_REST_URL / _TOKEN nisu postavljeni — reset tokens nemaju gde da se sačuvaju. Dodaj env vars i restart.' });
+  }
+  const token = crypto.randomBytes(32).toString('hex');
+  try {
+    await redis.set(PASSWORD_RESET_PREFIX + token, student.key, { ex: PASSWORD_RESET_TTL_SEC });
+  } catch (err) {
+    console.error('[Admin] Password-reset token store failed:', err?.message);
+    return res.status(503).json({ error: 'Greška pri čuvanju tokena u Redis: ' + (err?.message || 'unknown') });
+  }
+  const appUrl = (process.env.APP_URL || 'https://vajbagent.netlify.app').replace(/\/+$/, '');
+  const resetLink = `${appUrl}/?reset=${encodeURIComponent(token)}`;
+  const ok = await sendPasswordResetEmail(student, resetLink).catch(() => false);
+  if (!ok) {
+    return res.status(500).json({ error: 'Resend je odbio slanje. Proveri domen/FROM adresu u Resend dashboard-u.' });
+  }
+  console.log(`[Admin] Password reset sent to <${student.email}>`);
+  res.json({ ok: true, email: student.email });
+}));
 
 app.post('/auth/logout', asyncHandler(async (_req, res) => {
   const cookies = parseCookies(_req);
