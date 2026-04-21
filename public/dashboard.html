@@ -225,6 +225,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       </div>
       <input type="email" id="regEmail" placeholder="Email adresa" autocomplete="email" style="width:100%;padding:10px 14px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:rgba(255,255,255,0.05);color:#fff;font-size:14px;margin-top:2px;box-sizing:border-box;">
       <input type="text" name="website" id="regHoneypot" class="reg-hp" tabindex="-1" autocomplete="off">
+      <div id="regTurnstile" style="display:flex;justify-content:center;margin:10px 0 4px"></div>
       <button id="regBtn" onclick="doRegister()" disabled>Napravi nalog</button>
       <div class="login-err" id="regErr"></div>
     </div>
@@ -458,8 +459,45 @@ function switchTab(tab){
     resetRegBtn();
   }
 }
+let turnstileSiteKey=null;
+let turnstileToken='';
+let turnstileWidgetId=null;
 function fetchRegToken(){
-  fetch('/register/token').then(r=>r.json()).then(d=>{regToken=d.token}).catch(()=>{});
+  fetch('/register/token').then(r=>r.json()).then(d=>{
+    regToken=d.token;
+    if(d.turnstile_site_key && d.turnstile_site_key!==turnstileSiteKey){
+      turnstileSiteKey=d.turnstile_site_key;
+      loadTurnstile();
+    }
+  }).catch(()=>{});
+}
+// Lazy-load Cloudflare Turnstile script + render the widget once we
+// know the site key. Mirrors the React AuthModal flow so the landing
+// page gets the same protection as the web app.
+function loadTurnstile(){
+  if(!turnstileSiteKey)return;
+  const container=$('regTurnstile');
+  if(!container)return;
+  const render=()=>{
+    const cf=window.turnstile;
+    if(!cf||!cf.render)return;
+    if(turnstileWidgetId){try{cf.reset(turnstileWidgetId)}catch{}return}
+    turnstileWidgetId=cf.render(container,{
+      sitekey:turnstileSiteKey,
+      theme:'dark',
+      callback:(t)=>{turnstileToken=t;onRegFieldInput()},
+      'error-callback':()=>{turnstileToken=''},
+      'expired-callback':()=>{turnstileToken=''},
+    });
+  };
+  if(window.turnstile&&window.turnstile.render){render();return}
+  if(document.getElementById('cf-turnstile-script')){window.addEventListener('load',render,{once:true});return}
+  const s=document.createElement('script');
+  s.id='cf-turnstile-script';
+  s.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+  s.async=true;s.defer=true;
+  s.onload=render;
+  document.head.appendChild(s);
 }
 function resetRegBtn(){
   clearInterval(regCountdownTimer);regCountdownTimer=null;regBtnReady=false;
@@ -473,6 +511,16 @@ function onRegFieldInput(){
   if(fn.length<2||ln.length<2||!em||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){
     clearInterval(regCountdownTimer);regCountdownTimer=null;regBtnReady=false;
     btn.disabled=true;btn.textContent='Napravi nalog';
+    return;
+  }
+  // If Turnstile is enabled but hasn't resolved yet, hold the button
+  // — we refuse to submit without a fresh Cloudflare-issued token so
+  // the backend doesn't 403 us. onRegFieldInput is also invoked from
+  // Turnstile's success callback, so as soon as the user clears the
+  // challenge the countdown resumes naturally.
+  if(turnstileSiteKey && !turnstileToken){
+    clearInterval(regCountdownTimer);regCountdownTimer=null;regBtnReady=false;
+    btn.disabled=true;btn.textContent='Čekam CAPTCHA…';
     return;
   }
   if(regBtnReady||regCountdownTimer)return;
@@ -501,12 +549,16 @@ function doRegister(){
   if(!ln||ln.length<2){err.textContent='Prezime mora imati najmanje 2 karaktera.';err.style.display='block';return}
   if(!em||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){err.textContent='Unesite ispravnu email adresu.';err.style.display='block';return}
   btn.disabled=true;btn.textContent='Kreiranje...';
-  fetch('/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({first_name:fn,last_name:ln,email:em,honeypot:hp,token:regToken})})
+  fetch('/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({first_name:fn,last_name:ln,email:em,honeypot:hp,token:regToken,turnstile_token:turnstileToken})})
     .then(r=>r.json().then(d=>({ok:r.ok,data:d})))
     .then(({ok,data})=>{
       if(!ok){
         err.textContent=data.error||'Greška pri registraciji.';err.style.display='block';
-        fetchRegToken();regBtnReady=false;setTimeout(onRegFieldInput,100);
+        fetchRegToken();regBtnReady=false;
+        // Reset Turnstile so a single-use token isn't re-sent on retry.
+        turnstileToken='';
+        if(window.turnstile&&turnstileWidgetId){try{window.turnstile.reset(turnstileWidgetId)}catch{}}
+        setTimeout(onRegFieldInput,100);
         return;
       }
       apiKey=data.key;

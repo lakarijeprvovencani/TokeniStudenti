@@ -2199,9 +2199,24 @@ app.get('/register/token', registerTokenLimiter, (_req, res) => {
 });
 
 app.post('/register', registerLimiter, asyncHandler(async (req, res) => {
-  const { first_name, last_name, email, honeypot, token } = req.body || {};
+  const { first_name, last_name, email, honeypot, token, turnstile_token } = req.body || {};
+
+  // Same flood-control + Turnstile + forensic pipeline we apply to the
+  // web-app /auth/register. The legacy /register endpoint (powered by
+  // dashboard.html landing page) was the last unprotected surface
+  // where an attacker could farm accounts; now it matches the main
+  // entry-point defences byte-for-byte.
+  const floodCheck = await checkRegistrationAllowed(normalizeIP(req.ip || '')).catch(() => ({ ok: true }));
+  if (!floodCheck.ok) {
+    recordDenied(floodCheck.reason, req.ip, req).catch(() => {});
+    const msg = floodCheck.reason === 'killed'
+      ? 'Registracije su trenutno privremeno pauzirane. Pokušaj ponovo kasnije.'
+      : 'Previše registracija u kratkom periodu. Pokušaj ponovo za sat vremena.';
+    return res.status(floodCheck.reason === 'killed' ? 503 : 429).json({ error: msg });
+  }
 
   if (honeypot) {
+    recordDenied('honeypot', req.ip, req).catch(() => {});
     return res.status(400).json({ error: 'Neispravan zahtev.' });
   }
 
@@ -2209,11 +2224,13 @@ app.post('/register', registerLimiter, asyncHandler(async (req, res) => {
   console.log(`Registration attempt from IP: ${clientIP} (raw: ${req.ip})`);
   const canReg = await canRegisterFromIP(clientIP);
   if (!canReg) {
+    recordDenied('per_ip', req.ip, req).catch(() => {});
     return res.status(403).json({ error: 'Maksimalan broj naloga sa ove adrese je dostignut.' });
   }
 
   const tokenCheck = verifyRegisterToken(token);
   if (!tokenCheck.valid) {
+    recordDenied('bad_token', req.ip, req).catch(() => {});
     if (tokenCheck.reason === 'too_fast') {
       return res.status(429).json({ error: 'Sačekaj nekoliko sekundi pre slanja forme.' });
     }
@@ -2221,6 +2238,16 @@ app.post('/register', registerLimiter, asyncHandler(async (req, res) => {
       return res.status(400).json({ error: 'Forma je istekla. Osveži stranicu i pokušaj ponovo.' });
     }
     return res.status(400).json({ error: 'Neispravan sigurnosni token. Osveži stranicu.' });
+  }
+
+  // Cloudflare Turnstile — same gate as the web app. When TURNSTILE_SECRET
+  // is unset we silently skip, so local/dev still works.
+  if (process.env.TURNSTILE_SECRET) {
+    const ok = await verifyTurnstile(turnstile_token, normalizeIP(req.ip || '')).catch(() => false);
+    if (!ok) {
+      recordDenied('turnstile', req.ip, req).catch(() => {});
+      return res.status(403).json({ error: 'CAPTCHA verifikacija nije uspela. Osveži stranicu i pokušaj ponovo.' });
+    }
   }
 
   if (!first_name || typeof first_name !== 'string' || first_name.trim().length < 2) {
@@ -2242,6 +2269,7 @@ app.post('/register', registerLimiter, asyncHandler(async (req, res) => {
   const fullName = first_name.trim() + ' ' + last_name.trim();
   const result = await addStudent(fullName, email.trim());
   if (result.error) {
+    recordDenied('bad_input', req.ip, req).catch(() => {});
     return res.status(400).json({ error: result.error });
   }
 
@@ -2250,6 +2278,7 @@ app.post('/register', registerLimiter, asyncHandler(async (req, res) => {
   }
 
   await trackRegistrationIP(clientIP);
+  recordRegistration(clientIP).catch(() => {});
   console.log(`Self-registration: "${fullName}" <${result.student.email}> → key ${result.student.key.slice(0, 12)}... [IP: ${clientIP}]`);
 
   // Send welcome email with API key (async, don't block response)
