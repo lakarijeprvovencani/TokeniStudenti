@@ -927,25 +927,44 @@ function loadRegStats(){
     $('killBtn').className=KILL_STATE?'btn btn-sm btn-g':'btn btn-sm btn-r';
     const denied=d.denied_today||{};
     const deniedTotal=Object.values(denied).reduce((a,b)=>a+b,0);
+    const totalAttempts=(d.current_day||0)+deniedTotal;
+    const reasonLabel={
+      killed:'Kill switch (pauzirano)',
+      global_hourly:'Globalni limit/sat',
+      global_daily:'Globalni limit/dan',
+      subnet_daily:'/24 subnet limit',
+      honeypot:'Honeypot (bot autofill)',
+      bad_token:'Nepotpuni/stari token',
+      turnstile:'Cloudflare Turnstile',
+      per_ip:'Max naloga po IP-u',
+      bad_input:'Neispravan unos (anti-bot heuristike)',
+    };
     const deniedRows=Object.entries(denied).sort((a,b)=>b[1]-a[1]).map(([k,v])=>
-      `<tr><td style="padding:3px 10px 3px 0;color:var(--text)">${esc(k)}</td><td style="padding:3px 0;text-align:right;font-weight:600;color:#fca5a5">${v}</td></tr>`
+      `<tr><td style="padding:3px 10px 3px 0;color:var(--text)">${esc(reasonLabel[k]||k)}</td><td style="padding:3px 0;text-align:right;font-weight:600;color:#fca5a5">${v}</td></tr>`
     ).join('') || '<tr><td colspan="2" style="padding:4px 0;color:var(--text);font-size:.78rem">Nijedno odbijanje danas.</td></tr>';
     $('regStatsRes').innerHTML=`
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
         ${pill(KILL_STATE,d.kill_env?'(env var)':'(runtime)')}
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:.82rem">
-        <div style="background:rgba(0,0,0,0.2);padding:10px 12px;border-radius:6px">
-          <div style="color:var(--text);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em">Ovog sata</div>
-          <div style="font-size:1.4rem;font-weight:700;color:${d.current_hour>=d.limits.hourly?'#fca5a5':'#86efac'}">${d.current_hour} / ${d.limits.hourly}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;font-size:.82rem">
+        <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);padding:10px 12px;border-radius:6px">
+          <div style="color:#86efac;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">✓ Uspešno · ovog sata</div>
+          <div style="font-size:1.4rem;font-weight:700;color:${d.current_hour>=d.limits.hourly?'#fca5a5':'#86efac'}">${d.current_hour}<span style="font-size:.9rem;color:var(--text);font-weight:400"> / ${d.limits.hourly}</span></div>
         </div>
-        <div style="background:rgba(0,0,0,0.2);padding:10px 12px;border-radius:6px">
-          <div style="color:var(--text);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em">Danas</div>
-          <div style="font-size:1.4rem;font-weight:700;color:${d.current_day>=d.limits.daily?'#fca5a5':'#86efac'}">${d.current_day} / ${d.limits.daily}</div>
+        <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);padding:10px 12px;border-radius:6px">
+          <div style="color:#86efac;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">✓ Uspešno · danas</div>
+          <div style="font-size:1.4rem;font-weight:700;color:${d.current_day>=d.limits.daily?'#fca5a5':'#86efac'}">${d.current_day}<span style="font-size:.9rem;color:var(--text);font-weight:400"> / ${d.limits.daily}</span></div>
+        </div>
+        <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);padding:10px 12px;border-radius:6px">
+          <div style="color:#fca5a5;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:600">✗ Blokirano · danas</div>
+          <div style="font-size:1.4rem;font-weight:700;color:#fca5a5">${deniedTotal}</div>
         </div>
       </div>
-      <div style="margin-top:12px;background:rgba(0,0,0,0.2);padding:10px 12px;border-radius:6px">
-        <div style="color:var(--text);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Odbijeno danas · ukupno ${deniedTotal}</div>
+      <div style="margin-top:8px;padding:8px 12px;background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.2);border-radius:6px;font-size:.78rem;color:#bfdbfe;line-height:1.5">
+        <strong>Ukupno pokušaja danas:</strong> ${totalAttempts} (${d.current_day||0} prošlo, ${deniedTotal} blokirano). <em style="color:var(--text)">Brojači „Uspešno" se resetuju automatski (UTC — sat i dan).</em>
+      </div>
+      <div style="margin-top:10px;background:rgba(0,0,0,0.25);padding:10px 12px;border-radius:6px">
+        <div style="color:#fca5a5;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;font-weight:600">Razlozi odbijanja</div>
         <table style="width:100%;font-size:.82rem"><tbody>${deniedRows}</tbody></table>
       </div>
       <div style="margin-top:10px;font-size:.72rem;color:var(--text);line-height:1.5">
