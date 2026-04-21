@@ -159,6 +159,24 @@ const ENV_DISPOSABLE = (process.env.DISPOSABLE_EMAIL_DOMAINS || '')
   .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 for (const d of ENV_DISPOSABLE) DISPOSABLE_EMAIL_DOMAINS.add(d);
 
+// Entire TLDs that are (almost) exclusively used by spam / bot farms.
+// These cost ~$1/yr and are burned by the thousands, so there is no
+// point chasing individual domains — just block the TLD. Legitimate
+// users virtually never have addresses here. Override / extend via
+// BLOCKED_EMAIL_TLDS=foo,bar (comma-separated, no leading dot).
+const BLOCKED_EMAIL_TLDS = new Set([
+  'sbs', 'top', 'xyz', 'click', 'link', 'monster', 'buzz',
+  'gq', 'cf', 'tk', 'ml', 'ga', 'icu', 'cyou', 'rest',
+  'bond', 'autos', 'cfd', 'quest', 'makeup', 'skin', 'hair',
+  'pics', 'lol', 'bio', 'party', 'review', 'racing',
+  'stream', 'trade', 'loan', 'download', 'men', 'win',
+  'work', 'accountant', 'science', 'faith', 'date',
+  'country', 'cricket',
+]);
+const ENV_BLOCKED_TLDS = (process.env.BLOCKED_EMAIL_TLDS || '')
+  .split(',').map(s => s.trim().toLowerCase().replace(/^\./, '')).filter(Boolean);
+for (const t of ENV_BLOCKED_TLDS) BLOCKED_EMAIL_TLDS.add(t);
+
 const VOWEL_RE = /[aeiouAEIOUаеиоуАЕИОУ]/;
 
 /**
@@ -199,6 +217,48 @@ function emailDomainOf(email) {
   return email.slice(at + 1).toLowerCase();
 }
 
+function emailLocalPartOf(email) {
+  const at = email.lastIndexOf('@');
+  if (at < 0) return '';
+  return email.slice(0, at).toLowerCase();
+}
+
+function emailTldOf(domain) {
+  if (!domain) return '';
+  const dot = domain.lastIndexOf('.');
+  if (dot < 0) return '';
+  return domain.slice(dot + 1);
+}
+
+/**
+ * Bot-generated email local-parts look like "t56327h43illr4g",
+ * "x9k2m8q1p7r" — long tokens full of digits or high-entropy noise.
+ * Real users occasionally pick odd handles, so we only block the most
+ * obvious junk: length ≥ 10 AND either lots of digits or a long
+ * consonant run with no word-like vowel cluster.
+ */
+function suspiciousEmailLocal(local) {
+  if (!local) return null;
+  const base = local.split('+')[0].replace(/[._-]/g, '');
+  if (base.length < 10) return null;
+  // Real users put digits contiguously — usually at the end —
+  // ("nemanja123", "nikolina1998", "marko85"). Bot-generated handles
+  // interleave them throughout: "t56327h43illr4g", "t5759tiwpbbc4ly".
+  // Count letter↔digit transitions; 3+ swaps is a strong bot marker.
+  let transitions = 0;
+  for (let i = 1; i < base.length; i++) {
+    const prevIsDigit = /\d/.test(base[i - 1]);
+    const curIsDigit = /\d/.test(base[i]);
+    if (prevIsDigit !== curIsDigit) transitions++;
+  }
+  if (transitions >= 3) return 'interleaved_digits';
+  // 7+ consecutive consonants means no pronounceable structure.
+  if (/[bcdfghjklmnpqrstvwxz]{7,}/i.test(base)) return 'consonant_run_local';
+  // No vowel at all in a 10+ char handle → very unlikely to be a name.
+  if (!/[aeiouy]/i.test(base)) return 'no_vowel_local';
+  return null;
+}
+
 export async function addStudent(name, email) {
   if (!name || typeof name !== 'string' || name.trim().length < 2) {
     return { error: 'Ime mora imati najmanje 2 karaktera.' };
@@ -223,6 +283,24 @@ export async function addStudent(name, email) {
   if (domain && DISPOSABLE_EMAIL_DOMAINS.has(domain)) {
     console.warn(`[AntiBot] Rejected disposable domain: ${domain}`);
     return { error: 'Molimo koristi primarnu email adresu (nije dozvoljen privremeni email servis).' };
+  }
+
+  // Entire-TLD block — catches the endless `*.sbs`, `*.xyz`, `*.top`
+  // throwaway domains spun up per attack without having to maintain a
+  // per-domain list.
+  const tld = emailTldOf(domain);
+  if (tld && BLOCKED_EMAIL_TLDS.has(tld)) {
+    console.warn(`[AntiBot] Rejected blocked TLD: ${domain}`);
+    return { error: 'Molimo koristi primarnu email adresu (nije dozvoljen privremeni email servis).' };
+  }
+
+  // Email local-part heuristic — catches handles like "t56327h43illr4g"
+  // which pass the name check when the attacker simply types "Marko
+  // Markovic" in the form.
+  const localReason = suspiciousEmailLocal(emailLocalPartOf(cleanEmail));
+  if (localReason) {
+    console.warn(`[AntiBot] Rejected suspicious email local-part (${localReason}) <${cleanEmail}>`);
+    return { error: 'Email adresa izgleda neispravno. Koristi svoju pravu adresu.' };
   }
 
   // Gibberish name heuristic — check each whitespace-separated part. Real
