@@ -304,6 +304,20 @@ th{color:var(--text);font-weight:700;text-transform:uppercase;letter-spacing:.05
         <div id="emailStatusRes" style="margin-top:8px;font-size:.82rem"></div>
       </div>
 
+      <div class="card" style="border:1px solid rgba(239,68,68,0.3);background:linear-gradient(135deg,rgba(239,68,68,0.06),rgba(185,28,28,0.03));">
+        <div class="card-title" style="color:#fca5a5;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <span>Anti-bot monitor & kill switch</span>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm btn-ghost" onclick="loadRegStats()">Osveži</button>
+            <button class="btn btn-sm btn-r" id="killBtn" onclick="toggleKill()">Pauziraj registracije</button>
+          </div>
+        </div>
+        <p style="font-size:.78rem;color:var(--text);margin:0 0 8px;line-height:1.5">
+          Uživo brojači registracija (UTC) i razlozi odbijanja. „Pauziraj" zaustavlja sve nove naloge — koristi ako vidiš da kreće napad. Turnstile je primarna odbrana; ovo su dodatni slojevi (globalni cap, /24 subnet cap).
+        </p>
+        <div id="regStatsRes" style="margin-top:4px;font-size:.82rem"></div>
+      </div>
+
       <div class="card" style="border:1px solid rgba(250,115,21,0.3);background:linear-gradient(135deg,rgba(250,115,21,0.06),rgba(234,88,12,0.03));">
         <div class="card-title" style="color:#ffb27a">Čišćenje bot-naloga</div>
         <p style="font-size:.78rem;color:var(--text);margin:0 0 12px;line-height:1.5">
@@ -462,6 +476,7 @@ document.querySelectorAll('.nav-item').forEach(el=>{
 function renderAll(){renderOverview();renderStudents();renderModels();renderMarkups();renderEarnings()}
 
 function refresh(){
+  loadRegStats();
   Promise.all([
     api('GET','/admin/api/overview'),
     api('GET','/admin/students')
@@ -893,6 +908,59 @@ function checkEmailStatus(){
         <div style="font-size:.75rem;color:var(--text);margin-top:8px;line-height:1.5">${esc(d.hint||'')}</div>
       </div>
     `;
+  });
+}
+
+// Live flood-control counters. Shown in the Anti-Bot monitor card —
+// useful during an active attack to watch denied_today climb while
+// current_hour / current_day stay flat.
+let KILL_STATE=false;
+function pill(ok,label){
+  return `<span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:.72rem;background:${ok?'rgba(239,68,68,0.15)':'rgba(34,197,94,0.12)'};color:${ok?'#fca5a5':'#86efac'};border:1px solid ${ok?'rgba(239,68,68,0.35)':'rgba(34,197,94,0.3)'}">${ok?'⏸ PAUZIRANO':'✓ Aktivno'} ${label||''}</span>`;
+}
+function loadRegStats(){
+  $('regStatsRes').innerHTML='<span style="color:var(--text)">Učitavam…</span>';
+  api('GET','/admin/reg-stats').then(d=>{
+    if(d.error){$('regStatsRes').innerHTML='<span style="color:#ef4444">'+d.error+'</span>';return}
+    KILL_STATE=!!(d.kill_env||d.kill_redis);
+    $('killBtn').textContent=KILL_STATE?'▶ Omogući ponovo':'⏸ Pauziraj registracije';
+    $('killBtn').className=KILL_STATE?'btn btn-sm btn-g':'btn btn-sm btn-r';
+    const denied=d.denied_today||{};
+    const deniedTotal=Object.values(denied).reduce((a,b)=>a+b,0);
+    const deniedRows=Object.entries(denied).sort((a,b)=>b[1]-a[1]).map(([k,v])=>
+      `<tr><td style="padding:3px 10px 3px 0;color:var(--text)">${esc(k)}</td><td style="padding:3px 0;text-align:right;font-weight:600;color:#fca5a5">${v}</td></tr>`
+    ).join('') || '<tr><td colspan="2" style="padding:4px 0;color:var(--text);font-size:.78rem">Nijedno odbijanje danas.</td></tr>';
+    $('regStatsRes').innerHTML=`
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        ${pill(KILL_STATE,d.kill_env?'(env var)':'(runtime)')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:.82rem">
+        <div style="background:rgba(0,0,0,0.2);padding:10px 12px;border-radius:6px">
+          <div style="color:var(--text);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em">Ovog sata</div>
+          <div style="font-size:1.4rem;font-weight:700;color:${d.current_hour>=d.limits.hourly?'#fca5a5':'#86efac'}">${d.current_hour} / ${d.limits.hourly}</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.2);padding:10px 12px;border-radius:6px">
+          <div style="color:var(--text);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em">Danas</div>
+          <div style="font-size:1.4rem;font-weight:700;color:${d.current_day>=d.limits.daily?'#fca5a5':'#86efac'}">${d.current_day} / ${d.limits.daily}</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;background:rgba(0,0,0,0.2);padding:10px 12px;border-radius:6px">
+        <div style="color:var(--text);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Odbijeno danas · ukupno ${deniedTotal}</div>
+        <table style="width:100%;font-size:.82rem"><tbody>${deniedRows}</tbody></table>
+      </div>
+      <div style="margin-top:10px;font-size:.72rem;color:var(--text);line-height:1.5">
+        Limiti: globalni ${d.limits.hourly}/sat, ${d.limits.daily}/dan. Po /24 subnet-u: ${d.limits.subnet_daily}/dan. Izmeni preko env vars <code>REGISTRATION_HOURLY_CAP</code>, <code>REGISTRATION_DAILY_CAP</code>, <code>REGISTRATION_SUBNET_DAILY_CAP</code>.
+      </div>
+    `;
+  });
+}
+function toggleKill(){
+  const willDisable=!KILL_STATE;
+  if(willDisable && !confirm('Pauzirati sve registracije? Postojeći korisnici i dalje mogu da se loguju.'))return;
+  api('POST','/admin/reg-kill',{disabled:willDisable}).then(d=>{
+    if(d.error){toast('❌ '+d.error);return}
+    toast(d.disabled?'⏸ Registracije pauzirane':'▶ Registracije aktivne');
+    loadRegStats();
   });
 }
 

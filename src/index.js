@@ -36,6 +36,7 @@ import { logUsage, getUsageSummary, getUsageForKey, getModelStats, getMonthlyAgg
 import { getBalance, deductBalance, costUsd, costUsdWithCache, addBalance, getTotalDeposited, loadStudentMarkupFlags, setStudentNoMarkup, getStudentMarkup, providerCostUsd, getPrices } from './balance.js';
 import { seedFromEnv, getAllStudents, addStudent, removeStudent, removeStudents, toggleStudent, toggleStudentMarkup, findByKey, findByEmail, canRegisterFromIP, trackRegistrationIP, addStudentWithPassword, authenticateWithPassword, setStudentPassword, studentHasPassword, isStudentEmailVerified, createEmailVerificationToken, findByVerificationToken, markEmailVerified, purgeUnverifiedStudents, claimWelcomeBonus } from './students.js';
 import { sendWelcomeEmail, sendRecoveryEmail, sendPasswordResetEmail, sendEmailVerificationEmail, isEmailConfigured } from './email.js';
+import { checkRegistrationAllowed, recordRegistration, recordDenied, setKilled, getStats as getRegStats } from './reg-limits.js';
 import * as supabaseOAuth from './supabaseOAuth.js';
 import * as githubOAuth from './githubOAuth.js';
 import * as netlifyOAuth from './netlifyOAuth.js';
@@ -924,9 +925,26 @@ async function verifyTurnstile(token, remoteIp) {
 app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   const { first_name, last_name, email, password, honeypot, token, turnstile_token } = req.body || {};
 
+  // Flood-control: kill switch + global hourly/daily + per-/24 subnet
+  // caps. Evaluated BEFORE any per-request work so an attacker burning
+  // through signed tokens can't exhaust Resend quota in a burst.
+  // Runs even if Turnstile is on — defense-in-depth, per-/24 cap alone
+  // stops botnets that cluster in a few ASNs from abusing any one
+  // gate, and the kill switch gives us a big red button.
+  const floodCheck = await checkRegistrationAllowed(normalizeIP(req.ip || '')).catch(() => ({ ok: true }));
+  if (!floodCheck.ok) {
+    recordDenied(floodCheck.reason).catch(() => {});
+    console.warn(`[AntiBot] /auth/register flood-block reason=${floodCheck.reason} [IP: ${normalizeIP(req.ip || '?')}]`);
+    const msg = floodCheck.reason === 'killed'
+      ? 'Registracije su trenutno privremeno pauzirane. Pokušaj ponovo kasnije.'
+      : 'Previše registracija u kratkom periodu. Pokušaj ponovo za sat vremena.';
+    return res.status(floodCheck.reason === 'killed' ? 503 : 429).json({ error: msg });
+  }
+
   // Honeypot: hidden form field that is invisible to humans but bot
   // autofillers will happily populate. Any non-empty value = bot.
   if (honeypot) {
+    recordDenied('honeypot').catch(() => {});
     console.warn(`[AntiBot] /auth/register honeypot tripped [IP: ${normalizeIP(req.ip || '?')}]`);
     return res.status(400).json({ error: 'Neispravan zahtev.' });
   }
@@ -938,6 +956,7 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   // works. Legacy accounts (pre-web-app) never hit this path.
   const tokenCheck = verifyRegisterToken(token);
   if (!tokenCheck.valid) {
+    recordDenied('bad_token').catch(() => {});
     console.warn(`[AntiBot] /auth/register bad token reason=${tokenCheck.reason} [IP: ${normalizeIP(req.ip || '?')}]`);
     if (tokenCheck.reason === 'too_fast') {
       return res.status(429).json({ error: 'Sačekaj par sekundi pre slanja forme.' });
@@ -955,6 +974,7 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   if (process.env.TURNSTILE_SECRET) {
     const ok = await verifyTurnstile(turnstile_token, normalizeIP(req.ip || '')).catch(() => false);
     if (!ok) {
+      recordDenied('turnstile').catch(() => {});
       console.warn(`[AntiBot] /auth/register Turnstile failed [IP: ${normalizeIP(req.ip || '?')}]`);
       return res.status(403).json({ error: 'CAPTCHA verifikacija nije uspela. Osveži stranicu i pokušaj ponovo.' });
     }
@@ -979,6 +999,7 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   const clientIP = normalizeIP(req.ip || req.connection?.remoteAddress || 'unknown');
   const canReg = await canRegisterFromIP(clientIP);
   if (!canReg) {
+    recordDenied('per_ip').catch(() => {});
     return res.status(403).json({ error: 'Maksimalan broj naloga sa ove adrese je dostignut.' });
   }
 
@@ -989,10 +1010,12 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
     requireEmailVerification: true,
   });
   if (result.error) {
+    recordDenied('bad_input').catch(() => {});
     return res.status(400).json({ error: result.error });
   }
 
   await trackRegistrationIP(clientIP);
+  recordRegistration(clientIP).catch(() => {});
 
   // Generate verification token + send email. Until the user clicks the
   // link, email_verified stays false → chat endpoints reject, welcome bonus
@@ -1211,6 +1234,25 @@ app.get('/admin/email-status', adminLimiter, requireAdmin, (_req, res) => {
     hint: hints.join(' | '),
   });
 });
+
+// Flood-control dashboard + kill switch. /admin/reg-stats returns
+// current caps + running counters so we can watch attacks live.
+// /admin/reg-kill toggles the Redis-backed big red button that
+// refuses every registration with 503 until flipped back.
+app.get('/admin/reg-stats', adminLimiter, requireAdmin, asyncHandler(async (_req, res) => {
+  const stats = await getRegStats();
+  res.json(stats);
+}));
+app.post('/admin/reg-kill', adminLimiter, requireAdmin, asyncHandler(async (req, res) => {
+  const value = req.body?.disabled === true || req.body?.disabled === 'true' || req.body?.disabled === 1;
+  try {
+    await setKilled(value);
+  } catch (err) {
+    return res.status(503).json({ error: err?.message || 'Ne može da se postavi.' });
+  }
+  console.log(`[Admin] Registration kill switch → ${value ? 'DISABLED' : 'enabled'}`);
+  res.json({ ok: true, disabled: value });
+}));
 
 // Admin-initiated password reset. Bypasses the enumeration-protection
 // of /auth/request-password-reset (which returns a generic message even
