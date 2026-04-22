@@ -24,6 +24,7 @@ const KILL_KEY = 'vajb:reg:kill';
 const HOURLY_PREFIX = 'vajb:reg:hour:';
 const DAILY_PREFIX = 'vajb:reg:day:';
 const SUBNET_PREFIX = 'vajb:reg:subnet:';
+const DOMAIN_PREFIX = 'vajb:reg:domain:'; // per email-domain daily cap
 const DENIED_PREFIX = 'vajb:reg:denied:';
 const RECENT_DENIED_KEY = 'vajb:reg:recent_denied'; // Redis list (LPUSH, capped)
 const RECENT_DENIED_MAX = 200; // keep last N blocked attempts for inspection
@@ -31,6 +32,7 @@ const RECENT_DENIED_MAX = 200; // keep last N blocked attempts for inspection
 const HOURLY_TTL = 60 * 60 * 2; // 2h — generous retention for stats
 const DAILY_TTL = 60 * 60 * 36; // 36h
 const SUBNET_TTL = 60 * 60 * 36;
+const DOMAIN_TTL = 60 * 60 * 36;
 const DENIED_TTL = 60 * 60 * 36;
 
 function intEnv(name, dflt) {
@@ -39,12 +41,27 @@ function intEnv(name, dflt) {
 }
 
 export function getLimits() {
+  // Defaults tightened after the 22 Apr bot-wave that slipped
+  // through at the old 15/50/3 levels. If you run a legit promo and
+  // need more signups per hour, bump these in Render env vars.
   return {
-    hourly: intEnv('REGISTRATION_HOURLY_CAP', 15),
-    daily: intEnv('REGISTRATION_DAILY_CAP', 50),
-    subnet_daily: intEnv('REGISTRATION_SUBNET_DAILY_CAP', 3),
+    hourly: intEnv('REGISTRATION_HOURLY_CAP', 5),
+    daily: intEnv('REGISTRATION_DAILY_CAP', 20),
+    subnet_daily: intEnv('REGISTRATION_SUBNET_DAILY_CAP', 2),
+    // Per email-domain cap — stops single-provider floods (e.g. every
+    // account is @outlook.com) without touching legit multi-domain
+    // traffic. Legit users are spread across gmail/yahoo/icloud/etc
+    // so 3/day is generous.
+    domain_daily: intEnv('REGISTRATION_DOMAIN_DAILY_CAP', 3),
     kill_env: process.env.REGISTRATION_DISABLED === '1',
   };
+}
+
+function emailDomain(email) {
+  if (!email || typeof email !== 'string') return '';
+  const at = email.lastIndexOf('@');
+  if (at < 0) return '';
+  return email.slice(at + 1).trim().toLowerCase();
 }
 
 function hourKey(now = new Date()) {
@@ -98,12 +115,17 @@ export async function setKilled(value) {
 /**
  * Decide whether to let a registration through. Returns
  *   { ok: true }  — proceed
- *   { ok: false, reason: 'killed' | 'global_hourly' | 'global_daily' | 'subnet_daily' }
+ *   { ok: false, reason: 'killed' | 'global_hourly' | 'global_daily' | 'subnet_daily' | 'domain_daily' }
  *
  * Whitelisted IPs bypass all caps (but still honor kill switch so the
  * admin can shut everything off in an emergency).
+ *
+ * `email` is optional — when provided, the per-domain daily cap is
+ * enforced. This stops single-provider floods (every bot uses the
+ * same @outlook.com / @gmail.com) without touching legit multi-domain
+ * traffic.
  */
-export async function checkRegistrationAllowed(ip) {
+export async function checkRegistrationAllowed(ip, email) {
   if (await isKilled()) return { ok: false, reason: 'killed' };
 
   const ipNorm = normalizeIP(ip || '');
@@ -112,19 +134,29 @@ export async function checkRegistrationAllowed(ip) {
   const r = getRedis();
   if (!r) return { ok: true }; // no Redis → caps disabled silently
 
+  const domain = emailDomain(email);
+
   try {
-    const [hourCount, dayCount, subnetCount] = await Promise.all([
+    const reads = [
       r.get(HOURLY_PREFIX + hourKey()),
       r.get(DAILY_PREFIX + dayKey()),
       r.get(SUBNET_PREFIX + dayKey() + ':' + subnetOf(ipNorm)),
-    ]);
-    const h = Number(hourCount || 0);
-    const d = Number(dayCount || 0);
-    const s = Number(subnetCount || 0);
+    ];
+    if (domain) {
+      reads.push(r.get(DOMAIN_PREFIX + dayKey() + ':' + domain));
+    }
+    const results = await Promise.all(reads);
+    const h = Number(results[0] || 0);
+    const d = Number(results[1] || 0);
+    const s = Number(results[2] || 0);
+    const dom = domain ? Number(results[3] || 0) : 0;
     if (!isWL) {
       if (h >= limits.hourly) return { ok: false, reason: 'global_hourly' };
       if (d >= limits.daily) return { ok: false, reason: 'global_daily' };
       if (s >= limits.subnet_daily) return { ok: false, reason: 'subnet_daily' };
+      if (domain && dom >= limits.domain_daily) {
+        return { ok: false, reason: 'domain_daily' };
+      }
     }
     return { ok: true };
   } catch (err) {
@@ -133,19 +165,25 @@ export async function checkRegistrationAllowed(ip) {
   }
 }
 
-export async function recordRegistration(ip) {
+export async function recordRegistration(ip, email) {
   const r = getRedis();
   if (!r) return;
   const subnet = subnetOf(ip);
+  const domain = emailDomain(email);
   try {
     const hKey = HOURLY_PREFIX + hourKey();
     const dKey = DAILY_PREFIX + dayKey();
     const sKey = SUBNET_PREFIX + dayKey() + ':' + subnet;
-    await Promise.all([
+    const ops = [
       r.incr(hKey).then(() => r.expire(hKey, HOURLY_TTL)),
       r.incr(dKey).then(() => r.expire(dKey, DAILY_TTL)),
       r.incr(sKey).then(() => r.expire(sKey, SUBNET_TTL)),
-    ]);
+    ];
+    if (domain) {
+      const domKey = DOMAIN_PREFIX + dayKey() + ':' + domain;
+      ops.push(r.incr(domKey).then(() => r.expire(domKey, DOMAIN_TTL)));
+    }
+    await Promise.all(ops);
   } catch (err) {
     console.warn('[RegLimits] record failed:', err?.message);
   }
@@ -256,7 +294,8 @@ export async function getStats() {
     // Denied counters per reason. We only look for the known reason
     // codes — no wildcards needed.
     const reasons = ['killed', 'global_hourly', 'global_daily', 'subnet_daily',
-                     'honeypot', 'bad_token', 'turnstile', 'per_ip', 'bad_input'];
+                     'domain_daily', 'honeypot', 'bad_token', 'turnstile',
+                     'per_ip', 'bad_input'];
     const vals = await Promise.all(
       reasons.map(x => r.get(DENIED_PREFIX + dayKey() + ':' + x))
     );

@@ -967,6 +967,7 @@ function loadRegStats(){
       global_hourly:'Globalni limit/sat',
       global_daily:'Globalni limit/dan',
       subnet_daily:'/24 subnet limit',
+      domain_daily:'Limit po email domenu',
       honeypot:'Honeypot (bot autofill)',
       bad_token:'Nepotpuni/stari token',
       turnstile:'Cloudflare Turnstile',
@@ -1002,7 +1003,7 @@ function loadRegStats(){
         <table style="width:100%;font-size:.82rem"><tbody>${deniedRows}</tbody></table>
       </div>
       <div style="margin-top:10px;font-size:.72rem;color:var(--text);line-height:1.5">
-        Limiti: globalni ${d.limits.hourly}/sat, ${d.limits.daily}/dan. Po /24 subnet-u: ${d.limits.subnet_daily}/dan. Izmeni preko env vars <code>REGISTRATION_HOURLY_CAP</code>, <code>REGISTRATION_DAILY_CAP</code>, <code>REGISTRATION_SUBNET_DAILY_CAP</code>.
+        Limiti: globalni ${d.limits.hourly}/sat, ${d.limits.daily}/dan. Po /24 subnet-u: ${d.limits.subnet_daily}/dan. Po email domenu: ${d.limits.domain_daily||'?'}/dan. Izmeni preko env vars <code>REGISTRATION_HOURLY_CAP</code>, <code>REGISTRATION_DAILY_CAP</code>, <code>REGISTRATION_SUBNET_DAILY_CAP</code>, <code>REGISTRATION_DOMAIN_DAILY_CAP</code>.
       </div>
     `;
   });

@@ -930,12 +930,13 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   const realIP = getClientIP(req);
 
   // Flood-control: kill switch + global hourly/daily + per-/24 subnet
-  // caps. Evaluated BEFORE any per-request work so an attacker burning
-  // through signed tokens can't exhaust Resend quota in a burst.
-  const floodCheck = await checkRegistrationAllowed(realIP).catch(() => ({ ok: true }));
+  // + per-email-domain daily caps. Evaluated BEFORE any per-request
+  // work so an attacker burning through signed tokens can't exhaust
+  // Resend quota in a burst.
+  const floodCheck = await checkRegistrationAllowed(realIP, email).catch(() => ({ ok: true }));
   if (!floodCheck.ok) {
     recordDenied(floodCheck.reason, realIP, req).catch(() => {});
-    console.warn(`[AntiBot] /auth/register flood-block reason=${floodCheck.reason} [IP: ${realIP || '?'}]`);
+    console.warn(`[AntiBot] /auth/register flood-block reason=${floodCheck.reason} [IP: ${realIP || '?'}] domain=${(email||'').split('@')[1] || '?'}`);
     const msg = floodCheck.reason === 'killed'
       ? 'Registracije su trenutno privremeno pauzirane. Pokušaj ponovo kasnije.'
       : 'Previše registracija u kratkom periodu. Pokušaj ponovo za sat vremena.';
@@ -1005,7 +1006,7 @@ app.post('/auth/register', registerLimiter, asyncHandler(async (req, res) => {
   }
 
   await trackRegistrationIP(clientIP);
-  recordRegistration(clientIP).catch(() => {});
+  recordRegistration(clientIP, email).catch(() => {});
 
   // Generate verification token + send email. Until the user clicks the
   // link, email_verified stays false → chat endpoints reject, welcome bonus
@@ -2195,8 +2196,8 @@ app.post('/register', registerLimiter, asyncHandler(async (req, res) => {
   // Same flood-control + Turnstile + forensic pipeline we apply to the
   // web-app /auth/register. Resolves the real client IP via
   // CF-Connecting-IP so per-/24 and per-IP counters actually see the
-  // visitor, not Cloudflare's edge.
-  const floodCheck = await checkRegistrationAllowed(realIP).catch(() => ({ ok: true }));
+  // visitor, not Cloudflare's edge. Passes email for per-domain cap.
+  const floodCheck = await checkRegistrationAllowed(realIP, email).catch(() => ({ ok: true }));
   if (!floodCheck.ok) {
     recordDenied(floodCheck.reason, realIP, req).catch(() => {});
     const msg = floodCheck.reason === 'killed'
@@ -2261,12 +2262,18 @@ app.post('/register', registerLimiter, asyncHandler(async (req, res) => {
     return res.status(400).json({ error: result.error });
   }
 
-  if (REGISTER_BONUS > 0) {
-    await addBalance(result.student.key, REGISTER_BONUS);
-  }
-
+  // NO welcome bonus on the legacy /register path anymore. This
+  // endpoint (used by the Cursor-extension landing page) doesn't
+  // enforce email verification, so giving free balance here lets any
+  // signup-bot burn Anthropic credit immediately (observed on
+  // 22 Apr 2026 — 14+ @outlook.com bot accounts in 30 min, each
+  // draining ~$2 in Claude calls before we caught it). The web-app
+  // path /auth/register already gates the bonus behind email-click,
+  // so legit users still get $2 when they sign up there. Cursor users
+  // who come through the landing page start at $0 and top up via
+  // Stripe — same friction everyone else on the platform has.
   await trackRegistrationIP(clientIP);
-  recordRegistration(clientIP).catch(() => {});
+  recordRegistration(clientIP, email).catch(() => {});
   console.log(`Self-registration: "${fullName}" <${result.student.email}> → key ${result.student.key.slice(0, 12)}... [IP: ${clientIP}]`);
 
   // Send welcome email with API key (async, don't block response)
@@ -2376,17 +2383,32 @@ const chatCompletionsHandler = [
 
     // Block unverified accounts from burning any credit / hitting upstream
     // APIs. This is the anti-bot guard — bots spam /auth/register with fake
-    // emails but never click the verification link, so email_verified stays
-    // false forever and the welcome bonus is never released.
+    // emails but never click the verification link.
+    //
+    // HARDENED 22 Apr 2026: we used to check `=== false` here, which let
+    // bots through the legacy /register path — those accounts had
+    // `email_verified = undefined` (addStudent never set the field), and
+    // `undefined === false` is false, so the guard silently passed them.
+    // Now any account that isn't explicitly `email_verified: true` is
+    // denied, with a grandfather exception for pre-migration accounts
+    // created before the cutoff below (those predate the whole
+    // verification system and should keep working without interruption).
+    const GRANDFATHER_CUTOFF = '2026-04-01T00:00:00.000Z';
     try {
       const _authedStudent = await findByKey(req.studentApiKey);
-      if (_authedStudent && _authedStudent.email_verified === false) {
-        return res.status(403).json({
-          error: {
-            message: 'Potvrdi email adresu da aktiviraš nalog. Proveri inbox (i spam) za link, ili zatraži novi email sa dashboarda.',
-            code: 'email_not_verified',
-          },
-        });
+      if (_authedStudent) {
+        const isVerified = _authedStudent.email_verified === true;
+        const isGrandfathered = _authedStudent.created
+          && _authedStudent.email_verified === undefined
+          && _authedStudent.created < GRANDFATHER_CUTOFF;
+        if (!isVerified && !isGrandfathered) {
+          return res.status(403).json({
+            error: {
+              message: 'Potvrdi email adresu da aktiviraš nalog. Proveri inbox (i spam) za link, ili zatraži novi email sa dashboarda.',
+              code: 'email_not_verified',
+            },
+          });
+        }
       }
     } catch (err) {
       console.warn('[Chat] email-verification guard lookup failed:', err?.message);
