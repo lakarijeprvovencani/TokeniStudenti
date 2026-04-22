@@ -43,15 +43,23 @@ interface ToolResult {
  *
  * Reset between user messages by ChatPanel via resetTurnState().
  */
-// One real write per path per agent turn. Any further write_file to the
-// same path is silently accepted (model sees "Fajl kreiran") but the disk
-// is NOT touched and the backend's rewrite-loop guard has already been
-// priming the next response to pivot to replace_in_file. Two real writes
-// used to be tolerated, but that window alone burned 10-20k tokens on
-// Sonnet spirals before the soft-cap kicked in. One write is enough: if
-// the model realized something was missing, it can patch with
-// replace_in_file on the next turn.
-const MAX_REAL_WRITES_PER_PATH = 1
+// Soft cap on real write_file executions per path per agent turn.
+//
+// History:
+//   1: agent had zero room to self-correct. A single tool-call truncation
+//      or a realized missing import locked the file at the bad version
+//      for the rest of the turn — visible to users as "the agent loses
+//      the plot after one write".
+//   3 (current): up to 3 real writes per path. Combined with the backend
+//      guards below, this gives the model enough rope to recover from
+//      a bad first write without tolerating genuine spirals (10+).
+//
+// Override per-deployment via Vite env var VITE_WRITE_SOFT_CAP.
+const MAX_REAL_WRITES_PER_PATH = (() => {
+  const raw = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_WRITE_SOFT_CAP
+  const n = parseInt(raw || '', 10)
+  return Number.isFinite(n) && n > 0 && n <= 10 ? n : 3
+})()
 const writtenThisTurn = new Map<string, number>()
 const writeAttemptsThisTurn = new Map<string, number>()
 
@@ -213,18 +221,11 @@ export async function executeToolCall(
             tool_call_id: tc.id,
             role: 'tool',
             content:
-              `DUPLIKAT ODBIJEN: već si u ovom agent turn-u napisao ${path} ` +
-              `(${prevSize} karaktera, sačuvano na disku). Tvoja nova verzija ` +
-              `(${content.length} karaktera) NIJE primenjena i NEĆE biti — prethodna ` +
-              `verzija ostaje na disku i to je konačno. Svaki dalji write_file poziv ` +
-              `za ${path} biće odmah odbijen na isti način.\n\n` +
-              `Ovo NIJE greška zbog praznog sadržaja. Nije greška zbog truncation-a. ` +
-              `Fajl je već uspešno napisan i projekat ga vidi. Ne pokušavaj ponovo.\n\n` +
-              `Tvoj sledeći potez MORA biti tačno jedno od:\n` +
-              `1) Završi — napiši korisniku jednu kratku rečenicu šta je urađeno i STANI bez ijednog tool poziva.\n` +
-              `2) write_file za DRUGI fajl iz plana koji još nije napisan.\n` +
-              `3) replace_in_file sa kratkim old_text/new_text ako treba sitna izmena u ${path}.\n\n` +
-              `Ne izvinjavaj se. Ne objašnjavaj korisniku da je bilo duplikata.`,
+              `Note: ${path} has already been written ${MAX_REAL_WRITES_PER_PATH} time(s) in this turn ` +
+              `(last version on disk is ${prevSize} chars). To avoid a rewrite loop, further ` +
+              `full rewrites of this path are being skipped. The previous version is kept.\n\n` +
+              `If this file genuinely needs another change, use replace_in_file with a focused ` +
+              `old_text/new_text diff. Otherwise, move on to other tasks or finish the turn.`,
           }
         }
 

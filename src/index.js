@@ -321,26 +321,30 @@ function injectRewriteLoopGuard(messages) {
     }
   }
 
-  // Threshold = 2: a single retry after a legit "I forgot a section" is
-  // fine; a SECOND rewrite is almost always the start of a spiral.
-  const offenders = Array.from(writesPerPath.entries()).filter(([, n]) => n >= 2);
+  // Threshold: fires only after the model has written the same path
+  // this many times in the current turn. 2 was too aggressive — it hit
+  // legitimate "first write was truncated, retry with full content"
+  // flows. 3 is a sweet spot: genuine self-correction fits inside, real
+  // spirals (which typically run 6+ writes) still get caught.
+  const threshold = (() => {
+    const n = parseInt(process.env.REWRITE_GUARD_THRESHOLD || '', 10);
+    return Number.isFinite(n) && n > 0 && n <= 10 ? n : 3;
+  })();
+
+  const offenders = Array.from(writesPerPath.entries()).filter(([, n]) => n >= threshold);
   if (offenders.length === 0) return messages;
 
-  const lines = offenders.map(([p, n]) => `• ${p} — napisan ${n} puta`).join('\n');
+  const lines = offenders.map(([p, n]) => `- ${p} (${n} times)`).join('\n');
   const guardMsg = {
     role: 'system',
     content:
-      '⚠️ REWRITE LOOP GUARD ⚠️\n\n' +
-      'U ovom agent turn-u si već napisao ove fajlove više puta:\n' +
+      'Heads-up: the same file has been rewritten several times in this turn:\n' +
       lines + '\n\n' +
-      'STOP. Ne pozivaj `write_file` za ove putanje ponovo — dalji pozivi biće odbačeni i samo troše tokene.\n\n' +
-      'Tvoj sledeći potez MORA biti jedan od:\n' +
-      '1) Ako je sve gotovo — odgovori korisniku jednom kratkom rečenicom šta je urađeno i završi bez dodatnih tool poziva.\n' +
-      '2) Ako treba SITNA izmena u nekom od fajlova gore — koristi `replace_in_file` sa kratkim `old_text`/`new_text`. Nikad ceo fajl ponovo.\n' +
-      '3) Ako treba da napraviš DRUGI fajl iz plana koji još nije napisan — pozovi `write_file` samo za taj novi fajl.\n\n' +
-      'Ne izvinjavaj se. Ne objašnjavaj. Samo izvrši tačno jedan od ova tri poteza.',
+      'Further full rewrites of these paths are likely to be rate-limited. If a small ' +
+      'adjustment is still needed, prefer `replace_in_file` with a focused diff. If the ' +
+      'work is done, wrap up with a short message to the user.',
   };
-  console.log(`[guard] Rewrite-loop guard engaged for paths: ${offenders.map(([p, n]) => `${p}×${n}`).join(', ')}`);
+  console.log(`[guard] Rewrite-loop guard engaged (threshold=${threshold}) for paths: ${offenders.map(([p, n]) => `${p}x${n}`).join(', ')}`);
   return [...messages, guardMsg];
 }
 
@@ -390,32 +394,34 @@ function maybeDisableWriteFile(messages, openAITools) {
     }
   }
 
-  // Threshold = 2 (matches the frontend soft-cap): as soon as the model
-  // has attempted to write the same path twice in this turn, strip the
-  // tool. The first write hit disk (real write via front-end soft-cap),
-  // the second write is the start of a rewrite spiral — we never want a
-  // third attempt to go out at all. If the model genuinely needs to
-  // amend the file, replace_in_file is still available.
+  // Hard brake — fires only when the model has truly cemented a spiral.
+  // Threshold was 2 (matched the old 1-write soft-cap), which punished
+  // legitimate first-write-was-truncated recovery. Raised to 5, which
+  // pairs cleanly with the frontend soft-cap of 3: the model gets 3
+  // real writes → then 2 rejection responses → only then does write_file
+  // actually disappear from the tool list. Genuine spirals (8-10
+  // rewrites) still get stopped; legit iteration does not.
+  const disableThreshold = (() => {
+    const n = parseInt(process.env.WRITE_FILE_DISABLE_THRESHOLD || '', 10);
+    return Number.isFinite(n) && n > 0 && n <= 15 ? n : 5;
+  })();
   const maxCount = writesPerPath.size === 0 ? 0 : Math.max(...writesPerPath.values());
-  if (maxCount < 2) return { tools: openAITools, messages };
+  if (maxCount < disableThreshold) return { tools: openAITools, messages };
 
   const strippedTools = openAITools.filter(t => t?.function?.name !== 'write_file');
   const loopPaths = Array.from(writesPerPath.entries())
-    .filter(([, n]) => n >= 2)
-    .map(([p, n]) => `${p} (${n} puta)`)
+    .filter(([, n]) => n >= disableThreshold)
+    .map(([p, n]) => `${p} (${n} times)`)
     .join(', ');
   const finishDirective = {
     role: 'system',
     content:
-      '🚫 write_file je ONEMOGUĆEN do kraja ovog agent turn-a.\n\n' +
-      `Razlog: u ovom turn-u si već pozvao write_file tri ili više puta za isti fajl (${loopPaths}). ` +
-      'Alat ti je privremeno sklonjen iz liste dostupnih alata da bi se presekla petlja.\n\n' +
-      'Šta sada MORAŠ:\n' +
-      '• Odgovori korisniku JEDNOM kratkom rečenicom šta je urađeno (npr. "Sajt je spreman: index.html i style.css su kreirani. Pogledaj preview i javi šta da doteram.") i STANI. Bez ijednog tool poziva.\n' +
-      '• Ne izvinjavaj se. Ne ponavljaj plan. Ne najavljuj šta bi trebalo. Samo završna rečenica.\n' +
-      '• Ako ti baš treba sitna izmena, koristi `replace_in_file` — ali samo ako je strogo neophodno; bolje završi i pusti korisnika da pita.',
+      `write_file has been temporarily removed from the available tools for the rest of this turn ` +
+      `because the same path(s) were rewritten many times: ${loopPaths}.\n\n` +
+      `If a small adjustment is still needed, use \`replace_in_file\` with a focused diff. ` +
+      `Otherwise, wrap up the turn with a short summary to the user.`,
   };
-  console.log(`[guard] write_file DISABLED for this turn (loop paths: ${loopPaths})`);
+  console.log(`[guard] write_file DISABLED (threshold=${disableThreshold}) for paths: ${loopPaths}`);
   return { tools: strippedTools, messages: [...messages, finishDirective] };
 }
 
