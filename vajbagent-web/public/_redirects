@@ -1,3 +1,21 @@
+# ─── Render-hosted legacy pages (proxied, not SPA-routed) ─────────────
+# The extension marketing page, the extension self-register flow and the
+# .vsix download all live in the Render backend (public/*.html). When a
+# visitor hits these paths on vajbagent.netlify.app the default SPA
+# fallback below would load the React app with "extenzija" as a route,
+# which React doesn't know — so the user ends up on the home screen
+# "Šta želiš da napraviš?" instead of the Cursor extension landing page.
+#
+# A 200 rewrite proxies the response from Render without changing the
+# browser URL, so Netlify visitors see the same content as vajbagent.com
+# and there's still a single source of truth.
+/extenzija              https://vajbagent.com/extenzija               200
+/extenzija/             https://vajbagent.com/extenzija               200
+/dashboard              https://vajbagent.com/dashboard               200
+/dashboard/*            https://vajbagent.com/dashboard/:splat        200
+/vajbagent-latest.vsix  https://vajbagent.com/vajbagent-latest.vsix   200
+/og-image.png           https://vajbagent.com/og-image.png            200
+
 # Preview paths must be handled by the in-browser Service Worker.
 # If the SW isn't active yet (first visit, not controlling, disabled, etc.),
 # serving /__vajb_preview/... via the SPA fallback would load our entire
