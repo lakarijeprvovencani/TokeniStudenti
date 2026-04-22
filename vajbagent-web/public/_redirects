@@ -15,6 +15,10 @@
 /dashboard/*            https://vajbagent.com/dashboard/:splat        200
 /vajbagent-latest.vsix  https://vajbagent.com/vajbagent-latest.vsix   200
 /og-image.png           https://vajbagent.com/og-image.png            200
+# Screenshots and other image assets referenced by extenzija.html
+# (e.g. /img/screenshots/ss-chat.png). Without this, the SPA fallback
+# returns index.html for every image request → broken placeholders.
+/img/*                  https://vajbagent.com/img/:splat              200
 
 # Preview paths must be handled by the in-browser Service Worker.
 # If the SW isn't active yet (first visit, not controlling, disabled, etc.),
