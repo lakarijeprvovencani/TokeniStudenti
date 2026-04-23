@@ -138,7 +138,19 @@ function getModelLimit(backendModel) {
 const MAX_TOOL_RESULT_CHARS = 10000;
 const MAX_SINGLE_MESSAGE_CHARS = 30000;
 const MAX_RECENT_MESSAGE_CHARS = 80000;
-const SYSTEM_BUDGET_CHARS = 8000;
+// Bumped 8000 → 80000 on 2026-04-16 after agent-auditor finding:
+// web systemPrompt.ts is ~62k chars and Cursor extension agent.ts prompt is
+// ~80k chars. Old 8k budget silently truncated ~87-90% of instructions
+// (tool playbooks, error recovery, "definition of done" signals, Cursor
+// workspace rules). This was the most likely root cause of the "5x dumber /
+// gets lost / doesn't know when it's done" regression reported on 22 Apr.
+// Anthropic models have 200k input token windows (~600-800k chars), so 80k
+// for the system prompt is still well within budget and leaves plenty of
+// room for conversation history. Configurable via env if we ever need it.
+const SYSTEM_BUDGET_CHARS = (() => {
+  const n = parseInt(process.env.SYSTEM_PROMPT_BUDGET_CHARS || '', 10);
+  return Number.isFinite(n) && n >= 8000 && n <= 200000 ? n : 80000;
+})();
 
 function contentLength(content) {
   if (typeof content === 'string') return content.length;
